@@ -1,4 +1,4 @@
-# salvo Design Specification
+# Salvo Design Specification
 
 > HTTP Performance Testing Tool with DAG Workflow Engine
 
