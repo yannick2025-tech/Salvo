@@ -1,3 +1,10 @@
+// Package config provides YAML-based configuration loading and validation
+// for the Salvo performance testing engine.
+//
+// A Config struct aggregates all subsystem configurations (server, database,
+// logging, pool, storage) and offers sensible defaults via the Default
+// function. Partial YAML files overlay the defaults, so only the fields
+// that differ need to be specified.
 package config
 
 import (
@@ -9,13 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// RunMode determines how the goroutine pool terminates a test run.
 type RunMode string
 
 const (
+	// RunModeDuration runs the test for a fixed wall-clock duration.
 	RunModeDuration RunMode = "duration"
-	RunModeCount    RunMode = "count"
+	// RunModeCount runs the test for a fixed number of iterations.
+	RunModeCount RunMode = "count"
 )
 
+// Config is the top-level configuration for the Salvo application.
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
@@ -24,38 +35,61 @@ type Config struct {
 	Storage  StorageConfig  `yaml:"storage"`
 }
 
+// ServerConfig holds the HTTP server listen address.
 type ServerConfig struct {
+	// Host is the bind address (e.g. "0.0.0.0").
 	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	// Port is the listen port number.
+	Port int `yaml:"port"`
 }
 
+// DatabaseConfig holds the relational database connection parameters.
 type DatabaseConfig struct {
-	Driver   string `yaml:"driver"`
-	DSN      string `yaml:"dsn"`
-	MaxOpen  int    `yaml:"max_open"`
-	MaxIdle  int    `yaml:"max_idle"`
+	// Driver is the SQL driver name (e.g. "sqlite3", "mysql", "postgres").
+	Driver string `yaml:"driver"`
+	// DSN is the data source name / connection string.
+	DSN string `yaml:"dsn"`
+	// MaxOpen is the maximum number of open database connections.
+	MaxOpen int `yaml:"max_open"`
+	// MaxIdle is the maximum number of idle database connections.
+	MaxIdle int `yaml:"max_idle"`
+	// LogLevel controls the ORM query log verbosity.
 	LogLevel string `yaml:"log_level"`
 }
 
+// LogConfig configures the structured logger.
 type LogConfig struct {
-	Level      logger.LogLevel  `yaml:"level"`
-	Format     logger.LogFormat `yaml:"format"`
-	Output     string           `yaml:"output"`
-	TimeFormat string           `yaml:"time_format"`
+	// Level is the minimum log severity to emit.
+	Level logger.LogLevel `yaml:"level"`
+	// Format selects between text and JSON output.
+	Format logger.LogFormat `yaml:"format"`
+	// Output is the log file path; empty means stdout.
+	Output string `yaml:"output"`
+	// TimeFormat is the Go time layout for log timestamps.
+	TimeFormat string `yaml:"time_format"`
 }
 
+// PoolConfig configures the goroutine pool that drives test execution.
 type PoolConfig struct {
-	WorkerCount int           `yaml:"worker_count"`
-	RunMode     RunMode       `yaml:"run_mode"`
-	Duration    time.Duration `yaml:"duration"`
-	Count       int64         `yaml:"count"`
+	// WorkerCount is the fixed number of goroutines in the pool.
+	WorkerCount int `yaml:"worker_count"`
+	// RunMode determines whether the run stops by duration or iteration count.
+	RunMode RunMode `yaml:"run_mode"`
+	// Duration is the total run time when RunMode is RunModeDuration.
+	Duration time.Duration `yaml:"duration"`
+	// Count is the total iteration count when RunMode is RunModeCount.
+	Count int64 `yaml:"count"`
 }
 
+// StorageConfig holds the object/file storage connection parameters.
 type StorageConfig struct {
+	// Driver is the storage backend identifier.
 	Driver string `yaml:"driver"`
-	DSN    string `yaml:"dsn"`
+	// DSN is the storage connection string.
+	DSN string `yaml:"dsn"`
 }
 
+// Default returns a Config populated with sensible defaults.
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -81,6 +115,9 @@ func Default() *Config {
 	}
 }
 
+// Load reads a YAML configuration file at path, overlays it onto the
+// defaults, and validates the result. Returns an error if the file
+// cannot be read, parsed, or validated.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -99,6 +136,8 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// Validate checks the Config for semantic errors and returns the first
+// error encountered.
 func (c *Config) Validate() error {
 	if c.Server.Port < 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
@@ -124,6 +163,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// ServerAddr returns the combined host:port listen address string.
 func (c *Config) ServerAddr() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
 }

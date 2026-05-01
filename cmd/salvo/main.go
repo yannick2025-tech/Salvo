@@ -1,3 +1,9 @@
+// Package main is the entry point for the Salvo performance testing engine.
+//
+// Usage:
+//
+//	salvo -config configs/salvo.yaml
+//	salvo -version
 package main
 
 import (
@@ -37,7 +43,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to initialize logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	log.Info("salvo starting",
 		logger.F("addr", cfg.ServerAddr()),

@@ -135,7 +135,7 @@ func TestLoggerWithContextNoTraceID(t *testing.T) {
 func TestLoggerWithContextNil(t *testing.T) {
 	l, buf := newTestLogger(t, FormatJSON)
 
-	child := l.WithContext(nil)
+	child := l.WithContext(context.TODO())
 	child.Info("nil context")
 
 	var entry map[string]any
