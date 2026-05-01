@@ -821,7 +821,58 @@ dag, pool, variable, lifecycle, timer, plugin, generator, protocol, api, store, 
 
 ---
 
-## 15. 代码规范
+## 15. 模拟 HTTP 服务器
+
+内置模拟 HTTP 服务器，用于本地端到端测试，位于 `test/mockserver/`。
+
+### 15.1 接口列表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/login | 返回令牌，模拟认证 |
+| POST | /api/users | 创建用户，返回用户 JSON |
+| GET | /api/users/:id | 按 ID 获取用户 |
+| GET | /api/users | 分页列出用户 |
+| PUT | /api/users/:id | 更新用户 |
+| DELETE | /api/users/:id | 删除用户 |
+| POST | /api/orders | 创建订单 |
+| GET | /api/orders | 列出订单 |
+| POST | /api/upload | 上传文件，返回文件信息 |
+| GET | /api/delay/:ms | 延迟响应（可配置延迟时间） |
+| GET | /api/status/:code | 返回指定 HTTP 状态码 |
+| POST | /api/echo | 回显请求体 |
+| GET | /api/headers | 回显请求头 |
+| POST | /api/encrypt | 接收加密请求体，返回加密响应 |
+| GET | /api/chunked | 分块传输编码响应 |
+| GET | /api/redirect/:count | 链式重定向 |
+| POST | /api/error | 随机服务端错误（500/502/503） |
+
+### 15.2 功能特性
+
+- 可配置响应延迟（模拟慢速接口）
+- 可配置错误率（模拟不稳定服务）
+- 请求日志（检查 Salvo 发出的请求内容）
+- 启用 CORS（方便网页界面测试）
+- 通过 `go test` 或独立二进制启动
+
+### 15.3 使用方式
+
+```go
+func TestE2ELoginFlow(t *testing.T) {
+    srv := mockserver.New(t, mockserver.Config{
+        Port:     18080,
+        Latency:  50 * time.Millisecond,
+        ErrorRate: 0.0,
+    })
+    defer srv.Close()
+    
+    // 测试目标: srv.URL() + "/api/login"
+}
+```
+
+---
+
+## 16. 代码规范
 
 - 所有代码注释使用英文
 - 文档同时提供中文和英文（独立文件）
@@ -831,7 +882,7 @@ dag, pool, variable, lifecycle, timer, plugin, generator, protocol, api, store, 
 
 ---
 
-## 16. 使用的技能
+## 17. 使用的技能
 
 | 技能 | 用途 |
 |------|------|

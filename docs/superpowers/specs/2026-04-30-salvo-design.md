@@ -821,7 +821,58 @@ Each key module must pass all tests before committing:
 
 ---
 
-## 15. Code Standards
+## 15. Mock HTTP Server
+
+A built-in mock HTTP server for local end-to-end testing, located in `test/mockserver/`.
+
+### 15.1 Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/login | Return token, simulate auth |
+| POST | /api/users | Create user, return user JSON |
+| GET | /api/users/:id | Get user by ID |
+| GET | /api/users | List users with pagination |
+| PUT | /api/users/:id | Update user |
+| DELETE | /api/users/:id | Delete user |
+| POST | /api/orders | Create order |
+| GET | /api/orders | List orders |
+| POST | /api/upload | Upload file, return file info |
+| GET | /api/delay/:ms | Delayed response (configurable latency) |
+| GET | /api/status/:code | Return specified HTTP status code |
+| POST | /api/echo | Echo back request body |
+| GET | /api/headers | Echo back request headers |
+| POST | /api/encrypt | Accept encrypted body, return encrypted response |
+| GET | /api/chunked | Chunked transfer encoding response |
+| GET | /api/redirect/:count | Chain redirects |
+| POST | /api/error | Random server errors (500/502/503) |
+
+### 15.2 Features
+
+- Configurable response latency (simulate slow APIs)
+- Configurable error rate (simulate unstable services)
+- Request logging (inspect what Salvo sends)
+- CORS enabled (for Web UI testing)
+- Startup via `go test` or standalone binary
+
+### 15.3 Usage
+
+```go
+func TestE2ELoginFlow(t *testing.T) {
+    srv := mockserver.New(t, mockserver.Config{
+        Port:     18080,
+        Latency:  50 * time.Millisecond,
+        ErrorRate: 0.0,
+    })
+    defer srv.Close()
+    
+    // test against srv.URL() + "/api/login"
+}
+```
+
+---
+
+## 16. Code Standards
 
 - All code comments in English
 - Documentation in both Chinese and English (separate files)
@@ -831,7 +882,7 @@ Each key module must pass all tests before committing:
 
 ---
 
-## 16. Skills to Use
+## 17. Skills to Use
 
 | Skill | Purpose |
 |-------|---------|
