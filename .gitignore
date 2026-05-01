@@ -1,0 +1,16 @@
+.superpowers/
+.trae/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+vendor/
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
