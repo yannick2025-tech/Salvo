@@ -7,22 +7,27 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/yannick2025-tech/Salvo/internal/api"
 	"github.com/yannick2025-tech/Salvo/internal/config"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/store/migration"
+	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 )
 
 func main() {
 	configPath := flag.String("config", "configs/salvo.yaml", "path to configuration file")
-	version := flag.Bool("version", false, "print version and exit")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
-	if *version {
+	if *showVersion {
 		fmt.Println("Salvo v0.1.0")
 		os.Exit(0)
 	}
@@ -45,7 +50,29 @@ func main() {
 	}
 	defer func() { _ = log.Sync() }()
 
-	log.Info("salvo starting",
+	db, err := sqlite.Open(cfg.Database.DSN, 1)
+	if err != nil {
+		log.Fatal("failed to open database", logger.F("dsn", cfg.Database.DSN), logger.F("error", err))
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := migration.Migrate(db.DB); err != nil {
+		log.Fatal("failed to run migrations", logger.F("error", err))
+	}
+
+	srv := api.New(api.Config{
+		Addr:   cfg.ServerAddr(),
+		DB:     db,
+		Logger: log,
+	})
+
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Fatal("api server error", logger.F("error", err))
+		}
+	}()
+
+	log.Info("salvo started",
 		logger.F("addr", cfg.ServerAddr()),
 		logger.F("pool_workers", cfg.Pool.WorkerCount),
 		logger.F("run_mode", string(cfg.Pool.RunMode)),
@@ -56,5 +83,13 @@ func main() {
 
 	sig := <-sigCh
 	log.Info("received shutdown signal", logger.F("signal", sig.String()))
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error("server shutdown error", logger.F("error", err))
+	}
+
 	log.Info("salvo stopped")
 }
