@@ -3,13 +3,15 @@
 // a LimiterPlugin adapter that wraps any Limiter into a plugin.Plugin.
 //
 // Supported algorithms:
-//   - TokenBucket: steady rate with burst allowance (Go token-bucket)
-//   - LeakyBucket: constant output rate, smooths burst traffic
+//   - TokenBucket: steady rate with burst allowance
+//   - LeakyBucket: reservation-based with max slack (inspired by
+//     go.uber.org/ratelimit), supports both blocking and non-blocking
 //   - SlidingWindow: weighted counter over a sliding time window
 //   - FixedWindow: simple counter reset at fixed intervals
 package ratelimiter
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -21,17 +23,27 @@ import (
 // plugin system.
 type Limiter interface {
 	// Allow returns true if the request is permitted, false if the
-	// rate limit has been exceeded.
+	// rate limit has been exceeded. This is the non-blocking mode.
 	Allow() bool
 	// Name returns the algorithm identifier (e.g. "token-bucket").
 	Name() string
 }
 
+// BlockingLimiter is an optional interface that limiters may implement
+// to support blocking mode. In blocking mode, the caller waits until
+// the rate limiter permits the request.
+type BlockingLimiter interface {
+	Limiter
+	// Wait blocks until the request is permitted or the context is
+	// cancelled. Returns the time at which the request was allowed.
+	Wait(ctx context.Context) (time.Time, error)
+}
+
 // LimiterPlugin adapts a Limiter into a plugin.Plugin so it can be
 // registered with the plugin.Registry.
 type LimiterPlugin struct {
-	limiter   Limiter
-	priority  int
+	limiter    Limiter
+	priority   int
 	pluginName string
 }
 

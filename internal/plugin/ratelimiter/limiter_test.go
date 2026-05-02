@@ -57,7 +57,7 @@ func TestLimiterPluginAfterNoop(t *testing.T) {
 }
 
 func TestLimiterPluginAlgorithmName(t *testing.T) {
-	lp := NewLimiterPlugin(NewLeakyBucket(10, 5))
+	lp := NewLimiterPlugin(NewLeakyBucket(10))
 	assert.Equal(t, "leaky-bucket", lp.AlgorithmName())
 }
 
@@ -83,7 +83,7 @@ func TestLimiterPluginInterface(t *testing.T) {
 
 func TestLimiterInterface(t *testing.T) {
 	var _ Limiter = NewTokenBucket(10, 5)
-	var _ Limiter = NewLeakyBucket(10, 5)
+	var _ Limiter = NewLeakyBucket(10)
 	var _ Limiter = NewSlidingWindow(10, time.Second)
 	var _ Limiter = NewFixedWindow(10, time.Second)
 }
