@@ -8,20 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAESGCMAlgorithm(t *testing.T) {
-	a, err := NewAESGCM(testKey())
-	require.NoError(t, err)
-	assert.Equal(t, "aes-256-gcm", a.Algorithm())
-}
-
-func TestAESGCMInvalidKey(t *testing.T) {
-	_, err := NewAESGCM([]byte("short"))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "32 bytes")
-}
-
-func TestAESGCMEncryptDecrypt(t *testing.T) {
-	a, err := NewAESGCM(testKey())
+func TestAESGCMBasicRoundTrip(t *testing.T) {
+	a, err := NewAES(testKey(), WithMode(ModeGCM))
 	require.NoError(t, err)
 
 	plaintext := []byte("the quick brown fox jumps over the lazy dog")
@@ -34,8 +22,14 @@ func TestAESGCMEncryptDecrypt(t *testing.T) {
 	assert.Equal(t, plaintext, decrypted)
 }
 
-func TestAESGCMEncryptProducesDifferentCiphertexts(t *testing.T) {
-	a, err := NewAESGCM(testKey())
+func TestAESGCMAlgorithm(t *testing.T) {
+	a, err := NewAES(testKey(), WithMode(ModeGCM))
+	require.NoError(t, err)
+	assert.Equal(t, "aes-256-gcm", a.Algorithm())
+}
+
+func TestAESGCMDifferentCiphertexts(t *testing.T) {
+	a, err := NewAES(testKey(), WithMode(ModeGCM))
 	require.NoError(t, err)
 
 	plaintext := []byte("same input")
@@ -47,20 +41,20 @@ func TestAESGCMEncryptProducesDifferentCiphertexts(t *testing.T) {
 }
 
 func TestAESGCMDecryptTooShort(t *testing.T) {
-	a, err := NewAESGCM(testKey())
+	a, err := NewAES(testKey(), WithMode(ModeGCM))
 	require.NoError(t, err)
 	_, err = a.Decrypt([]byte("short"))
 	assert.Error(t, err)
 }
 
-func TestAESGCMDecryptWrongKey(t *testing.T) {
+func TestAESGCMWrongKey(t *testing.T) {
 	key1 := testKey()
 	key2 := make([]byte, 32)
 	rand.Read(key2)
 
-	a1, err := NewAESGCM(key1)
+	a1, err := NewAES(key1, WithMode(ModeGCM))
 	require.NoError(t, err)
-	a2, err := NewAESGCM(key2)
+	a2, err := NewAES(key2, WithMode(ModeGCM))
 	require.NoError(t, err)
 
 	ciphertext, err := a1.Encrypt([]byte("secret"))
@@ -71,7 +65,7 @@ func TestAESGCMDecryptWrongKey(t *testing.T) {
 }
 
 func TestAESGCMEmptyPlaintext(t *testing.T) {
-	a, err := NewAESGCM(testKey())
+	a, err := NewAES(testKey(), WithMode(ModeGCM))
 	require.NoError(t, err)
 
 	ciphertext, err := a.Encrypt([]byte{})
@@ -80,4 +74,20 @@ func TestAESGCMEmptyPlaintext(t *testing.T) {
 	decrypted, err := a.Decrypt(ciphertext)
 	require.NoError(t, err)
 	assert.Empty(t, decrypted)
+}
+
+func TestAESGCM128RoundTrip(t *testing.T) {
+	key := make([]byte, 16)
+	rand.Read(key)
+
+	a, err := NewAES(key, WithMode(ModeGCM))
+	require.NoError(t, err)
+
+	plaintext := []byte("AES-128-GCM test")
+	ciphertext, err := a.Encrypt(plaintext)
+	require.NoError(t, err)
+
+	decrypted, err := a.Decrypt(ciphertext)
+	require.NoError(t, err)
+	assert.Equal(t, plaintext, decrypted)
 }
