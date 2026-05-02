@@ -13,7 +13,10 @@ database:
 log:
   level: "info"
   format: "json"
-  output: ""
+  output: "logs/salvo.log"
+  max_size: 100
+  max_backups: 5
+  max_age: 30
   time_format: "2006-01-02T15:04:05.000Z07:00"
 
 pool:
@@ -23,3 +26,7 @@ pool:
 
 auth:
   jwt_secret: "salvo-jwt-secret-change-in-production"
+
+mock:
+  enabled: true
+  port: 9090

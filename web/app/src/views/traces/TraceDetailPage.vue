@@ -43,7 +43,7 @@ const route = useRoute()
 const trace = ref<TraceDTO | null>(null)
 
 async function fetchTrace() {
-  const id = route.params.id as string
+  const id = Number(route.params.id)
   if (!id) return
   try {
     const resp = await getTrace(id)

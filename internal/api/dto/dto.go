@@ -396,6 +396,11 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+type ResetPasswordRequest struct {
+	UserID      snowflake.ID `json:"user_id"`
+	NewPassword string       `json:"new_password"`
+}
+
 type UserDTO struct {
 	ID         snowflake.ID `json:"id"`
 	Email      string       `json:"email"`

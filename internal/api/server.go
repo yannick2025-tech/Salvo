@@ -121,6 +121,7 @@ var routePermissions = map[string]string{
 	"/api/v1/scenes/nodes/add":     "scene:write",
 	"/api/v1/scenes/nodes/update":  "scene:write",
 	"/api/v1/scenes/nodes/delete":  "scene:write",
+	"/api/v1/scenes/edges/list":    "scene:read",
 	"/api/v1/scenes/edges/add":     "scene:write",
 	"/api/v1/scenes/edges/delete":  "scene:write",
 	"/api/v1/scenes/variables/list": "scene:read",
@@ -139,6 +140,7 @@ var routePermissions = map[string]string{
 	"/api/v1/traces/get-by-run":    "trace:read",
 	"/api/v1/auth/me":              "",
 	"/api/v1/auth/logout":          "",
+	"/api/v1/auth/reset-password":  "user:write",
 	"/api/v1/users/list":           "user:read",
 	"/api/v1/users/create":         "user:write",
 	"/api/v1/users/update":         "user:write",
@@ -154,6 +156,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/me", s.handleAuth(s.handler.Me))
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleAuth(s.handler.Logout))
 	mux.HandleFunc("POST /api/v1/auth/change-password", s.handleAuth(s.handler.ChangePassword))
+	mux.HandleFunc("POST /api/v1/auth/reset-password", s.handleAuth(s.handler.ResetPassword))
 
 	mux.HandleFunc("POST /api/v1/dashboard/overview", s.handleAuth(s.handler.DashboardOverview))
 
@@ -169,6 +172,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/scenes/nodes/delete", s.handleAuth(s.handler.DeleteNode))
 
 	mux.HandleFunc("POST /api/v1/scenes/edges/add", s.handleAuth(s.handler.AddEdge))
+	mux.HandleFunc("POST /api/v1/scenes/edges/list", s.handleAuth(s.handler.ListEdges))
 	mux.HandleFunc("POST /api/v1/scenes/edges/delete", s.handleAuth(s.handler.DeleteEdge))
 
 	mux.HandleFunc("POST /api/v1/scenes/variables/list", s.handleAuth(s.handler.ListVariables))

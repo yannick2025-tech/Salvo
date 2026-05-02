@@ -18,4 +18,5 @@ bin/
 *.db
 *.db-shm
 *.db-wal
+logs/
 salvo

@@ -29,6 +29,7 @@
             <td>{{ formatTime(u.last_login_at) }}</td>
             <td class="actions">
               <button class="btn-sm" @click="editUser(u)">编辑</button>
+              <button class="btn-sm warn" @click="resetUserPassword(u)">重置密码</button>
               <button v-if="u.role_name !== 'admin'" class="btn-sm danger" @click="handleDelete(u.id)">删除</button>
             </td>
           </tr>
@@ -54,6 +55,7 @@
         <div class="form-group">
           <label>角色</label>
           <select v-model="createForm.role_id">
+            <option :value="0">请选择角色</option>
             <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
         </div>
@@ -64,9 +66,29 @@
             <option value="disabled">禁用</option>
           </select>
         </div>
+        <div v-if="formError" class="form-error">{{ formError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeModal">取消</button>
           <button class="btn-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showResetPwd" class="modal-overlay" @click.self="showResetPwd = false">
+      <div class="modal">
+        <h3>重置密码 - {{ resetTargetUser?.email }}</h3>
+        <div class="form-group">
+          <label>新密码</label>
+          <input v-model="newPassword" type="password" placeholder="输入新密码" />
+        </div>
+        <div class="form-group">
+          <label>确认密码</label>
+          <input v-model="confirmPassword" type="password" placeholder="再次输入新密码" />
+        </div>
+        <div v-if="formError" class="form-error">{{ formError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showResetPwd = false">取消</button>
+          <button class="btn-primary" @click="handleResetPassword">确认重置</button>
         </div>
       </div>
     </div>
@@ -75,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { listUsers, createUser, updateUser, deleteUser } from '@/api/user'
+import { listUsers, createUser, updateUser, deleteUser, resetPassword } from '@/api/user'
 import { listRoles } from '@/api/user'
 import type { UserDTO, RoleDTO } from '@/types'
 
@@ -83,7 +105,12 @@ const users = ref<UserDTO[]>([])
 const roles = ref<RoleDTO[]>([])
 const showCreate = ref(false)
 const editingUser = ref<UserDTO | null>(null)
-const createForm = reactive({ email: '', password: '', nickname: '', role_id: '', status: 'active' })
+const createForm = reactive({ email: '', password: '', nickname: '', role_id: 0, status: 'active' })
+const formError = ref('')
+const showResetPwd = ref(false)
+const resetTargetUser = ref<UserDTO | null>(null)
+const newPassword = ref('')
+const confirmPassword = ref('')
 
 async function fetchUsers() {
   try {
@@ -114,31 +141,83 @@ function closeModal() {
   createForm.email = ''
   createForm.password = ''
   createForm.nickname = ''
-  createForm.role_id = ''
+  createForm.role_id = 0
   createForm.status = 'active'
+  formError.value = ''
 }
 
 async function handleSave() {
-  if (editingUser.value) {
-    await updateUser({
-      id: editingUser.value.id,
-      nickname: createForm.nickname,
-      role_id: createForm.role_id,
-      status: createForm.status,
-    })
-  } else {
-    await createUser({
-      email: createForm.email,
-      password: createForm.password,
-      nickname: createForm.nickname,
-      role_id: createForm.role_id,
-    })
+  formError.value = ''
+  if (!createForm.email || (!editingUser.value && !createForm.password)) {
+    formError.value = '邮箱和密码为必填项'
+    return
   }
-  closeModal()
-  fetchUsers()
+  if (!createForm.role_id || createForm.role_id === 0) {
+    formError.value = '请选择角色'
+    return
+  }
+  try {
+    if (editingUser.value) {
+      const resp = await updateUser({
+        id: editingUser.value.id,
+        nickname: createForm.nickname,
+        role_id: createForm.role_id,
+        status: createForm.status,
+      })
+      if (resp.code !== 0) {
+        formError.value = resp.message || '更新失败'
+        return
+      }
+    } else {
+      const resp = await createUser({
+        email: createForm.email,
+        password: createForm.password,
+        nickname: createForm.nickname,
+        role_id: createForm.role_id,
+      })
+      if (resp.code !== 0) {
+        formError.value = resp.message || '创建失败'
+        return
+      }
+    }
+    closeModal()
+    fetchUsers()
+  } catch (e: any) {
+    formError.value = e.message || '操作失败'
+  }
 }
 
-async function handleDelete(id: string) {
+function resetUserPassword(u: UserDTO) {
+  resetTargetUser.value = u
+  newPassword.value = ''
+  confirmPassword.value = ''
+  formError.value = ''
+  showResetPwd.value = true
+}
+
+async function handleResetPassword() {
+  formError.value = ''
+  if (!newPassword.value || newPassword.value.length < 6) {
+    formError.value = '密码长度至少6位'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    formError.value = '两次输入的密码不一致'
+    return
+  }
+  try {
+    const resp = await resetPassword(resetTargetUser.value!.id, newPassword.value)
+    if (resp.code === 0) {
+      showResetPwd.value = false
+    } else {
+      formError.value = resp.message || '重置失败'
+    }
+  } catch (e: any) {
+    formError.value = e.message || '重置失败'
+  }
+}
+
+async function handleDelete(id: number) {
   await deleteUser(id)
   fetchUsers()
 }
@@ -162,6 +241,8 @@ onMounted(() => {
 .btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
 .btn-sm.danger { color: var(--accent-danger); border-color: var(--accent-danger); }
+.btn-sm.warn { color: #f0ad4e; border-color: #f0ad4e; }
+.form-error { font-size: 12px; color: var(--accent-danger, #e74c3c); background: rgba(248,81,73,0.1); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 8px; }
 
 .table-wrapper { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: auto; }
 .data-table { width: 100%; border-collapse: collapse; }

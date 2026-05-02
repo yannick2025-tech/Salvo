@@ -10,7 +10,7 @@
         <div class="form-group">
           <label>场景</label>
           <select v-model="form.scene_id">
-            <option value="">选择场景</option>
+            <option :value="0">选择场景</option>
             <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
         </div>
@@ -35,9 +35,12 @@
           <label>总请求数</label>
           <input v-model.number="form.count" type="number" min="1" />
         </div>
-        <button class="btn-primary" @click="handleStart" :disabled="!form.scene_id || starting">
+        <button class="btn-primary" @click="handleStart" :disabled="!form.scene_id || starting || selectedSceneHasNoDAG">
           {{ starting ? '启动中...' : '启动' }}
         </button>
+        <div v-if="form.scene_id && selectedSceneHasNoDAG" class="no-dag-warning">
+          ⚠ 该场景没有配置 DAG 请求流，请先编辑场景添加节点
+        </div>
       </div>
 
       <div class="card status-card">
@@ -94,17 +97,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
+import { listNodes } from '@/api/node'
 import type { SceneDTO, RunRecordDTO } from '@/types'
 
 const scenes = ref<SceneDTO[]>([])
 const runs = ref<RunRecordDTO[]>([])
 const activeRuns = ref<RunRecordDTO[]>([])
 const starting = ref(false)
+const selectedSceneHasNoDAG = ref(false)
 
 const form = reactive({
-  scene_id: '',
+  scene_id: 0,
   workers: 10,
   duration: 60,
   run_mode: 'duration',
@@ -112,6 +117,19 @@ const form = reactive({
 })
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+watch(() => form.scene_id, async (newId) => {
+  if (!newId) {
+    selectedSceneHasNoDAG.value = false
+    return
+  }
+  try {
+    const resp = await listNodes(newId)
+    if (resp.code === 0) {
+      selectedSceneHasNoDAG.value = !resp.data.items || resp.data.items.length === 0
+    }
+  } catch { selectedSceneHasNoDAG.value = false }
+})
 
 async function fetchScenes() {
   try {
@@ -146,7 +164,7 @@ async function handleStart() {
   starting.value = false
 }
 
-async function handleStop(sceneId: string) {
+async function handleStop(sceneId: number) {
   try {
     await stopScene(sceneId)
     fetchRuns()
@@ -196,6 +214,7 @@ onUnmounted(() => {
 
 .btn-primary { padding: 8px 20px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; margin-top: 8px; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.no-dag-warning { margin-top: 8px; font-size: 12px; color: #f0ad4e; background: rgba(240,173,78,0.1); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(240,173,78,0.3); }
 .btn-stop { padding: 4px 12px; border: 1px solid var(--accent-danger); border-radius: var(--radius-sm); background: transparent; color: var(--accent-danger); font-size: 12px; cursor: pointer; margin-top: 8px; }
 
 .empty { text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 24px 0; }

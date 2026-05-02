@@ -13,6 +13,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/auth"
 	"github.com/yannick2025-tech/Salvo/internal/config"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/mock"
 	"github.com/yannick2025-tech/Salvo/internal/store/migration"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 )
@@ -37,6 +38,9 @@ func main() {
 		Level:      cfg.Log.Level,
 		Format:     cfg.Log.Format,
 		Output:     cfg.Log.Output,
+		MaxSize:    cfg.Log.MaxSize,
+		MaxBackups: cfg.Log.MaxBackups,
+		MaxAge:     cfg.Log.MaxAge,
 		TimeFormat: cfg.Log.TimeFormat,
 	})
 	if err != nil {
@@ -85,6 +89,16 @@ func main() {
 		}
 	}()
 
+	var mockSrv *mock.MockServer
+	if cfg.Mock.Enabled {
+		mockSrv = mock.NewMockServer(cfg.Mock.Port)
+		if err := mockSrv.Start(); err != nil {
+			log.Error("mock server start error", logger.F("error", err))
+		} else {
+			log.Info("mock HTTP server started", logger.F("port", cfg.Mock.Port))
+		}
+	}
+
 	log.Info("salvo started",
 		logger.F("addr", cfg.ServerAddr()),
 		logger.F("pool_workers", cfg.Pool.WorkerCount),
@@ -102,6 +116,11 @@ func main() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error("server shutdown error", logger.F("error", err))
+	}
+
+	if mockSrv != nil {
+		_ = mockSrv.Stop()
+		log.Info("mock server stopped")
 	}
 
 	log.Info("salvo stopped")

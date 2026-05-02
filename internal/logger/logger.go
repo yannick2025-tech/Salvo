@@ -10,6 +10,8 @@ import (
 	"context"
 	"io"
 	"os"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // LogLevel represents the severity level of a log entry.
@@ -40,14 +42,13 @@ const (
 
 // Config holds the configuration for constructing a Logger.
 type Config struct {
-	// Level is the minimum severity that will be emitted.
-	Level LogLevel `yaml:"level"`
-	// Format selects between text and JSON encoding.
-	Format LogFormat `yaml:"format"`
-	// Output is the file path to write logs to. Empty means stdout.
-	Output string `yaml:"output"`
-	// TimeFormat is the Go time layout used for timestamp formatting.
-	TimeFormat string `yaml:"time_format"`
+	Level      LogLevel `yaml:"level"`
+	Format     LogFormat `yaml:"format"`
+	Output     string    `yaml:"output"`
+	MaxSize    int       `yaml:"max_size"`
+	MaxBackups int       `yaml:"max_backups"`
+	MaxAge     int       `yaml:"max_age"`
+	TimeFormat string    `yaml:"time_format"`
 }
 
 // Field is a key-value pair attached to a log entry.
@@ -83,14 +84,34 @@ type Logger interface {
 // New creates a Logger from the supplied Config.
 // If Config fields are empty, sensible defaults are applied.
 func New(cfg Config) (Logger, error) {
-	var w io.Writer = os.Stdout
+	var writers []io.Writer
+
 	if cfg.Output != "" {
-		f, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return nil, err
+		maxSize := cfg.MaxSize
+		if maxSize <= 0 {
+			maxSize = 100
 		}
-		w = f
+		maxBackups := cfg.MaxBackups
+		if maxBackups <= 0 {
+			maxBackups = 5
+		}
+		maxAge := cfg.MaxAge
+		if maxAge <= 0 {
+			maxAge = 30
+		}
+		lj := &lumberjack.Logger{
+			Filename:   cfg.Output,
+			MaxSize:    maxSize,
+			MaxBackups: maxBackups,
+			MaxAge:     maxAge,
+		}
+		writers = append(writers, lj)
+		writers = append(writers, os.Stdout)
+	} else {
+		writers = append(writers, os.Stdout)
 	}
+
+	w := io.MultiWriter(writers...)
 
 	if cfg.Level == "" {
 		cfg.Level = InfoLevel

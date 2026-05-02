@@ -87,7 +87,7 @@ async function handleCreate() {
   }
 }
 
-async function handleDelete(id: string) {
+async function handleDelete(id: number) {
   await deleteScene(id)
   fetchScenes()
 }

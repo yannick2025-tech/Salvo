@@ -25,7 +25,7 @@ const route = useRoute()
 const report = ref<ReportDTO | null>(null)
 
 async function fetchReport() {
-  const id = route.params.id as string
+  const id = Number(route.params.id)
   if (!id) return
   try {
     const resp = await getReport(id)

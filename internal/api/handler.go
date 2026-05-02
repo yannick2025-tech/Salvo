@@ -320,6 +320,44 @@ func (h *Handler) AddEdge(r *http.Request) dto.Response {
 	return dto.OK(toEdgeDTO(edge))
 }
 
+func (h *Handler) ListEdges(r *http.Request) dto.Response {
+	req, err := decode[dto.ListEdgesRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+
+	edges, err := h.edges.List(r.Context(), repo.Filter{
+		SceneID: req.SceneID,
+		Offset:  req.Offset,
+		Limit:   limit,
+	})
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
+	}
+
+	items := make([]dto.EdgeDTO, 0, len(edges))
+	for _, e := range edges {
+		items = append(items, toEdgeDTO(e))
+	}
+
+	return dto.OK(dto.ListResponse[[]dto.EdgeDTO]{
+		Items: items,
+		Pagination: dto.Pagination{
+			Offset: req.Offset,
+			Limit:  limit,
+			Total:  len(items),
+		},
+	})
+}
+
 func (h *Handler) DeleteEdge(r *http.Request) dto.Response {
 	req, err := decode[dto.DeleteEdgeRequest](r)
 	if err != nil {

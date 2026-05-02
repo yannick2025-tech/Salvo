@@ -34,6 +34,7 @@ type Config struct {
 	Pool     PoolConfig     `yaml:"pool"`
 	Storage  StorageConfig  `yaml:"storage"`
 	Auth     AuthConfig     `yaml:"auth"`
+	Mock     MockConfig     `yaml:"mock"`
 }
 
 // ServerConfig holds the HTTP server listen address.
@@ -59,14 +60,13 @@ type DatabaseConfig struct {
 
 // LogConfig configures the structured logger.
 type LogConfig struct {
-	// Level is the minimum log severity to emit.
-	Level logger.LogLevel `yaml:"level"`
-	// Format selects between text and JSON output.
-	Format logger.LogFormat `yaml:"format"`
-	// Output is the log file path; empty means stdout.
-	Output string `yaml:"output"`
-	// TimeFormat is the Go time layout for log timestamps.
-	TimeFormat string `yaml:"time_format"`
+	Level      logger.LogLevel `yaml:"level"`
+	Format     logger.LogFormat `yaml:"format"`
+	Output     string          `yaml:"output"`
+	MaxSize    int             `yaml:"max_size"`
+	MaxBackups int             `yaml:"max_backups"`
+	MaxAge     int             `yaml:"max_age"`
+	TimeFormat string          `yaml:"time_format"`
 }
 
 // PoolConfig configures the goroutine pool that drives test execution.
@@ -91,8 +91,12 @@ type StorageConfig struct {
 
 // AuthConfig holds the authentication configuration.
 type AuthConfig struct {
-	// JWTSecret is the secret key used for signing JWT tokens.
 	JWTSecret string `yaml:"jwt_secret"`
+}
+
+type MockConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Port    int  `yaml:"port"`
 }
 
 // Default returns a Config populated with sensible defaults.
@@ -120,6 +124,10 @@ func Default() *Config {
 		},
 		Auth: AuthConfig{
 			JWTSecret: "salvo-default-jwt-secret-change-me",
+		},
+		Mock: MockConfig{
+			Enabled: false,
+			Port:    9090,
 		},
 	}
 }

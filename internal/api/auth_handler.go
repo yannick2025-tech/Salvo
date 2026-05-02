@@ -129,6 +129,36 @@ func (h *Handler) ChangePassword(r *http.Request) dto.Response {
 	return dto.OK(nil)
 }
 
+func (h *Handler) ResetPassword(r *http.Request) dto.Response {
+	req, err := decode[dto.ResetPasswordRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.UserID == 0 || req.NewPassword == "" {
+		return dto.ErrorResp(400, "user_id and new_password are required")
+	}
+
+	user, err := h.users.GetByID(r.Context(), req.UserID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "user not found")
+	}
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get user: %v", err))
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return dto.ErrorResp(500, "failed to hash password")
+	}
+
+	user.PasswordHash = string(hash)
+	if err := h.users.Update(r.Context(), user); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("update user: %v", err))
+	}
+
+	return dto.OK(nil)
+}
+
 func (h *Handler) ListUsers(r *http.Request) dto.Response {
 	req, err := decode[dto.ListUsersRequest](r)
 	if err != nil {
