@@ -149,3 +149,37 @@ const (
 	RunStatusFailed    = "failed"
 	RunStatusCancelled = "cancelled"
 )
+
+type User struct {
+	Model
+	Email        string     `json:"email"`
+	PasswordHash string     `json:"-"`
+	Nickname     string     `json:"nickname"`
+	RoleID       snowflake.ID `json:"role_id,string"`
+	Status       string     `json:"status"`
+	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+}
+
+const (
+	UserStatusActive   = "active"
+	UserStatusDisabled = "disabled"
+)
+
+type Role struct {
+	Model
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	IsBuiltin   bool   `json:"is_builtin"`
+}
+
+type Permission struct {
+	Model
+	Resource    string `json:"resource"`
+	Action      string `json:"action"`
+	Description string `json:"description,omitempty"`
+}
+
+type RolePermission struct {
+	RoleID       snowflake.ID `json:"role_id,string"`
+	PermissionID snowflake.ID `json:"permission_id,string"`
+}

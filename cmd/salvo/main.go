@@ -1,9 +1,3 @@
-// Package main is the entry point for the Salvo performance testing engine.
-//
-// Usage:
-//
-//	salvo -config configs/salvo.yaml
-//	salvo -version
 package main
 
 import (
@@ -16,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api"
+	"github.com/yannick2025-tech/Salvo/internal/auth"
 	"github.com/yannick2025-tech/Salvo/internal/config"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/migration"
@@ -60,10 +55,27 @@ func main() {
 		log.Fatal("failed to run migrations", logger.F("error", err))
 	}
 
+	jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, 24*time.Hour)
+
+	users := sqlite.NewUserRepo(db)
+	roles := sqlite.NewRoleRepo(db)
+	perms := sqlite.NewPermissionRepo(db)
+	rp := sqlite.NewRolePermissionRepo(db)
+
+	rbacChecker := auth.NewRBACChecker(perms, rp)
+
+	seedCfg := auth.DefaultSeedConfig()
+	seed := auth.NewSeeders(users, roles, perms, rp, seedCfg)
+	if err := seed.Seed(context.Background()); err != nil {
+		log.Fatal("failed to seed data", logger.F("error", err))
+	}
+
 	srv := api.New(api.Config{
 		Addr:   cfg.ServerAddr(),
 		DB:     db,
 		Logger: log,
+		JWT:    jwtManager,
+		RBAC:   rbacChecker,
 	})
 
 	go func() {

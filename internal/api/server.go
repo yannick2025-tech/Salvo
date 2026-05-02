@@ -1,6 +1,3 @@
-// Package api provides the REST API server for Salvo. All endpoints use
-// POST method; query parameters are passed via the JSON request body.
-// The server uses Go 1.22+ enhanced ServeMux for route matching.
 package api
 
 import (
@@ -8,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/auth"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
@@ -19,25 +18,23 @@ import (
 	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
 )
 
-// Server is the REST API server for Salvo.
 type Server struct {
 	httpServer *http.Server
 	db         *sqlite.DB
 	logger     logger.Logger
 	handler    *Handler
+	jwt        *auth.JWTManager
+	rbac       *auth.RBACChecker
 }
 
-// Config holds the API server configuration.
 type Config struct {
-	// Addr is the listen address (e.g. ":8080").
-	Addr string
-	// DB is the SQLite database wrapper.
-	DB *sqlite.DB
-	// Logger is the structured logger.
+	Addr   string
+	DB     *sqlite.DB
 	Logger logger.Logger
+	JWT    *auth.JWTManager
+	RBAC   *auth.RBACChecker
 }
 
-// New creates a new API server with the given configuration.
 func New(cfg Config) *Server {
 	h := &Handler{
 		scenes:    sqlite.NewSceneRepo(cfg.DB),
@@ -47,6 +44,12 @@ func New(cfg Config) *Server {
 		plugins:   sqlite.NewPluginConfigRepo(cfg.DB),
 		reports:   sqlite.NewReportRepo(cfg.DB),
 		runs:      sqlite.NewRunRecordRepo(cfg.DB),
+		users:     sqlite.NewUserRepo(cfg.DB),
+		roles:     sqlite.NewRoleRepo(cfg.DB),
+		perms:     sqlite.NewPermissionRepo(cfg.DB),
+		rp:        sqlite.NewRolePermissionRepo(cfg.DB),
+		jwt:       cfg.JWT,
+		rbac:      cfg.RBAC,
 	}
 
 	tracer, err := tracelib.NewTracer(tracelib.Config{BufferSize: 1000})
@@ -61,6 +64,8 @@ func New(cfg Config) *Server {
 		db:      cfg.DB,
 		logger:  cfg.Logger,
 		handler: h,
+		jwt:     cfg.JWT,
+		rbac:    cfg.RBAC,
 	}
 
 	mux := http.NewServeMux()
@@ -82,7 +87,6 @@ func New(cfg Config) *Server {
 	return s
 }
 
-// Start starts the API server in a blocking manner.
 func (s *Server) Start() error {
 	s.logger.Info("api server starting", logger.F("addr", s.httpServer.Addr))
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -91,54 +95,163 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Shutdown gracefully shuts down the API server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("api server shutting down")
 	return s.httpServer.Shutdown(ctx)
 }
 
-func (s *Server) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/scenes/list", s.handle(s.handler.ListScenes))
-	mux.HandleFunc("POST /api/v1/scenes/create", s.handle(s.handler.CreateScene))
-	mux.HandleFunc("POST /api/v1/scenes/get", s.handle(s.handler.GetScene))
-	mux.HandleFunc("POST /api/v1/scenes/update", s.handle(s.handler.UpdateScene))
-	mux.HandleFunc("POST /api/v1/scenes/delete", s.handle(s.handler.DeleteScene))
-
-	mux.HandleFunc("POST /api/v1/scenes/nodes/list", s.handle(s.handler.ListNodes))
-	mux.HandleFunc("POST /api/v1/scenes/nodes/add", s.handle(s.handler.AddNode))
-	mux.HandleFunc("POST /api/v1/scenes/nodes/update", s.handle(s.handler.UpdateNode))
-	mux.HandleFunc("POST /api/v1/scenes/nodes/delete", s.handle(s.handler.DeleteNode))
-
-	mux.HandleFunc("POST /api/v1/scenes/edges/add", s.handle(s.handler.AddEdge))
-	mux.HandleFunc("POST /api/v1/scenes/edges/delete", s.handle(s.handler.DeleteEdge))
-
-	mux.HandleFunc("POST /api/v1/scenes/variables/list", s.handle(s.handler.ListVariables))
-	mux.HandleFunc("POST /api/v1/scenes/variables/set", s.handle(s.handler.SetVariable))
-
-	mux.HandleFunc("POST /api/v1/plugins/list", s.handle(s.handler.ListPlugins))
-	mux.HandleFunc("POST /api/v1/plugins/config", s.handle(s.handler.UpdatePluginConfig))
-
-	mux.HandleFunc("POST /api/v1/reports/list", s.handle(s.handler.ListReports))
-	mux.HandleFunc("POST /api/v1/reports/get", s.handle(s.handler.GetReport))
-
-	mux.HandleFunc("POST /api/v1/runs/list", s.handle(s.handler.ListRunRecords))
-	mux.HandleFunc("POST /api/v1/runs/get", s.handle(s.handler.GetRunRecord))
-
-	mux.HandleFunc("POST /api/v1/traces/list", s.handle(s.handler.ListTraces))
-	mux.HandleFunc("POST /api/v1/traces/get", s.handle(s.handler.GetTrace))
-	mux.HandleFunc("POST /api/v1/traces/get-by-run", s.handle(s.handler.GetTraceByRun))
-
-	mux.HandleFunc("POST /api/v1/scenes/start", s.handle(s.handler.StartScene))
-	mux.HandleFunc("POST /api/v1/scenes/stop", s.handle(s.handler.StopScene))
-	mux.HandleFunc("POST /api/v1/scenes/status", s.handle(s.handler.SceneStatus))
+var publicRoutes = map[string]bool{
+	"/api/v1/auth/login":          true,
+	"/api/v1/auth/change-password": true,
 }
 
-// handlerFunc is an adapter that returns a standard dto.Response.
+var routePermissions = map[string]string{
+	"/api/v1/scenes/list":          "scene:read",
+	"/api/v1/scenes/create":        "scene:write",
+	"/api/v1/scenes/get":           "scene:read",
+	"/api/v1/scenes/update":        "scene:write",
+	"/api/v1/scenes/delete":        "scene:write",
+	"/api/v1/scenes/nodes/list":    "scene:read",
+	"/api/v1/scenes/nodes/add":     "scene:write",
+	"/api/v1/scenes/nodes/update":  "scene:write",
+	"/api/v1/scenes/nodes/delete":  "scene:write",
+	"/api/v1/scenes/edges/add":     "scene:write",
+	"/api/v1/scenes/edges/delete":  "scene:write",
+	"/api/v1/scenes/variables/list": "scene:read",
+	"/api/v1/scenes/variables/set":  "scene:write",
+	"/api/v1/scenes/start":         "scene:run",
+	"/api/v1/scenes/stop":          "scene:run",
+	"/api/v1/scenes/status":        "runner:read",
+	"/api/v1/plugins/list":         "settings:read",
+	"/api/v1/plugins/config":       "settings:write",
+	"/api/v1/reports/list":         "report:read",
+	"/api/v1/reports/get":          "report:read",
+	"/api/v1/runs/list":            "runner:read",
+	"/api/v1/runs/get":             "runner:read",
+	"/api/v1/traces/list":          "trace:read",
+	"/api/v1/traces/get":           "trace:read",
+	"/api/v1/traces/get-by-run":    "trace:read",
+	"/api/v1/auth/me":              "",
+	"/api/v1/auth/logout":          "",
+	"/api/v1/users/list":           "user:read",
+	"/api/v1/users/create":         "user:write",
+	"/api/v1/users/update":         "user:write",
+	"/api/v1/users/delete":         "user:write",
+	"/api/v1/roles/list":           "role:read",
+	"/api/v1/roles/create":         "role:write",
+	"/api/v1/roles/update":         "role:write",
+	"/api/v1/roles/delete":         "role:write",
+}
+
+func (s *Server) registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/v1/auth/login", s.handlePublic(s.handler.Login))
+	mux.HandleFunc("POST /api/v1/auth/me", s.handleAuth(s.handler.Me))
+	mux.HandleFunc("POST /api/v1/auth/logout", s.handleAuth(s.handler.Logout))
+	mux.HandleFunc("POST /api/v1/auth/change-password", s.handleAuth(s.handler.ChangePassword))
+
+	mux.HandleFunc("POST /api/v1/scenes/list", s.handleAuth(s.handler.ListScenes))
+	mux.HandleFunc("POST /api/v1/scenes/create", s.handleAuth(s.handler.CreateScene))
+	mux.HandleFunc("POST /api/v1/scenes/get", s.handleAuth(s.handler.GetScene))
+	mux.HandleFunc("POST /api/v1/scenes/update", s.handleAuth(s.handler.UpdateScene))
+	mux.HandleFunc("POST /api/v1/scenes/delete", s.handleAuth(s.handler.DeleteScene))
+
+	mux.HandleFunc("POST /api/v1/scenes/nodes/list", s.handleAuth(s.handler.ListNodes))
+	mux.HandleFunc("POST /api/v1/scenes/nodes/add", s.handleAuth(s.handler.AddNode))
+	mux.HandleFunc("POST /api/v1/scenes/nodes/update", s.handleAuth(s.handler.UpdateNode))
+	mux.HandleFunc("POST /api/v1/scenes/nodes/delete", s.handleAuth(s.handler.DeleteNode))
+
+	mux.HandleFunc("POST /api/v1/scenes/edges/add", s.handleAuth(s.handler.AddEdge))
+	mux.HandleFunc("POST /api/v1/scenes/edges/delete", s.handleAuth(s.handler.DeleteEdge))
+
+	mux.HandleFunc("POST /api/v1/scenes/variables/list", s.handleAuth(s.handler.ListVariables))
+	mux.HandleFunc("POST /api/v1/scenes/variables/set", s.handleAuth(s.handler.SetVariable))
+
+	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
+	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
+
+	mux.HandleFunc("POST /api/v1/reports/list", s.handleAuth(s.handler.ListReports))
+	mux.HandleFunc("POST /api/v1/reports/get", s.handleAuth(s.handler.GetReport))
+
+	mux.HandleFunc("POST /api/v1/runs/list", s.handleAuth(s.handler.ListRunRecords))
+	mux.HandleFunc("POST /api/v1/runs/get", s.handleAuth(s.handler.GetRunRecord))
+
+	mux.HandleFunc("POST /api/v1/traces/list", s.handleAuth(s.handler.ListTraces))
+	mux.HandleFunc("POST /api/v1/traces/get", s.handleAuth(s.handler.GetTrace))
+	mux.HandleFunc("POST /api/v1/traces/get-by-run", s.handleAuth(s.handler.GetTraceByRun))
+
+	mux.HandleFunc("POST /api/v1/scenes/start", s.handleAuth(s.handler.StartScene))
+	mux.HandleFunc("POST /api/v1/scenes/stop", s.handleAuth(s.handler.StopScene))
+	mux.HandleFunc("POST /api/v1/scenes/status", s.handleAuth(s.handler.SceneStatus))
+
+	mux.HandleFunc("POST /api/v1/users/list", s.handleAuth(s.handler.ListUsers))
+	mux.HandleFunc("POST /api/v1/users/create", s.handleAuth(s.handler.CreateUser))
+	mux.HandleFunc("POST /api/v1/users/update", s.handleAuth(s.handler.UpdateUser))
+	mux.HandleFunc("POST /api/v1/users/delete", s.handleAuth(s.handler.DeleteUser))
+
+	mux.HandleFunc("POST /api/v1/roles/list", s.handleAuth(s.handler.ListRoles))
+	mux.HandleFunc("POST /api/v1/roles/create", s.handleAuth(s.handler.CreateRole))
+	mux.HandleFunc("POST /api/v1/roles/update", s.handleAuth(s.handler.UpdateRole))
+	mux.HandleFunc("POST /api/v1/roles/delete", s.handleAuth(s.handler.DeleteRole))
+}
+
 type handlerFunc func(r *http.Request) dto.Response
 
 func (s *Server) handle(h handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := h(r)
+		writeJSON(w, resp)
+	}
+}
+
+func (s *Server) handlePublic(h handlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resp := h(r)
+		writeJSON(w, resp)
+	}
+}
+
+func (s *Server) handleAuth(h handlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			writeJSON(w, dto.ErrorResp(401, "missing authorization header"))
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenStr == authHeader {
+			writeJSON(w, dto.ErrorResp(401, "invalid authorization format"))
+			return
+		}
+
+		claims, err := s.jwt.Parse(tokenStr)
+		if err != nil {
+			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
+			return
+		}
+
+		ctx := auth.WithUserID(r.Context(), claims.UserID)
+		ctx = auth.WithRoleID(ctx, claims.RoleID)
+
+		perm, exists := routePermissions[r.URL.Path]
+		if exists && perm != "" {
+			parts := strings.SplitN(perm, ":", 2)
+			if len(parts) == 2 {
+				ok, err := s.rbac.HasPermission(ctx, claims.RoleID, parts[0], parts[1])
+				if err != nil {
+					s.logger.Error("rbac check failed", logger.F("error", err))
+					writeJSON(w, dto.ErrorResp(500, "permission check failed"))
+					return
+				}
+				if !ok {
+					writeJSON(w, dto.ErrorResp(403, "insufficient permissions"))
+					return
+				}
+			}
+		}
+
+		h2 := h
+		resp := h2(r.WithContext(ctx))
 		writeJSON(w, resp)
 	}
 }
@@ -158,8 +271,6 @@ func decode[T any](r *http.Request) (T, error) {
 	}
 	return v, nil
 }
-
-// --- Middleware ---
 
 func (s *Server) recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,18 +314,21 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// --- Handler ---
-
-// Handler holds all repository references and implements the API handlers.
 type Handler struct {
-	scenes      repo.SceneRepo
-	nodes       repo.NodeRepo
-	edges       repo.EdgeRepo
-	variables   repo.VariableRepo
-	plugins     repo.PluginConfigRepo
-	reports     repo.ReportRepo
-	runs        repo.RunRecordRepo
-	tracer      *tracelib.Tracer
-	traceStore  *tracestore.Store
-	runnerMgr   *runner.Manager
+	scenes     repo.SceneRepo
+	nodes      repo.NodeRepo
+	edges      repo.EdgeRepo
+	variables  repo.VariableRepo
+	plugins    repo.PluginConfigRepo
+	reports    repo.ReportRepo
+	runs       repo.RunRecordRepo
+	users      repo.UserRepo
+	roles      repo.RoleRepo
+	perms      repo.PermissionRepo
+	rp         repo.RolePermissionRepo
+	tracer     *tracelib.Tracer
+	traceStore *tracestore.Store
+	runnerMgr  *runner.Manager
+	jwt        *auth.JWTManager
+	rbac       *auth.RBACChecker
 }

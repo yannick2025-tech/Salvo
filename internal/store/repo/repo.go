@@ -95,3 +95,36 @@ type RunRecordRepo interface {
 	Update(ctx context.Context, record *model.RunRecord) error
 	Delete(ctx context.Context, id snowflake.ID) error
 }
+
+type UserRepo interface {
+	Create(ctx context.Context, user *model.User) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.User, error)
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	List(ctx context.Context, filter Filter) ([]*model.User, error)
+	Update(ctx context.Context, user *model.User) error
+	Delete(ctx context.Context, id snowflake.ID) error
+}
+
+type RoleRepo interface {
+	Create(ctx context.Context, role *model.Role) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.Role, error)
+	GetByName(ctx context.Context, name string) (*model.Role, error)
+	List(ctx context.Context, filter Filter) ([]*model.Role, error)
+	Update(ctx context.Context, role *model.Role) error
+	Delete(ctx context.Context, id snowflake.ID) error
+}
+
+type PermissionRepo interface {
+	Create(ctx context.Context, perm *model.Permission) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.Permission, error)
+	GetByResourceAction(ctx context.Context, resource, action string) (*model.Permission, error)
+	List(ctx context.Context) ([]*model.Permission, error)
+	ListByRoleID(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error)
+}
+
+type RolePermissionRepo interface {
+	Assign(ctx context.Context, roleID, permissionID snowflake.ID) error
+	Revoke(ctx context.Context, roleID, permissionID snowflake.ID) error
+	RevokeAll(ctx context.Context, roleID snowflake.ID) error
+	ListPermissions(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error)
+}

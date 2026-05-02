@@ -678,3 +678,350 @@ func scanRunRecordRow(rows interface {
 }) (*model.RunRecord, error) {
 	return scanRunRecord(rows)
 }
+
+// --- UserRepo ---
+
+type UserRepo struct {
+	db *DB
+}
+
+func NewUserRepo(db *DB) *UserRepo {
+	return &UserRepo{db: db}
+}
+
+func (r *UserRepo) Create(ctx context.Context, user *model.User) error {
+	now := time.Now().UTC()
+	user.ID = r.db.NextID()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO users (id, email, password_hash, nickname, role_id, status, last_login_at, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		user.ID, user.Email, user.PasswordHash, user.Nickname,
+		user.RoleID, user.Status, user.LastLoginAt,
+		user.CreatedAt, user.UpdatedAt)
+	return err
+}
+
+func (r *UserRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, email, password_hash, nickname, role_id, status, last_login_at, created_at, updated_at
+		FROM users WHERE id=? AND deleted_at IS NULL`, id)
+	return scanUser(row)
+}
+
+func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, email, password_hash, nickname, role_id, status, last_login_at, created_at, updated_at
+		FROM users WHERE email=? AND deleted_at IS NULL`, email)
+	return scanUser(row)
+}
+
+func (r *UserRepo) List(ctx context.Context, filter repo.Filter) ([]*model.User, error) {
+	query := `SELECT id, email, password_hash, nickname, role_id, status, last_login_at, created_at, updated_at
+		FROM users WHERE deleted_at IS NULL`
+	args := []any{}
+
+	if filter.Status != "" {
+		query += ` AND status=?`
+		args = append(args, filter.Status)
+	}
+	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+	args = append(args, filter.Limit, filter.Offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var users []*model.User
+	for rows.Next() {
+		u, err := scanUserRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
+	user.UpdatedAt = time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE users SET email=?, nickname=?, role_id=?, status=?, last_login_at=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		user.Email, user.Nickname, user.RoleID, user.Status,
+		user.LastLoginAt, user.UpdatedAt, user.ID)
+	return err
+}
+
+func (r *UserRepo) Delete(ctx context.Context, id snowflake.ID) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE users SET deleted_at=? WHERE id=?`, now, id)
+	return err
+}
+
+func scanUser(row interface {
+	Scan(dest ...any) error
+}) (*model.User, error) {
+	u := &model.User{}
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Nickname,
+		&u.RoleID, &u.Status, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func scanUserRow(rows interface {
+	Scan(dest ...any) error
+}) (*model.User, error) {
+	return scanUser(rows)
+}
+
+// --- RoleRepo ---
+
+type RoleRepo struct {
+	db *DB
+}
+
+func NewRoleRepo(db *DB) *RoleRepo {
+	return &RoleRepo{db: db}
+}
+
+func (r *RoleRepo) Create(ctx context.Context, role *model.Role) error {
+	now := time.Now().UTC()
+	role.ID = r.db.NextID()
+	role.CreatedAt = now
+	role.UpdatedAt = now
+
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO roles (id, name, description, is_builtin, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+		role.ID, role.Name, role.Description, role.IsBuiltin,
+		role.CreatedAt, role.UpdatedAt)
+	return err
+}
+
+func (r *RoleRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Role, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, name, description, is_builtin, created_at, updated_at
+		FROM roles WHERE id=? AND deleted_at IS NULL`, id)
+	return scanRole(row)
+}
+
+func (r *RoleRepo) GetByName(ctx context.Context, name string) (*model.Role, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, name, description, is_builtin, created_at, updated_at
+		FROM roles WHERE name=? AND deleted_at IS NULL`, name)
+	return scanRole(row)
+}
+
+func (r *RoleRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Role, error) {
+	query := `SELECT id, name, description, is_builtin, created_at, updated_at
+		FROM roles WHERE deleted_at IS NULL`
+	args := []any{}
+
+	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+	args = append(args, filter.Limit, filter.Offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var roles []*model.Role
+	for rows.Next() {
+		rl, err := scanRoleRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		roles = append(roles, rl)
+	}
+	return roles, rows.Err()
+}
+
+func (r *RoleRepo) Update(ctx context.Context, role *model.Role) error {
+	role.UpdatedAt = time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE roles SET name=?, description=?, is_builtin=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		role.Name, role.Description, role.IsBuiltin, role.UpdatedAt, role.ID)
+	return err
+}
+
+func (r *RoleRepo) Delete(ctx context.Context, id snowflake.ID) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE roles SET deleted_at=? WHERE id=?`, now, id)
+	return err
+}
+
+func scanRole(row interface {
+	Scan(dest ...any) error
+}) (*model.Role, error) {
+	rl := &model.Role{}
+	err := row.Scan(&rl.ID, &rl.Name, &rl.Description, &rl.IsBuiltin,
+		&rl.CreatedAt, &rl.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return rl, nil
+}
+
+func scanRoleRow(rows interface {
+	Scan(dest ...any) error
+}) (*model.Role, error) {
+	return scanRole(rows)
+}
+
+// --- PermissionRepo ---
+
+type PermissionRepo struct {
+	db *DB
+}
+
+func NewPermissionRepo(db *DB) *PermissionRepo {
+	return &PermissionRepo{db: db}
+}
+
+func (r *PermissionRepo) Create(ctx context.Context, perm *model.Permission) error {
+	now := time.Now().UTC()
+	perm.ID = r.db.NextID()
+	perm.CreatedAt = now
+
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO permissions (id, resource, action, description, created_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		perm.ID, perm.Resource, perm.Action, perm.Description, perm.CreatedAt)
+	return err
+}
+
+func (r *PermissionRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Permission, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, resource, action, description, created_at
+		FROM permissions WHERE id=?`, id)
+	return scanPermission(row)
+}
+
+func (r *PermissionRepo) GetByResourceAction(ctx context.Context, resource, action string) (*model.Permission, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, resource, action, description, created_at
+		FROM permissions WHERE resource=? AND action=?`, resource, action)
+	return scanPermission(row)
+}
+
+func (r *PermissionRepo) List(ctx context.Context) ([]*model.Permission, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, resource, action, description, created_at
+		FROM permissions ORDER BY resource, action`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var perms []*model.Permission
+	for rows.Next() {
+		p, err := scanPermissionRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		perms = append(perms, p)
+	}
+	return perms, rows.Err()
+}
+
+func (r *PermissionRepo) ListByRoleID(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT p.id, p.resource, p.action, p.description, p.created_at
+		FROM permissions p
+		INNER JOIN role_permissions rp ON rp.permission_id = p.id
+		WHERE rp.role_id = ?
+		ORDER BY p.resource, p.action`, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var perms []*model.Permission
+	for rows.Next() {
+		p, err := scanPermissionRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		perms = append(perms, p)
+	}
+	return perms, rows.Err()
+}
+
+func scanPermission(row interface {
+	Scan(dest ...any) error
+}) (*model.Permission, error) {
+	p := &model.Permission{}
+	err := row.Scan(&p.ID, &p.Resource, &p.Action, &p.Description, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func scanPermissionRow(rows interface {
+	Scan(dest ...any) error
+}) (*model.Permission, error) {
+	return scanPermission(rows)
+}
+
+// --- RolePermissionRepo ---
+
+type RolePermissionRepo struct {
+	db *DB
+}
+
+func NewRolePermissionRepo(db *DB) *RolePermissionRepo {
+	return &RolePermissionRepo{db: db}
+}
+
+func (r *RolePermissionRepo) Assign(ctx context.Context, roleID, permissionID snowflake.ID) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)`,
+		roleID, permissionID)
+	return err
+}
+
+func (r *RolePermissionRepo) Revoke(ctx context.Context, roleID, permissionID snowflake.ID) error {
+	_, err := r.db.ExecContext(ctx, `
+		DELETE FROM role_permissions WHERE role_id=? AND permission_id=?`,
+		roleID, permissionID)
+	return err
+}
+
+func (r *RolePermissionRepo) RevokeAll(ctx context.Context, roleID snowflake.ID) error {
+	_, err := r.db.ExecContext(ctx, `
+		DELETE FROM role_permissions WHERE role_id=?`, roleID)
+	return err
+}
+
+func (r *RolePermissionRepo) ListPermissions(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT p.id, p.resource, p.action, p.description, p.created_at
+		FROM permissions p
+		INNER JOIN role_permissions rp ON rp.permission_id = p.id
+		WHERE rp.role_id = ?
+		ORDER BY p.resource, p.action`, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var perms []*model.Permission
+	for rows.Next() {
+		p, err := scanPermissionRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		perms = append(perms, p)
+	}
+	return perms, rows.Err()
+}

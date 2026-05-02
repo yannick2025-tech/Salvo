@@ -23,6 +23,10 @@ func Migrate(db *sql.DB) error {
 		{"run_records", createRunRecordsTable},
 		{"traces", createTracesTable},
 		{"spans", createSpansTable},
+		{"roles", createRolesTable},
+		{"permissions", createPermissionsTable},
+		{"role_permissions", createRolePermissionsTable},
+		{"users", createUsersTable},
 	}
 
 	for _, m := range migrations {
@@ -178,7 +182,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 2
+const currentVersion = 3
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -232,6 +236,60 @@ CREATE TABLE IF NOT EXISTS spans (
 );
 CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id);
 CREATE INDEX IF NOT EXISTS idx_spans_node_id ON spans(node_id);
+`
+
+const createUsersTable = `
+CREATE TABLE IF NOT EXISTS users (
+	id              INTEGER PRIMARY KEY,
+	email           TEXT    NOT NULL UNIQUE,
+	password_hash   TEXT    NOT NULL,
+	nickname        TEXT    NOT NULL DEFAULT '',
+	role_id         INTEGER NOT NULL,
+	status          TEXT    NOT NULL DEFAULT 'active',
+	last_login_at   DATETIME DEFAULT NULL,
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL,
+	FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+`
+
+const createRolesTable = `
+CREATE TABLE IF NOT EXISTS roles (
+	id              INTEGER PRIMARY KEY,
+	name            TEXT    NOT NULL UNIQUE,
+	description     TEXT    DEFAULT '',
+	is_builtin      BOOLEAN DEFAULT 0,
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
+CREATE INDEX IF NOT EXISTS idx_roles_deleted_at ON roles(deleted_at);
+`
+
+const createPermissionsTable = `
+CREATE TABLE IF NOT EXISTS permissions (
+	id              INTEGER PRIMARY KEY,
+	resource        TEXT    NOT NULL,
+	action          TEXT    NOT NULL,
+	description     TEXT    DEFAULT '',
+	created_at      DATETIME NOT NULL,
+	UNIQUE(resource, action)
+);
+`
+
+const createRolePermissionsTable = `
+CREATE TABLE IF NOT EXISTS role_permissions (
+	role_id         INTEGER NOT NULL,
+	permission_id   INTEGER NOT NULL,
+	PRIMARY KEY (role_id, permission_id),
+	FOREIGN KEY (role_id) REFERENCES roles(id),
+	FOREIGN KEY (permission_id) REFERENCES permissions(id)
+);
 `
 
 // CurrentVersion returns the current schema version number.

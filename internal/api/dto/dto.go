@@ -380,3 +380,84 @@ type SceneStatusDTO struct {
 	FailedReqs  int64        `json:"failed_reqs"`
 	Duration    float64      `json:"duration_seconds"`
 }
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string   `json:"token"`
+	User  UserDTO  `json:"user"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+type UserDTO struct {
+	ID         snowflake.ID `json:"id"`
+	Email      string       `json:"email"`
+	Nickname   string       `json:"nickname"`
+	RoleID     snowflake.ID `json:"role_id"`
+	RoleName   string       `json:"role_name"`
+	Status     string       `json:"status"`
+	LastLoginAt *time.Time  `json:"last_login_at,omitempty"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
+}
+
+type CreateUserRequest struct {
+	Email    string       `json:"email"`
+	Password string       `json:"password"`
+	Nickname string       `json:"nickname"`
+	RoleID   snowflake.ID `json:"role_id"`
+}
+
+type UpdateUserRequest struct {
+	ID       snowflake.ID `json:"id"`
+	Nickname string       `json:"nickname,omitempty"`
+	RoleID   snowflake.ID `json:"role_id,omitempty"`
+	Status   string       `json:"status,omitempty"`
+}
+
+type ListUsersRequest struct {
+	Status string `json:"status,omitempty"`
+	Offset int    `json:"offset,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+}
+
+type RoleDTO struct {
+	ID          snowflake.ID   `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	IsBuiltin   bool           `json:"is_builtin"`
+	Permissions []PermissionDTO `json:"permissions"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type PermissionDTO struct {
+	ID          snowflake.ID `json:"id"`
+	Resource    string       `json:"resource"`
+	Action      string       `json:"action"`
+	Description string       `json:"description"`
+}
+
+type CreateRoleRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+type UpdateRoleRequest struct {
+	ID          snowflake.ID `json:"id"`
+	Name        string       `json:"name,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Permissions []string     `json:"permissions,omitempty"`
+}
+
+type ListRolesRequest struct {
+	Offset int `json:"offset,omitempty"`
+	Limit  int `json:"limit,omitempty"`
+}

@@ -33,6 +33,7 @@ type Config struct {
 	Log      LogConfig      `yaml:"log"`
 	Pool     PoolConfig     `yaml:"pool"`
 	Storage  StorageConfig  `yaml:"storage"`
+	Auth     AuthConfig     `yaml:"auth"`
 }
 
 // ServerConfig holds the HTTP server listen address.
@@ -89,6 +90,12 @@ type StorageConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
+// AuthConfig holds the authentication configuration.
+type AuthConfig struct {
+	// JWTSecret is the secret key used for signing JWT tokens.
+	JWTSecret string `yaml:"jwt_secret"`
+}
+
 // Default returns a Config populated with sensible defaults.
 func Default() *Config {
 	return &Config{
@@ -111,6 +118,9 @@ func Default() *Config {
 			WorkerCount: 20,
 			RunMode:     RunModeCount,
 			Count:       10000,
+		},
+		Auth: AuthConfig{
+			JWTSecret: "salvo-default-jwt-secret-change-me",
 		},
 	}
 }
