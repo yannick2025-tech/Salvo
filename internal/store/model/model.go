@@ -1,0 +1,151 @@
+// Package model defines the data models for the Salvo persistence layer.
+//
+// All models embed the Model base struct which provides a Snowflake ID
+// (JSON-serialised as string), timestamps, and soft-delete support.
+// Repository implementations must filter out soft-deleted records
+// (where deleted_at IS NOT NULL) in every query.
+package model
+
+import (
+	"time"
+
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
+)
+
+// Model is the base struct embedded by all data models.
+type Model struct {
+	ID        snowflake.ID `json:"id,string"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+	DeletedAt *time.Time   `json:"deleted_at,omitempty"`
+}
+
+// IsDeleted returns true if the record has been soft-deleted.
+func (m *Model) IsDeleted() bool {
+	return m.DeletedAt != nil
+}
+
+// Scene represents a test scenario configuration.
+type Scene struct {
+	Model
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	DAGJSON     string `json:"dag_json"`
+	Variables   string `json:"variables,omitempty"`
+	Plugins     string `json:"plugins,omitempty"`
+	Status      string `json:"status"`
+}
+
+const (
+	SceneStatusDraft     = "draft"
+	SceneStatusReady     = "ready"
+	SceneStatusRunning   = "running"
+	SceneStatusCompleted = "completed"
+	SceneStatusFailed    = "failed"
+)
+
+// Node represents a DAG node within a scene.
+type Node struct {
+	Model
+	SceneID   snowflake.ID `json:"scene_id,string"`
+	Name      string       `json:"name"`
+	Type      string       `json:"type"`
+	Config    string       `json:"config,omitempty"`
+	Position  string       `json:"position,omitempty"`
+	LoopCount int          `json:"loop_count,omitempty"`
+}
+
+const (
+	NodeTypeHTTP      = "http"
+	NodeTypeDelay     = "delay"
+	NodeTypeCondition = "condition"
+	NodeTypeLoop      = "loop"
+	NodeTypeGroup     = "group"
+)
+
+// Edge represents a directed edge between two DAG nodes.
+type Edge struct {
+	Model
+	SceneID   snowflake.ID `json:"scene_id,string"`
+	FromNode  snowflake.ID `json:"from_node,string"`
+	ToNode    snowflake.ID `json:"to_node,string"`
+	Condition string       `json:"condition,omitempty"`
+	Priority  int          `json:"priority,omitempty"`
+}
+
+// Variable represents a scoped variable definition.
+type Variable struct {
+	Model
+	SceneID snowflake.ID `json:"scene_id,string"`
+	Scope   string       `json:"scope"`
+	Key     string       `json:"key"`
+	Value   string       `json:"value"`
+}
+
+const (
+	VariableScopeGlobal = "global"
+	VariableScopeScene  = "scene"
+	VariableScopeAPI    = "api"
+)
+
+// PluginConfig represents a plugin configuration for a scene.
+type PluginConfig struct {
+	Model
+	SceneID  snowflake.ID `json:"scene_id,string"`
+	Name     string       `json:"name"`
+	Type     string       `json:"type"`
+	Config   string       `json:"config"`
+	Phase    string       `json:"phase"`
+	Priority int          `json:"priority"`
+	Enabled  bool         `json:"enabled"`
+}
+
+const (
+	PluginPhaseBefore = "before"
+	PluginPhaseAfter  = "after"
+)
+
+// Report represents a test execution report.
+type Report struct {
+	Model
+	SceneID    snowflake.ID `json:"scene_id,string"`
+	RunID      snowflake.ID `json:"run_id,string"`
+	Status     string       `json:"status"`
+	Summary    string       `json:"summary,omitempty"`
+	Detail     string       `json:"detail,omitempty"`
+	StartedAt  *time.Time   `json:"started_at,omitempty"`
+	FinishedAt *time.Time   `json:"finished_at,omitempty"`
+}
+
+const (
+	ReportStatusSuccess = "success"
+	ReportStatusFailed  = "failed"
+	ReportStatusPartial = "partial"
+)
+
+// RunRecord represents a single test execution record.
+type RunRecord struct {
+	Model
+	SceneID     snowflake.ID `json:"scene_id,string"`
+	Status      string       `json:"status"`
+	WorkerCount int          `json:"worker_count"`
+	RunMode     string       `json:"run_mode"`
+	Duration    float64      `json:"duration"`
+	TotalReqs   int64        `json:"total_reqs"`
+	SuccessReqs int64        `json:"success_reqs"`
+	FailedReqs  int64        `json:"failed_reqs"`
+	AvgLatency  float64      `json:"avg_latency"`
+	P50Latency  float64      `json:"p50_latency"`
+	P95Latency  float64      `json:"p95_latency"`
+	P99Latency  float64      `json:"p99_latency"`
+	ErrorMsg    string       `json:"error_msg,omitempty"`
+	StartedAt   *time.Time   `json:"started_at,omitempty"`
+	FinishedAt  *time.Time   `json:"finished_at,omitempty"`
+}
+
+const (
+	RunStatusRunning   = "running"
+	RunStatusCompleted = "completed"
+	RunStatusFailed    = "failed"
+	RunStatusCancelled = "cancelled"
+)
