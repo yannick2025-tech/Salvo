@@ -78,9 +78,12 @@ func (p *Protocol) Execute(ctx context.Context, req *protocol.Request) (*protoco
 	latency := time.Since(start)
 
 	respBody, err := io.ReadAll(httpResp.Body)
-	httpResp.Body.Close()
+	closeErr := httpResp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("http: read response body: %w", err)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("http: close response body: %w", closeErr)
 	}
 
 	respHeaders := make(map[string][]string)

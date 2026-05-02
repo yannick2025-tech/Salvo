@@ -20,35 +20,35 @@ func newTestServer() *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(body)
+		_, _ = w.Write(body)
 	})
 
 	mux.HandleFunc("/api/status/404", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"not found"}`))
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	})
 
 	mux.HandleFunc("/api/status/500", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":"internal"}`))
+		_, _ = w.Write([]byte(`{"error":"internal"}`))
 	})
 
 	mux.HandleFunc("/api/headers", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Custom", "value")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 
 	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"slow":true}`))
+		_, _ = w.Write([]byte(`{"slow":true}`))
 	})
 
 	mux.HandleFunc("/api/method", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"method":"` + r.Method + `"}`))
+		_, _ = w.Write([]byte(`{"method":"` + r.Method + `"}`))
 	})
 
 	return httptest.NewServer(mux)
@@ -209,7 +209,6 @@ func TestHTTPProtocolTimeout(t *testing.T) {
 	}
 
 	resp, err := p.Execute(context.Background(), req)
-	// Timeout should produce an error.
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 }
