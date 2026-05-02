@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,14 +27,16 @@ type Server struct {
 	handler    *Handler
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker
+	webDir     string
 }
 
 type Config struct {
-	Addr   string
-	DB     *sqlite.DB
-	Logger logger.Logger
-	JWT    *auth.JWTManager
-	RBAC   *auth.RBACChecker
+	Addr     string
+	DB       *sqlite.DB
+	Logger   logger.Logger
+	JWT      *auth.JWTManager
+	RBAC     *auth.RBACChecker
+	WebDir   string
 }
 
 func New(cfg Config) *Server {
@@ -66,6 +70,7 @@ func New(cfg Config) *Server {
 		handler: h,
 		jwt:     cfg.JWT,
 		rbac:    cfg.RBAC,
+		webDir:  cfg.WebDir,
 	}
 
 	mux := http.NewServeMux()
@@ -192,6 +197,28 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/roles/create", s.handleAuth(s.handler.CreateRole))
 	mux.HandleFunc("POST /api/v1/roles/update", s.handleAuth(s.handler.UpdateRole))
 	mux.HandleFunc("POST /api/v1/roles/delete", s.handleAuth(s.handler.DeleteRole))
+
+	if s.webDir != "" {
+		s.registerSPA(mux)
+	}
+}
+
+func (s *Server) registerSPA(mux *http.ServeMux) {
+	fileServer := http.FileServer(http.Dir(s.webDir))
+
+	mux.HandleFunc("GET /assets/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		fileServer.ServeHTTP(w, r)
+	})
+
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		path := filepath.Join(s.webDir, filepath.Clean(r.URL.Path))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(s.webDir, "index.html"))
+	})
 }
 
 type handlerFunc func(r *http.Request) dto.Response

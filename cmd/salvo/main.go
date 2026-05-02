@@ -71,11 +71,12 @@ func main() {
 	}
 
 	srv := api.New(api.Config{
-		Addr:   cfg.ServerAddr(),
-		DB:     db,
-		Logger: log,
-		JWT:    jwtManager,
-		RBAC:   rbacChecker,
+		Addr:     cfg.ServerAddr(),
+		DB:       db,
+		Logger:   log,
+		JWT:      jwtManager,
+		RBAC:     rbacChecker,
+		WebDir:   cfg.Server.WebDir,
 	})
 
 	go func() {

@@ -38,10 +38,9 @@ type Config struct {
 
 // ServerConfig holds the HTTP server listen address.
 type ServerConfig struct {
-	// Host is the bind address (e.g. "0.0.0.0").
-	Host string `yaml:"host"`
-	// Port is the listen port number.
-	Port int `yaml:"port"`
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+	WebDir string `yaml:"web_dir"`
 }
 
 // DatabaseConfig holds the relational database connection parameters.

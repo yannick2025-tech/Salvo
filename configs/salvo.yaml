@@ -1,6 +1,7 @@
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 8766
+  web_dir: "web/dist"
 
 database:
   driver: "sqlite3"
@@ -19,3 +20,6 @@ pool:
   worker_count: 20
   run_mode: "count"
   count: 10000
+
+auth:
+  jwt_secret: "salvo-jwt-secret-change-in-production"
