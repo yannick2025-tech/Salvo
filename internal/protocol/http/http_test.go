@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/yannick2025-tech/Salvo/internal/protocol"
 )
 
@@ -54,20 +55,29 @@ func newTestServer() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
+func asHTTPResp(t *testing.T, resp protocol.Response) *HTTPResponse {
+	t.Helper()
+	require.NotNil(t, resp)
+	httpResp, ok := resp.(*HTTPResponse)
+	require.True(t, ok, "expected *HTTPResponse, got %T", resp)
+	return httpResp
+}
+
 func TestHTTPProtocolGet(t *testing.T) {
 	srv := newTestServer()
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/echo",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	assert.NoError(t, resp.Error)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+	assert.NoError(t, hr.Error)
 }
 
 func TestHTTPProtocolPost(t *testing.T) {
@@ -75,8 +85,8 @@ func TestHTTPProtocolPost(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method:  protocol.MethodPost,
+	req := &HTTPRequest{
+		Method:  MethodPost,
 		URL:     srv.URL + "/api/echo",
 		Headers: map[string]string{"Content-Type": "application/json"},
 		Body:    []byte(`{"hello":"world"}`),
@@ -84,8 +94,9 @@ func TestHTTPProtocolPost(t *testing.T) {
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	assert.Equal(t, `{"hello":"world"}`, string(resp.Body))
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+	assert.Equal(t, `{"hello":"world"}`, string(hr.Body))
 }
 
 func TestHTTPProtocolPut(t *testing.T) {
@@ -93,17 +104,18 @@ func TestHTTPProtocolPut(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodPut,
+	req := &HTTPRequest{
+		Method: MethodPut,
 		URL:    srv.URL + "/api/method",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
 
 	var result map[string]string
-	require.NoError(t, resp.BodyJSON(&result))
+	require.NoError(t, hr.BodyJSON(&result))
 	assert.Equal(t, "PUT", result["method"])
 }
 
@@ -112,17 +124,18 @@ func TestHTTPProtocolDelete(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodDelete,
+	req := &HTTPRequest{
+		Method: MethodDelete,
 		URL:    srv.URL + "/api/method",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
 
 	var result map[string]string
-	require.NoError(t, resp.BodyJSON(&result))
+	require.NoError(t, hr.BodyJSON(&result))
 	assert.Equal(t, "DELETE", result["method"])
 }
 
@@ -131,17 +144,18 @@ func TestHTTPProtocolPatch(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodPatch,
+	req := &HTTPRequest{
+		Method: MethodPatch,
 		URL:    srv.URL + "/api/method",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
 
 	var result map[string]string
-	require.NoError(t, resp.BodyJSON(&result))
+	require.NoError(t, hr.BodyJSON(&result))
 	assert.Equal(t, "PATCH", result["method"])
 }
 
@@ -150,8 +164,8 @@ func TestHTTPProtocolHeaders(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/headers",
 		Headers: map[string]string{
 			"X-Request-ID": "test-123",
@@ -160,8 +174,9 @@ func TestHTTPProtocolHeaders(t *testing.T) {
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	assert.Contains(t, resp.Headers["X-Custom"], "value")
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+	assert.Contains(t, hr.Headers["X-Custom"], "value")
 }
 
 func TestHTTPProtocol404(t *testing.T) {
@@ -169,16 +184,17 @@ func TestHTTPProtocol404(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/status/404",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 404, resp.StatusCode)
-	assert.True(t, resp.IsError())
-	assert.False(t, resp.IsSuccess())
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 404, hr.StatusCode)
+	assert.True(t, hr.IsError())
+	assert.False(t, hr.IsSuccess())
 }
 
 func TestHTTPProtocol500(t *testing.T) {
@@ -186,15 +202,16 @@ func TestHTTPProtocol500(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/status/500",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 500, resp.StatusCode)
-	assert.True(t, resp.IsError())
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 500, hr.StatusCode)
+	assert.True(t, hr.IsError())
 }
 
 func TestHTTPProtocolTimeout(t *testing.T) {
@@ -202,8 +219,8 @@ func TestHTTPProtocolTimeout(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method:  protocol.MethodGet,
+	req := &HTTPRequest{
+		Method:  MethodGet,
 		URL:     srv.URL + "/api/slow",
 		Timeout: 50 * time.Millisecond,
 	}
@@ -221,8 +238,8 @@ func TestHTTPProtocolContextCancellation(t *testing.T) {
 	defer cancel()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/slow",
 	}
 
@@ -236,15 +253,16 @@ func TestHTTPProtocolLatency(t *testing.T) {
 	defer srv.Close()
 
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/echo",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, resp.Latency, time.Microsecond)
-	assert.Less(t, resp.Latency, 5*time.Second)
+	hr := asHTTPResp(t, resp)
+	assert.GreaterOrEqual(t, hr.Latency, time.Microsecond)
+	assert.Less(t, hr.Latency, 5*time.Second)
 }
 
 func TestHTTPProtocolName(t *testing.T) {
@@ -254,8 +272,8 @@ func TestHTTPProtocolName(t *testing.T) {
 
 func TestHTTPProtocolInvalidURL(t *testing.T) {
 	p := NewProtocol()
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    "http://invalid-host-that-does-not-exist.local/api",
 	}
 
@@ -271,12 +289,34 @@ func TestHTTPProtocolWithClient(t *testing.T) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	p := NewProtocol(WithClient(client))
 
-	req := &protocol.Request{
-		Method: protocol.MethodGet,
+	req := &HTTPRequest{
+		Method: MethodGet,
 		URL:    srv.URL + "/api/echo",
 	}
 
 	resp, err := p.Execute(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
 }
+
+func TestHTTPRequestGetTimeout(t *testing.T) {
+	req := &HTTPRequest{Timeout: 5 * time.Second}
+	assert.Equal(t, 5*time.Second, req.GetTimeout())
+}
+
+func TestHTTPResponseInterfaceCompliance(t *testing.T) {
+	var _ protocol.Response = &HTTPResponse{}
+}
+
+func TestHTTPProtocolWrongRequestType(t *testing.T) {
+	p := NewProtocol()
+
+	resp, err := p.Execute(context.Background(), &mockBadRequest{})
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+}
+
+type mockBadRequest struct{}
+
+func (m *mockBadRequest) GetTimeout() time.Duration { return 0 }
