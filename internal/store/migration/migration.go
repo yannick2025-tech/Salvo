@@ -21,6 +21,8 @@ func Migrate(db *sql.DB) error {
 		{"plugin_configs", createPluginConfigsTable},
 		{"reports", createReportsTable},
 		{"run_records", createRunRecordsTable},
+		{"traces", createTracesTable},
+		{"spans", createSpansTable},
 	}
 
 	for _, m := range migrations {
@@ -176,7 +178,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 1
+const currentVersion = 2
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -196,6 +198,41 @@ func ensureSchemaVersion(db *sql.DB) error {
 
 	return nil
 }
+
+const createTracesTable = `
+CREATE TABLE IF NOT EXISTS traces (
+	id              INTEGER PRIMARY KEY,
+	scene_id        INTEGER NOT NULL,
+	run_id          INTEGER NOT NULL,
+	status          TEXT    NOT NULL DEFAULT 'ok',
+	error           TEXT    DEFAULT '',
+	started_at      DATETIME NOT NULL,
+	finished_at     DATETIME DEFAULT NULL,
+	duration_ns     INTEGER DEFAULT 0,
+	created_at      DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_traces_scene_id ON traces(scene_id);
+CREATE INDEX IF NOT EXISTS idx_traces_run_id ON traces(run_id);
+CREATE INDEX IF NOT EXISTS idx_traces_status ON traces(status);
+`
+
+const createSpansTable = `
+CREATE TABLE IF NOT EXISTS spans (
+	id              INTEGER PRIMARY KEY,
+	trace_id        INTEGER NOT NULL,
+	node_id         TEXT    NOT NULL,
+	status          TEXT    NOT NULL DEFAULT 'ok',
+	error           TEXT    DEFAULT '',
+	input           TEXT    DEFAULT '',
+	output          TEXT    DEFAULT '',
+	started_at      DATETIME NOT NULL,
+	finished_at     DATETIME DEFAULT NULL,
+	duration_ns     INTEGER DEFAULT 0,
+	FOREIGN KEY (trace_id) REFERENCES traces(id)
+);
+CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id);
+CREATE INDEX IF NOT EXISTS idx_spans_node_id ON spans(node_id);
+`
 
 // CurrentVersion returns the current schema version number.
 func CurrentVersion() int {

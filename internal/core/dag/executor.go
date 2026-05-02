@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 )
 
 // ConditionEvaluator decides whether a conditional edge should be traversed.
@@ -32,6 +34,9 @@ type Executor struct {
 	evalCondition ConditionEvaluator
 	results       map[string]*Output
 	mu            sync.RWMutex
+	traceHook     TraceHook
+	traceSceneID  snowflake.ID
+	traceRunID    snowflake.ID
 }
 
 // NewExecutor creates a new Executor for the given DAG.

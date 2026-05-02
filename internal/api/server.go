@@ -14,6 +14,8 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
+	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
 )
 
 // Server is the REST API server for Salvo.
@@ -37,14 +39,21 @@ type Config struct {
 // New creates a new API server with the given configuration.
 func New(cfg Config) *Server {
 	h := &Handler{
-		scenes:   sqlite.NewSceneRepo(cfg.DB),
-		nodes:    sqlite.NewNodeRepo(cfg.DB),
-		edges:    sqlite.NewEdgeRepo(cfg.DB),
+		scenes:    sqlite.NewSceneRepo(cfg.DB),
+		nodes:     sqlite.NewNodeRepo(cfg.DB),
+		edges:     sqlite.NewEdgeRepo(cfg.DB),
 		variables: sqlite.NewVariableRepo(cfg.DB),
-		plugins:  sqlite.NewPluginConfigRepo(cfg.DB),
-		reports:  sqlite.NewReportRepo(cfg.DB),
-		runs:     sqlite.NewRunRecordRepo(cfg.DB),
+		plugins:   sqlite.NewPluginConfigRepo(cfg.DB),
+		reports:   sqlite.NewReportRepo(cfg.DB),
+		runs:      sqlite.NewRunRecordRepo(cfg.DB),
 	}
+
+	tracer, err := tracelib.NewTracer(tracelib.Config{BufferSize: 1000})
+	if err != nil {
+		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
+	}
+	h.tracer = tracer
+	h.traceStore = tracestore.New(cfg.DB.DB)
 
 	s := &Server{
 		db:      cfg.DB,
@@ -112,6 +121,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/runs/list", s.handle(s.handler.ListRunRecords))
 	mux.HandleFunc("POST /api/v1/runs/get", s.handle(s.handler.GetRunRecord))
+
+	mux.HandleFunc("POST /api/v1/traces/list", s.handle(s.handler.ListTraces))
+	mux.HandleFunc("POST /api/v1/traces/get", s.handle(s.handler.GetTrace))
+	mux.HandleFunc("POST /api/v1/traces/get-by-run", s.handle(s.handler.GetTraceByRun))
 }
 
 // handlerFunc is an adapter that returns a standard dto.Response.
@@ -188,11 +201,13 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 
 // Handler holds all repository references and implements the API handlers.
 type Handler struct {
-	scenes    repo.SceneRepo
-	nodes     repo.NodeRepo
-	edges     repo.EdgeRepo
-	variables repo.VariableRepo
-	plugins   repo.PluginConfigRepo
-	reports   repo.ReportRepo
-	runs      repo.RunRecordRepo
+	scenes     repo.SceneRepo
+	nodes      repo.NodeRepo
+	edges      repo.EdgeRepo
+	variables  repo.VariableRepo
+	plugins    repo.PluginConfigRepo
+	reports    repo.ReportRepo
+	runs       repo.RunRecordRepo
+	tracer     *tracelib.Tracer
+	traceStore *tracestore.Store
 }

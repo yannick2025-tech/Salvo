@@ -8,6 +8,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
+	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
 )
 
 const defaultLimit = 20
@@ -698,5 +699,106 @@ func toRunRecordDTO(rr *model.RunRecord) dto.RunRecordDTO {
 		FinishedAt:  rr.FinishedAt,
 		CreatedAt:   rr.CreatedAt,
 		UpdatedAt:   rr.UpdatedAt,
+	}
+}
+
+// --- Trace Handlers ---
+
+func (h *Handler) ListTraces(r *http.Request) dto.Response {
+	req, err := decode[dto.ListTracesRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	var traces []*tracelib.Trace
+	if req.SceneID != 0 {
+		traces = h.tracer.ListByScene(req.SceneID, limit)
+	} else {
+		traces = h.tracer.List(limit)
+	}
+
+	items := make([]dto.TraceDTO, 0, len(traces))
+	for _, tr := range traces {
+		items = append(items, toTraceDTO(tr))
+	}
+	return dto.OK(items)
+}
+
+func (h *Handler) GetTrace(r *http.Request) dto.Response {
+	req, err := decode[dto.GetTraceRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	tr, ok := h.tracer.Get(req.ID)
+	if !ok {
+		if h.traceStore != nil {
+			var storeErr error
+			tr, storeErr = h.traceStore.GetTrace(r.Context(), req.ID)
+			if storeErr != nil {
+				return dto.ErrorResp(404, "trace not found")
+			}
+		} else {
+			return dto.ErrorResp(404, "trace not found")
+		}
+	}
+
+	return dto.OK(toTraceDTO(tr))
+}
+
+func (h *Handler) GetTraceByRun(r *http.Request) dto.Response {
+	req, err := decode[dto.GetTraceByRunRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	tr, ok := h.tracer.ByRunID(req.RunID)
+	if !ok {
+		if h.traceStore != nil {
+			var storeErr error
+			tr, storeErr = h.traceStore.GetTraceByRunID(r.Context(), req.RunID)
+			if storeErr != nil {
+				return dto.ErrorResp(404, "trace not found")
+			}
+		} else {
+			return dto.ErrorResp(404, "trace not found")
+		}
+	}
+
+	return dto.OK(toTraceDTO(tr))
+}
+
+func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
+	spans := make([]dto.SpanDTO, 0, len(tr.Spans))
+	for _, sp := range tr.Spans {
+		spans = append(spans, dto.SpanDTO{
+			ID:         sp.ID,
+			TraceID:    sp.TraceID,
+			NodeID:     sp.NodeID,
+			Status:     string(sp.Status),
+			Error:      sp.Error,
+			Input:      sp.Input,
+			Output:     sp.Output,
+			StartedAt:  sp.StartedAt,
+			FinishedAt: sp.FinishedAt,
+			Duration:   sp.Duration.Nanoseconds(),
+		})
+	}
+
+	return dto.TraceDTO{
+		ID:         tr.ID,
+		SceneID:    tr.SceneID,
+		RunID:      tr.RunID,
+		Status:     string(tr.Status),
+		Error:      tr.Error,
+		Spans:      spans,
+		StartedAt:  tr.StartedAt,
+		FinishedAt: tr.FinishedAt,
+		Duration:   tr.Duration.Nanoseconds(),
 	}
 }

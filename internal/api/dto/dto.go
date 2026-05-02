@@ -299,3 +299,49 @@ type RunRecordDTO struct {
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
 }
+
+// --- Trace ---
+
+// ListTracesRequest is the request for listing traces.
+type ListTracesRequest struct {
+	SceneID snowflake.ID `json:"scene_id,omitempty"`
+	Limit   int          `json:"limit,omitempty"`
+	Offset  int          `json:"offset,omitempty"`
+}
+
+// GetTraceRequest is the request for getting a single trace.
+type GetTraceRequest struct {
+	ID snowflake.ID `json:"id"`
+}
+
+// GetTraceByRunRequest is the request for getting a trace by run ID.
+type GetTraceByRunRequest struct {
+	RunID snowflake.ID `json:"run_id"`
+}
+
+// SpanDTO is the span detail returned in API responses.
+type SpanDTO struct {
+	ID         snowflake.ID `json:"id"`
+	TraceID    snowflake.ID `json:"trace_id"`
+	NodeID     string       `json:"node_id"`
+	Status     string       `json:"status"`
+	Error      string       `json:"error,omitempty"`
+	Input      string       `json:"input,omitempty"`
+	Output     string       `json:"output,omitempty"`
+	StartedAt  time.Time    `json:"started_at"`
+	FinishedAt time.Time    `json:"finished_at"`
+	Duration   int64        `json:"duration_ns"`
+}
+
+// TraceDTO is the trace detail returned in API responses.
+type TraceDTO struct {
+	ID         snowflake.ID `json:"id"`
+	SceneID    snowflake.ID `json:"scene_id"`
+	RunID      snowflake.ID `json:"run_id"`
+	Status     string       `json:"status"`
+	Error      string       `json:"error,omitempty"`
+	Spans      []SpanDTO    `json:"spans"`
+	StartedAt  time.Time    `json:"started_at"`
+	FinishedAt time.Time    `json:"finished_at"`
+	Duration   int64        `json:"duration_ns"`
+}
