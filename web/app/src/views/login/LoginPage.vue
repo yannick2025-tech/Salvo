@@ -16,7 +16,7 @@
             v-model="form.email"
             type="email"
             placeholder="请输入邮箱"
-            autocomplete="email"
+            autocomplete="off"
             required
           />
         </div>
@@ -27,7 +27,7 @@
             v-model="form.password"
             type="password"
             placeholder="请输入密码"
-            autocomplete="current-password"
+            autocomplete="off"
             required
           />
         </div>

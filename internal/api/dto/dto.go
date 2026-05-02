@@ -55,7 +55,7 @@ type Pagination struct {
 
 // ListResponse is a generic paginated list response.
 type ListResponse[T any] struct {
-	Items      T         `json:"items"`
+	Items      T          `json:"items"`
 	Pagination Pagination `json:"pagination"`
 }
 
@@ -69,6 +69,13 @@ type CreateSceneRequest struct {
 	Variables   string `json:"variables,omitempty"`
 	Plugins     string `json:"plugins,omitempty"`
 	Status      string `json:"status,omitempty"`
+}
+
+// ImportYAMLRequest is the request body for POST /api/v1/scenes/import.
+type ImportYAMLRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	YAML        string `json:"yaml"`
 }
 
 // UpdateSceneRequest is the request body for POST /api/v1/scenes/update.
@@ -256,16 +263,16 @@ type GetReportRequest struct {
 
 // ReportDTO is the report detail returned in API responses.
 type ReportDTO struct {
-	ID         snowflake.ID  `json:"id,string"`
-	SceneID    snowflake.ID  `json:"scene_id,string"`
-	RunID      snowflake.ID  `json:"run_id,string"`
-	Status     string        `json:"status"`
-	Summary    string        `json:"summary"`
-	Detail     string        `json:"detail"`
-	StartedAt  *time.Time    `json:"started_at,omitempty"`
-	FinishedAt *time.Time    `json:"finished_at,omitempty"`
-	CreatedAt  time.Time     `json:"created_at"`
-	UpdatedAt  time.Time     `json:"updated_at"`
+	ID         snowflake.ID `json:"id,string"`
+	SceneID    snowflake.ID `json:"scene_id,string"`
+	RunID      snowflake.ID `json:"run_id,string"`
+	Status     string       `json:"status"`
+	Summary    string       `json:"summary"`
+	Detail     string       `json:"detail"`
+	StartedAt  *time.Time   `json:"started_at,omitempty"`
+	FinishedAt *time.Time   `json:"finished_at,omitempty"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // --- RunRecord ---
@@ -350,12 +357,12 @@ type TraceDTO struct {
 
 // StartSceneRequest is the request body for POST /api/v1/scenes/start.
 type StartSceneRequest struct {
-	SceneID   snowflake.ID   `json:"scene_id"`
-	Workers   int            `json:"workers,omitempty"`
-	RunMode   string         `json:"run_mode,omitempty"`
-	Count     int64          `json:"count,omitempty"`
-	Duration  float64        `json:"duration,omitempty"`
-	Timeout   float64        `json:"timeout,omitempty"`
+	SceneID   snowflake.ID      `json:"scene_id"`
+	Workers   int               `json:"workers,omitempty"`
+	RunMode   string            `json:"run_mode,omitempty"`
+	Count     int64             `json:"count,omitempty"`
+	Duration  float64           `json:"duration,omitempty"`
+	Timeout   float64           `json:"timeout,omitempty"`
 	Variables map[string]string `json:"variables,omitempty"`
 }
 
@@ -387,8 +394,8 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string   `json:"token"`
-	User  UserDTO  `json:"user"`
+	Token string  `json:"token"`
+	User  UserDTO `json:"user"`
 }
 
 type ChangePasswordRequest struct {
@@ -402,15 +409,15 @@ type ResetPasswordRequest struct {
 }
 
 type UserDTO struct {
-	ID         snowflake.ID `json:"id"`
-	Email      string       `json:"email"`
-	Nickname   string       `json:"nickname"`
-	RoleID     snowflake.ID `json:"role_id"`
-	RoleName   string       `json:"role_name"`
-	Status     string       `json:"status"`
-	LastLoginAt *time.Time  `json:"last_login_at,omitempty"`
-	CreatedAt  time.Time    `json:"created_at"`
-	UpdatedAt  time.Time    `json:"updated_at"`
+	ID          snowflake.ID `json:"id"`
+	Email       string       `json:"email"`
+	Nickname    string       `json:"nickname"`
+	RoleID      snowflake.ID `json:"role_id"`
+	RoleName    string       `json:"role_name"`
+	Status      string       `json:"status"`
+	LastLoginAt *time.Time   `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
 }
 
 type CreateUserRequest struct {
@@ -434,13 +441,13 @@ type ListUsersRequest struct {
 }
 
 type RoleDTO struct {
-	ID          snowflake.ID   `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	IsBuiltin   bool           `json:"is_builtin"`
+	ID          snowflake.ID    `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	IsBuiltin   bool            `json:"is_builtin"`
 	Permissions []PermissionDTO `json:"permissions"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type PermissionDTO struct {
@@ -474,28 +481,28 @@ type DashboardOverviewRequest struct {
 }
 
 type DashboardOverviewDTO struct {
-	TotalReqs   int64              `json:"total_reqs"`
-	SuccessReqs int64              `json:"success_reqs"`
-	FailedReqs  int64              `json:"failed_reqs"`
-	P50Latency  float64            `json:"p50_latency"`
-	P95Latency  float64            `json:"p95_latency"`
-	P99Latency  float64            `json:"p99_latency"`
-	AvgLatency  float64            `json:"avg_latency"`
-	Running     int                `json:"running"`
-	RecentRuns  []RunRecordDTO     `json:"recent_runs"`
-	NodeMetrics []NodeMetricDTO    `json:"node_metrics"`
-	TimeSeries  *TimeSeriesDTO     `json:"time_series,omitempty"`
+	TotalReqs   int64           `json:"total_reqs"`
+	SuccessReqs int64           `json:"success_reqs"`
+	FailedReqs  int64           `json:"failed_reqs"`
+	P50Latency  float64         `json:"p50_latency"`
+	P95Latency  float64         `json:"p95_latency"`
+	P99Latency  float64         `json:"p99_latency"`
+	AvgLatency  float64         `json:"avg_latency"`
+	Running     int             `json:"running"`
+	RecentRuns  []RunRecordDTO  `json:"recent_runs"`
+	NodeMetrics []NodeMetricDTO `json:"node_metrics"`
+	TimeSeries  *TimeSeriesDTO  `json:"time_series,omitempty"`
 }
 
 type NodeMetricDTO struct {
-	Name       string  `json:"name"`
-	Type       string  `json:"type"`
-	TotalReqs  int64   `json:"total_reqs"`
-	SuccessReqs int64  `json:"success_reqs"`
-	P50Latency float64 `json:"p50_latency"`
-	P95Latency float64 `json:"p95_latency"`
-	P99Latency float64 `json:"p99_latency"`
-	AvgLatency float64 `json:"avg_latency"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	TotalReqs   int64   `json:"total_reqs"`
+	SuccessReqs int64   `json:"success_reqs"`
+	P50Latency  float64 `json:"p50_latency"`
+	P95Latency  float64 `json:"p95_latency"`
+	P99Latency  float64 `json:"p99_latency"`
+	AvgLatency  float64 `json:"avg_latency"`
 }
 
 type TimeSeriesDTO struct {

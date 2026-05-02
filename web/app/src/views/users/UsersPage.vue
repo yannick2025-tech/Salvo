@@ -152,6 +152,11 @@ async function handleSave() {
     formError.value = '邮箱和密码为必填项'
     return
   }
+  const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/
+  if (!emailRe.test(createForm.email)) {
+    formError.value = '邮箱格式不正确'
+    return
+  }
   if (!createForm.role_id || createForm.role_id === 0) {
     formError.value = '请选择角色'
     return

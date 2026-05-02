@@ -2,15 +2,18 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+	"gopkg.in/yaml.v3"
 )
 
 const defaultLimit = 20
@@ -42,6 +45,99 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+	}
+
+	return dto.OK(toSceneDTO(scene))
+}
+
+type yamlScene struct {
+	Name        string        `yaml:"name"`
+	Description string        `yaml:"description"`
+	Nodes       []yamlNode    `yaml:"nodes"`
+	Variables   []yamlVarItem `yaml:"variables,omitempty"`
+}
+
+type yamlNode struct {
+	Name   string         `yaml:"name"`
+	Type   string         `yaml:"type"`
+	Config map[string]any `yaml:"config"`
+}
+
+type yamlVarItem struct {
+	Key   string `yaml:"key"`
+	Value string `yaml:"value"`
+}
+
+func (h *Handler) ImportYAML(r *http.Request) dto.Response {
+	req, err := decode[dto.ImportYAMLRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.YAML == "" {
+		return dto.ErrorResp(400, "yaml content is required")
+	}
+
+	var ys yamlScene
+	if err := yaml.Unmarshal([]byte(req.YAML), &ys); err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("invalid yaml: %v", err))
+	}
+
+	name := req.Name
+	if name == "" {
+		name = ys.Name
+	}
+	if name == "" {
+		return dto.ErrorResp(400, "scene name is required")
+	}
+
+	var varsJSON string
+	if len(ys.Variables) > 0 {
+		vm := make(map[string]string)
+		for _, v := range ys.Variables {
+			vm[v.Key] = v.Value
+		}
+		vb, _ := json.Marshal(vm)
+		varsJSON = string(vb)
+	}
+
+	scene := &model.Scene{
+		Name:        name,
+		Description: req.Description,
+		Variables:   varsJSON,
+		Status:      model.SceneStatusDraft,
+	}
+	if scene.Description == "" {
+		scene.Description = ys.Description
+	}
+
+	if err := h.scenes.Create(r.Context(), scene); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+	}
+
+	var prevNodeID snowflake.ID
+	for _, yn := range ys.Nodes {
+		configBytes, _ := json.Marshal(yn.Config)
+		node := &model.Node{
+			SceneID: scene.ID,
+			Name:    yn.Name,
+			Type:    yn.Type,
+			Config:  string(configBytes),
+		}
+		if err := h.nodes.Create(r.Context(), node); err != nil {
+			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
+		}
+
+		if prevNodeID != 0 {
+			edge := &model.Edge{
+				SceneID:  scene.ID,
+				FromNode: prevNodeID,
+				ToNode:   node.ID,
+			}
+			if err := h.edges.Create(r.Context(), edge); err != nil {
+				return dto.ErrorResp(500, fmt.Sprintf("create edge: %v", err))
+			}
+		}
+		prevNodeID = node.ID
 	}
 
 	return dto.OK(toSceneDTO(scene))

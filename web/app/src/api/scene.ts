@@ -13,6 +13,10 @@ export function createScene(req: CreateSceneRequest) {
   return post<SceneDTO>('/scenes/create', req)
 }
 
+export function importYAML(req: { name: string; description?: string; yaml: string }) {
+  return post<SceneDTO>('/scenes/import', req)
+}
+
 export function updateScene(req: any) {
   return post<SceneDTO>('/scenes/update', req)
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +24,9 @@ func (h *Handler) Login(r *http.Request) dto.Response {
 	}
 	if req.Email == "" || req.Password == "" {
 		return dto.ErrorResp(400, "email and password are required")
+	}
+	if !isValidEmail(req.Email) {
+		return dto.ErrorResp(400, "invalid email format")
 	}
 
 	user, err := h.users.GetByEmail(r.Context(), req.Email)
@@ -202,6 +206,9 @@ func (h *Handler) CreateUser(r *http.Request) dto.Response {
 	}
 	if req.Email == "" || req.Password == "" {
 		return dto.ErrorResp(400, "email and password are required")
+	}
+	if !isValidEmail(req.Email) {
+		return dto.ErrorResp(400, "invalid email format")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -474,3 +481,9 @@ func toPermissionDTOs(perms []*model.Permission) []dto.PermissionDTO {
 }
 
 var _ = snowflake.ID(0)
+
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+func isValidEmail(email string) bool {
+	return emailRegex.MatchString(email)
+}
