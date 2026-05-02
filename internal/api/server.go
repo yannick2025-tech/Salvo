@@ -111,6 +111,7 @@ var publicRoutes = map[string]bool{
 }
 
 var routePermissions = map[string]string{
+	"/api/v1/dashboard/overview":   "dashboard:read",
 	"/api/v1/scenes/list":          "scene:read",
 	"/api/v1/scenes/create":        "scene:write",
 	"/api/v1/scenes/get":           "scene:read",
@@ -153,6 +154,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/me", s.handleAuth(s.handler.Me))
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleAuth(s.handler.Logout))
 	mux.HandleFunc("POST /api/v1/auth/change-password", s.handleAuth(s.handler.ChangePassword))
+
+	mux.HandleFunc("POST /api/v1/dashboard/overview", s.handleAuth(s.handler.DashboardOverview))
 
 	mux.HandleFunc("POST /api/v1/scenes/list", s.handleAuth(s.handler.ListScenes))
 	mux.HandleFunc("POST /api/v1/scenes/create", s.handleAuth(s.handler.CreateScene))

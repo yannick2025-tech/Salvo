@@ -461,3 +461,43 @@ type ListRolesRequest struct {
 	Offset int `json:"offset,omitempty"`
 	Limit  int `json:"limit,omitempty"`
 }
+
+// --- Dashboard ---
+
+type DashboardOverviewRequest struct {
+	RangeSeconds int `json:"range_seconds,omitempty"`
+}
+
+type DashboardOverviewDTO struct {
+	TotalReqs   int64              `json:"total_reqs"`
+	SuccessReqs int64              `json:"success_reqs"`
+	FailedReqs  int64              `json:"failed_reqs"`
+	P50Latency  float64            `json:"p50_latency"`
+	P95Latency  float64            `json:"p95_latency"`
+	P99Latency  float64            `json:"p99_latency"`
+	AvgLatency  float64            `json:"avg_latency"`
+	Running     int                `json:"running"`
+	RecentRuns  []RunRecordDTO     `json:"recent_runs"`
+	NodeMetrics []NodeMetricDTO    `json:"node_metrics"`
+	TimeSeries  *TimeSeriesDTO     `json:"time_series,omitempty"`
+}
+
+type NodeMetricDTO struct {
+	Name       string  `json:"name"`
+	Type       string  `json:"type"`
+	TotalReqs  int64   `json:"total_reqs"`
+	SuccessReqs int64  `json:"success_reqs"`
+	P50Latency float64 `json:"p50_latency"`
+	P95Latency float64 `json:"p95_latency"`
+	P99Latency float64 `json:"p99_latency"`
+	AvgLatency float64 `json:"avg_latency"`
+}
+
+type TimeSeriesDTO struct {
+	Timestamps []string  `json:"timestamps"`
+	QPS        []float64 `json:"qps"`
+	P50        []float64 `json:"p50"`
+	P95        []float64 `json:"p95"`
+	P99        []float64 `json:"p99"`
+	ErrorRate  []float64 `json:"error_rate"`
+}

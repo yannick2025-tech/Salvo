@@ -61,8 +61,8 @@
       <div class="card">
         <h3>最近运行</h3>
         <div class="run-list">
-          <div v-if="recentRuns.length === 0" class="empty">暂无运行记录</div>
-          <div v-for="run in recentRuns" :key="run.id" class="run-item">
+          <div v-if="overview?.recent_runs?.length === 0" class="empty">暂无运行记录</div>
+          <div v-for="run in overview?.recent_runs || []" :key="run.id" class="run-item">
             <div class="run-info">
               <span class="run-name">Scene #{{ run.scene_id }}</span>
               <span :class="['run-status', run.status]">{{ run.status }}</span>
@@ -79,24 +79,24 @@
       <div class="card">
         <h3>节点指标</h3>
         <div class="node-list">
-          <div v-if="nodeMetrics.length === 0" class="empty">暂无节点数据</div>
-          <div v-for="node in nodeMetrics" :key="node.name" class="node-item">
+          <div v-if="!overview?.node_metrics?.length" class="empty">暂无节点数据</div>
+          <div v-for="node in overview?.node_metrics || []" :key="node.name" class="node-item">
             <div class="node-name">{{ node.name }}</div>
             <div class="node-bars">
               <div class="bar-row">
                 <span class="bar-label">P50</span>
-                <div class="bar-track"><div class="bar-fill" :style="{ width: barWidth(node.p50) }"></div></div>
-                <span class="bar-value">{{ formatMs(node.p50) }}</span>
+                <div class="bar-track"><div class="bar-fill" :style="{ width: barWidth(node.p50_latency) }"></div></div>
+                <span class="bar-value">{{ formatMs(node.p50_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P95</span>
-                <div class="bar-track"><div class="bar-fill warn" :style="{ width: barWidth(node.p95) }"></div></div>
-                <span class="bar-value">{{ formatMs(node.p95) }}</span>
+                <div class="bar-track"><div class="bar-fill warn" :style="{ width: barWidth(node.p95_latency) }"></div></div>
+                <span class="bar-value">{{ formatMs(node.p95_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P99</span>
-                <div class="bar-track"><div class="bar-fill danger" :style="{ width: barWidth(node.p99) }"></div></div>
-                <span class="bar-value">{{ formatMs(node.p99) }}</span>
+                <div class="bar-track"><div class="bar-fill danger" :style="{ width: barWidth(node.p99_latency) }"></div></div>
+                <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
               </div>
             </div>
           </div>
@@ -109,7 +109,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { listRuns } from '@/api/scene'
+import { dashboardOverview } from '@/api/dashboard'
+import type { DashboardOverviewDTO } from '@/types'
 
 const timeRanges = [
   { label: '1m', value: 60 },
@@ -132,32 +133,28 @@ let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
 
-const recentRuns = ref<any[]>([])
-const nodeMetrics = ref<any[]>([])
+const overview = ref<DashboardOverviewDTO | null>(null)
 
 const summaryMetrics = computed(() => {
-  const runs = recentRuns.value
-  if (runs.length === 0) {
+  const d = overview.value
+  if (!d) {
     return [
-      { label: '总请求数', value: '0', color: 'var(--accent-primary)', sub: '' },
-      { label: '成功率', value: '0%', color: 'var(--accent-success)', sub: '' },
-      { label: 'P50 延迟', value: '0ms', color: 'var(--accent-info)', sub: '' },
-      { label: 'P95 延迟', value: '0ms', color: 'var(--accent-warning)', sub: '' },
-      { label: 'P99 延迟', value: '0ms', color: 'var(--accent-danger)', sub: '' },
-      { label: '运行中', value: '0', color: 'var(--accent-primary)', sub: '' },
+      { label: '总请求数', value: '-', color: 'var(--accent-primary)', sub: '' },
+      { label: '成功率', value: '-', color: 'var(--accent-success)', sub: '' },
+      { label: 'P50 延迟', value: '-', color: 'var(--accent-info)', sub: '' },
+      { label: 'P95 延迟', value: '-', color: 'var(--accent-warning)', sub: '' },
+      { label: 'P99 延迟', value: '-', color: 'var(--accent-danger)', sub: '' },
+      { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '' },
     ]
   }
-  const latest = runs[0]
-  const totalReqs = runs.reduce((s, r) => s + r.total_reqs, 0)
-  const successReqs = runs.reduce((s, r) => s + r.success_reqs, 0)
-  const running = runs.filter((r) => r.status === 'running').length
+  const rate = d.total_reqs > 0 ? ((d.success_reqs / d.total_reqs) * 100).toFixed(1) + '%' : '0%'
   return [
-    { label: '总请求数', value: formatNum(totalReqs), color: 'var(--accent-primary)', sub: '' },
-    { label: '成功率', value: ((successReqs / Math.max(totalReqs, 1)) * 100).toFixed(1) + '%', color: 'var(--accent-success)', sub: '' },
-    { label: 'P50 延迟', value: formatMs(latest.p50_latency), color: 'var(--accent-info)', sub: '' },
-    { label: 'P95 延迟', value: formatMs(latest.p95_latency), color: 'var(--accent-warning)', sub: '' },
-    { label: 'P99 延迟', value: formatMs(latest.p99_latency), color: 'var(--accent-danger)', sub: '' },
-    { label: '运行中', value: String(running), color: 'var(--accent-primary)', sub: '' },
+    { label: '总请求数', value: formatNum(d.total_reqs), color: 'var(--accent-primary)', sub: '' },
+    { label: '成功率', value: rate, color: 'var(--accent-success)', sub: '' },
+    { label: 'P50 延迟', value: formatMs(d.p50_latency), color: 'var(--accent-info)', sub: '' },
+    { label: 'P95 延迟', value: formatMs(d.p95_latency), color: 'var(--accent-warning)', sub: '' },
+    { label: 'P99 延迟', value: formatMs(d.p99_latency), color: 'var(--accent-danger)', sub: '' },
+    { label: '运行中', value: String(d.running), color: 'var(--accent-primary)', sub: '' },
   ]
 })
 
@@ -182,31 +179,6 @@ function barWidth(val: number): string {
   return pct + '%'
 }
 
-function generateMockData(range: number) {
-  const points = Math.min(range, 120)
-  const now = Date.now()
-  const interval = (range * 1000) / points
-  const times: string[] = []
-  const qps: number[] = []
-  const p50: number[] = []
-  const p95: number[] = []
-  const p99: number[] = []
-  const errRate: number[] = []
-
-  for (let i = 0; i < points; i++) {
-    const t = new Date(now - (points - i) * interval)
-    times.push(t.toLocaleTimeString())
-    const base = 500 + Math.sin(i / 10) * 200 + Math.random() * 100
-    qps.push(Math.round(base))
-    p50.push(Math.round(20 + Math.random() * 10))
-    p95.push(Math.round(50 + Math.random() * 30))
-    p99.push(Math.round(100 + Math.random() * 80))
-    errRate.push(parseFloat((Math.random() * 2).toFixed(2)))
-  }
-
-  return { times, qps, p50, p95, p99, errRate }
-}
-
 function getChartTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
   return {
@@ -221,16 +193,26 @@ function renderQpsChart() {
   if (!qpsChart) {
     qpsChart = echarts.init(qpsChartRef.value)
   }
-  const data = generateMockData(qpsRange.value)
   const theme = getChartTheme()
+  const ts = overview.value?.time_series
+  if (!ts || !ts.timestamps.length) {
+    qpsChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 30, left: 50 },
-    xAxis: { type: 'category', data: data.times, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: data.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#58a6ff', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.3)' }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
+    series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#58a6ff', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.3)' }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
     tooltip: { trigger: 'axis' },
-  })
+  }, true)
 }
 
 function renderLatencyChart() {
@@ -238,21 +220,31 @@ function renderLatencyChart() {
   if (!latencyChart) {
     latencyChart = echarts.init(latencyChartRef.value)
   }
-  const data = generateMockData(latencyRange.value)
   const theme = getChartTheme()
+  const ts = overview.value?.time_series
+  if (!ts || !ts.timestamps.length) {
+    latencyChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 30, left: 50 },
-    xAxis: { type: 'category', data: data.times, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
-      { name: 'P50', data: data.p50, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#3fb950', width: 2 } },
-      { name: 'P95', data: data.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#d29922', width: 2 } },
-      { name: 'P99', data: data.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#f85149', width: 2 } },
+      { name: 'P50', data: ts.p50, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#3fb950', width: 2 } },
+      { name: 'P95', data: ts.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#d29922', width: 2 } },
+      { name: 'P99', data: ts.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#f85149', width: 2 } },
     ],
     tooltip: { trigger: 'axis' },
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
-  })
+  }, true)
 }
 
 function renderErrorChart() {
@@ -260,23 +252,33 @@ function renderErrorChart() {
   if (!errorChart) {
     errorChart = echarts.init(errorChartRef.value)
   }
-  const data = generateMockData(errorRange.value)
   const theme = getChartTheme()
+  const ts = overview.value?.time_series
+  if (!ts || !ts.timestamps.length) {
+    errorChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
   errorChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 30, left: 50 },
-    xAxis: { type: 'category', data: data.times, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ data: data.errRate, type: 'bar', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f85149' }, { offset: 1, color: 'rgba(248,81,73,0.3)' }]) } }],
+    series: [{ data: ts.error_rate, type: 'bar', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f85149' }, { offset: 1, color: 'rgba(248,81,73,0.3)' }]) } }],
     tooltip: { trigger: 'axis' },
-  })
+  }, true)
 }
 
-async function fetchRuns() {
+async function fetchOverview(rangeSeconds: number) {
   try {
-    const resp = await listRuns({ limit: 10 })
+    const resp = await dashboardOverview(rangeSeconds)
     if (resp.code === 0) {
-      recentRuns.value = resp.data.items || []
+      overview.value = resp.data
     }
   } catch { /* ignore */ }
 }
@@ -288,23 +290,20 @@ function handleResize() {
 }
 
 watch([qpsRange, latencyRange, errorRange], () => {
+  fetchOverview(qpsRange.value)
   renderQpsChart()
   renderLatencyChart()
   renderErrorChart()
 })
 
 onMounted(() => {
-  fetchRuns()
-  renderQpsChart()
-  renderLatencyChart()
-  renderErrorChart()
+  fetchOverview(qpsRange.value)
+  setTimeout(() => {
+    renderQpsChart()
+    renderLatencyChart()
+    renderErrorChart()
+  }, 100)
   window.addEventListener('resize', handleResize)
-
-  nodeMetrics.value = [
-    { name: 'HTTP Login', p50: 15e6, p95: 45e6, p99: 120e6 },
-    { name: 'HTTP Query', p50: 8e6, p95: 25e6, p99: 68e6 },
-    { name: 'Delay Wait', p50: 100e6, p95: 105e6, p99: 115e6 },
-  ]
 })
 
 onUnmounted(() => {

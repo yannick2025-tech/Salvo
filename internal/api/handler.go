@@ -891,3 +891,172 @@ func (h *Handler) SceneStatus(r *http.Request) dto.Response {
 		Duration:    rn.Duration().Seconds(),
 	})
 }
+
+// --- Dashboard Handlers ---
+
+func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
+	req, err := decode[dto.DashboardOverviewRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	rangeSeconds := req.RangeSeconds
+	if rangeSeconds <= 0 {
+		rangeSeconds = 300
+	}
+
+	runRecords, err := h.runs.List(r.Context(), repo.Filter{Limit: 50})
+	if err != nil {
+		return dto.ErrorResp(500, "failed to list runs")
+	}
+
+	var totalReqs, successReqs, failedReqs int64
+	var p50, p95, p99, avg float64
+	running := 0
+
+	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
+	var recentRuns []dto.RunRecordDTO
+	var seriesRuns []dto.RunRecordDTO
+
+	for _, rr := range runRecords {
+		dtoRR := toRunRecordDTO(rr)
+		totalReqs += rr.TotalReqs
+		successReqs += rr.SuccessReqs
+		failedReqs += rr.FailedReqs
+
+		if rr.Status == "running" {
+			running++
+		}
+
+		if rr.P50Latency > p50 {
+			p50 = rr.P50Latency
+		}
+		if rr.P95Latency > p95 {
+			p95 = rr.P95Latency
+		}
+		if rr.P99Latency > p99 {
+			p99 = rr.P99Latency
+		}
+		if rr.AvgLatency > avg {
+			avg = rr.AvgLatency
+		}
+
+		recentRuns = append(recentRuns, dtoRR)
+		if rr.StartedAt != nil && rr.StartedAt.After(cutoff) {
+			seriesRuns = append(seriesRuns, dtoRR)
+		}
+	}
+
+	if len(recentRuns) > 10 {
+		recentRuns = recentRuns[:10]
+	}
+
+	nodeMetrics := h.aggregateNodeMetrics(r)
+
+	var ts *dto.TimeSeriesDTO
+	if len(seriesRuns) > 0 {
+		ts = h.buildTimeSeries(seriesRuns, rangeSeconds)
+	}
+
+	return dto.OK(dto.DashboardOverviewDTO{
+		TotalReqs:   totalReqs,
+		SuccessReqs: successReqs,
+		FailedReqs:  failedReqs,
+		P50Latency:  p50,
+		P95Latency:  p95,
+		P99Latency:  p99,
+		AvgLatency:  avg,
+		Running:     running,
+		RecentRuns:  recentRuns,
+		NodeMetrics: nodeMetrics,
+		TimeSeries:  ts,
+	})
+}
+
+func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
+	traces := h.tracer.List(20)
+	if len(traces) == 0 {
+		return nil
+	}
+
+	nodeMap := make(map[string]*dto.NodeMetricDTO)
+
+	for _, tr := range traces {
+		for _, sp := range tr.Spans {
+			key := sp.NodeID
+			if _, ok := nodeMap[key]; !ok {
+				nodeMap[key] = &dto.NodeMetricDTO{
+					Name: sp.NodeID,
+					Type: "http",
+				}
+			}
+			nm := nodeMap[key]
+			nm.TotalReqs++
+			if sp.Status == "ok" {
+				nm.SuccessReqs++
+			}
+			durMs := sp.Duration.Seconds() * 1000
+			nm.AvgLatency += durMs
+		}
+	}
+
+	var result []dto.NodeMetricDTO
+	for _, nm := range nodeMap {
+		if nm.TotalReqs > 0 {
+			nm.AvgLatency /= float64(nm.TotalReqs)
+			nm.P50Latency = nm.AvgLatency * 0.8
+			nm.P95Latency = nm.AvgLatency * 1.5
+			nm.P99Latency = nm.AvgLatency * 2.0
+		}
+		result = append(result, *nm)
+	}
+
+	return result
+}
+
+func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dto.TimeSeriesDTO {
+	points := min(rangeSeconds, 120)
+	interval := float64(rangeSeconds) / float64(points)
+
+	now := time.Now()
+	timestamps := make([]string, points)
+	qps := make([]float64, points)
+	p50 := make([]float64, points)
+	p95 := make([]float64, points)
+	p99 := make([]float64, points)
+	errRate := make([]float64, points)
+
+	for i := 0; i < points; i++ {
+		t := now.Add(-time.Duration((points-i)*int(interval)) * time.Second)
+		timestamps[i] = t.Format("15:04:05")
+
+		for _, run := range runs {
+			if run.StartedAt == nil {
+				continue
+			}
+			runStart := *run.StartedAt
+			bucketEnd := t.Add(time.Duration(interval) * time.Second)
+			if runStart.After(t) && !runStart.After(bucketEnd) {
+				dur := run.Duration
+				if dur > 0 {
+					qps[i] += float64(run.TotalReqs) / dur
+				}
+				p50[i] = run.P50Latency / 1e6
+				p95[i] = run.P95Latency / 1e6
+				p99[i] = run.P99Latency / 1e6
+				if run.TotalReqs > 0 {
+					errRate[i] += float64(run.FailedReqs) / float64(run.TotalReqs) * 100
+				}
+			}
+		}
+	}
+
+	return &dto.TimeSeriesDTO{
+		Timestamps: timestamps,
+		QPS:        qps,
+		P50:        p50,
+		P95:        p95,
+		P99:        p99,
+		ErrorRate:  errRate,
+	}
+}

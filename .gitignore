@@ -16,3 +16,6 @@ dist/
 .DS_Store
 bin/
 *.db
+*.db-shm
+*.db-wal
+salvo

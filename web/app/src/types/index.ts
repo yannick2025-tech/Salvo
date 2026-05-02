@@ -171,3 +171,37 @@ export interface StartSceneRequest {
   timeout?: number
   variables?: Record<string, string>
 }
+
+export interface DashboardOverviewDTO {
+  total_reqs: number
+  success_reqs: number
+  failed_reqs: number
+  p50_latency: number
+  p95_latency: number
+  p99_latency: number
+  avg_latency: number
+  running: number
+  recent_runs: RunRecordDTO[]
+  node_metrics: NodeMetricDTO[]
+  time_series?: TimeSeriesDTO
+}
+
+export interface NodeMetricDTO {
+  name: string
+  type: string
+  total_reqs: number
+  success_reqs: number
+  p50_latency: number
+  p95_latency: number
+  p99_latency: number
+  avg_latency: number
+}
+
+export interface TimeSeriesDTO {
+  timestamps: string[]
+  qps: number[]
+  p50: number[]
+  p95: number[]
+  p99: number[]
+  error_rate: number[]
+}
