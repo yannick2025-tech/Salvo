@@ -345,3 +345,38 @@ type TraceDTO struct {
 	FinishedAt time.Time    `json:"finished_at"`
 	Duration   int64        `json:"duration_ns"`
 }
+
+// --- Runner ---
+
+// StartSceneRequest is the request body for POST /api/v1/scenes/start.
+type StartSceneRequest struct {
+	SceneID   snowflake.ID   `json:"scene_id"`
+	Workers   int            `json:"workers,omitempty"`
+	RunMode   string         `json:"run_mode,omitempty"`
+	Count     int64          `json:"count,omitempty"`
+	Duration  float64        `json:"duration,omitempty"`
+	Timeout   float64        `json:"timeout,omitempty"`
+	Variables map[string]string `json:"variables,omitempty"`
+}
+
+// StopSceneRequest is the request body for POST /api/v1/scenes/stop.
+type StopSceneRequest struct {
+	SceneID snowflake.ID `json:"scene_id"`
+}
+
+// SceneStatusRequest is the request body for POST /api/v1/scenes/status.
+type SceneStatusRequest struct {
+	SceneID snowflake.ID `json:"scene_id"`
+}
+
+// SceneStatusDTO is the scene run status returned in API responses.
+type SceneStatusDTO struct {
+	SceneID     snowflake.ID `json:"scene_id"`
+	RunID       snowflake.ID `json:"run_id"`
+	Status      string       `json:"status"`
+	Workers     int          `json:"workers"`
+	TotalReqs   int64        `json:"total_reqs"`
+	SuccessReqs int64        `json:"success_reqs"`
+	FailedReqs  int64        `json:"failed_reqs"`
+	Duration    float64      `json:"duration_seconds"`
+}

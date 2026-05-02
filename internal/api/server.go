@@ -12,6 +12,7 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -54,6 +55,7 @@ func New(cfg Config) *Server {
 	}
 	h.tracer = tracer
 	h.traceStore = tracestore.New(cfg.DB.DB)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.tracer)
 
 	s := &Server{
 		db:      cfg.DB,
@@ -125,6 +127,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/traces/list", s.handle(s.handler.ListTraces))
 	mux.HandleFunc("POST /api/v1/traces/get", s.handle(s.handler.GetTrace))
 	mux.HandleFunc("POST /api/v1/traces/get-by-run", s.handle(s.handler.GetTraceByRun))
+
+	mux.HandleFunc("POST /api/v1/scenes/start", s.handle(s.handler.StartScene))
+	mux.HandleFunc("POST /api/v1/scenes/stop", s.handle(s.handler.StopScene))
+	mux.HandleFunc("POST /api/v1/scenes/status", s.handle(s.handler.SceneStatus))
 }
 
 // handlerFunc is an adapter that returns a standard dto.Response.
@@ -201,13 +207,14 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 
 // Handler holds all repository references and implements the API handlers.
 type Handler struct {
-	scenes     repo.SceneRepo
-	nodes      repo.NodeRepo
-	edges      repo.EdgeRepo
-	variables  repo.VariableRepo
-	plugins    repo.PluginConfigRepo
-	reports    repo.ReportRepo
-	runs       repo.RunRecordRepo
-	tracer     *tracelib.Tracer
-	traceStore *tracestore.Store
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	variables   repo.VariableRepo
+	plugins     repo.PluginConfigRepo
+	reports     repo.ReportRepo
+	runs        repo.RunRecordRepo
+	tracer      *tracelib.Tracer
+	traceStore  *tracestore.Store
+	runnerMgr   *runner.Manager
 }

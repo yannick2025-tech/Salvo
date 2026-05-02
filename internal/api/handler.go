@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -801,4 +803,91 @@ func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
 		FinishedAt: tr.FinishedAt,
 		Duration:   tr.Duration.Nanoseconds(),
 	}
+}
+
+// --- Runner Handlers ---
+
+func (h *Handler) StartScene(r *http.Request) dto.Response {
+	req, err := decode[dto.StartSceneRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	workers := req.Workers
+	if workers <= 0 {
+		workers = 1
+	}
+
+	runMode := runner.RunMode(req.RunMode)
+	if runMode == "" {
+		runMode = runner.RunModeCount
+	}
+
+	cfg := runner.Config{
+		SceneID:   req.SceneID,
+		Workers:   workers,
+		RunMode:   runMode,
+		Count:     req.Count,
+		Variables: req.Variables,
+	}
+
+	if req.Duration > 0 {
+		cfg.Duration = time.Duration(req.Duration * float64(time.Second))
+	}
+	if req.Timeout > 0 {
+		cfg.Timeout = time.Duration(req.Timeout * float64(time.Second))
+	}
+
+	if runMode == runner.RunModeCount && cfg.Count <= 0 {
+		cfg.Count = 1
+	}
+
+	rn, err := h.runnerMgr.Start(r.Context(), cfg)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	return dto.OK(dto.SceneStatusDTO{
+		SceneID: req.SceneID,
+		RunID:   rn.RunID(),
+		Status:  string(rn.Status()),
+		Workers: workers,
+	})
+}
+
+func (h *Handler) StopScene(r *http.Request) dto.Response {
+	req, err := decode[dto.StopSceneRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	if err := h.runnerMgr.Stop(req.SceneID); err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	return dto.OK(map[string]string{"status": "stopping"})
+}
+
+func (h *Handler) SceneStatus(r *http.Request) dto.Response {
+	req, err := decode[dto.SceneStatusRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	rn, ok := h.runnerMgr.Get(req.SceneID)
+	if !ok {
+		return dto.ErrorResp(404, "scene is not running")
+	}
+
+	stats := rn.Stats()
+	return dto.OK(dto.SceneStatusDTO{
+		SceneID:     req.SceneID,
+		RunID:       rn.RunID(),
+		Status:      string(rn.Status()),
+		Workers:     rn.Workers(),
+		TotalReqs:   stats.TotalReqs.Load(),
+		SuccessReqs: stats.SuccessReqs.Load(),
+		FailedReqs:  stats.FailedReqs.Load(),
+		Duration:    rn.Duration().Seconds(),
+	})
 }
