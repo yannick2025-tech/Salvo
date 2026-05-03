@@ -321,7 +321,11 @@ async function handleCreate() {
     showCreate.value = false
     createForm.name = ''
     createForm.description = ''
-    fetchScenes()
+    if (resp.data?.id) {
+      router.push(`/scenes/${resp.data.id}`)
+    } else {
+      fetchScenes()
+    }
   }
 }
 

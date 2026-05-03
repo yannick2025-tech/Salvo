@@ -36,15 +36,11 @@ func NewSeeders(users repo.UserRepo, roles repo.RoleRepo, perms repo.PermissionR
 }
 
 func (s *Seeders) Seed(ctx context.Context) error {
-	var count int
 	users, err := s.users.List(ctx, repo.Filter{Limit: 1})
 	if err != nil {
 		return fmt.Errorf("check users: %w", err)
 	}
-	count = len(users)
-	if count > 0 {
-		return nil
-	}
+	isFresh := len(users) == 0
 
 	permDefs := []struct {
 		Resource string
@@ -70,6 +66,16 @@ func (s *Seeders) Seed(ctx context.Context) error {
 
 	permIDs := make(map[string]snowflake.ID)
 	for _, pd := range permDefs {
+		existing, err := s.perms.List(ctx)
+		if err == nil {
+			for _, p := range existing {
+				permIDs[p.Resource+":"+p.Action] = p.ID
+			}
+		}
+		key := pd.Resource + ":" + pd.Action
+		if _, exists := permIDs[key]; exists {
+			continue
+		}
 		p := &model.Permission{
 			Resource:    pd.Resource,
 			Action:      pd.Action,
@@ -78,7 +84,7 @@ func (s *Seeders) Seed(ctx context.Context) error {
 		if err := s.perms.Create(ctx, p); err != nil {
 			return fmt.Errorf("create permission %s:%s: %w", pd.Resource, pd.Action, err)
 		}
-		permIDs[pd.Resource+":"+pd.Action] = p.ID
+		permIDs[key] = p.ID
 	}
 
 	roleDefs := []struct {
@@ -100,7 +106,7 @@ func (s *Seeders) Seed(ctx context.Context) error {
 		{
 			Name: "operator", Desc: "Can run tests and view results", IsBuiltin: true,
 			Permissions: []string{
-				"dashboard:read", "scene:read", "scene:run",
+				"dashboard:read", "scene:read", "scene:write", "scene:run",
 				"report:read", "report:export", "trace:read",
 				"runner:read", "runner:write",
 				"settings:read",
@@ -118,6 +124,26 @@ func (s *Seeders) Seed(ctx context.Context) error {
 
 	roleIDs := make(map[string]snowflake.ID)
 	for _, rd := range roleDefs {
+		existingRoles, err := s.roles.List(ctx, repo.Filter{Limit: 200})
+		if err != nil {
+			return fmt.Errorf("list roles: %w", err)
+		}
+		var existingRole *model.Role
+		for _, r := range existingRoles {
+			if r.Name == rd.Name {
+				existingRole = r
+				break
+			}
+		}
+
+		if existingRole != nil {
+			roleIDs[rd.Name] = existingRole.ID
+			if err := s.syncRolePermissions(ctx, existingRole.ID, rd.Permissions, permIDs); err != nil {
+				return fmt.Errorf("sync role %s permissions: %w", rd.Name, err)
+			}
+			continue
+		}
+
 		r := &model.Role{
 			Name:        rd.Name,
 			Description: rd.Desc,
@@ -139,6 +165,10 @@ func (s *Seeders) Seed(ctx context.Context) error {
 		}
 	}
 
+	if !isFresh {
+		return nil
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(s.config.AdminPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("hash admin password: %w", err)
@@ -154,6 +184,39 @@ func (s *Seeders) Seed(ctx context.Context) error {
 	}
 	if err := s.users.Create(ctx, adminUser); err != nil {
 		return fmt.Errorf("create admin user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Seeders) syncRolePermissions(ctx context.Context, roleID snowflake.ID, wantPerms []string, permIDs map[string]snowflake.ID) error {
+	wantSet := make(map[string]bool)
+	for _, k := range wantPerms {
+		wantSet[k] = true
+	}
+
+	current, err := s.rp.ListPermissions(ctx, roleID)
+	if err != nil {
+		return fmt.Errorf("list role permissions: %w", err)
+	}
+
+	currentSet := make(map[string]bool)
+	for _, p := range current {
+		key := p.Resource + ":" + p.Action
+		currentSet[key] = true
+	}
+
+	for _, permKey := range wantPerms {
+		if currentSet[permKey] {
+			continue
+		}
+		pid, ok := permIDs[permKey]
+		if !ok {
+			continue
+		}
+		if err := s.rp.Assign(ctx, roleID, pid); err != nil {
+			return fmt.Errorf("assign %s: %w", permKey, err)
+		}
 	}
 
 	return nil
