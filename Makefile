@@ -36,10 +36,12 @@ dev-backend:
 	go run ./cmd/salvo -config $(CONFIG)
 
 dev-frontend:
+	@find web/app/src -name "*.vue.js" -delete
 	cd web/app && npm run dev
 
 dev:
 	@echo "Starting backend and frontend..."
+	@find web/app/src -name "*.vue.js" -delete
 	@make dev-backend & make dev-frontend & wait
 
 build-frontend:
@@ -48,6 +50,7 @@ build-frontend:
 clean:
 	rm -rf bin/ logs/ *.db *.db-shm *.db-wal salvo
 	rm -rf web/app/dist web/app/node_modules web/app/.vite
+	find web/app/src -name "*.vue.js" -delete
 	@echo "Cleaned build artifacts and temp files"
 
 test:
