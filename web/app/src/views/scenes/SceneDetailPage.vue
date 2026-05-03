@@ -313,11 +313,11 @@ const conditionConfig = reactive({ expr: '' })
 const sortedNodes = computed(() => {
   if (nodes.value.length === 0) return []
 
-  const nodeMap = new Map<number, NodeDTO>()
+  const nodeMap = new Map<string, NodeDTO>()
   for (const n of nodes.value) nodeMap.set(n.id, n)
 
-  const outEdges = new Map<number, EdgeDTO[]>()
-  const inEdges = new Map<number, EdgeDTO[]>()
+  const outEdges = new Map<string, EdgeDTO[]>()
+  const inEdges = new Map<string, EdgeDTO[]>()
   for (const e of edges.value) {
     outEdges.set(e.from_node, [...(outEdges.get(e.from_node) || []), e])
     inEdges.set(e.to_node, [...(inEdges.get(e.to_node) || []), e])
@@ -326,9 +326,9 @@ const sortedNodes = computed(() => {
   const rootNodes = nodes.value.filter(n => !edges.value.some(e => e.to_node === n.id))
 
   const result: NodeDTO[] = []
-  const visited = new Set<number>()
+  const visited = new Set<string>()
 
-  function dfs(nodeId: number) {
+  function dfs(nodeId: string) {
     if (visited.has(nodeId)) return
     visited.add(nodeId)
     const n = nodeMap.get(nodeId)
@@ -350,7 +350,7 @@ const sortedNodes = computed(() => {
   return result
 })
 
-function getEdgeCondition(fromId: number, toId: number): string {
+function getEdgeCondition(fromId: string, toId: string): string {
   const edge = edges.value.find(e => e.from_node === fromId && e.to_node === toId)
   return edge?.condition || ''
 }
@@ -386,7 +386,7 @@ function showToast(msg: string, type = 'info') {
 }
 
 async function fetchScene() {
-  const id = Number(route.params.id)
+  const id = route.params.id as string
   if (!id) return
   try {
     const resp = await getScene(id)
@@ -395,7 +395,7 @@ async function fetchScene() {
 }
 
 async function fetchNodes() {
-  const id = Number(route.params.id)
+  const id = route.params.id as string
   if (!id) return
   try {
     const resp = await listNodes(id)
@@ -412,7 +412,7 @@ async function fetchNodes() {
 }
 
 async function fetchEdges() {
-  const id = Number(route.params.id)
+  const id = route.params.id as string
   if (!id) return
   try {
     const resp = await listEdges(id)
@@ -472,7 +472,7 @@ async function handleSaveNode() {
     return
   }
 
-  const sceneId = Number(route.params.id)
+  const sceneId = route.params.id as string
   let config = '{}'
 
   if (nodeForm.type === 'http' || nodeForm.type === 'setup' || nodeForm.type === 'teardown') {
@@ -537,7 +537,8 @@ async function handleSaveNode() {
   closeNodeEditor()
 }
 
-async function handleDeleteNode(id: number) {
+async function handleDeleteNode(id: string) {
+  if (!confirm('确定要删除该节点吗？')) return
   const resp = await apiDeleteNode(id)
   if (resp.code === 0) {
     showToast('节点已删除')
@@ -553,7 +554,7 @@ async function deleteEdgeBetween(idx: number) {
   if (idx >= sorted.length - 1) return
   const fromNode = sorted[idx]
   const toNode = sorted[idx + 1]
-  const edge = edges.value.find(e => e.from_node === fromNode.id && e.to_node === toNode.id)
+  const edge = edges.value.find(e => String(e.from_node) === String(fromNode.id) && String(e.to_node) === String(toNode.id))
   if (edge) {
     await deleteEdge(edge.id)
     fetchNodes()
@@ -619,7 +620,7 @@ async function handleStart() {
     showToast('请先添加 DAG 节点', 'error')
     return
   }
-  const sceneId = Number(route.params.id)
+  const sceneId = route.params.id as string
   try {
     const resp = await startScene({
       scene_id: sceneId,

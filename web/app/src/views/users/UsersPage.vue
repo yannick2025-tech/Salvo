@@ -222,7 +222,8 @@ async function handleResetPassword() {
   }
 }
 
-async function handleDelete(id: number) {
+async function handleDelete(id: string) {
+  if (!confirm('确定要删除该用户吗？此操作不可撤销。')) return
   await deleteUser(id)
   fetchUsers()
 }

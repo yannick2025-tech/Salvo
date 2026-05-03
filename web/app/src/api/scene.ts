@@ -5,7 +5,7 @@ export function listScenes(params?: { status?: string; offset?: number; limit?: 
   return post<ListResponse<SceneDTO>>('/scenes/list', params)
 }
 
-export function getScene(id: number) {
+export function getScene(id: string) {
   return post<SceneDTO>('/scenes/get', { id })
 }
 
@@ -21,7 +21,7 @@ export function updateScene(req: any) {
   return post<SceneDTO>('/scenes/update', req)
 }
 
-export function deleteScene(id: number) {
+export function deleteScene(id: string) {
   return post('/scenes/delete', { id })
 }
 
@@ -29,18 +29,18 @@ export function startScene(req: StartSceneRequest) {
   return post<SceneStatusDTO>('/scenes/start', req)
 }
 
-export function stopScene(sceneId: number) {
+export function stopScene(sceneId: string) {
   return post('/scenes/stop', { scene_id: sceneId })
 }
 
-export function sceneStatus(sceneId: number) {
+export function sceneStatus(sceneId: string) {
   return post<SceneStatusDTO>('/scenes/status', { scene_id: sceneId })
 }
 
-export function listRuns(params?: { scene_id?: number; status?: string; offset?: number; limit?: number }) {
+export function listRuns(params?: { scene_id?: string; status?: string; offset?: number; limit?: number }) {
   return post<ListResponse<RunRecordDTO>>('/runs/list', params)
 }
 
-export function getRun(id: number) {
+export function getRun(id: string) {
   return post<RunRecordDTO>('/runs/get', { id })
 }

@@ -26,10 +26,10 @@ export interface LoginResponse {
 }
 
 export interface UserDTO {
-  id: number
+  id: string
   email: string
   nickname: string
-  role_id: number
+  role_id: string
   role_name: string
   status: string
   last_login_at?: string
@@ -41,18 +41,18 @@ export interface CreateUserRequest {
   email: string
   password: string
   nickname: string
-  role_id: number
+  role_id: string
 }
 
 export interface UpdateUserRequest {
-  id: number
+  id: string
   nickname?: string
-  role_id?: number
+  role_id?: string
   status?: string
 }
 
 export interface RoleDTO {
-  id: number
+  id: string
   name: string
   description: string
   is_builtin: boolean
@@ -62,14 +62,14 @@ export interface RoleDTO {
 }
 
 export interface PermissionDTO {
-  id: number
+  id: string
   resource: string
   action: string
   description: string
 }
 
 export interface SceneDTO {
-  id: number
+  id: string
   name: string
   description: string
   dag_json: string
@@ -88,8 +88,8 @@ export interface CreateSceneRequest {
 }
 
 export interface RunRecordDTO {
-  id: number
-  scene_id: number
+  id: string
+  scene_id: string
   status: string
   worker_count: number
   run_mode: string
@@ -109,9 +109,9 @@ export interface RunRecordDTO {
 }
 
 export interface TraceDTO {
-  id: number
-  scene_id: number
-  run_id: number
+  id: string
+  scene_id: string
+  run_id: string
   status: string
   error?: string
   spans: SpanDTO[]
@@ -121,9 +121,9 @@ export interface TraceDTO {
 }
 
 export interface SpanDTO {
-  id: number
-  trace_id: number
-  node_id: number
+  id: string
+  trace_id: string
+  node_id: string
   status: string
   error?: string
   input?: string
@@ -134,9 +134,9 @@ export interface SpanDTO {
 }
 
 export interface ReportDTO {
-  id: number
-  scene_id: number
-  run_id: number
+  id: string
+  scene_id: string
+  run_id: string
   status: string
   summary: string
   detail: string
@@ -152,13 +152,13 @@ export interface ChangePasswordRequest {
 }
 
 export interface ResetPasswordRequest {
-  user_id: number
+  user_id: string
   new_password: string
 }
 
 export interface NodeDTO {
-  id: number
-  scene_id: number
+  id: string
+  scene_id: string
   name: string
   type: string
   config: string
@@ -169,10 +169,10 @@ export interface NodeDTO {
 }
 
 export interface EdgeDTO {
-  id: number
-  scene_id: number
-  from_node: number
-  to_node: number
+  id: string
+  scene_id: string
+  from_node: string
+  to_node: string
   condition: string
   priority: number
   created_at: string
@@ -180,7 +180,7 @@ export interface EdgeDTO {
 }
 
 export interface AddNodeRequest {
-  scene_id: number
+  scene_id: string
   name: string
   type: string
   config?: string
@@ -189,7 +189,7 @@ export interface AddNodeRequest {
 }
 
 export interface UpdateNodeRequest {
-  id: number
+  id: string
   name?: string
   type?: string
   config?: string
@@ -198,16 +198,16 @@ export interface UpdateNodeRequest {
 }
 
 export interface AddEdgeRequest {
-  scene_id: number
-  from_node: number
-  to_node: number
+  scene_id: string
+  from_node: string
+  to_node: string
   condition?: string
   priority?: number
 }
 
 export interface VariableDTO {
-  id: number
-  scene_id: number
+  id: string
+  scene_id: string
   scope: string
   key: string
   value: string
@@ -226,8 +226,8 @@ export interface HTTPNodeConfig {
 }
 
 export interface SceneStatusDTO {
-  scene_id: number
-  run_id: number
+  scene_id: string
+  run_id: string
   status: string
   workers: number
   total_reqs: number
@@ -237,7 +237,7 @@ export interface SceneStatusDTO {
 }
 
 export interface StartSceneRequest {
-  scene_id: number
+  scene_id: string
   workers?: number
   run_mode?: string
   count?: number

@@ -13,7 +13,7 @@ export function updateUser(req: UpdateUserRequest) {
   return post<UserDTO>('/users/update', req)
 }
 
-export function deleteUser(id: number) {
+export function deleteUser(id: string) {
   return post('/users/delete', { id })
 }
 
@@ -33,6 +33,6 @@ export function deleteRole(id: string) {
   return post('/roles/delete', { id })
 }
 
-export function resetPassword(userId: number, newPassword: string) {
+export function resetPassword(userId: string, newPassword: string) {
   return post('/auth/reset-password', { user_id: userId, new_password: newPassword })
 }

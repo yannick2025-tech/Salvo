@@ -109,7 +109,7 @@ const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
 
 const form = reactive({
-  scene_id: 0,
+  scene_id: '',
   workers: 10,
   duration: 60,
   run_mode: 'duration',
@@ -164,7 +164,7 @@ async function handleStart() {
   starting.value = false
 }
 
-async function handleStop(sceneId: number) {
+async function handleStop(sceneId: string) {
   try {
     await stopScene(sceneId)
     fetchRuns()

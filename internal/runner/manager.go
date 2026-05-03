@@ -48,7 +48,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 	m.runners[cfg.SceneID] = r
 
 	go func() {
-		_ = r.Run(ctx)
+		_ = r.Run(context.Background())
 		m.mu.Lock()
 		delete(m.runners, cfg.SceneID)
 		m.mu.Unlock()
