@@ -42,12 +42,13 @@ const (
 
 // Config holds the configuration for constructing a Logger.
 type Config struct {
-	Level      LogLevel `yaml:"level"`
+	Level      LogLevel  `yaml:"level"`
 	Format     LogFormat `yaml:"format"`
 	Output     string    `yaml:"output"`
 	MaxSize    int       `yaml:"max_size"`
 	MaxBackups int       `yaml:"max_backups"`
 	MaxAge     int       `yaml:"max_age"`
+	Compress   bool      `yaml:"compress"`
 	TimeFormat string    `yaml:"time_format"`
 }
 
@@ -89,7 +90,7 @@ func New(cfg Config) (Logger, error) {
 	if cfg.Output != "" {
 		maxSize := cfg.MaxSize
 		if maxSize <= 0 {
-			maxSize = 100
+			maxSize = 500 // Default to 500MB per log file
 		}
 		maxBackups := cfg.MaxBackups
 		if maxBackups <= 0 {
@@ -104,6 +105,7 @@ func New(cfg Config) (Logger, error) {
 			MaxSize:    maxSize,
 			MaxBackups: maxBackups,
 			MaxAge:     maxAge,
+			Compress:   cfg.Compress, // Enable compression for rotated logs
 		}
 		writers = append(writers, lj)
 		writers = append(writers, os.Stdout)

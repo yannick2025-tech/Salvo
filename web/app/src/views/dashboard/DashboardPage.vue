@@ -12,14 +12,7 @@
       <div class="chart-card">
         <div class="chart-header">
           <h3>QPS</h3>
-          <div class="chart-controls">
-            <button
-              v-for="r in timeRanges"
-              :key="r.value"
-              :class="['time-btn', { active: qpsRange === r.value }]"
-              @click="qpsRange = r.value"
-            >{{ r.label }}</button>
-          </div>
+          <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
         </div>
         <div class="chart-body" ref="qpsChartRef"></div>
       </div>
@@ -27,14 +20,7 @@
       <div class="chart-card">
         <div class="chart-header">
           <h3>延迟分布</h3>
-          <div class="chart-controls">
-            <button
-              v-for="r in timeRanges"
-              :key="r.value"
-              :class="['time-btn', { active: latencyRange === r.value }]"
-              @click="latencyRange = r.value"
-            >{{ r.label }}</button>
-          </div>
+          <div class="chart-tip">点击图例可显示/隐藏对应线条</div>
         </div>
         <div class="chart-body" ref="latencyChartRef"></div>
       </div>
@@ -44,14 +30,7 @@
       <div class="chart-card wide">
         <div class="chart-header">
           <h3>错误率</h3>
-          <div class="chart-controls">
-            <button
-              v-for="r in timeRanges"
-              :key="r.value"
-              :class="['time-btn', { active: errorRange === r.value }]"
-              @click="errorRange = r.value"
-            >{{ r.label }}</button>
-          </div>
+          <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
         </div>
         <div class="chart-body" ref="errorChartRef"></div>
       </div>
@@ -138,19 +117,6 @@ import * as echarts from 'echarts'
 import { dashboardOverview } from '@/api/dashboard'
 import type { DashboardOverviewDTO } from '@/types'
 
-const timeRanges = [
-  { label: '1m', value: 60 },
-  { label: '5m', value: 300 },
-  { label: '15m', value: 900 },
-  { label: '1h', value: 3600 },
-  { label: '6h', value: 21600 },
-  { label: '24h', value: 86400 },
-]
-
-const qpsRange = ref(300)
-const latencyRange = ref(300)
-const errorRange = ref(300)
-
 const qpsChartRef = ref<HTMLElement>()
 const latencyChartRef = ref<HTMLElement>()
 const errorChartRef = ref<HTMLElement>()
@@ -225,8 +191,8 @@ function formatMs(sec: number): string {
   if (!sec) return '0ms'
   const ms = sec * 1000
   if (ms < 1) return ms.toFixed(3) + 'ms'
-  if (ms < 1000) return ms.toFixed(1) + 'ms'
-  return (ms / 1000).toFixed(2) + 's'
+  if (ms < 1000) return ms.toFixed(3) + 'ms'
+  return (ms / 1000).toFixed(3) + 's'
 }
 
 function barWidth(val: number): string {
@@ -356,17 +322,33 @@ function renderNodeDetailChart(nodeId: string) {
   const theme = getChartTheme()
   const isSmooth = nodeChartType.value === 'smooth'
 
-  const hasTimeSeries = node.timestamps && node.timestamps.length > 0 && (node.ts_p50?.length || 0) > 0
+  const hasTimeSeries = node.timestamps && node.timestamps.length > 0
 
   if (hasTimeSeries) {
+    const tsP50 = node.ts_p50 || []
+    const tsAvg = node.ts_avg || []
+    const tsP95 = node.ts_p95 || []
+    const tsP99 = node.ts_p99 || []
+    const tsQPS = node.ts_qps || []
+    
+    // Ensure all arrays have the same length as timestamps
+    const padArray = (arr: number[], length: number): number[] => {
+      const result = [...arr]
+      while (result.length < length) {
+        result.push(0)
+      }
+      return result.slice(0, length)
+    }
+    
+    const timestampsLength = node.timestamps?.length || 0
     const series: any[] = [
-      { name: 'P50', data: node.ts_p50!, lineStyle: { color: '#58a6ff', width: 2 }, itemStyle: { color: '#58a6ff' }, areaStyle: undefined },
-      { name: 'Avg', data: node.ts_avg!, lineStyle: { color: '#3fb950', width: 2 }, itemStyle: { color: '#3fb950' }, areaStyle: undefined },
-      { name: 'P95', data: node.ts_p95!, lineStyle: { color: '#d29922', width: 2 }, itemStyle: { color: '#d29922' }, areaStyle: undefined },
-      { name: 'P99', data: node.ts_p99!, lineStyle: { color: '#f85149', width: 2 }, itemStyle: { color: '#f85149' }, areaStyle: undefined },
+      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: '#58a6ff', width: 2 }, itemStyle: { color: '#58a6ff' }, areaStyle: undefined },
+      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: '#3fb950', width: 2 }, itemStyle: { color: '#3fb950' }, areaStyle: undefined },
+      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: '#d29922', width: 2 }, itemStyle: { color: '#d29922' }, areaStyle: undefined },
+      { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: '#f85149', width: 2 }, itemStyle: { color: '#f85149' }, areaStyle: undefined },
     ]
-    if (node.ts_qps && node.ts_qps.some((v: number) => v > 0)) {
-      series.push({ name: 'QPS', data: node.ts_qps, type: 'bar', lineStyle: undefined, itemStyle: { color: 'rgba(88,166,255,0.25)', borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
+    if (tsQPS.length > 0) {
+      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: 'rgba(88,166,255,0.25)', borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
     }
 
     const hasQPS = series.length > 4
@@ -424,9 +406,10 @@ function renderNodeDetailChart(nodeId: string) {
   }
 }
 
-async function fetchOverview(rangeSeconds: number) {
+async function fetchOverview() {
   try {
-    const resp = await dashboardOverview(rangeSeconds)
+    // Fetch all available data without time range limit
+    const resp = await dashboardOverview(0)
     if (resp.code === 0) {
       overview.value = resp.data
     }
@@ -439,15 +422,8 @@ function handleResize() {
   errorChart?.resize()
 }
 
-watch([qpsRange, latencyRange, errorRange], () => {
-  fetchOverview(qpsRange.value)
-  renderQpsChart()
-  renderLatencyChart()
-  renderErrorChart()
-})
-
 onMounted(() => {
-  fetchOverview(qpsRange.value)
+  fetchOverview()
   setTimeout(() => {
     renderQpsChart()
     renderLatencyChart()
@@ -455,7 +431,7 @@ onMounted(() => {
   }, 100)
   window.addEventListener('resize', handleResize)
   pollTimer = setInterval(() => {
-    fetchOverview(qpsRange.value)
+    fetchOverview()
     setTimeout(() => {
       renderQpsChart()
       renderLatencyChart()

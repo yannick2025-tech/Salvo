@@ -1334,6 +1334,8 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 	totalDur := globalEnd.Sub(globalStart)
 	if totalDur <= 0 {
 		totalDur = time.Minute
+		globalStart = time.Now().Add(-time.Minute)
+		globalEnd = time.Now()
 	}
 	bucketSize := totalDur / time.Duration(numBuckets)
 
@@ -1416,6 +1418,19 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 			nm.TSP99 = tsP99
 			nm.TSAvg = tsAvg
 			nm.TSQPS = tsQPS
+		} else {
+			// Generate empty time series for nodes with no duration data
+			timestamps := make([]string, numBuckets)
+			for i := 0; i < numBuckets; i++ {
+				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
+				timestamps[i] = bucketTime.Format("15:04:05")
+			}
+			nm.Timestamps = timestamps
+			nm.TSP50 = make([]float64, numBuckets)
+			nm.TSP95 = make([]float64, numBuckets)
+			nm.TSP99 = make([]float64, numBuckets)
+			nm.TSAvg = make([]float64, numBuckets)
+			nm.TSQPS = make([]float64, numBuckets)
 		}
 
 		result = append(result, nm)

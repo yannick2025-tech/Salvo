@@ -406,20 +406,20 @@ function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') 
   const input = event.target as HTMLInputElement
   const value = input.value
   
-  if (!value || value === '0') {
-    input.value = '1'
-    if (field === 'workers') runConfig.workers = 1
-    else if (field === 'count') runConfig.count = 1
-    else if (field === 'duration') runConfig.duration = 1
+  // Allow empty input - user may be typing
+  if (!value) {
+    return
+  }
+  
+  // Allow single zero - user may be typing
+  if (value === '0') {
     return
   }
   
   const numValue = parseInt(value, 10)
   if (isNaN(numValue)) {
-    input.value = '1'
-    if (field === 'workers') runConfig.workers = 1
-    else if (field === 'count') runConfig.count = 1
-    else if (field === 'duration') runConfig.duration = 1
+    // Remove non-numeric characters
+    input.value = value.replace(/[^0-9]/g, '')
     return
   }
   
@@ -440,6 +440,11 @@ function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') 
     if (field === 'workers') runConfig.workers = limit.max
     else if (field === 'count') runConfig.count = limit.max
     else if (field === 'duration') runConfig.duration = limit.max
+  } else {
+    // Update the reactive value when valid input
+    if (field === 'workers') runConfig.workers = numValue
+    else if (field === 'count') runConfig.count = numValue
+    else if (field === 'duration') runConfig.duration = numValue
   }
 }
 

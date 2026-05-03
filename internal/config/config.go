@@ -67,6 +67,7 @@ type LogConfig struct {
 	MaxSize    int             `yaml:"max_size"`
 	MaxBackups int             `yaml:"max_backups"`
 	MaxAge     int             `yaml:"max_age"`
+	Compress   bool            `yaml:"compress"`
 	TimeFormat string          `yaml:"time_format"`
 }
 
@@ -116,6 +117,10 @@ func Default() *Config {
 		Log: LogConfig{
 			Level:      logger.InfoLevel,
 			Format:     logger.FormatJSON,
+			MaxSize:    500,
+			MaxBackups: 5,
+			MaxAge:     30,
+			Compress:   true,
 			TimeFormat: "2006-01-02T15:04:05.000Z07:00",
 		},
 		Pool: PoolConfig{

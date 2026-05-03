@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -112,6 +113,9 @@ func (s *Stats) LatencyPercentiles() (avg, p50, p95, p99 time.Duration) {
 		total += l
 	}
 	avg = total / time.Duration(len(list))
+
+	// Sort the list before calculating percentiles
+	sort.Slice(list, func(i, j int) bool { return list[i] < list[j] })
 
 	p50 = percentile(list, 50)
 	p95 = percentile(list, 95)
