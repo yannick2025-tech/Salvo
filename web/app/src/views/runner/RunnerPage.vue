@@ -10,7 +10,7 @@
         <div class="form-group">
           <label>场景</label>
           <select v-model="form.scene_id">
-            <option :value="0">选择场景</option>
+            <option value="">选择场景</option>
             <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
         </div>

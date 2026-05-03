@@ -20,3 +20,4 @@ bin/
 *.db-wal
 logs/
 salvo
+*.vue.js

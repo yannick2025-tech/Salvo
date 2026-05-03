@@ -55,7 +55,7 @@
         <div class="form-group">
           <label>角色</label>
           <select v-model="createForm.role_id">
-            <option :value="0">请选择角色</option>
+            <option value="">请选择角色</option>
             <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
         </div>
@@ -105,7 +105,7 @@ const users = ref<UserDTO[]>([])
 const roles = ref<RoleDTO[]>([])
 const showCreate = ref(false)
 const editingUser = ref<UserDTO | null>(null)
-const createForm = reactive({ email: '', password: '', nickname: '', role_id: 0, status: 'active' })
+const createForm = reactive({ email: '', password: '', nickname: '', role_id: '', status: 'active' })
 const formError = ref('')
 const showResetPwd = ref(false)
 const resetTargetUser = ref<UserDTO | null>(null)
@@ -141,7 +141,7 @@ function closeModal() {
   createForm.email = ''
   createForm.password = ''
   createForm.nickname = ''
-  createForm.role_id = 0
+  createForm.role_id = ''
   createForm.status = 'active'
   formError.value = ''
 }
@@ -157,7 +157,7 @@ async function handleSave() {
     formError.value = '邮箱格式不正确'
     return
   }
-  if (!createForm.role_id || createForm.role_id === 0) {
+  if (!createForm.role_id) {
     formError.value = '请选择角色'
     return
   }
