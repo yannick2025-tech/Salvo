@@ -1,3 +1,6 @@
+// Package api implements the HTTP API layer for Salvo, handling scene
+// management, user authentication, DAG node/edge operations, and test
+// execution control.
 package api
 
 import (

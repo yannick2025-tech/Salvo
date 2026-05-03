@@ -1,3 +1,7 @@
+// Package runner implements the test execution engine for Salvo scenarios.
+// It loads scene configuration from the store, builds a DAG, and runs
+// the scenario using a configurable worker pool with count-based or
+// duration-based modes.
 package runner
 
 import (
@@ -164,6 +168,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		runs:    runs,
 		tracer:  tracer,
 		nodeGen: n,
+		runID:   n.Generate(),
 		done:    make(chan struct{}),
 	}
 	r.status.Store(StatusPending)
@@ -180,7 +185,6 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.ctx, r.cancel = context.WithCancel(ctx)
 	r.status.Store(StatusRunning)
 	r.startedAt = time.Now().UTC()
-	r.runID = r.nodeGen.Generate()
 	r.mu.Unlock()
 
 	defer func() {

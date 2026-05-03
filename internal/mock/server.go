@@ -1,3 +1,6 @@
+// Package mock provides a lightweight HTTP mock server for testing Salvo
+// DAG scenarios. It exposes REST endpoints that simulate an e-commerce
+// API (users, products, orders, auth, payment, notify).
 package mock
 
 import (

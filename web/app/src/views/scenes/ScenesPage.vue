@@ -60,14 +60,14 @@
     <div v-if="showImport" class="modal-overlay" @click.self="showImport = false">
       <div class="modal modal-lg">
         <h3>导入 YAML 配置</h3>
-        <p class="import-hint">粘贴 YAML 配置内容，系统将自动创建场景和 DAG 请求流节点。可点击"加载示例"查看基于 Mock Server 的配置模板。</p>
+        <p class="import-hint">粘贴 YAML 配置内容，系统将自动创建场景和 DAG 请求流节点。支持 setup/teardown 生命周期、参数生成器 (generator)、参数关联 (extract)、条件判断 (condition) 和延迟 (delay) 等节点类型。可点击"加载示例"查看完整电商全链路配置模板。</p>
         <div class="form-group">
           <label>场景名称</label>
           <input v-model="importForm.name" placeholder="留空则使用 YAML 中的 name 字段" />
         </div>
         <div class="form-group">
           <label>YAML 内容</label>
-          <textarea v-model="importForm.yaml" class="yaml-input" placeholder="在此粘贴 YAML 配置..." rows="16"></textarea>
+          <textarea v-model="importForm.yaml" class="yaml-input" placeholder="在此粘贴 YAML 配置..." rows="24"></textarea>
         </div>
         <div v-if="importError" class="form-error">{{ importError }}</div>
         <div class="modal-actions">
@@ -97,72 +97,212 @@ const importForm = reactive({ name: '', yaml: '' })
 const importing = ref(false)
 const importError = ref('')
 
-const exampleYAML = `name: Mock API 电商流程测试
-description: 基于 Mock Server 的完整电商链路压测场景
+const exampleYAML = `name: Mock API 电商全链路压测
+description: |
+  基于 Mock Server 的完整电商链路压测场景，展示 Salvo 核心能力：
+  - Setup/Teardown 生命周期管理
+  - 参数生成器 (Generator) 动态生成请求参数
+  - 参数关联 (Extract) 从响应提取变量传递给后续请求
+  - 条件判断 (Condition) 根据运行时条件走不同分支
+  - 延迟控制 (Delay) 模拟用户思考时间
 
 variables:
   - key: base_url
     value: http://localhost:9090/mock/api
   - key: token
     value: ""
+  - key: user_id
+    value: "0"
+  - key: product_id
+    value: "1"
+  - key: order_id
+    value: ""
+  - key: payment_status
+    value: ""
 
-nodes:
-  - name: 用户登录
-    type: http
+setup:
+  - name: 注册测试用户
+    type: setup
     config:
       method: POST
-      url: "{{base_url}}/auth/login"
+      url: "\${base_url}/users"
+      headers:
+        Content-Type: application/json
+      body: '{"name":"perf_test_user","email":"perf@example.com"}'
+      timeout: 5000
+      expect_status: 201
+      extract:
+        user_id: "$.data.id"
+
+  - name: 用户登录获取Token
+    type: setup
+    config:
+      method: POST
+      url: "\${base_url}/auth/login"
       headers:
         Content-Type: application/json
       body: '{"email":"admin@example.com","password":"admin123"}'
       timeout: 5000
       expect_status: 200
+      extract:
+        token: "$.data.token"
+        user_id: "$.data.user.id"
 
-  - name: 获取商品列表
+nodes:
+  - name: 浏览商品列表
     type: http
     config:
       method: GET
-      url: "{{base_url}}/products"
+      url: "\${base_url}/products?page=1"
       headers:
-        Authorization: "Bearer {{token}}"
+        Authorization: "Bearer \${token}"
       timeout: 5000
       expect_status: 200
+      extract:
+        product_id: "$.data[0].id"
+
+  - name: 查看商品详情
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/\${product_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: 5000
+      expect_status: 200
+
+  - name: 用户思考时间
+    type: delay
+    config:
+      ms: 500
 
   - name: 创建订单
     type: http
     config:
       method: POST
-      url: "{{base_url}}/orders"
+      url: "\${base_url}/orders"
       headers:
         Content-Type: application/json
-        Authorization: "Bearer {{token}}"
-      body: '{"user_id":1,"total":79.98}'
+        Authorization: "Bearer \${token}"
+      body: '{"user_id":\${user_id},"total":79.98}'
       timeout: 5000
       expect_status: 201
+      extract:
+        order_id: "$.data.id"
+      generator:
+        body_fields:
+          total:
+            type: number
+            minimum: 10
+            maximum: 500
+            multipleOf: 0.01
+
+  - name: 判断是否支付
+    type: condition
+    config:
+      expr: "\${order_id} != ''"
 
   - name: 支付订单
     type: http
     config:
       method: POST
-      url: "{{base_url}}/payment"
+      url: "\${base_url}/payment"
       headers:
         Content-Type: application/json
-        Authorization: "Bearer {{token}}"
-      body: '{"amount":79.98,"order_id":"ORD-001"}'
+        Authorization: "Bearer \${token}"
+      body: '{"amount":79.98,"order_id":"\${order_id}"}'
+      timeout: 5000
+      expect_status: 200
+      extract:
+        payment_status: "$.data.status"
+      generator:
+        body_fields:
+          amount:
+            type: number
+            minimum: 10
+            maximum: 500
+
+  - name: 跳过支付
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/orders/\${order_id}"
+      headers:
+        Authorization: "Bearer \${token}"
       timeout: 5000
       expect_status: 200
 
-  - name: 发送通知
+  - name: 发送支付通知
     type: http
     config:
       method: POST
-      url: "{{base_url}}/notify"
+      url: "\${base_url}/notify"
       headers:
         Content-Type: application/json
-        Authorization: "Bearer {{token}}"
-      body: '{"event":"payment_success","order_id":"ORD-001"}'
+        Authorization: "Bearer \${token}"
+      body: '{"event":"payment_success","order_id":"\${order_id}"}'
       timeout: 5000
       expect_status: 200
+
+teardown:
+  - name: 查询最终订单状态
+    type: teardown
+    config:
+      method: GET
+      url: "\${base_url}/orders/\${order_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: 5000
+      expect_status: 200
+
+  - name: 清理测试数据
+    type: teardown
+    config:
+      method: DELETE
+      url: "\${base_url}/users/\${user_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: 5000
+      expect_status: 200
+
+edges:
+  - from: 注册测试用户
+    to: 用户登录获取Token
+
+  - from: 用户登录获取Token
+    to: 浏览商品列表
+
+  - from: 浏览商品列表
+    to: 查看商品详情
+
+  - from: 查看商品详情
+    to: 用户思考时间
+
+  - from: 用户思考时间
+    to: 创建订单
+
+  - from: 创建订单
+    to: 判断是否支付
+
+  - from: 判断是否支付
+    to: 支付订单
+    condition: "true"
+
+  - from: 判断是否支付
+    to: 跳过支付
+    condition: "false"
+
+  - from: 支付订单
+    to: 发送支付通知
+
+  - from: 发送支付通知
+    to: 查询最终订单状态
+
+  - from: 跳过支付
+    to: 查询最终订单状态
+
+  - from: 查询最终订单状态
+    to: 清理测试数据
 `
 
 async function fetchScenes() {

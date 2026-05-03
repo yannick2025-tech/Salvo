@@ -53,14 +53,23 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 type yamlScene struct {
 	Name        string        `yaml:"name"`
 	Description string        `yaml:"description"`
-	Nodes       []yamlNode    `yaml:"nodes"`
 	Variables   []yamlVarItem `yaml:"variables,omitempty"`
+	Setup       []yamlNode    `yaml:"setup,omitempty"`
+	Nodes       []yamlNode    `yaml:"nodes"`
+	Teardown    []yamlNode    `yaml:"teardown,omitempty"`
+	Edges       []yamlEdge    `yaml:"edges,omitempty"`
 }
 
 type yamlNode struct {
 	Name   string         `yaml:"name"`
 	Type   string         `yaml:"type"`
 	Config map[string]any `yaml:"config"`
+}
+
+type yamlEdge struct {
+	From      string `yaml:"from"`
+	To        string `yaml:"to"`
+	Condition string `yaml:"condition,omitempty"`
 }
 
 type yamlVarItem struct {
@@ -114,8 +123,14 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
 	}
 
-	var prevNodeID snowflake.ID
-	for _, yn := range ys.Nodes {
+	nodeNameToID := make(map[string]snowflake.ID)
+
+	allNodes := make([]yamlNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
+	allNodes = append(allNodes, ys.Setup...)
+	allNodes = append(allNodes, ys.Nodes...)
+	allNodes = append(allNodes, ys.Teardown...)
+
+	for _, yn := range allNodes {
 		configBytes, _ := json.Marshal(yn.Config)
 		node := &model.Node{
 			SceneID: scene.ID,
@@ -126,18 +141,80 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		if err := h.nodes.Create(r.Context(), node); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
 		}
+		nodeNameToID[yn.Name] = node.ID
+	}
 
-		if prevNodeID != 0 {
+	if len(ys.Edges) > 0 {
+		for _, ye := range ys.Edges {
+			fromID, ok := nodeNameToID[ye.From]
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("edge from node %q not found", ye.From))
+			}
+			toID, ok := nodeNameToID[ye.To]
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("edge to node %q not found", ye.To))
+			}
 			edge := &model.Edge{
-				SceneID:  scene.ID,
-				FromNode: prevNodeID,
-				ToNode:   node.ID,
+				SceneID:   scene.ID,
+				FromNode:  fromID,
+				ToNode:    toID,
+				Condition: ye.Condition,
 			}
 			if err := h.edges.Create(r.Context(), edge); err != nil {
 				return dto.ErrorResp(500, fmt.Sprintf("create edge: %v", err))
 			}
 		}
-		prevNodeID = node.ID
+	} else {
+		setupIDs := make([]snowflake.ID, 0, len(ys.Setup))
+		for _, n := range ys.Setup {
+			if id, ok := nodeNameToID[n.Name]; ok {
+				setupIDs = append(setupIDs, id)
+			}
+		}
+		mainIDs := make([]snowflake.ID, 0, len(ys.Nodes))
+		for _, n := range ys.Nodes {
+			if id, ok := nodeNameToID[n.Name]; ok {
+				mainIDs = append(mainIDs, id)
+			}
+		}
+		teardownIDs := make([]snowflake.ID, 0, len(ys.Teardown))
+		for _, n := range ys.Teardown {
+			if id, ok := nodeNameToID[n.Name]; ok {
+				teardownIDs = append(teardownIDs, id)
+			}
+		}
+
+		var lastSetupID snowflake.ID
+		for i, id := range setupIDs {
+			if i > 0 {
+				h.edges.Create(r.Context(), &model.Edge{SceneID: scene.ID, FromNode: lastSetupID, ToNode: id})
+			}
+			lastSetupID = id
+		}
+
+		var lastMainID snowflake.ID
+		for i, id := range mainIDs {
+			if i > 0 {
+				h.edges.Create(r.Context(), &model.Edge{SceneID: scene.ID, FromNode: lastMainID, ToNode: id})
+			}
+			lastMainID = id
+		}
+
+		if lastSetupID != 0 && len(mainIDs) > 0 {
+			h.edges.Create(r.Context(), &model.Edge{SceneID: scene.ID, FromNode: lastSetupID, ToNode: mainIDs[0]})
+		}
+
+		var lastTeardownID snowflake.ID
+		for i, id := range teardownIDs {
+			if i > 0 {
+				h.edges.Create(r.Context(), &model.Edge{SceneID: scene.ID, FromNode: lastTeardownID, ToNode: id})
+			}
+			lastTeardownID = id
+		}
+
+		if lastMainID != 0 && len(teardownIDs) > 0 {
+			h.edges.Create(r.Context(), &model.Edge{SceneID: scene.ID, FromNode: lastMainID, ToNode: teardownIDs[0]})
+		}
 	}
 
 	return dto.OK(toSceneDTO(scene))

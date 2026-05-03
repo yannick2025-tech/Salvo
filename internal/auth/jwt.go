@@ -1,3 +1,6 @@
+// Package auth provides JWT-based authentication and RBAC authorization
+// for Salvo. It handles token issuance, validation, role-based access
+// control, and initial seed data for built-in roles and permissions.
 package auth
 
 import (

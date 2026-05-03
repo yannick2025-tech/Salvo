@@ -21,9 +21,11 @@
       <div class="section-header">
         <h3>DAG 请求流</h3>
         <div class="dag-actions">
-          <button class="btn-sm" @click="addNode('http')">+ HTTP 请求</button>
+          <button class="btn-sm" @click="addNode('setup')">+ Setup</button>
+          <button class="btn-sm" @click="addNode('http')">+ HTTP</button>
           <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
           <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
+          <button class="btn-sm" @click="addNode('teardown')">+ Teardown</button>
         </div>
       </div>
 
@@ -39,10 +41,10 @@
               :class="['dag-node', node.type, { active: selectedNode?.id === node.id }]"
               @click="selectNode(node)"
             >
-              <div class="node-icon">{{ nodeIcon(node.type) }}</div>
+              <div :class="['node-icon', node.type]">{{ nodeIcon(node.type) }}</div>
               <div class="node-info">
                 <span class="node-name">{{ node.name }}</span>
-                <span class="node-type">{{ node.type }}</span>
+                <span class="node-type-badge">{{ nodeTypeLabel(node.type) }}</span>
               </div>
               <div class="node-actions">
                 <button class="node-btn" @click.stop="editNode(node)" title="编辑">✎</button>
@@ -51,6 +53,9 @@
             </div>
             <div v-if="idx < sortedNodes.length - 1" class="dag-edge">
               <div class="edge-line"></div>
+              <div v-if="getEdgeCondition(sortedNodes[idx].id, sortedNodes[idx + 1].id)" class="edge-condition">
+                {{ getEdgeCondition(sortedNodes[idx].id, sortedNodes[idx + 1].id) }}
+              </div>
               <div class="edge-arrow">▼</div>
               <button class="edge-delete" @click="deleteEdgeBetween(idx)" title="删除连线">✕</button>
             </div>
@@ -65,7 +70,7 @@
         <button class="btn-close" @click="selectedNode = null">✕</button>
       </div>
 
-      <div v-if="selectedNode.type === 'http'" class="config-form">
+      <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
         <div class="form-row">
           <label>节点名称</label>
           <input v-model="editingConfig.name" @change="saveNodeConfig" />
@@ -86,7 +91,7 @@
         </div>
         <div class="form-row">
           <label>Headers (JSON)</label>
-          <textarea v-model="httpConfig.headers" rows="3" placeholder='{"Content-Type":"application/json","Authorization":"Bearer {{token}}"}' @change="saveNodeConfig"></textarea>
+          <textarea v-model="httpConfig.headers" rows="3" placeholder='{"Content-Type":"application/json","Authorization":"Bearer ${token}"}' @change="saveNodeConfig"></textarea>
         </div>
         <div class="form-row">
           <label>Body</label>
@@ -103,6 +108,10 @@
         <div class="form-row">
           <label>变量提取 (JSON)</label>
           <textarea v-model="httpConfig.extract" rows="2" placeholder='{"token":"$.data.token","user_id":"$.data.user.id"}' @change="saveNodeConfig"></textarea>
+        </div>
+        <div class="form-row">
+          <label>参数生成器 (JSON)</label>
+          <textarea v-model="httpConfig.generator" rows="3" placeholder='{"email":{"type":"string","format":"email"},"age":{"type":"integer","minimum":18,"maximum":65}}' @change="saveNodeConfig"></textarea>
         </div>
       </div>
 
@@ -124,7 +133,7 @@
         </div>
         <div class="form-row">
           <label>条件表达式</label>
-          <input v-model="conditionConfig.expr" placeholder='{{status_code}} == 200' @change="saveNodeConfig" />
+          <input v-model="conditionConfig.expr" placeholder='${status_code} == 200' @change="saveNodeConfig" />
         </div>
       </div>
     </div>
@@ -187,12 +196,14 @@
         <div class="form-group">
           <label>节点类型</label>
           <select v-model="nodeForm.type" :disabled="!!editingNode">
+            <option value="setup">Setup (初始化)</option>
             <option value="http">HTTP 请求</option>
             <option value="delay">延迟</option>
             <option value="condition">条件判断</option>
+            <option value="teardown">Teardown (清理)</option>
           </select>
         </div>
-        <template v-if="nodeForm.type === 'http'">
+        <template v-if="nodeForm.type === 'http' || nodeForm.type === 'setup' || nodeForm.type === 'teardown'">
           <div class="form-group">
             <label>请求方法</label>
             <select v-model="nodeForm.httpMethod">
@@ -214,6 +225,10 @@
             <label>Body</label>
             <textarea v-model="nodeForm.body" rows="3" placeholder='{"key":"value"}'></textarea>
           </div>
+          <div class="form-group">
+            <label>变量提取 (JSON)</label>
+            <textarea v-model="nodeForm.extract" rows="2" placeholder='{"token":"$.data.token"}'></textarea>
+          </div>
         </template>
         <template v-if="nodeForm.type === 'delay'">
           <div class="form-group">
@@ -224,7 +239,7 @@
         <template v-if="nodeForm.type === 'condition'">
           <div class="form-group">
             <label>条件表达式</label>
-            <input v-model="nodeForm.conditionExpr" placeholder='{{status_code}} == 200' />
+            <input v-model="nodeForm.conditionExpr" placeholder='${status_code} == 200' />
           </div>
         </template>
         <div class="modal-actions">
@@ -239,9 +254,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene, updateScene } from '@/api/scene'
+import { getScene, createScene, startScene } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import type { SceneDTO, NodeDTO, EdgeDTO } from '@/types'
 
@@ -278,6 +293,7 @@ const nodeForm = reactive({
   body: '',
   delayMs: 1000,
   conditionExpr: '',
+  extract: '',
 })
 
 const editingConfig = reactive({ name: '' })
@@ -289,29 +305,79 @@ const httpConfig = reactive({
   timeout: 5000,
   expect_status: 200,
   extract: '',
+  generator: '',
 })
 const delayConfig = reactive({ ms: 1000 })
 const conditionConfig = reactive({ expr: '' })
 
 const sortedNodes = computed(() => {
-  if (edges.value.length === 0) return nodes.value
-  const edgeMap = new Map<number, number>()
+  if (nodes.value.length === 0) return []
+
+  const nodeMap = new Map<number, NodeDTO>()
+  for (const n of nodes.value) nodeMap.set(n.id, n)
+
+  const outEdges = new Map<number, EdgeDTO[]>()
+  const inEdges = new Map<number, EdgeDTO[]>()
   for (const e of edges.value) {
-    edgeMap.set(e.from_node, e.to_node)
+    outEdges.set(e.from_node, [...(outEdges.get(e.from_node) || []), e])
+    inEdges.set(e.to_node, [...(inEdges.get(e.to_node) || []), e])
   }
-  const startNodes = nodes.value.filter(n => !edges.value.some(e => e.to_node === n.id))
+
+  const rootNodes = nodes.value.filter(n => !edges.value.some(e => e.to_node === n.id))
+
   const result: NodeDTO[] = []
-  let current = startNodes[0]
   const visited = new Set<number>()
-  while (current && !visited.has(current.id)) {
-    result.push(current)
-    visited.add(current.id)
-    const nextId = edgeMap.get(current.id)
-    current = nextId ? nodes.value.find(n => n.id === nextId)! : null as any
+
+  function dfs(nodeId: number) {
+    if (visited.has(nodeId)) return
+    visited.add(nodeId)
+    const n = nodeMap.get(nodeId)
+    if (n) result.push(n)
+    const children = outEdges.get(nodeId) || []
+    for (const e of children) {
+      dfs(e.to_node)
+    }
   }
-  const remaining = nodes.value.filter(n => !visited.has(n.id))
-  return [...result, ...remaining]
+
+  for (const root of rootNodes) {
+    dfs(root.id)
+  }
+
+  for (const n of nodes.value) {
+    if (!visited.has(n.id)) result.push(n)
+  }
+
+  return result
 })
+
+function getEdgeCondition(fromId: number, toId: number): string {
+  const edge = edges.value.find(e => e.from_node === fromId && e.to_node === toId)
+  return edge?.condition || ''
+}
+
+function nodeIcon(type: string) {
+  switch (type) {
+    case 'setup': return '▶'
+    case 'http': return '⇄'
+    case 'delay': return '⏱'
+    case 'condition': return '◇'
+    case 'loop': return '↻'
+    case 'teardown': return '■'
+    default: return '○'
+  }
+}
+
+function nodeTypeLabel(type: string) {
+  switch (type) {
+    case 'setup': return 'SETUP'
+    case 'http': return 'HTTP'
+    case 'delay': return 'DELAY'
+    case 'condition': return 'CONDITION'
+    case 'loop': return 'LOOP'
+    case 'teardown': return 'TEARDOWN'
+    default: return type.toUpperCase()
+  }
+}
 
 function showToast(msg: string, type = 'info') {
   toastMsg.value = msg
@@ -337,6 +403,12 @@ async function fetchNodes() {
       nodes.value = resp.data.items || []
     }
   } catch { /* ignore */ }
+  try {
+    const resp = await listEdges(id)
+    if (resp.code === 0) {
+      edges.value = resp.data.items || []
+    }
+  } catch { /* ignore */ }
 }
 
 async function fetchEdges() {
@@ -350,16 +422,6 @@ async function fetchEdges() {
   } catch { /* ignore */ }
 }
 
-function nodeIcon(type: string) {
-  switch (type) {
-    case 'http': return '⇄'
-    case 'delay': return '⏱'
-    case 'condition': return '◇'
-    case 'loop': return '↻'
-    default: return '○'
-  }
-}
-
 function addNode(type: string) {
   editingNode.value = null
   nodeForm.name = ''
@@ -370,6 +432,7 @@ function addNode(type: string) {
   nodeForm.body = ''
   nodeForm.delayMs = 1000
   nodeForm.conditionExpr = ''
+  nodeForm.extract = ''
   showNodeEditor.value = true
 }
 
@@ -385,6 +448,7 @@ function editNode(node: NodeDTO) {
     nodeForm.body = cfg.body || ''
     nodeForm.delayMs = cfg.ms || 1000
     nodeForm.conditionExpr = cfg.expr || ''
+    nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
   } catch {
     nodeForm.httpMethod = 'GET'
     nodeForm.url = ''
@@ -392,6 +456,7 @@ function editNode(node: NodeDTO) {
     nodeForm.body = ''
     nodeForm.delayMs = 1000
     nodeForm.conditionExpr = ''
+    nodeForm.extract = ''
   }
   showNodeEditor.value = true
 }
@@ -410,11 +475,11 @@ async function handleSaveNode() {
   const sceneId = Number(route.params.id)
   let config = '{}'
 
-  if (nodeForm.type === 'http') {
+  if (nodeForm.type === 'http' || nodeForm.type === 'setup' || nodeForm.type === 'teardown') {
     let headers: Record<string, string> = {}
     try { headers = JSON.parse(nodeForm.headers || '{}') } catch { /* ignore */ }
     let extract: Record<string, string> = {}
-    try { extract = JSON.parse(httpConfig.extract || '{}') } catch { /* ignore */ }
+    try { extract = JSON.parse(nodeForm.extract || '{}') } catch { /* ignore */ }
     config = JSON.stringify({
       method: nodeForm.httpMethod,
       url: nodeForm.url,
@@ -507,6 +572,7 @@ function selectNode(node: NodeDTO) {
     httpConfig.timeout = cfg.timeout || 5000
     httpConfig.expect_status = cfg.expect_status || 200
     httpConfig.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
+    httpConfig.generator = cfg.generator ? JSON.stringify(cfg.generator, null, 2) : ''
     delayConfig.ms = cfg.ms || 1000
     conditionConfig.expr = cfg.expr || ''
   } catch { /* ignore */ }
@@ -515,23 +581,28 @@ function selectNode(node: NodeDTO) {
 async function saveNodeConfig() {
   if (!selectedNode.value) return
   let config = '{}'
-  if (selectedNode.value.type === 'http') {
+  const nodeType = selectedNode.value.type
+  if (nodeType === 'http' || nodeType === 'setup' || nodeType === 'teardown') {
     let headers: Record<string, string> = {}
     try { headers = JSON.parse(httpConfig.headers || '{}') } catch { /* ignore */ }
     let extract: Record<string, string> = {}
     try { extract = JSON.parse(httpConfig.extract || '{}') } catch { /* ignore */ }
-    config = JSON.stringify({
+    let generator: Record<string, any> = {}
+    try { generator = JSON.parse(httpConfig.generator || '{}') } catch { /* ignore */ }
+    const cfg: Record<string, any> = {
       method: httpConfig.method,
       url: httpConfig.url,
       headers,
       body: httpConfig.body,
       timeout: httpConfig.timeout,
       expect_status: httpConfig.expect_status,
-      extract,
-    })
-  } else if (selectedNode.value.type === 'delay') {
+    }
+    if (Object.keys(extract).length > 0) cfg.extract = extract
+    if (Object.keys(generator).length > 0) cfg.generator = generator
+    config = JSON.stringify(cfg)
+  } else if (nodeType === 'delay') {
     config = JSON.stringify({ ms: delayConfig.ms })
-  } else if (selectedNode.value.type === 'condition') {
+  } else if (nodeType === 'condition') {
     config = JSON.stringify({ expr: conditionConfig.expr })
   }
 
@@ -629,6 +700,7 @@ onMounted(() => {
 .status-badge.draft { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
 .status-badge.ready { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+.status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 
 .dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; }
 .section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-secondary); }
@@ -644,26 +716,35 @@ onMounted(() => {
 .dag-node {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
-  background: var(--bg-tertiary); cursor: pointer; min-width: 280px;
+  background: var(--bg-tertiary); cursor: pointer; min-width: 300px;
   transition: all 0.15s ease;
 }
 .dag-node:hover { border-color: var(--accent-primary); }
 .dag-node.active { border-color: var(--accent-primary); box-shadow: 0 0 0 2px rgba(88,166,255,0.2); }
+.dag-node.setup { border-left: 3px solid #2ecc71; }
 .dag-node.http { border-left: 3px solid var(--accent-primary); }
 .dag-node.delay { border-left: 3px solid #f0ad4e; }
 .dag-node.condition { border-left: 3px solid #9b59b6; }
+.dag-node.teardown { border-left: 3px solid #e74c3c; }
 
-.node-icon { font-size: 16px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(88,166,255,0.1); }
-.node-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.node-icon { font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+.node-icon.setup { background: rgba(46,204,113,0.15); color: #2ecc71; }
+.node-icon.http { background: rgba(88,166,255,0.1); color: var(--accent-primary); }
+.node-icon.delay { background: rgba(240,173,78,0.15); color: #f0ad4e; }
+.node-icon.condition { background: rgba(155,89,182,0.15); color: #9b59b6; }
+.node-icon.teardown { background: rgba(231,76,60,0.15); color: #e74c3c; }
+
+.node-info { flex: 1; display: flex; align-items: center; gap: 8px; }
 .node-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-.node-type { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; }
+.node-type-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(139,148,158,0.15); color: var(--text-tertiary); letter-spacing: 0.5px; }
 .node-actions { display: flex; gap: 4px; }
 .node-btn { border: none; background: transparent; color: var(--text-tertiary); font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
 .node-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 .node-btn.danger:hover { color: var(--accent-danger); }
 
 .dag-edge { display: flex; flex-direction: column; align-items: center; position: relative; padding: 4px 0; }
-.edge-line { width: 2px; height: 16px; background: var(--border-primary); }
+.edge-line { width: 2px; height: 12px; background: var(--border-primary); }
+.edge-condition { font-size: 10px; padding: 2px 8px; border-radius: 8px; background: rgba(155,89,182,0.15); color: #9b59b6; margin: 2px 0; }
 .edge-arrow { color: var(--text-tertiary); font-size: 10px; line-height: 1; }
 .edge-delete { position: absolute; right: -20px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: var(--text-tertiary); font-size: 10px; cursor: pointer; opacity: 0; transition: opacity 0.15s; }
 .dag-edge:hover .edge-delete { opacity: 1; }
