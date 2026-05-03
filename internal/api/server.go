@@ -278,11 +278,17 @@ func (s *Server) handleAuth(h handlerFunc) http.HandlerFunc {
 			if len(parts) == 2 {
 				ok, err := s.rbac.HasPermission(ctx, claims.RoleID, parts[0], parts[1])
 				if err != nil {
-					s.logger.Error("rbac check failed", logger.F("error", err))
+					s.logger.Error("rbac check failed", logger.F("error", err), logger.F("role_id", claims.RoleID), logger.F("path", r.URL.Path))
 					writeJSON(w, dto.ErrorResp(500, "permission check failed"))
 					return
 				}
 				if !ok {
+					s.logger.Warn("permission denied",
+						logger.F("role_id", claims.RoleID),
+						logger.F("user_id", claims.UserID),
+						logger.F("required", perm),
+						logger.F("path", r.URL.Path),
+					)
 					writeJSON(w, dto.ErrorResp(403, "insufficient permissions"))
 					return
 				}
