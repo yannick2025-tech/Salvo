@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -19,9 +20,10 @@ type Manager struct {
 	edges  repo.EdgeRepo
 	runs   repo.RunRecordRepo
 	tracer *tracelib.Tracer
+	log    logger.Logger
 }
 
-func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, tracer *tracelib.Tracer) *Manager {
+func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, tracer *tracelib.Tracer, log logger.Logger) *Manager {
 	return &Manager{
 		runners: make(map[snowflake.ID]*Runner),
 		scenes:  scenes,
@@ -29,6 +31,7 @@ func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo,
 		edges:   edges,
 		runs:    runs,
 		tracer:  tracer,
+		log:     log,
 	}
 }
 
@@ -40,7 +43,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 		return nil, fmt.Errorf("scene %d is already running", cfg.SceneID)
 	}
 
-	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.tracer)
+	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.tracer, m.log)
 	if err != nil {
 		return nil, err
 	}

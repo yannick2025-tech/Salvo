@@ -495,14 +495,22 @@ type DashboardOverviewDTO struct {
 }
 
 type NodeMetricDTO struct {
-	Name        string  `json:"name"`
-	Type        string  `json:"type"`
-	TotalReqs   int64   `json:"total_reqs"`
-	SuccessReqs int64   `json:"success_reqs"`
-	P50Latency  float64 `json:"p50_latency"`
-	P95Latency  float64 `json:"p95_latency"`
-	P99Latency  float64 `json:"p99_latency"`
-	AvgLatency  float64 `json:"avg_latency"`
+	NodeID      string    `json:"node_id"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`
+	SortOrder   int       `json:"sort_order"`
+	TotalReqs   int64     `json:"total_reqs"`
+	SuccessReqs int64     `json:"success_reqs"`
+	P50Latency  float64   `json:"p50_latency"`
+	P95Latency  float64   `json:"p95_latency"`
+	P99Latency  float64   `json:"p99_latency"`
+	AvgLatency  float64   `json:"avg_latency"`
+	Timestamps  []string  `json:"timestamps"`
+	TSP50       []float64 `json:"ts_p50"`
+	TSP95       []float64 `json:"ts_p95"`
+	TSP99       []float64 `json:"ts_p99"`
+	TSAvg       []float64 `json:"ts_avg"`
+	TSQPS       []float64 `json:"ts_qps"`
 }
 
 type TimeSeriesDTO struct {

@@ -57,8 +57,8 @@
       </div>
     </div>
 
-    <div class="bottom-row">
-      <div class="card">
+    <div class="bottom-section">
+      <div class="card card-full">
         <h3>最近运行</h3>
         <div class="run-list">
           <div v-if="overview?.recent_runs?.length === 0" class="empty">暂无运行记录</div>
@@ -76,12 +76,24 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>节点指标</h3>
-        <div class="node-list">
-          <div v-if="!overview?.node_metrics?.length" class="empty">暂无节点数据</div>
-          <div v-for="node in overview?.node_metrics || []" :key="node.name" class="node-item">
-            <div class="node-name">{{ node.name }}</div>
+      <div class="card card-full">
+        <div class="node-section-header">
+          <h3>节点指标</h3>
+          <span class="time-range-label" v-if="overview?.recent_runs?.length">时间区间: {{ runTimeRange }}</span>
+        </div>
+        <div v-if="!overview?.node_metrics?.length" class="empty">暂无节点数据</div>
+        <div class="node-grid" v-else>
+          <div v-for="node in overview?.node_metrics || []" :key="node.node_id" class="node-card" :class="{ expanded: expandedNodeId === node.node_id }" @click="toggleNodeExpand(node.node_id)">
+            <div class="node-header">
+              <span class="node-name">{{ node.name }}</span>
+              <span class="node-id">ID: {{ node.node_id.slice(-8) }}</span>
+              <span :class="['node-type', node.type]">{{ node.type }}</span>
+              <span class="expand-icon">{{ expandedNodeId === node.node_id ? '▼' : '▶' }}</span>
+            </div>
+            <div class="node-qps">
+              <span class="qps-label">QPS</span>
+              <span class="qps-value">{{ nodeQPS(node) }}</span>
+            </div>
             <div class="node-bars">
               <div class="bar-row">
                 <span class="bar-label">P50</span>
@@ -97,6 +109,20 @@
                 <span class="bar-label">P99</span>
                 <div class="bar-track"><div class="bar-fill danger" :style="{ width: barWidth(node.p99_latency) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
+              </div>
+            </div>
+            <div v-if="expandedNodeId === node.node_id" class="node-detail" @click.stop>
+              <div class="detail-grid">
+                <div class="detail-item"><span class="detail-label">总请求数</span><span class="detail-val">{{ formatNum(node.total_reqs) }}</span></div>
+                <div class="detail-item"><span class="detail-label">成功数</span><span class="detail-val success">{{ formatNum(node.success_reqs) }}</span></div>
+                <div class="detail-item"><span class="detail-label">失败数</span><span class="detail-val danger">{{ formatNum(node.total_reqs - node.success_reqs) }}</span></div>
+                <div class="detail-item"><span class="detail-label">成功率</span><span class="detail-val">{{ node.total_reqs > 0 ? ((node.success_reqs / node.total_reqs) * 100).toFixed(1) : '0' }}%</span></div>
+                <div class="detail-item"><span class="detail-label">平均延迟</span><span class="detail-val">{{ formatMs(node.avg_latency) }}</span></div>
+              </div>
+              <div class="detail-chart" :ref="el => setNodeChartRef(node.node_id, el as HTMLElement)"></div>
+              <div class="chart-type-toggle">
+                <button :class="['type-btn', { active: nodeChartType === 'smooth' }]" @click.stop="switchNodeChartType('smooth')">平滑</button>
+                <button :class="['type-btn', { active: nodeChartType === 'step' }]" @click.stop="switchNodeChartType('step')">阶梯</button>
               </div>
             </div>
           </div>
@@ -132,8 +158,39 @@ const errorChartRef = ref<HTMLElement>()
 let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
+const expandedNodeId = ref('')
+const nodeChartRefs = new Map<string, HTMLElement>()
+const nodeCharts = new Map<string, echarts.ECharts>()
+const nodeChartType = ref<'smooth' | 'step'>('smooth')
 
 const overview = ref<DashboardOverviewDTO | null>(null)
+
+const runTimeRange = computed(() => {
+  const runs = overview.value?.recent_runs
+  if (!runs?.length) return '-'
+  const first = runs[runs.length - 1]
+  const last = runs[0]
+  const fmt = (t?: string) => t ? new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'
+  return `${fmt(first.started_at)} ~ ${fmt(last.started_at)}`
+})
+
+function toggleNodeExpand(nodeId: string) {
+  expandedNodeId.value = expandedNodeId.value === nodeId ? '' : nodeId
+  if (expandedNodeId.value) {
+    setTimeout(() => renderNodeDetailChart(nodeId), 50)
+  }
+}
+
+function switchNodeChartType(type: 'smooth' | 'step') {
+  nodeChartType.value = type
+  if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
+}
+
+function setNodeChartRef(nodeId: string, el: HTMLElement | null) {
+  if (el) nodeChartRefs.set(nodeId, el)
+  else nodeChartRefs.delete(nodeId)
+}
 
 const summaryMetrics = computed(() => {
   const d = overview.value
@@ -164,9 +221,9 @@ function formatNum(n: number): string {
   return Math.round(n).toString()
 }
 
-function formatMs(ns: number): string {
-  if (!ns) return '0ms'
-  const ms = ns / 1e6
+function formatMs(sec: number): string {
+  if (!sec) return '0ms'
+  const ms = sec * 1000
   if (ms < 1) return ms.toFixed(3) + 'ms'
   if (ms < 1000) return ms.toFixed(1) + 'ms'
   return (ms / 1000).toFixed(2) + 's'
@@ -174,9 +231,18 @@ function formatMs(ns: number): string {
 
 function barWidth(val: number): string {
   if (!val) return '0%'
-  const ms = val / 1e6
+  const ms = val * 1000
   const pct = Math.min((ms / 500) * 100, 100)
   return pct + '%'
+}
+
+function nodeQPS(node: any): string {
+  if (node.ts_qps?.length) {
+    const valid = node.ts_qps.filter((v: number) => v > 0)
+    if (valid.length) return formatNum(valid.reduce((a: number, b: number) => a + b, 0) / valid.length)
+  }
+  if (node.total_reqs > 0 && node.avg_latency > 0) return formatNum(1 / node.avg_latency)
+  return '0'
 }
 
 function getChartTheme() {
@@ -207,7 +273,8 @@ function renderQpsChart() {
   }
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 30, left: 50 },
+    grid: { top: 20, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#58a6ff', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.3)' }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
@@ -234,7 +301,8 @@ function renderLatencyChart() {
   }
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 30, left: 50 },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
@@ -266,12 +334,94 @@ function renderErrorChart() {
   }
   errorChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 30, left: 50 },
+    grid: { top: 20, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ data: ts.error_rate, type: 'bar', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f85149' }, { offset: 1, color: 'rgba(248,81,73,0.3)' }]) } }],
+    yAxis: { type: 'value', min: 0, max: ts.error_rate.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
+    series: [{ data: ts.error_rate, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f85149' }, { offset: 1, color: 'rgba(248,81,73,0.3)' }]) } }],
     tooltip: { trigger: 'axis' },
   }, true)
+}
+
+function renderNodeDetailChart(nodeId: string) {
+  const el = nodeChartRefs.get(nodeId)
+  if (!el) return
+  let chart = nodeCharts.get(nodeId)
+  if (!chart) {
+    chart = echarts.init(el)
+    nodeCharts.set(nodeId, chart)
+  }
+  const node = overview.value?.node_metrics?.find(n => n.node_id === nodeId)
+  if (!node) return
+  const theme = getChartTheme()
+  const isSmooth = nodeChartType.value === 'smooth'
+
+  const hasTimeSeries = node.timestamps && node.timestamps.length > 0 && (node.ts_p50?.length || 0) > 0
+
+  if (hasTimeSeries) {
+    const series: any[] = [
+      { name: 'P50', data: node.ts_p50!, lineStyle: { color: '#58a6ff', width: 2 }, itemStyle: { color: '#58a6ff' }, areaStyle: undefined },
+      { name: 'Avg', data: node.ts_avg!, lineStyle: { color: '#3fb950', width: 2 }, itemStyle: { color: '#3fb950' }, areaStyle: undefined },
+      { name: 'P95', data: node.ts_p95!, lineStyle: { color: '#d29922', width: 2 }, itemStyle: { color: '#d29922' }, areaStyle: undefined },
+      { name: 'P99', data: node.ts_p99!, lineStyle: { color: '#f85149', width: 2 }, itemStyle: { color: '#f85149' }, areaStyle: undefined },
+    ]
+    if (node.ts_qps && node.ts_qps.some((v: number) => v > 0)) {
+      series.push({ name: 'QPS', data: node.ts_qps, type: 'bar', lineStyle: undefined, itemStyle: { color: 'rgba(88,166,255,0.25)', borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
+    }
+
+    const hasQPS = series.length > 4
+    chart.setOption({
+      backgroundColor: 'transparent',
+      legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
+      grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+      xAxis: { type: 'category', data: node.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor((node.timestamps!.length || 1) / 6) - 1 } },
+      yAxis: hasQPS ? [
+        { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
+        { type: 'value', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}' } },
+      ] : { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
+      tooltip: { trigger: 'axis', confine: true, formatter: (p: any[]) => {
+        let s = `<div style="font-size:11px">${p[0].axisValue}</div>`
+        for (const pt of p) {
+          const val = pt.seriesName === 'QPS' ? pt.value.toFixed(1) : pt.value.toFixed(1) + 'ms'
+          s += `<div style="display:flex;justify-content:space-between;gap:12px"><span>${pt.marker}${pt.seriesName}</span><b>${val}</b></div>`
+        }
+        return s
+      }},
+      series: series.map((s, idx) => ({
+        name: s.name,
+        type: s.type || 'line',
+        smooth: isSmooth,
+        step: isSmooth ? false : 'middle',
+        symbol: 'none',
+        data: s.data,
+        lineStyle: s.lineStyle,
+        itemStyle: s.itemStyle,
+        areaStyle: s.areaStyle,
+        yAxisIndex: hasQPS && s.name === 'QPS' ? 1 : 0,
+      })),
+    }, true)
+  } else {
+    chart.setOption({
+      backgroundColor: 'transparent',
+      grid: { top: 16, right: 16, bottom: 36, left: 48 },
+      xAxis: { type: 'category', data: ['P50', 'P95', 'P99', 'Avg'], axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+      yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
+      series: [{
+        data: [node.p50_latency * 1000, node.p95_latency * 1000, node.p99_latency * 1000, node.avg_latency * 1000],
+        type: 'bar',
+        barWidth: '40%',
+        itemStyle: {
+          borderRadius: [3, 3, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#58a6ff' },
+            { offset: 1, color: 'rgba(88,166,255,0.3)' },
+          ]),
+        },
+      }],
+      tooltip: { trigger: 'axis', formatter: (p: any[]) => `${p[0].name}: ${formatMs(p[0].value / 1000)}` },
+    }, true)
+  }
 }
 
 async function fetchOverview(rangeSeconds: number) {
@@ -280,7 +430,7 @@ async function fetchOverview(rangeSeconds: number) {
     if (resp.code === 0) {
       overview.value = resp.data
     }
-  } catch { /* ignore */ }
+  } catch (e) { /* ignore */ }
 }
 
 function handleResize() {
@@ -304,10 +454,19 @@ onMounted(() => {
     renderErrorChart()
   }, 100)
   window.addEventListener('resize', handleResize)
+  pollTimer = setInterval(() => {
+    fetchOverview(qpsRange.value)
+    setTimeout(() => {
+      renderQpsChart()
+      renderLatencyChart()
+      renderErrorChart()
+    }, 100)
+  }, 5000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   qpsChart?.dispose()
   latencyChart?.dispose()
   errorChart?.dispose()
@@ -408,10 +567,15 @@ onUnmounted(() => {
   height: 220px;
 }
 
-.bottom-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.bottom-section {
+  display: flex;
+  flex-direction: column !important;
   gap: 16px;
+  width: 100%;
+}
+
+.card-full {
+  width: 100%;
 }
 
 .card {
@@ -477,23 +641,69 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-.node-list {
-  display: flex;
-  flex-direction: column;
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 12px;
 }
 
-.node-item {
-  padding: 10px 12px;
+.node-card {
+  padding: 14px 16px;
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border-secondary);
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .node-name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 8px;
+}
+
+.node-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.node-type {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.node-type.http { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+.node-type.setup, .node-type.teardown { background: rgba(63,185,80,0.15); color: var(--accent-success); }
+.node-type.delay { background: rgba(210,153,34,0.15); color: var(--accent-warning); }
+.node-type.condition { background: rgba(163,113,247,0.15); color: #a371f7; }
+
+.node-qps {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.qps-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.qps-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent-primary);
 }
 
 .node-bars {
@@ -539,5 +749,83 @@ onUnmounted(() => {
   width: 60px;
   text-align: right;
   flex-shrink: 0;
+}
+
+.node-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.node-section-header h3 { margin-bottom: 0; }
+.time-range-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: monospace;
+}
+
+.node-card { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.node-card:hover { border-color: var(--accent-primary); }
+.node-card.expanded {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px rgba(88,166,255,0.2);
+  grid-column: 1 / -1;
+}
+
+.expand-icon {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  transition: transform 0.15s ease;
+}
+
+.node-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+}
+
+.detail-label { font-size: 11px; color: var(--text-tertiary); }
+.detail-val { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.detail-val.success { color: var(--accent-success); }
+.detail-val.danger { color: var(--accent-danger); }
+
+.detail-chart { height: 140px; }
+
+.chart-type-toggle {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.type-btn {
+  padding: 3px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.type-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
 }
 </style>

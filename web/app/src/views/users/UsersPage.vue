@@ -92,6 +92,20 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
+      <div class="confirm-dialog">
+        <div class="confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 class="confirm-title">确认删除</h3>
+        <p class="confirm-msg">{{ confirmMessage }}</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="showConfirm = false">取消</button>
+          <button class="btn-danger-confirm" @click="confirmDelete">确认删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -111,6 +125,9 @@ const showResetPwd = ref(false)
 const resetTargetUser = ref<UserDTO | null>(null)
 const newPassword = ref('')
 const confirmPassword = ref('')
+const showConfirm = ref(false)
+const confirmMessage = ref('')
+const pendingDeleteId = ref('')
 
 async function fetchUsers() {
   try {
@@ -223,7 +240,15 @@ async function handleResetPassword() {
 }
 
 async function handleDelete(id: string) {
-  if (!confirm('确定要删除该用户吗？此操作不可撤销。')) return
+  pendingDeleteId.value = id
+  confirmMessage.value = '确定要删除该用户吗？此操作不可撤销。'
+  showConfirm.value = true
+}
+
+async function confirmDelete() {
+  const id = pendingDeleteId.value
+  showConfirm.value = false
+  pendingDeleteId.value = ''
   await deleteUser(id)
   fetchUsers()
 }
@@ -271,4 +296,37 @@ onMounted(() => {
 .form-group input:disabled { opacity: 0.5; }
 .form-group input:focus, .form-group select:focus { border-color: var(--accent-primary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+.confirm-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.confirm-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--accent-danger);
+}
+.confirm-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+.confirm-msg { font-size: 13px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: center; gap: 10px; }
+.btn-cancel {
+  padding: 8px 20px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-cancel:hover { background: var(--bg-hover); }
+.btn-danger-confirm {
+  padding: 8px 20px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-danger); color: #fff; font-size: 13px; cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.btn-danger-confirm:hover { opacity: 0.88; }
 </style>

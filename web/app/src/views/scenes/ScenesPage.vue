@@ -27,7 +27,7 @@
           <tr v-for="s in scenes" :key="s.id">
             <td class="mono">{{ s.id }}</td>
             <td><router-link :to="`/scenes/${s.id}`" class="link">{{ s.name }}</router-link></td>
-            <td>{{ s.description || '-' }}</td>
+            <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
             <td class="actions">
@@ -53,6 +53,24 @@
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreate = false">取消</button>
           <button class="btn-primary" @click="handleCreate">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
+      <div class="confirm-dialog">
+        <div class="confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h3 class="confirm-title">确认删除</h3>
+        <p class="confirm-msg">{{ confirmMessage }}</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="showConfirm = false">取消</button>
+          <button class="btn-danger-confirm" @click="confirmDelete">确认删除</button>
         </div>
       </div>
     </div>
@@ -96,6 +114,9 @@ const showImport = ref(false)
 const importForm = reactive({ name: '', yaml: '' })
 const importing = ref(false)
 const importError = ref('')
+const showConfirm = ref(false)
+const confirmMessage = ref('')
+const pendingDeleteId = ref('')
 
 const exampleYAML = `name: Mock API 电商全链路压测
 description: |
@@ -330,7 +351,15 @@ async function handleCreate() {
 }
 
 async function handleDelete(id: string) {
-  if (!confirm('确定要删除该场景吗？此操作不可撤销。')) return
+  pendingDeleteId.value = id
+  confirmMessage.value = '确定要删除该场景吗？此操作不可撤销。'
+  showConfirm.value = true
+}
+
+async function confirmDelete() {
+  const id = pendingDeleteId.value
+  showConfirm.value = false
+  pendingDeleteId.value = ''
   await deleteScene(id)
   fetchScenes()
 }
@@ -410,6 +439,7 @@ onMounted(fetchScenes)
 .data-table td { color: var(--text-primary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
 .mono { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
+.desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
@@ -431,4 +461,41 @@ onMounted(fetchScenes)
 .import-hint { font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; line-height: 1.5; }
 .form-error { font-size: 12px; color: var(--accent-danger, #e74c3c); background: rgba(248,81,73,0.1); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 8px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+.confirm-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.confirm-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--accent-danger);
+}
+.confirm-title {
+  font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px;
+}
+.confirm-msg {
+  font-size: 13px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5;
+}
+.confirm-actions { display: flex; justify-content: center; gap: 10px; }
+.btn-cancel {
+  padding: 8px 20px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-cancel:hover { background: var(--bg-hover); }
+.btn-danger-confirm {
+  padding: 8px 20px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-danger); color: #fff; font-size: 13px; cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.btn-danger-confirm:hover { opacity: 0.88; }
 </style>

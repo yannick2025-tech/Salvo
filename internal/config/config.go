@@ -28,13 +28,14 @@ const (
 
 // Config is the top-level configuration for the Salvo application.
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Log      LogConfig      `yaml:"log"`
-	Pool     PoolConfig     `yaml:"pool"`
-	Storage  StorageConfig  `yaml:"storage"`
-	Auth     AuthConfig     `yaml:"auth"`
-	Mock     MockConfig     `yaml:"mock"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Log       LogConfig       `yaml:"log"`
+	Pool      PoolConfig      `yaml:"pool"`
+	Storage   StorageConfig   `yaml:"storage"`
+	Auth      AuthConfig      `yaml:"auth"`
+	Mock      MockConfig      `yaml:"mock"`
+	Variables map[string]string `yaml:"variables"`
 }
 
 // ServerConfig holds the HTTP server listen address.

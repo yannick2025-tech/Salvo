@@ -34,29 +34,31 @@ type Server struct {
 }
 
 type Config struct {
-	Addr     string
-	DB       *sqlite.DB
-	Logger   logger.Logger
-	JWT      *auth.JWTManager
-	RBAC     *auth.RBACChecker
-	WebDir   string
+	Addr      string
+	DB        *sqlite.DB
+	Logger    logger.Logger
+	JWT       *auth.JWTManager
+	RBAC      *auth.RBACChecker
+	WebDir    string
+	Variables map[string]string
 }
 
 func New(cfg Config) *Server {
 	h := &Handler{
-		scenes:    sqlite.NewSceneRepo(cfg.DB),
-		nodes:     sqlite.NewNodeRepo(cfg.DB),
-		edges:     sqlite.NewEdgeRepo(cfg.DB),
-		variables: sqlite.NewVariableRepo(cfg.DB),
-		plugins:   sqlite.NewPluginConfigRepo(cfg.DB),
-		reports:   sqlite.NewReportRepo(cfg.DB),
-		runs:      sqlite.NewRunRecordRepo(cfg.DB),
-		users:     sqlite.NewUserRepo(cfg.DB),
-		roles:     sqlite.NewRoleRepo(cfg.DB),
-		perms:     sqlite.NewPermissionRepo(cfg.DB),
-		rp:        sqlite.NewRolePermissionRepo(cfg.DB),
-		jwt:       cfg.JWT,
-		rbac:      cfg.RBAC,
+		scenes:     sqlite.NewSceneRepo(cfg.DB),
+		nodes:      sqlite.NewNodeRepo(cfg.DB),
+		edges:      sqlite.NewEdgeRepo(cfg.DB),
+		variables:  sqlite.NewVariableRepo(cfg.DB),
+		plugins:    sqlite.NewPluginConfigRepo(cfg.DB),
+		reports:    sqlite.NewReportRepo(cfg.DB),
+		runs:       sqlite.NewRunRecordRepo(cfg.DB),
+		users:      sqlite.NewUserRepo(cfg.DB),
+		roles:      sqlite.NewRoleRepo(cfg.DB),
+		perms:      sqlite.NewPermissionRepo(cfg.DB),
+		rp:         sqlite.NewRolePermissionRepo(cfg.DB),
+		jwt:        cfg.JWT,
+		rbac:       cfg.RBAC,
+		globalVars: cfg.Variables,
 	}
 
 	tracer, err := tracelib.NewTracer(tracelib.Config{BufferSize: 1000})
@@ -65,7 +67,7 @@ func New(cfg Config) *Server {
 	}
 	h.tracer = tracer
 	h.traceStore = tracestore.New(cfg.DB.DB)
-	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.tracer)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.tracer, cfg.Logger)
 
 	s := &Server{
 		db:      cfg.DB,
@@ -219,7 +221,7 @@ func (s *Server) registerSPA(mux *http.ServeMux) {
 	fileServer := http.FileServer(http.Dir(s.webDir))
 
 	mux.HandleFunc("GET /assets/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 		fileServer.ServeHTTP(w, r)
 	})
 
@@ -376,4 +378,5 @@ type Handler struct {
 	runnerMgr  *runner.Manager
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker
+	globalVars map[string]string
 }

@@ -18,7 +18,8 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (resp) => resp,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+    if (status === 401 || status === 403) {
       localStorage.removeItem('salvo_token')
       localStorage.removeItem('salvo_user')
       localStorage.removeItem('salvo_permissions')

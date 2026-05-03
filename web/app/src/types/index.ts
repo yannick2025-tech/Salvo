@@ -261,14 +261,22 @@ export interface DashboardOverviewDTO {
 }
 
 export interface NodeMetricDTO {
+  node_id: string
   name: string
   type: string
+  sort_order: number
   total_reqs: number
   success_reqs: number
   p50_latency: number
   p95_latency: number
   p99_latency: number
   avg_latency: number
+  timestamps?: string[]
+  ts_p50?: number[]
+  ts_p95?: number[]
+  ts_p99?: number[]
+  ts_avg?: number[]
+  ts_qps?: number[]
 }
 
 export interface TimeSeriesDTO {

@@ -171,9 +171,9 @@ async function handleStop(sceneId: string) {
   } catch { /* ignore */ }
 }
 
-function formatMs(ns: number): string {
-  if (!ns) return '0ms'
-  const ms = ns / 1e6
+function formatMs(sec: number): string {
+  if (!sec) return '0ms'
+  const ms = sec * 1000
   if (ms < 1) return ms.toFixed(3) + 'ms'
   if (ms < 1000) return ms.toFixed(1) + 'ms'
   return (ms / 1000).toFixed(2) + 's'

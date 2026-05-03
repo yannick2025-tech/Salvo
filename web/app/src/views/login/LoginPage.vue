@@ -29,6 +29,7 @@
             placeholder="请输入密码"
             autocomplete="off"
             required
+            @keyup.enter="handleLogin"
           />
         </div>
 

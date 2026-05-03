@@ -33,15 +33,18 @@ backend: build
 
 dev-backend:
 	mkdir -p logs
-	go run ./cmd/salvo -config $(CONFIG)
+	SALVO_ROOT=$(shell pwd) go run ./cmd/salvo -config $(CONFIG)
 
 dev-frontend:
 	@find web/app/src -name "*.vue.js" -delete
 	cd web/app && npm install && npm run dev
 
 dev:
-	@echo "Starting backend and frontend..."
+	@echo "Starting backend and frontend (dev mode)..."
+	@echo "  → Frontend: http://localhost:3000  (Vite HMR, use this port!)"
+	@echo "  → Backend:  http://localhost:8766"
 	@find web/app/src -name "*.vue.js" -delete
+	@cd web/app && npm install
 	@make dev-backend & make dev-frontend & wait
 
 build-frontend:
@@ -49,7 +52,7 @@ build-frontend:
 
 clean:
 	rm -rf bin/ logs/ *.db *.db-shm *.db-wal salvo
-	rm -rf web/app/dist web/app/node_modules web/app/.vite
+	rm -rf web/app/dist web/app/node_modules web/app/.vite web/dist
 	find web/app/src -name "*.vue.js" -delete
 	@echo "Cleaned build artifacts and temp files"
 
@@ -61,6 +64,10 @@ lint:
 
 stop:
 	-pkill -f "bin/salvo" 2>/dev/null || true
+	-pkill -f "salvo" 2>/dev/null || true
 	-pkill -f "go run ./cmd/salvo" 2>/dev/null || true
+	-pkill -f "vite" 2>/dev/null || true
+	-pkill -f "node.*vite" 2>/dev/null || true
+	@sleep 1 && echo "stopped"
 
 restart: stop backend

@@ -146,7 +146,7 @@
         </div>
         <div class="form-group">
           <label>并发数</label>
-          <input v-model.number="runConfig.workers" type="number" min="1" max="1000" />
+          <input v-model.number="runConfig.workers" type="number" min="1" max="1000" step="1" @input="normalizeNumber($event, 'workers')" />
         </div>
         <div class="form-group">
           <label>运行模式</label>
@@ -157,11 +157,11 @@
         </div>
         <div v-if="runConfig.run_mode === 'count'" class="form-group">
           <label>总次数</label>
-          <input v-model.number="runConfig.count" type="number" min="1" />
+          <input v-model.number="runConfig.count" type="number" min="1" max="1000000" step="1" @input="normalizeNumber($event, 'count')" />
         </div>
         <div v-if="runConfig.run_mode === 'duration'" class="form-group">
           <label>持续时间(秒)</label>
-          <input v-model.number="runConfig.duration" type="number" min="1" />
+          <input v-model.number="runConfig.duration" type="number" min="1" max="3600" step="1" @input="normalizeNumber($event, 'duration')" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
@@ -250,6 +250,20 @@
     </div>
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
+
+    <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
+      <div class="confirm-dialog">
+        <div class="confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 class="confirm-title">确认删除</h3>
+        <p class="confirm-msg">{{ confirmMessage }}</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="showConfirm = false">取消</button>
+          <button class="btn-danger-confirm" @click="confirmDeleteNode">确认删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -276,6 +290,9 @@ const copyName = ref('')
 
 const toastMsg = ref('')
 const toastType = ref('info')
+const showConfirm = ref(false)
+const confirmMessage = ref('')
+const pendingDeleteNodeId = ref('')
 
 const runConfig = reactive({
   workers: 10,
@@ -383,6 +400,47 @@ function showToast(msg: string, type = 'info') {
   toastMsg.value = msg
   toastType.value = type
   setTimeout(() => { toastMsg.value = '' }, 3000)
+}
+
+function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') {
+  const input = event.target as HTMLInputElement
+  const value = input.value
+  
+  if (!value || value === '0') {
+    input.value = '1'
+    if (field === 'workers') runConfig.workers = 1
+    else if (field === 'count') runConfig.count = 1
+    else if (field === 'duration') runConfig.duration = 1
+    return
+  }
+  
+  const numValue = parseInt(value, 10)
+  if (isNaN(numValue)) {
+    input.value = '1'
+    if (field === 'workers') runConfig.workers = 1
+    else if (field === 'count') runConfig.count = 1
+    else if (field === 'duration') runConfig.duration = 1
+    return
+  }
+  
+  const limits: Record<string, { min: number; max: number }> = {
+    workers: { min: 1, max: 1000 },
+    count: { min: 1, max: 1000000 },
+    duration: { min: 1, max: 3600 },
+  }
+  
+  const limit = limits[field]
+  if (numValue < limit.min) {
+    input.value = String(limit.min)
+    if (field === 'workers') runConfig.workers = limit.min
+    else if (field === 'count') runConfig.count = limit.min
+    else if (field === 'duration') runConfig.duration = limit.min
+  } else if (numValue > limit.max) {
+    input.value = String(limit.max)
+    if (field === 'workers') runConfig.workers = limit.max
+    else if (field === 'count') runConfig.count = limit.max
+    else if (field === 'duration') runConfig.duration = limit.max
+  }
 }
 
 async function fetchScene() {
@@ -538,7 +596,15 @@ async function handleSaveNode() {
 }
 
 async function handleDeleteNode(id: string) {
-  if (!confirm('确定要删除该节点吗？')) return
+  pendingDeleteNodeId.value = id
+  confirmMessage.value = '确定要删除该节点吗？'
+  showConfirm.value = true
+}
+
+async function confirmDeleteNode() {
+  const id = pendingDeleteNodeId.value
+  showConfirm.value = false
+  pendingDeleteNodeId.value = ''
   const resp = await apiDeleteNode(id)
   if (resp.code === 0) {
     showToast('节点已删除')
@@ -794,4 +860,37 @@ onMounted(() => {
 .toast.info { background: var(--accent-primary); color: #fff; }
 .toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
 @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.confirm-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.confirm-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--accent-danger);
+}
+.confirm-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+.confirm-msg { font-size: 13px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: center; gap: 10px; }
+.btn-cancel {
+  padding: 8px 20px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-cancel:hover { background: var(--bg-hover); }
+.btn-danger-confirm {
+  padding: 8px 20px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-danger); color: #fff; font-size: 13px; cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.btn-danger-confirm:hover { opacity: 0.88; }
 </style>

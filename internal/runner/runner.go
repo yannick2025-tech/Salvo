@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/core/pool"
 	"github.com/yannick2025-tech/Salvo/internal/core/variable"
 	"github.com/yannick2025-tech/Salvo/internal/generator"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/plugin"
 	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
@@ -34,13 +36,13 @@ const (
 )
 
 type Config struct {
-	SceneID    snowflake.ID
-	Workers    int
-	RunMode    RunMode
-	Count      int64
-	Duration   time.Duration
-	Timeout    time.Duration
-	Variables  map[string]string
+	SceneID   snowflake.ID
+	Workers   int
+	RunMode   RunMode
+	Count     int64
+	Duration  time.Duration
+	Timeout   time.Duration
+	Variables map[string]string
 }
 
 func (c Config) Validate() error {
@@ -129,13 +131,14 @@ func percentile(sorted []time.Duration, p int) time.Duration {
 }
 
 type Runner struct {
-	cfg      Config
-	status   atomic.Value
-	stats    *Stats
-	cancel   context.CancelFunc
-	ctx      context.Context
-	mu       sync.Mutex
-	done     chan struct{}
+	cfg    Config
+	status atomic.Value
+	stats  *Stats
+	cancel context.CancelFunc
+	ctx    context.Context
+	mu     sync.Mutex
+	done   chan struct{}
+	log    logger.Logger
 
 	scenes  repo.SceneRepo
 	nodes   repo.NodeRepo
@@ -149,7 +152,7 @@ type Runner struct {
 	finishedAt time.Time
 }
 
-func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, tracer *tracelib.Tracer) (*Runner, error) {
+func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, tracer *tracelib.Tracer, log logger.Logger) (*Runner, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -170,6 +173,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		nodeGen: n,
 		runID:   n.Generate(),
 		done:    make(chan struct{}),
+		log:     log,
 	}
 	r.status.Store(StatusPending)
 	return r, nil
@@ -187,27 +191,46 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.startedAt = time.Now().UTC()
 	r.mu.Unlock()
 
+	traceID := r.runID.String()
+	runLog := r.log.With(
+		logger.F("trace_id", traceID),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+		logger.F("run_id", traceID),
+	)
+
 	defer func() {
 		r.finishedAt = time.Now().UTC()
 		r.status.Store(StatusDone)
 		close(r.done)
 	}()
 
+	runLog.Info("scene run started",
+		logger.F("workers", r.cfg.Workers),
+		logger.F("run_mode", r.cfg.RunMode),
+		logger.F("count", r.cfg.Count),
+		logger.F("duration", r.cfg.Duration),
+	)
+
 	scene, err := r.scenes.GetByID(r.ctx, r.cfg.SceneID)
 	if err != nil {
 		r.status.Store(StatusFailed)
+		runLog.Error("failed to load scene", logger.F("error", err))
 		return fmt.Errorf("runner: load scene: %w", err)
 	}
+	runLog.Info("scene loaded", logger.F("scene_name", scene.Name))
 
 	dagObj, err := r.buildDAG(scene)
 	if err != nil {
 		r.status.Store(StatusFailed)
+		runLog.Error("failed to build DAG", logger.F("error", err))
 		return fmt.Errorf("runner: build dag: %w", err)
 	}
+	runLog.Info("DAG built", logger.F("nodes", len(dagObj.Nodes())), logger.F("edges", len(dagObj.Edges())))
 
 	scope, err := r.buildScope(scene)
 	if err != nil {
 		r.status.Store(StatusFailed)
+		runLog.Error("failed to build scope", logger.F("error", err))
 		return fmt.Errorf("runner: build scope: %w", err)
 	}
 
@@ -261,16 +284,49 @@ func (r *Runner) Run(ctx context.Context) error {
 	runRecord.P95Latency = p95.Seconds()
 	runRecord.P99Latency = p99.Seconds()
 
-	if err != nil {
+	totalReqs := r.stats.TotalReqs.Load()
+	successReqs := r.stats.SuccessReqs.Load()
+
+	if err != nil && totalReqs == 0 {
 		runRecord.Status = model.RunStatusFailed
 		runRecord.ErrorMsg = err.Error()
 		r.status.Store(StatusFailed)
+	} else if totalReqs > 0 {
+		rate := float64(successReqs) / float64(totalReqs)
+		if rate < 0.95 {
+			runRecord.Status = model.RunStatusFailed
+			if err != nil {
+				runRecord.ErrorMsg = err.Error()
+			} else {
+				runRecord.ErrorMsg = fmt.Sprintf("success rate %.1f%% below threshold", rate*100)
+			}
+			r.status.Store(StatusFailed)
+		} else {
+			runRecord.Status = model.RunStatusCompleted
+			r.status.Store(StatusDone)
+		}
 	} else if r.ctx.Err() != nil {
 		runRecord.Status = model.RunStatusCancelled
 		r.status.Store(StatusCanceled)
+	} else {
+		runRecord.Status = model.RunStatusCompleted
+		r.status.Store(StatusDone)
 	}
 
-	_ = r.runs.Update(r.ctx, runRecord)
+	if err := r.runs.Update(r.ctx, runRecord); err != nil {
+		runLog.Error("failed to save run record", logger.F("error", err))
+	} else {
+		runLog.Info("run completed",
+			logger.F("status", runRecord.Status),
+			logger.F("total_reqs", runRecord.TotalReqs),
+			logger.F("success_reqs", runRecord.SuccessReqs),
+			logger.F("failed_reqs", runRecord.FailedReqs),
+			logger.F("p50", runRecord.P50Latency),
+			logger.F("p95", runRecord.P95Latency),
+			logger.F("p99", runRecord.P99Latency),
+			logger.F("duration_s", runRecord.Duration),
+		)
+	}
 	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
 
 	return err
@@ -314,6 +370,12 @@ func (r *Runner) Duration() time.Duration {
 }
 
 func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
+	traceID := r.runID.String()
+	execLog := r.log.With(
+		logger.F("trace_id", traceID),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+	)
+
 	poolCfg := pool.Config{
 		RunMode:  pool.RunModeCount,
 		Count:    r.cfg.Count,
@@ -325,8 +387,10 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 	p, err := pool.NewWithContext(r.ctx, r.cfg.Workers, poolCfg)
 	if err != nil {
+		execLog.Error("failed to create worker pool", logger.F("error", err))
 		return fmt.Errorf("runner: create pool: %w", err)
 	}
+	execLog.Info("worker pool created", logger.F("workers", r.cfg.Workers), logger.F("run_mode", r.cfg.RunMode))
 
 	genRegistry := generator.NewRegistry()
 	httpProto := httpprotocol.NewProtocol()
@@ -349,28 +413,19 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		exec := dag.NewExecutor(dagObj, execOpts...)
 
 		resolvedVars := variable.ResolveAll(scope)
-		input := &dag.Input{Variables: resolvedVars}
+		execLog.Info("resolved scene variables",
+			logger.F("variable_count", len(resolvedVars)),
+			logger.F("variables", fmt.Sprintf("%v", resolvedVars)),
+		)
 
 		_ = genRegistry
 		_ = httpProto
 		_ = pluginReg
-		_ = input
 
-		out, err := exec.ExecuteWithTrace(taskCtx)
+		_, err := exec.ExecuteWithTrace(taskCtx, resolvedVars)
 		if err != nil {
 			r.stats.RecordLatency(0, false)
 			return err
-		}
-
-		if out != nil && out.Response != nil {
-			if resp, ok := out.Response.(*httpprotocol.HTTPResponse); ok {
-				success := resp.IsSuccess()
-				r.stats.RecordLatency(resp.Latency, success)
-			} else {
-				r.stats.RecordLatency(0, true)
-			}
-		} else {
-			r.stats.RecordLatency(0, true)
 		}
 
 		return nil
@@ -448,27 +503,37 @@ type sceneNode struct {
 	timeout   time.Duration
 	loopCount int
 	mode      dag.ExecMode
+	stats     *Stats
+	log       logger.Logger
+	traceID   string
 }
 
-func (n *sceneNode) ID() string            { return n.id }
+func (n *sceneNode) ID() string             { return n.id }
 func (n *sceneNode) Timeout() time.Duration { return n.timeout }
 func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
+	nodeLog := n.log.With(
+		logger.F("trace_id", n.traceID),
+		logger.F("node_id", n.id),
+		logger.F("node_type", n.nodeType),
+	)
+
 	switch n.nodeType {
 	case model.NodeTypeHTTP:
-		return n.executeHTTP(ctx, input)
+		return n.executeHTTP(ctx, input, nodeLog)
 	case model.NodeTypeDelay:
-		return n.executeDelay(ctx)
+		return n.executeDelay(ctx, nodeLog)
 	case model.NodeTypeCondition:
-		return n.executeCondition(input)
+		return n.executeCondition(input, nodeLog)
 	default:
+		nodeLog.Warn("unknown node type, skipping")
 		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
 	}
 }
 
-func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input) (*dag.Output, error) {
+func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
 		Method  string            `json:"method"`
 		URL     string            `json:"url"`
@@ -481,15 +546,21 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input) (*dag.Out
 	}
 
 	url := cfg.URL
+
 	if input != nil && input.Variables != nil {
-		scope := variable.NewScope()
-		for k, v := range input.Variables {
-			scope.Set(k, v)
-		}
-		resolved, err := variable.ResolveString(scope, url)
-		if err == nil {
-			url = resolved
-		}
+		nodeLog.Info("resolving variables in URL",
+			logger.F("original_url", url),
+			logger.F("variable_count", len(input.Variables)),
+		)
+		url = resolveWithVariables(url, input.Variables)
+		nodeLog.Info("URL after variable resolution",
+			logger.F("resolved_url", url),
+		)
+	} else {
+		nodeLog.Warn("no variables available for URL resolution",
+			logger.F("input_nil", input == nil),
+			logger.F("variables_nil", input != nil && input.Variables == nil),
+		)
 	}
 
 	method := cfg.Method
@@ -509,23 +580,51 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input) (*dag.Out
 		Timeout: timeout,
 	}
 	if cfg.Body != "" {
-		req.Body = []byte(cfg.Body)
+		if input != nil && input.Variables != nil {
+			req.Body = []byte(resolveWithVariables(cfg.Body, input.Variables))
+		} else {
+			req.Body = []byte(cfg.Body)
+		}
 	}
 
 	proto := httpprotocol.NewProtocol()
 	resp, err := proto.Execute(ctx, req)
 	if err != nil {
+		nodeLog.Error("HTTP request failed",
+			logger.F("method", method),
+			logger.F("url", url),
+			logger.F("error", err),
+		)
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
 		return &dag.Output{Error: err}, nil
+	}
+
+	if n.stats != nil {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+			n.stats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+			nodeLog.Info("HTTP request completed",
+				logger.F("method", method),
+				logger.F("url", url),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+				logger.F("success", httpResp.IsSuccess()),
+			)
+		}
 	}
 
 	return &dag.Output{Response: resp}, nil
 }
 
-func (n *sceneNode) executeDelay(ctx context.Context) (*dag.Output, error) {
+func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
 		DurationMs int64 `json:"duration_ms"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
 		return nil, fmt.Errorf("parse delay config: %w", err)
 	}
 
@@ -534,15 +633,29 @@ func (n *sceneNode) executeDelay(ctx context.Context) (*dag.Output, error) {
 		dur = 100 * time.Millisecond
 	}
 
+	nodeLog.Info("delay started", logger.F("duration_ms", cfg.DurationMs))
+
 	select {
 	case <-time.After(dur):
+		if n.stats != nil {
+			n.stats.RecordLatency(dur, true)
+		}
+		nodeLog.Info("delay completed", logger.F("duration_ms", cfg.DurationMs))
 		return &dag.Output{Response: map[string]any{"delay_ms": cfg.DurationMs}}, nil
 	case <-ctx.Done():
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		nodeLog.Warn("delay cancelled", logger.F("error", ctx.Err()))
 		return nil, ctx.Err()
 	}
 }
 
-func (n *sceneNode) executeCondition(input *dag.Input) (*dag.Output, error) {
+func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	nodeLog.Info("condition evaluated", logger.F("result", true))
+	if n.stats != nil {
+		n.stats.RecordLatency(0, true)
+	}
 	return &dag.Output{Response: map[string]any{"condition": true}}, nil
 }
 
@@ -553,6 +666,9 @@ func (r *Runner) buildDAGNode(n *model.Node) (*sceneNode, error) {
 		config:    n.Config,
 		loopCount: n.LoopCount,
 		mode:      dag.ExecSync,
+		stats:     r.stats,
+		log:       r.log,
+		traceID:   r.runID.String(),
 	}
 
 	if n.LoopCount <= 0 {
@@ -585,4 +701,14 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 	)
 
 	return sceneScope, nil
+}
+
+func resolveWithVariables(str string, vars map[string]any) string {
+	if str == "" || vars == nil {
+		return str
+	}
+	for k, v := range vars {
+		str = strings.ReplaceAll(str, "${"+k+"}", fmt.Sprintf("%v", v))
+	}
+	return str
 }

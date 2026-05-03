@@ -1,25 +1,78 @@
-// Package mock provides a lightweight HTTP mock server for testing Salvo
-// DAG scenarios. It exposes REST endpoints that simulate an e-commerce
-// API (users, products, orders, auth, payment, notify).
 package mock
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 )
 
-var log logger.Logger
+var appLog logger.Logger
+
+type multiWriter struct {
+	writers []io.Writer
+}
+
+func (mw *multiWriter) Write(p []byte) (n int, err error) {
+	for _, w := range mw.writers {
+		n, err = w.Write(p)
+		if err != nil {
+			return
+		}
+	}
+	return len(p), nil
+}
+
+var (
+	reqLogOnce sync.Once
+	reqLog     *log.Logger
+)
+
+func initRequestLog() {
+	reqLogOnce.Do(func() {
+		logDir := getLogDir()
+		logPath := filepath.Join(logDir, "mock-requests.log")
+
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			mw := &multiWriter{writers: []io.Writer{f, os.Stdout}}
+			reqLog = log.New(mw, "[MOCK-REQ] ", log.LstdFlags)
+		} else {
+			reqLog = log.New(os.Stdout, "[MOCK-REQ] ", log.LstdFlags)
+		}
+	})
+}
+
+func getLogDir() string {
+	if projectRoot := os.Getenv("SALVO_ROOT"); projectRoot != "" {
+		logDir := filepath.Join(projectRoot, "logs")
+		if err := os.MkdirAll(logDir, 0755); err == nil {
+			return logDir
+		}
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		logDir := filepath.Join(cwd, "logs")
+		if err := os.MkdirAll(logDir, 0755); err == nil {
+			return logDir
+		}
+	}
+
+	return "./logs"
+}
 
 func init() {
 	var err error
-	log, err = logger.New(logger.Config{Level: logger.InfoLevel, Format: logger.FormatText})
+	appLog, err = logger.New(logger.Config{Level: logger.InfoLevel, Format: logger.FormatText})
 	if err != nil {
 		panic(err)
 	}
@@ -35,28 +88,34 @@ func NewMockServer(port int) *MockServer {
 }
 
 func (m *MockServer) Start() error {
+	initRequestLog()
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/mock/api/users", m.handleUsers)
-	mux.HandleFunc("/mock/api/users/", m.handleUserDetail)
-	mux.HandleFunc("/mock/api/products", m.handleProducts)
-	mux.HandleFunc("/mock/api/products/", m.handleProductDetail)
-	mux.HandleFunc("/mock/api/orders", m.handleOrders)
-	mux.HandleFunc("/mock/api/orders/", m.handleOrderDetail)
-	mux.HandleFunc("/mock/api/auth/login", m.handleAuthLogin)
-	mux.HandleFunc("/mock/api/payment", m.handlePayment)
-	mux.HandleFunc("/mock/api/notify", m.handleNotify)
-	mux.HandleFunc("/mock/health", m.handleHealth)
+	logHandler := func(pattern string, handler http.HandlerFunc) {
+		mux.HandleFunc(pattern, m.logRequest(handler))
+	}
+
+	logHandler("/mock/api/users", m.handleUsers)
+	logHandler("/mock/api/users/", m.handleUserDetail)
+	logHandler("/mock/api/products", m.handleProducts)
+	logHandler("/mock/api/products/", m.handleProductDetail)
+	logHandler("/mock/api/orders", m.handleOrders)
+	logHandler("/mock/api/orders/", m.handleOrderDetail)
+	logHandler("/mock/api/auth/login", m.handleAuthLogin)
+	logHandler("/mock/api/payment", m.handlePayment)
+	logHandler("/mock/api/notify", m.handleNotify)
+	logHandler("/mock/health", m.handleHealth)
 
 	m.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", m.port),
 		Handler: mux,
 	}
 
-	log.Info("mock HTTP server starting", logger.F("port", m.port))
+	appLog.Info("mock HTTP server starting", logger.F("port", m.port))
 	go func() {
 		if err := m.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("mock server error", logger.F("error", err))
+			appLog.Error("mock server error", logger.F("error", err))
 		}
 	}()
 
@@ -212,4 +271,24 @@ func (m *MockServer) handleNotify(w http.ResponseWriter, r *http.Request) {
 
 func (m *MockServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"status": "ok", "service": "salvo-mock", "timestamp": time.Now().Format(time.RFC3339)})
+}
+
+func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
+		next(rw, r)
+		elapsed := time.Since(start)
+		reqLog.Printf("%s %s | %d | %.2fms", r.Method, r.URL.Path, rw.statusCode, float64(elapsed.Microseconds())/1000)
+	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }

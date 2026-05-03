@@ -8,6 +8,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserDTO | null>(null)
   const permissions = ref<string[]>([])
   const loading = ref(false)
+  const validated = ref(false)
 
   const isLoggedIn = computed(() => !!token.value)
   const userRole = computed(() => user.value?.role_name || '')
@@ -51,16 +52,23 @@ export const useAuthStore = defineStore('auth', () => {
         permissions.value = resp.data.permissions
         localStorage.setItem('salvo_user', JSON.stringify(resp.data.user))
         localStorage.setItem('salvo_permissions', JSON.stringify(resp.data.permissions))
+        validated.value = true
       }
     } catch {
       doLogout()
     }
   }
 
+  async function validateToken() {
+    if (!token.value || validated.value) return
+    await fetchMe()
+  }
+
   function doLogout() {
     token.value = ''
     user.value = null
     permissions.value = []
+    validated.value = false
     localStorage.removeItem('salvo_token')
     localStorage.removeItem('salvo_user')
     localStorage.removeItem('salvo_permissions')
@@ -78,5 +86,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, permissions, loading, isLoggedIn, userRole, hasPermission, canAccess, login, fetchMe, doLogout, initFromStorage }
+  return { token, user, permissions, loading, validated, isLoggedIn, userRole, hasPermission, canAccess, login, fetchMe, validateToken, doLogout, initFromStorage }
 })

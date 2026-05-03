@@ -30,3 +30,8 @@ auth:
 mock:
   enabled: true
   port: 9090
+
+variables:
+  base_url: "http://localhost:9090/mock/api"
+  product_id: "12345"
+  order_id: "67890"

@@ -105,10 +105,16 @@ func WithTraceHook(hook TraceHook, sceneID, runID snowflake.ID) ExecutorOption {
 
 // ExecuteWithTrace runs the DAG with trace instrumentation. It is a
 // wrapper around Execute that starts a trace, records spans for each
-// node, and finishes the trace when done.
-func (e *Executor) ExecuteWithTrace(ctx context.Context) (*Output, error) {
+// node, and finishes the trace when done. Returns all node outputs.
+func (e *Executor) ExecuteWithTrace(ctx context.Context, initialVars map[string]any) (map[string]*Output, error) {
+	e.initialVars = initialVars
+	
 	if e.traceHook == nil {
-		return e.Execute(ctx)
+		out, err := e.Execute(ctx)
+		if out != nil {
+			return map[string]*Output{"_": out}, err
+		}
+		return nil, err
 	}
 
 	tctx := e.traceHook.StartTrace(ctx, e.traceSceneID, e.traceRunID)
@@ -124,7 +130,7 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context) (*Output, error) {
 }
 
 // executeTraced runs the DAG execution with per-node span recording.
-func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (*Output, error) {
+func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[string]*Output, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("executor context already cancelled: %w", err)
 	}
@@ -252,17 +258,11 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (*Outpu
 		return nil, fmt.Errorf("executor cancelled: %w", ctx.Err())
 	}
 
-	for i := len(order) - 1; i >= 0; i-- {
-		node, _ := e.dag.Node(order[i])
-		if node != nil && node.Mode() == ExecSync {
-			e.mu.RLock()
-			out, exists := e.results[order[i]]
-			e.mu.RUnlock()
-			if exists {
-				return out, nil
-			}
-		}
+	e.mu.RLock()
+	results := make(map[string]*Output, len(e.results))
+	for k, v := range e.results {
+		results[k] = v
 	}
-
-	return nil, nil
+	e.mu.RUnlock()
+	return results, nil
 }

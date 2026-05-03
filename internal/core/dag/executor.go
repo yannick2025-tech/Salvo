@@ -37,6 +37,7 @@ type Executor struct {
 	traceHook     TraceHook
 	traceSceneID  snowflake.ID
 	traceRunID    snowflake.ID
+	initialVars   map[string]any
 }
 
 // NewExecutor creates a new Executor for the given DAG.
@@ -221,8 +222,17 @@ func (e *Executor) Results() map[string]*Output {
 // for parameter correlation.
 func (e *Executor) buildInput(nodeID string) *Input {
 	inEdges := e.dag.InEdges(nodeID)
+	
+	// Start with initial variables
+	variables := make(map[string]any)
+	if e.initialVars != nil {
+		for k, v := range e.initialVars {
+			variables[k] = v
+		}
+	}
+	
 	if len(inEdges) == 0 {
-		return &Input{Variables: make(map[string]any)}
+		return &Input{Variables: variables}
 	}
 
 	e.mu.RLock()
@@ -236,7 +246,7 @@ func (e *Executor) buildInput(nodeID string) *Input {
 	}
 
 	input := &Input{
-		Variables: make(map[string]any),
+		Variables: variables,
 	}
 	if lastParentOutput != nil {
 		input.Response = lastParentOutput.Response
