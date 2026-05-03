@@ -37,7 +37,7 @@ dev-backend:
 
 dev-frontend:
 	@find web/app/src -name "*.vue.js" -delete
-	cd web/app && npm run dev
+	cd web/app && npm install && npm run dev
 
 dev:
 	@echo "Starting backend and frontend..."
