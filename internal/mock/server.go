@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -277,6 +278,13 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
+
+		// Add random delay between 30-200ms for all API endpoints except health
+		if r.URL.Path != "/mock/health" {
+			delayMs := rand.Intn(171) + 30 // 30-200ms
+			time.Sleep(time.Duration(delayMs) * time.Millisecond)
+		}
+
 		next(rw, r)
 		elapsed := time.Since(start)
 		reqLog.Printf("%s %s | %d | %.2fms", r.Method, r.URL.Path, rw.statusCode, float64(elapsed.Microseconds())/1000)

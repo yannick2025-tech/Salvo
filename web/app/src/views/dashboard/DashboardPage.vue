@@ -76,17 +76,17 @@
             <div class="node-bars">
               <div class="bar-row">
                 <span class="bar-label">P50</span>
-                <div class="bar-track"><div class="bar-fill" :style="{ width: barWidth(node.p50_latency) }"></div></div>
+                <div class="bar-track"><div class="bar-fill p50" :style="{ width: barWidth(node.p50_latency) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p50_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P95</span>
-                <div class="bar-track"><div class="bar-fill warn" :style="{ width: barWidth(node.p95_latency) }"></div></div>
+                <div class="bar-track"><div class="bar-fill p95" :style="{ width: barWidth(node.p95_latency) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p95_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P99</span>
-                <div class="bar-track"><div class="bar-fill danger" :style="{ width: barWidth(node.p99_latency) }"></div></div>
+                <div class="bar-track"><div class="bar-fill p99" :style="{ width: barWidth(node.p99_latency) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
               </div>
             </div>
@@ -213,10 +213,31 @@ function nodeQPS(node: any): string {
 
 function getChartTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+  if (isDark) {
+    return {
+      textColor: '#8b949e',
+      lineColor: '#30363d',
+      bgColor: 'transparent',
+      colors: {
+        primary: '#58a6ff',
+        success: '#3fb950',
+        warning: '#d29922',
+        danger: '#f85149',
+        info: '#89d0ff',
+      }
+    }
+  }
   return {
-    textColor: isDark ? '#8b949e' : '#656d76',
-    lineColor: isDark ? '#30363d' : '#d0d7de',
+    textColor: '#475569',
+    lineColor: '#e2e8f0',
     bgColor: 'transparent',
+    colors: {
+      primary: '#0ea5e9',
+      success: '#22c55e',
+      warning: '#a855f7',
+      danger: '#ef4444',
+      info: '#06b6d4',
+    }
   }
 }
 
@@ -240,11 +261,18 @@ function renderQpsChart() {
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#58a6ff', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.3)' }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
-    tooltip: { trigger: 'axis' },
+    series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
+    tooltip: { 
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        const param = params[0]
+        const value = Number(param.value).toFixed(3)
+        return `<div style="font-size:12px">${param.axisValue}</div><div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}QPS</span><b>${value}</b></div>`
+      }
+    },
   }, true)
 }
 
@@ -268,15 +296,25 @@ function renderLatencyChart() {
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
-      { name: 'P50', data: ts.p50, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#3fb950', width: 2 } },
-      { name: 'P95', data: ts.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#d29922', width: 2 } },
-      { name: 'P99', data: ts.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: '#f85149', width: 2 } },
+      { name: 'P50', data: ts.p50, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
+      { name: 'P95', data: ts.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
+      { name: 'P99', data: ts.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
     ],
-    tooltip: { trigger: 'axis' },
+    tooltip: { 
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        let result = `<div style="font-size:12px;margin-bottom:6px">${params[0].axisValue}</div>`
+        for (const param of params) {
+          const value = Number(param.value).toFixed(3)
+          result += `<div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}${param.seriesName}</span><b>${value}ms</b></div>`
+        }
+        return result
+      }
+    },
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
   }, true)
 }
@@ -301,11 +339,18 @@ function renderErrorChart() {
   errorChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: ts.error_rate.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ data: ts.error_rate, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f85149' }, { offset: 1, color: 'rgba(248,81,73,0.3)' }]) } }],
-    tooltip: { trigger: 'axis' },
+    series: [{ data: ts.error_rate, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: theme.colors.danger }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.3)` }]) } }],
+    tooltip: { 
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        const param = params[0]
+        const value = Number(param.value).toFixed(3)
+        return `<div style="font-size:12px">${param.axisValue}</div><div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}错误率</span><b>${value}%</b></div>`
+      }
+    },
   }, true)
 }
 
@@ -325,10 +370,10 @@ function renderNodeDetailChart(nodeId: string) {
   const hasTimeSeries = node.timestamps && node.timestamps.length > 0
 
   if (hasTimeSeries) {
-    const tsP50 = node.ts_p50 || []
-    const tsAvg = node.ts_avg || []
-    const tsP95 = node.ts_p95 || []
-    const tsP99 = node.ts_p99 || []
+    const tsP50 = (node.ts_p50 || []).map(v => v * 1000)
+    const tsAvg = (node.ts_avg || []).map(v => v * 1000)
+    const tsP95 = (node.ts_p95 || []).map(v => v * 1000)
+    const tsP99 = (node.ts_p99 || []).map(v => v * 1000)
     const tsQPS = node.ts_qps || []
     
     // Ensure all arrays have the same length as timestamps
@@ -342,13 +387,13 @@ function renderNodeDetailChart(nodeId: string) {
     
     const timestampsLength = node.timestamps?.length || 0
     const series: any[] = [
-      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: '#58a6ff', width: 2 }, itemStyle: { color: '#58a6ff' }, areaStyle: undefined },
-      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: '#3fb950', width: 2 }, itemStyle: { color: '#3fb950' }, areaStyle: undefined },
-      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: '#d29922', width: 2 }, itemStyle: { color: '#d29922' }, areaStyle: undefined },
-      { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: '#f85149', width: 2 }, itemStyle: { color: '#f85149' }, areaStyle: undefined },
+      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info }, areaStyle: undefined },
+      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
+      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: undefined },
+      { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, areaStyle: undefined },
     ]
     if (tsQPS.length > 0) {
-      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: 'rgba(88,166,255,0.25)', borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
+      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
     }
 
     const hasQPS = series.length > 4
@@ -356,7 +401,7 @@ function renderNodeDetailChart(nodeId: string) {
       backgroundColor: 'transparent',
       legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
       grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
-      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: 'rgba(88,166,255,0.15)', handleStyle: { color: '#58a6ff' }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: node.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor((node.timestamps!.length || 1) / 6) - 1 } },
       yAxis: hasQPS ? [
         { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -365,7 +410,7 @@ function renderNodeDetailChart(nodeId: string) {
       tooltip: { trigger: 'axis', confine: true, formatter: (p: any[]) => {
         let s = `<div style="font-size:11px">${p[0].axisValue}</div>`
         for (const pt of p) {
-          const val = pt.seriesName === 'QPS' ? pt.value.toFixed(1) : pt.value.toFixed(1) + 'ms'
+          const val = pt.seriesName === 'QPS' ? pt.value.toFixed(3) : pt.value.toFixed(3) + 'ms'
           s += `<div style="display:flex;justify-content:space-between;gap:12px"><span>${pt.marker}${pt.seriesName}</span><b>${val}</b></div>`
         }
         return s
@@ -396,12 +441,15 @@ function renderNodeDetailChart(nodeId: string) {
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#58a6ff' },
-            { offset: 1, color: 'rgba(88,166,255,0.3)' },
+            { offset: 0, color: theme.colors.primary },
+            { offset: 1, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` },
           ]),
         },
       }],
-      tooltip: { trigger: 'axis', formatter: (p: any[]) => `${p[0].name}: ${formatMs(p[0].value / 1000)}` },
+      tooltip: { trigger: 'axis', formatter: (p: any[]) => {
+        const val = (p[0].value / 1000).toFixed(3)
+        return `${p[0].name}: ${val}ms`
+      } },
     }, true)
   }
 }
@@ -619,43 +667,50 @@ onUnmounted(() => {
 
 .node-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
 }
 
 .node-card {
-  padding: 14px 16px;
+  padding: 16px 18px;
   background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-secondary);
+  position: relative;
+  overflow: hidden;
 }
 
 .node-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .node-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: 0.2px;
 }
 
 .node-id {
-  font-family: monospace;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
   font-size: 11px;
   color: var(--text-tertiary);
+  padding: 2px 6px;
+  background: rgba(0,0,0,0.1);
+  border-radius: 4px;
 }
 
 .node-type {
   font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
   margin-left: auto;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  font-weight: 600;
 }
 .node-type.http { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .node-type.setup, .node-type.teardown { background: rgba(63,185,80,0.15); color: var(--accent-success); }
@@ -665,73 +720,79 @@ onUnmounted(() => {
 .node-qps {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-secondary);
 }
 
 .qps-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-tertiary);
+  font-weight: 500;
 }
 
 .qps-value {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--accent-primary);
+  letter-spacing: -1px;
 }
 
 .node-bars {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .bar-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .bar-label {
   font-size: 11px;
   color: var(--text-tertiary);
-  width: 28px;
+  width: 32px;
   flex-shrink: 0;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .bar-track {
   flex: 1;
-  height: 6px;
-  background: var(--bg-hover);
-  border-radius: 3px;
+  height: 8px;
+  background: rgba(0,0,0,0.1);
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--accent-success);
-  transition: width 0.3s ease;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.bar-fill.warn { background: var(--accent-warning); }
-.bar-fill.danger { background: var(--accent-danger); }
+.bar-fill.p50 { background: var(--accent-primary); }
+.bar-fill.p95 { background: var(--accent-warning); }
+.bar-fill.p99 { background: var(--accent-danger); }
 
 .bar-value {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
-  width: 60px;
+  width: 65px;
   text-align: right;
   flex-shrink: 0;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-weight: 500;
 }
 
 .node-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .node-section-header h3 { margin-bottom: 0; }
 .time-range-label {
@@ -740,12 +801,172 @@ onUnmounted(() => {
   font-family: monospace;
 }
 
-.node-card { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-.node-card:hover { border-color: var(--accent-primary); }
+.node-card { 
+  cursor: pointer; 
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+.node-card:hover { 
+  border-color: var(--accent-primary); 
+  box-shadow: 0 8px 24px rgba(88, 166, 255, 0.12);
+  transform: translateY(-2px);
+}
 .node-card.expanded {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px rgba(88,166,255,0.2);
+  box-shadow: 0 12px 40px rgba(88, 166, 255, 0.15);
   grid-column: 1 / -1;
+}
+
+.node-stats-row {
+  display: flex;
+  gap: 16px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border-secondary);
+}
+.node-stat-item {
+  flex: 1;
+  text-align: center;
+}
+.node-stat-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  display: block;
+}
+.node-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.node-stat-value.success { color: var(--accent-success); }
+.node-stat-value.danger { color: var(--accent-danger); }
+.node-stat-value.warning { color: var(--accent-warning); }
+
+/* Light theme specific styles */
+[data-theme='light'] .dashboard-page {
+  background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%);
+}
+
+[data-theme='light'] .metric-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .chart-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .card {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .node-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-color: rgba(0,0,0,0.06);
+}
+
+[data-theme='light'] .node-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #0ea5e9, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+[data-theme='light'] .node-card:hover::before,
+[data-theme='light'] .node-card.expanded::before {
+  opacity: 1;
+}
+
+[data-theme='light'] .node-id {
+  background: rgba(0,0,0,0.03);
+}
+
+[data-theme='light'] .node-type {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+[data-theme='light'] .node-type.http { 
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.18) 0%, rgba(14, 165, 233, 0.08) 100%); 
+  color: #0ea5e9;
+}
+
+[data-theme='light'] .node-type.setup, 
+[data-theme='light'] .node-type.teardown { 
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.08) 100%); 
+  color: #22c55e;
+}
+
+[data-theme='light'] .node-type.delay { 
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(202, 138, 4, 0.08) 100%); 
+  color: #f59e0b;
+}
+
+[data-theme='light'] .node-type.condition { 
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(124, 58, 237, 0.08) 100%); 
+  color: #a855f7;
+}
+
+[data-theme='light'] .qps-value {
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme='light'] .bar-track {
+  background: rgba(0,0,0,0.05);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+}
+
+[data-theme='light'] .bar-fill.p50 { 
+  background: linear-gradient(90deg, #06b6d4 0%, #0ea5e9 100%); 
+  box-shadow: 0 1px 4px rgba(6, 182, 212, 0.4);
+}
+
+[data-theme='light'] .bar-fill.p95 { 
+  background: linear-gradient(90deg, #a855f7 0%, #8b5cf6 100%); 
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.4);
+}
+
+[data-theme='light'] .bar-fill.p99 { 
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); 
+  box-shadow: 0 1px 4px rgba(239, 68, 68, 0.4);
+}
+
+[data-theme='light'] .node-qps {
+  border-bottom-color: rgba(0,0,0,0.05);
+}
+
+[data-theme='light'] .node-card.expanded {
+  background: linear-gradient(180deg, #f8fafc 0%, rgba(255,255,255,0.98) 100%);
+}
+
+[data-theme='light'] .node-card:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
+}
+
+[data-theme='light'] .node-card.expanded {
+  border-color: #0ea5e9;
+  box-shadow: 0 12px 40px rgba(14, 165, 233, 0.18);
+}
+
+[data-theme='light'] .detail-item {
+  background: rgba(0,0,0,0.03);
+}
+
+[data-theme='light'] .run-item {
+  background: rgba(0,0,0,0.03);
 }
 
 .expand-icon {
