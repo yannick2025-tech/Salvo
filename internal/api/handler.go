@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
@@ -647,6 +648,13 @@ func (h *Handler) ListPlugins(r *http.Request) dto.Response {
 		Pagination: dto.Pagination{
 			Total: len(items),
 		},
+	})
+}
+
+func (h *Handler) ListGenerators(r *http.Request) dto.Response {
+	catalog := builtin.Catalog()
+	return dto.OK(map[string]any{
+		"categories": catalog,
 	})
 }
 

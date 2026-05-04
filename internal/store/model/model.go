@@ -59,6 +59,7 @@ const (
 	NodeTypeHTTP      = "http"
 	NodeTypeDelay     = "delay"
 	NodeTypeCondition = "condition"
+	NodeTypeIfElse    = "if-else"
 	NodeTypeLoop      = "loop"
 	NodeTypeGroup     = "group"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/generator"
 )
 
-func intPtr(v int) *int       { return &v }
+func intPtr(v int) *int           { return &v }
 func floatPtr(v float64) *float64 { return &v }
 
 func TestUUIDGenerator(t *testing.T) {
@@ -447,4 +447,54 @@ func TestDefaultRegistryFullObject(t *testing.T) {
 	id, ok := obj["id"].(string)
 	require.True(t, ok)
 	assert.Len(t, id, 36)
+}
+
+func TestCatalog(t *testing.T) {
+	catalog := Catalog()
+	assert.NotEmpty(t, catalog)
+
+	categoryKeys := make(map[string]bool)
+	for _, cat := range catalog {
+		assert.NotEmpty(t, cat.Key, "category key should not be empty")
+		assert.NotEmpty(t, cat.Label, "category label should not be empty")
+		assert.NotEmpty(t, cat.Generators, "category %s should have generators", cat.Key)
+		assert.False(t, categoryKeys[cat.Key], "duplicate category key: %s", cat.Key)
+		categoryKeys[cat.Key] = true
+
+		genNames := make(map[string]bool)
+		for _, gen := range cat.Generators {
+			assert.NotEmpty(t, gen.Name, "generator name should not be empty")
+			assert.NotEmpty(t, gen.Label, "generator label should not be empty")
+			assert.NotEmpty(t, gen.Description, "generator %s should have description", gen.Name)
+			assert.NotNil(t, gen.SchemaTemplate, "generator %s should have schema_template", gen.Name)
+			assert.False(t, genNames[gen.Name], "duplicate generator name in %s: %s", cat.Key, gen.Name)
+			genNames[gen.Name] = true
+		}
+	}
+}
+
+func TestCatalogCategories(t *testing.T) {
+	catalog := Catalog()
+
+	expectedCategories := []string{"string", "number", "boolean", "composite"}
+	foundCategories := make(map[string]bool)
+	for _, cat := range catalog {
+		foundCategories[cat.Key] = true
+	}
+	for _, expected := range expectedCategories {
+		assert.True(t, foundCategories[expected], "missing category: %s", expected)
+	}
+}
+
+func TestCatalogGeneratorParams(t *testing.T) {
+	catalog := Catalog()
+
+	for _, cat := range catalog {
+		for _, gen := range cat.Generators {
+			for _, param := range gen.Params {
+				assert.NotEmpty(t, param.Key, "param key should not be empty in generator %s", gen.Name)
+				assert.NotEmpty(t, param.Type, "param type should not be empty in generator %s param %s", gen.Name, param.Key)
+			}
+		}
+	}
 }

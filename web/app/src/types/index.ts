@@ -287,3 +287,24 @@ export interface TimeSeriesDTO {
   p99: number[]
   error_rate: number[]
 }
+
+export interface GeneratorParamInfo {
+  key: string
+  type: string
+  label: string
+  default_value: string
+}
+
+export interface GeneratorInfo {
+  name: string
+  label: string
+  description: string
+  schema_template: Record<string, any>
+  params?: GeneratorParamInfo[]
+}
+
+export interface GeneratorCategoryInfo {
+  key: string
+  label: string
+  generators: GeneratorInfo[]
+}

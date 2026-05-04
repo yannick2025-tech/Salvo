@@ -474,6 +474,200 @@ func deduplicate(arr []any) []any {
 	return result
 }
 
+// GeneratorInfo describes a single generator for the catalog API.
+type GeneratorInfo struct {
+	Name           string         `json:"name"`
+	Label          string         `json:"label"`
+	Description    string         `json:"description"`
+	SchemaTemplate map[string]any `json:"schema_template"`
+	Params         []ParamInfo    `json:"params,omitempty"`
+}
+
+// ParamInfo describes a configurable parameter for a generator.
+type ParamInfo struct {
+	Key      string   `json:"key"`
+	Type     string   `json:"type"`
+	Default  any      `json:"default,omitempty"`
+	Required bool     `json:"required,omitempty"`
+	Enum     []string `json:"enum,omitempty"`
+}
+
+// CategoryInfo groups generators under a named category.
+type CategoryInfo struct {
+	Key        string          `json:"key"`
+	Label      string          `json:"label"`
+	Generators []GeneratorInfo `json:"generators"`
+}
+
+// Catalog returns the full generator catalog grouped by category.
+func Catalog() []CategoryInfo {
+	return []CategoryInfo{
+		{
+			Key:   "string",
+			Label: "String",
+			Generators: []GeneratorInfo{
+				{
+					Name:        "uuid",
+					Label:       "UUID v4",
+					Description: "Generate random UUID v4",
+					SchemaTemplate: map[string]any{
+						"type":   "string",
+						"format": "uuid",
+					},
+				},
+				{
+					Name:        "email",
+					Label:       "Email",
+					Description: "Generate random email address",
+					SchemaTemplate: map[string]any{
+						"type":   "string",
+						"format": "email",
+					},
+				},
+				{
+					Name:        "random-string",
+					Label:       "Random String",
+					Description: "Random alphanumeric string",
+					SchemaTemplate: map[string]any{
+						"type":      "string",
+						"minLength": 8,
+						"maxLength": 16,
+					},
+					Params: []ParamInfo{
+						{Key: "minLength", Type: "integer", Default: 8},
+						{Key: "maxLength", Type: "integer", Default: 16},
+					},
+				},
+				{
+					Name:        "enum-string",
+					Label:       "Enum String",
+					Description: "Pick from enum values",
+					SchemaTemplate: map[string]any{
+						"type": "string",
+						"enum": []string{"option1", "option2"},
+					},
+					Params: []ParamInfo{
+						{Key: "enum", Type: "array", Required: true},
+					},
+				},
+				{
+					Name:        "format-string",
+					Label:       "Format String",
+					Description: "Formatted string (ipv4/ipv6/url/date etc.)",
+					SchemaTemplate: map[string]any{
+						"type":   "string",
+						"format": "ipv4",
+					},
+					Params: []ParamInfo{
+						{Key: "format", Type: "string", Required: true, Enum: []string{"ipv4", "ipv6", "hostname", "uri", "url", "byte", "password"}},
+					},
+				},
+			},
+		},
+		{
+			Key:   "number",
+			Label: "Number",
+			Generators: []GeneratorInfo{
+				{
+					Name:        "random-int",
+					Label:       "Random Integer",
+					Description: "Random integer in range",
+					SchemaTemplate: map[string]any{
+						"type":    "integer",
+						"minimum": float64(0),
+						"maximum": float64(100),
+					},
+					Params: []ParamInfo{
+						{Key: "minimum", Type: "integer", Default: 0},
+						{Key: "maximum", Type: "integer", Default: 100},
+					},
+				},
+				{
+					Name:        "increment-int",
+					Label:       "Increment Integer",
+					Description: "Auto-incrementing integer",
+					SchemaTemplate: map[string]any{
+						"type":    "integer",
+						"minimum": float64(0),
+					},
+					Params: []ParamInfo{
+						{Key: "minimum", Type: "integer", Default: 0},
+					},
+				},
+				{
+					Name:        "random-float",
+					Label:       "Random Float",
+					Description: "Random float in range",
+					SchemaTemplate: map[string]any{
+						"type":       "number",
+						"minimum":    float64(0),
+						"maximum":    float64(100),
+						"multipleOf": 0.01,
+					},
+					Params: []ParamInfo{
+						{Key: "minimum", Type: "number", Default: float64(0)},
+						{Key: "maximum", Type: "number", Default: float64(100)},
+						{Key: "multipleOf", Type: "number", Default: 0.01},
+					},
+				},
+			},
+		},
+		{
+			Key:   "boolean",
+			Label: "Boolean",
+			Generators: []GeneratorInfo{
+				{
+					Name:        "random-bool",
+					Label:       "Random Boolean",
+					Description: "Random true/false",
+					SchemaTemplate: map[string]any{
+						"type": "boolean",
+					},
+				},
+				{
+					Name:        "weighted-bool",
+					Label:       "Weighted Boolean",
+					Description: "Boolean with weighted true ratio",
+					SchemaTemplate: map[string]any{
+						"type": "boolean",
+					},
+					Params: []ParamInfo{
+						{Key: "trueWeight", Type: "number", Default: 0.5},
+					},
+				},
+			},
+		},
+		{
+			Key:   "composite",
+			Label: "Composite",
+			Generators: []GeneratorInfo{
+				{
+					Name:        "array",
+					Label:       "Array",
+					Description: "Array of generated items",
+					SchemaTemplate: map[string]any{
+						"type":     "array",
+						"minItems": 1,
+						"maxItems": 5,
+					},
+					Params: []ParamInfo{
+						{Key: "minItems", Type: "integer", Default: 1},
+						{Key: "maxItems", Type: "integer", Default: 5},
+					},
+				},
+				{
+					Name:        "object",
+					Label:       "Object",
+					Description: "Object with generated properties",
+					SchemaTemplate: map[string]any{
+						"type": "object",
+					},
+				},
+			},
+		},
+	}
+}
+
 // DefaultRegistry returns a Registry with all built-in generators
 // registered in the recommended order (specific → general).
 func DefaultRegistry() *generator.Registry {

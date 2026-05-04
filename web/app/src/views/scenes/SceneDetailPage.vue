@@ -17,25 +17,27 @@
       </div>
     </div>
 
-    <div class="dag-section">
-      <div class="section-header">
-        <h3>DAG 请求流</h3>
-        <div class="dag-actions">
-          <button class="btn-sm" @click="addNode('setup')">+ Setup</button>
-          <button class="btn-sm" @click="addNode('http')">+ HTTP</button>
-          <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
-          <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
-          <button class="btn-sm" @click="addNode('teardown')">+ Teardown</button>
-        </div>
-      </div>
-
-      <div class="dag-canvas" ref="canvasRef">
-        <div v-if="nodes.length === 0" class="dag-empty">
-          <div class="empty-icon">⬡</div>
-          <p>暂无请求节点，点击上方按钮添加</p>
+    <div class="workspace-split">
+      <div class="dag-section">
+        <div class="section-header">
+          <h3>DAG 请求流</h3>
+          <div class="dag-actions">
+            <button class="btn-sm" @click="addNode('setup')">+ Setup</button>
+            <button class="btn-sm" @click="addNode('http')">+ HTTP</button>
+            <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
+            <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
+            <button class="btn-sm" @click="addNode('if-else')">+ IF-ELSE</button>
+            <button class="btn-sm" @click="addNode('teardown')">+ Teardown</button>
+          </div>
         </div>
 
-        <div class="dag-flow" v-else>
+        <div class="dag-canvas" ref="canvasRef">
+          <div v-if="nodes.length === 0" class="dag-empty">
+            <div class="empty-icon">⬡</div>
+            <p>暂无请求节点，点击上方按钮添加</p>
+          </div>
+
+          <div class="dag-flow" v-else>
           <template v-for="(node, idx) in sortedNodes" :key="node.id">
             <div
               :class="['dag-node', node.type, { active: selectedNode?.id === node.id }]"
@@ -64,11 +66,12 @@
       </div>
     </div>
 
-    <div v-if="selectedNode" class="node-config-panel">
-      <div class="panel-header">
-        <h4>{{ selectedNode.name }} - 配置</h4>
-        <button class="btn-close" @click="selectedNode = null">✕</button>
-      </div>
+    <div v-if="selectedNode" class="config-sidebar">
+      <div class="node-config-panel">
+        <div class="panel-header">
+          <h4>{{ selectedNode.name }} - 配置</h4>
+          <button class="btn-close" @click="selectedNode = null">✕</button>
+        </div>
 
       <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
         <div class="form-row">
@@ -110,8 +113,21 @@
           <textarea v-model="httpConfig.extract" rows="2" placeholder='{"token":"$.data.token","user_id":"$.data.user.id"}' @change="saveNodeConfig"></textarea>
         </div>
         <div class="form-row">
-          <label>参数生成器 (JSON)</label>
-          <textarea v-model="httpConfig.generator" rows="3" placeholder='{"email":{"type":"string","format":"email"},"age":{"type":"integer","minimum":18,"maximum":65}}' @change="saveNodeConfig"></textarea>
+          <label>参数生成器</label>
+          <div class="generator-selector">
+            <div class="generator-dropdown-row">
+              <select v-model="selectedGeneratorCategory" class="gen-category-select" @change="selectedGeneratorName = ''">
+                <option value="">选择分类</option>
+                <option v-for="cat in generatorCategories" :key="cat.key" :value="cat.key">{{ cat.label }}</option>
+              </select>
+              <select v-model="selectedGeneratorName" class="gen-name-select" @change="applyGenerator">
+                <option value="">选择函数</option>
+                <option v-for="gen in filteredGenerators" :key="gen.name" :value="gen.name">{{ gen.label }} - {{ gen.description }}</option>
+              </select>
+              <button class="btn-sm" @click="insertGeneratorToBody" :disabled="!selectedGeneratorName">插入</button>
+            </div>
+            <textarea v-model="httpConfig.generator" rows="3" placeholder='{"email":{"type":"string","format":"email"},"age":{"type":"integer","minimum":18,"maximum":65}}' @change="saveNodeConfig"></textarea>
+          </div>
         </div>
       </div>
 
@@ -136,6 +152,22 @@
           <input v-model="conditionConfig.expr" placeholder='${status_code} == 200' @change="saveNodeConfig" />
         </div>
       </div>
+
+      <div v-else-if="selectedNode.type === 'if-else'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>条件表达式</label>
+          <input v-model="ifElseConfig.expr" placeholder='${order_id} != ""' @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">表达式求值为 true 时走 IF 分支，false 时走 ELSE 分支。连线条件使用 __if_true__ / __if_false__ 标识。</label>
+        </div>
+      </div>
+    </div>
+    </div>
     </div>
 
     <div v-if="showRunConfig" class="modal-overlay" @click.self="showRunConfig = false">
@@ -200,6 +232,7 @@
             <option value="http">HTTP 请求</option>
             <option value="delay">延迟</option>
             <option value="condition">条件判断</option>
+            <option value="if-else">IF-ELSE 分支</option>
             <option value="teardown">Teardown (清理)</option>
           </select>
         </div>
@@ -242,6 +275,12 @@
             <input v-model="nodeForm.conditionExpr" placeholder='${status_code} == 200' />
           </div>
         </template>
+        <template v-if="nodeForm.type === 'if-else'">
+          <div class="form-group">
+            <label>条件表达式</label>
+            <input v-model="nodeForm.conditionExpr" placeholder='${order_id} != ""' />
+          </div>
+        </template>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeNodeEditor">取消</button>
           <button class="btn-primary" @click="handleSaveNode">{{ editingNode ? '保存' : '添加' }}</button>
@@ -272,7 +311,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getScene, createScene, startScene } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
-import type { SceneDTO, NodeDTO, EdgeDTO } from '@/types'
+import { listGenerators } from '@/api/generator'
+import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -326,6 +366,17 @@ const httpConfig = reactive({
 })
 const delayConfig = reactive({ ms: 1000 })
 const conditionConfig = reactive({ expr: '' })
+const ifElseConfig = reactive({ expr: '' })
+
+const generatorCategories = ref<GeneratorCategoryInfo[]>([])
+const selectedGeneratorCategory = ref('')
+const selectedGeneratorName = ref('')
+
+const filteredGenerators = computed<GeneratorInfo[]>(() => {
+  if (!selectedGeneratorCategory.value) return []
+  const cat = generatorCategories.value.find(c => c.key === selectedGeneratorCategory.value)
+  return cat?.generators || []
+})
 
 const sortedNodes = computed(() => {
   if (nodes.value.length === 0) return []
@@ -378,6 +429,7 @@ function nodeIcon(type: string) {
     case 'http': return '⇄'
     case 'delay': return '⏱'
     case 'condition': return '◇'
+    case 'if-else': return '⑂'
     case 'loop': return '↻'
     case 'teardown': return '■'
     default: return '○'
@@ -390,6 +442,7 @@ function nodeTypeLabel(type: string) {
     case 'http': return 'HTTP'
     case 'delay': return 'DELAY'
     case 'condition': return 'CONDITION'
+    case 'if-else': return 'IF-ELSE'
     case 'loop': return 'LOOP'
     case 'teardown': return 'TEARDOWN'
     default: return type.toUpperCase()
@@ -556,6 +609,8 @@ async function handleSaveNode() {
     config = JSON.stringify({ ms: nodeForm.delayMs })
   } else if (nodeForm.type === 'condition') {
     config = JSON.stringify({ expr: nodeForm.conditionExpr })
+  } else if (nodeForm.type === 'if-else') {
+    config = JSON.stringify({ expr: nodeForm.conditionExpr })
   }
 
   if (editingNode.value) {
@@ -647,6 +702,7 @@ function selectNode(node: NodeDTO) {
     httpConfig.generator = cfg.generator ? JSON.stringify(cfg.generator, null, 2) : ''
     delayConfig.ms = cfg.ms || 1000
     conditionConfig.expr = cfg.expr || ''
+    ifElseConfig.expr = cfg.expr || ''
   } catch { /* ignore */ }
 }
 
@@ -676,6 +732,8 @@ async function saveNodeConfig() {
     config = JSON.stringify({ ms: delayConfig.ms })
   } else if (nodeType === 'condition') {
     config = JSON.stringify({ expr: conditionConfig.expr })
+  } else if (nodeType === 'if-else') {
+    config = JSON.stringify({ expr: ifElseConfig.expr })
   }
 
   await apiUpdateNode({
@@ -739,17 +797,61 @@ function formatTime(t: string) {
   return new Date(t).toLocaleString()
 }
 
+async function fetchGenerators() {
+  try {
+    const resp = await listGenerators()
+    if (resp.code === 0) {
+      generatorCategories.value = resp.data.categories || []
+    }
+  } catch { /* ignore */ }
+}
+
+function applyGenerator() {
+  if (!selectedGeneratorCategory.value || !selectedGeneratorName.value) return
+  const cat = generatorCategories.value.find(c => c.key === selectedGeneratorCategory.value)
+  if (!cat) return
+  const gen = cat.generators.find(g => g.name === selectedGeneratorName.value)
+  if (!gen) return
+
+  let current: Record<string, any> = {}
+  try { current = JSON.parse(httpConfig.generator || '{}') } catch { /* ignore */ }
+  current[gen.name] = gen.schema_template
+  httpConfig.generator = JSON.stringify(current, null, 2)
+  saveNodeConfig()
+}
+
+function insertGeneratorToBody() {
+  if (!selectedGeneratorCategory.value || !selectedGeneratorName.value) return
+  const cat = generatorCategories.value.find(c => c.key === selectedGeneratorCategory.value)
+  if (!cat) return
+  const gen = cat.generators.find(g => g.name === selectedGeneratorName.value)
+  if (!gen) return
+
+  let body: Record<string, any> = {}
+  try {
+    const parsed = JSON.parse(httpConfig.body || '{}')
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      body = parsed
+    }
+  } catch { /* ignore */ }
+
+  body[gen.name] = `\${generator.${gen.name}}`
+  httpConfig.body = JSON.stringify(body, null, 2)
+  saveNodeConfig()
+}
+
 onMounted(() => {
   fetchScene()
   fetchNodes()
   fetchEdges()
+  fetchGenerators()
 })
 </script>
 
 <style scoped>
-.scene-detail { display: flex; flex-direction: column; gap: 16px; }
+.scene-detail { display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 100px); max-height: calc(100vh - 100px); overflow: hidden; }
 
-.page-header { display: flex; align-items: center; gap: 12px; }
+.page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .page-header h2 { font-size: 18px; font-weight: 600; flex: 1; }
 .header-actions { display: flex; gap: 8px; }
 
@@ -762,7 +864,7 @@ onMounted(() => {
 .btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
 .btn-close { border: none; background: transparent; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; }
 
-.scene-info { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; }
+.scene-info { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; flex-shrink: 0; }
 .info-grid { display: flex; gap: 24px; flex-wrap: wrap; }
 .info-item { display: flex; align-items: center; gap: 8px; }
 .info-item .label { font-size: 12px; color: var(--text-tertiary); }
@@ -774,12 +876,12 @@ onMounted(() => {
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 
-.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; }
-.section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-secondary); }
+.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-secondary); flex-shrink: 0; }
 .section-header h3 { font-size: 14px; font-weight: 600; }
-.dag-actions { display: flex; gap: 6px; }
+.dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.dag-canvas { padding: 20px; min-height: 200px; }
+.dag-canvas { padding: 20px; min-height: 200px; overflow-y: auto; flex: 1; }
 .dag-empty { text-align: center; padding: 40px 0; color: var(--text-tertiary); }
 .empty-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
 
@@ -797,6 +899,7 @@ onMounted(() => {
 .dag-node.http { border-left: 3px solid var(--accent-primary); }
 .dag-node.delay { border-left: 3px solid #f0ad4e; }
 .dag-node.condition { border-left: 3px solid #9b59b6; }
+.dag-node.if-else { border-left: 3px solid #e67e22; }
 .dag-node.teardown { border-left: 3px solid #e74c3c; }
 
 .node-icon { font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
@@ -804,6 +907,7 @@ onMounted(() => {
 .node-icon.http { background: rgba(88,166,255,0.1); color: var(--accent-primary); }
 .node-icon.delay { background: rgba(240,173,78,0.15); color: #f0ad4e; }
 .node-icon.condition { background: rgba(155,89,182,0.15); color: #9b59b6; }
+.node-icon.if-else { background: rgba(230,126,34,0.15); color: #e67e22; }
 .node-icon.teardown { background: rgba(231,76,60,0.15); color: #e74c3c; }
 
 .node-info { flex: 1; display: flex; align-items: center; gap: 8px; }
@@ -822,9 +926,18 @@ onMounted(() => {
 .dag-edge:hover .edge-delete { opacity: 1; }
 .edge-delete:hover { color: var(--accent-danger); }
 
+.workspace-split { display: flex; gap: 16px; flex: 1; min-height: 0; overflow: hidden; }
+
+.config-sidebar {
+  width: 420px; max-width: 45%; min-width: 340px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .node-config-panel {
   background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 16px; min-width: 0;
 }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h4 { font-size: 14px; font-weight: 600; }
@@ -835,9 +948,10 @@ onMounted(() => {
 .form-row.inline label { width: 100px; flex-shrink: 0; }
 .form-row label { font-size: 12px; color: var(--text-secondary); }
 .form-row input, .form-row select, .form-row textarea {
+  width: 100%; box-sizing: border-box;
   padding: 6px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
   background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none;
-  font-family: inherit;
+  font-family: inherit; word-break: break-all;
 }
 .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent-primary); }
 .form-row textarea { resize: vertical; min-height: 60px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
@@ -898,4 +1012,17 @@ onMounted(() => {
   transition: opacity 0.15s ease;
 }
 .btn-danger-confirm:hover { opacity: 0.88; }
+
+.generator-selector { display: flex; flex-direction: column; gap: 8px; }
+.generator-dropdown-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gen-category-select, .gen-name-select { flex: 1 1 120px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
+.gen-category-select:focus, .gen-name-select:focus { border-color: var(--accent-primary); }
+.hint-label { font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
+
+@media (max-width: 900px) {
+  .workspace-split { flex-direction: column; overflow-y: auto; }
+  .config-sidebar { width: 100%; max-width: none; min-width: 0; }
+  .dag-section { min-width: 0; }
+  .scene-detail { height: auto; max-height: none; overflow: visible; }
+}
 </style>

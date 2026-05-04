@@ -124,7 +124,7 @@ description: |
   - Setup/Teardown 生命周期管理
   - 参数生成器 (Generator) 动态生成请求参数
   - 参数关联 (Extract) 从响应提取变量传递给后续请求
-  - 条件判断 (Condition) 根据运行时条件走不同分支
+  - IF-ELSE 分支 (IF-ELSE) 根据运行时条件走不同分支
   - 延迟控制 (Delay) 模拟用户思考时间
 
 variables:
@@ -219,7 +219,7 @@ nodes:
             multipleOf: 0.01
 
   - name: 判断是否支付
-    type: condition
+    type: if-else
     config:
       expr: "\${order_id} != ''"
 
@@ -307,11 +307,11 @@ edges:
 
   - from: 判断是否支付
     to: 支付订单
-    condition: "true"
+    condition: "__if_true__"
 
   - from: 判断是否支付
     to: 跳过支付
-    condition: "false"
+    condition: "__if_false__"
 
   - from: 支付订单
     to: 发送支付通知

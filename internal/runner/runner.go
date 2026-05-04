@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/core/pool"
 	"github.com/yannick2025-tech/Salvo/internal/core/variable"
 	"github.com/yannick2025-tech/Salvo/internal/generator"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/plugin"
@@ -413,6 +415,7 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 			hook := &dag.HookAdapter{Tracer: r.tracer}
 			execOpts = append(execOpts, dag.WithTraceHook(hook, r.cfg.SceneID, r.runID))
 		}
+		execOpts = append(execOpts, dag.WithConditionEvaluator(r.evalCondition))
 
 		exec := dag.NewExecutor(dagObj, execOpts...)
 
@@ -531,6 +534,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		return n.executeDelay(ctx, nodeLog)
 	case model.NodeTypeCondition:
 		return n.executeCondition(input, nodeLog)
+	case model.NodeTypeIfElse:
+		return n.executeIfElse(input, nodeLog)
 	default:
 		nodeLog.Warn("unknown node type, skipping")
 		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
@@ -550,6 +555,10 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	url := cfg.URL
+
+	genReg := builtin.DefaultRegistry()
+	url = resolveGeneratorRefs(url, genReg)
+	nodeLog.Info("resolved generator references in URL", logger.F("url", url))
 
 	if input != nil && input.Variables != nil {
 		nodeLog.Info("resolving variables in URL",
@@ -583,12 +592,17 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		Headers: cfg.Headers,
 		Timeout: timeout,
 	}
+
+	for k, v := range req.Headers {
+		req.Headers[k] = resolveGeneratorRefs(v, genReg)
+	}
+
 	if cfg.Body != "" {
+		body := resolveGeneratorRefs(cfg.Body, genReg)
 		if input != nil && input.Variables != nil {
-			req.Body = []byte(resolveWithVariables(cfg.Body, input.Variables))
-		} else {
-			req.Body = []byte(cfg.Body)
+			body = resolveWithVariables(body, input.Variables)
 		}
+		req.Body = []byte(body)
 	}
 
 	proto := httpprotocol.NewProtocol()
@@ -663,6 +677,64 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 	return &dag.Output{Response: map[string]any{"condition": true}}, nil
 }
 
+func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		Expr string `json:"expr"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		return nil, fmt.Errorf("parse if-else config: %w", err)
+	}
+
+	result := evaluateExpression(cfg.Expr, input)
+	nodeLog.Info("if-else evaluated", logger.F("expr", cfg.Expr), logger.F("result", result))
+	if n.stats != nil {
+		n.stats.RecordLatency(0, true)
+	}
+	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
+}
+
+func evaluateExpression(expr string, input *dag.Input) bool {
+	if expr == "" {
+		return true
+	}
+
+	if input != nil && input.Variables != nil {
+		expr = resolveWithVariables(expr, input.Variables)
+	}
+
+	return expr != "" && expr != "false" && expr != "0" && expr != "''" && expr != "\"\""
+}
+
+func (r *Runner) evalCondition(ctx context.Context, condition string, output *dag.Output) bool {
+	if condition == "" {
+		return true
+	}
+
+	if condition == "__if_true__" {
+		if output != nil {
+			if resp, ok := output.Response.(map[string]any); ok {
+				if result, exists := resp["if_else_result"]; exists {
+					return result == true
+				}
+			}
+		}
+		return true
+	}
+
+	if condition == "__if_false__" {
+		if output != nil {
+			if resp, ok := output.Response.(map[string]any); ok {
+				if result, exists := resp["if_else_result"]; exists {
+					return result != true
+				}
+			}
+		}
+		return false
+	}
+
+	return condition != "false" && condition != "0"
+}
+
 func (r *Runner) buildDAGNode(n *model.Node) (*sceneNode, error) {
 	sn := &sceneNode{
 		id:        n.ID.String(),
@@ -715,4 +787,80 @@ func resolveWithVariables(str string, vars map[string]any) string {
 		str = strings.ReplaceAll(str, "${"+k+"}", fmt.Sprintf("%v", v))
 	}
 	return str
+}
+
+var genSchemaOnce sync.Once
+var genNameToSchema map[string]*generator.Schema
+
+func initGeneratorSchemaMap() {
+	genSchemaOnce.Do(func() {
+		genNameToSchema = make(map[string]*generator.Schema)
+		for _, cat := range builtin.Catalog() {
+			for _, g := range cat.Generators {
+				schema := schemaFromTemplate(g.SchemaTemplate)
+				genNameToSchema[g.Name] = schema
+			}
+		}
+	})
+}
+
+func schemaFromTemplate(tmpl map[string]any) *generator.Schema {
+	if tmpl == nil {
+		return &generator.Schema{Type: generator.TypeString}
+	}
+	s := &generator.Schema{}
+	if v, ok := tmpl["type"].(string); ok {
+		s.Type = generator.Type(v)
+	}
+	if v, ok := tmpl["format"].(string); ok {
+		s.Format = v
+	}
+	if v, ok := tmpl["minimum"].(float64); ok {
+		s.Minimum = &v
+	}
+	if v, ok := tmpl["maximum"].(float64); ok {
+		s.Maximum = &v
+	}
+	if v, ok := tmpl["minLength"].(float64); ok {
+		n := int(v)
+		s.MinLength = &n
+	}
+	if v, ok := tmpl["maxLength"].(float64); ok {
+		n := int(v)
+		s.MaxLength = &n
+	}
+	if v, ok := tmpl["enum"]; ok {
+		if arr, ok := v.([]any); ok {
+			s.Enum = arr
+		}
+	}
+	if v, ok := tmpl["multipleOf"].(float64); ok {
+		s.MultipleOf = &v
+	}
+	return s
+}
+
+var generatorRefRe = regexp.MustCompile(`\$\{generator\.([a-zA-Z0-9_-]+)\}`)
+
+func resolveGeneratorRefs(str string, reg *generator.Registry) string {
+	if str == "" || reg == nil {
+		return str
+	}
+	initGeneratorSchemaMap()
+	return generatorRefRe.ReplaceAllStringFunc(str, func(match string) string {
+		name := generatorRefRe.FindStringSubmatch(match)
+		if len(name) < 2 {
+			return match
+		}
+		genName := name[1]
+		schema, ok := genNameToSchema[genName]
+		if !ok {
+			return match
+		}
+		val, err := reg.Generate(schema)
+		if err != nil {
+			return match
+		}
+		return fmt.Sprintf("%v", val)
+	})
 }

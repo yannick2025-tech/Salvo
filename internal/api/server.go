@@ -188,6 +188,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
 	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
 
+	mux.HandleFunc("POST /api/v1/generators/list", s.handleAuth(s.handler.ListGenerators))
+
 	mux.HandleFunc("POST /api/v1/reports/list", s.handleAuth(s.handler.ListReports))
 	mux.HandleFunc("POST /api/v1/reports/get", s.handleAuth(s.handler.GetReport))
 
