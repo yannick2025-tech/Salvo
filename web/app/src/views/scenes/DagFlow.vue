@@ -1,16 +1,15 @@
 <template>
-  <div class="dag-flow-wrapper">
+  <div class="dag-flow-wrapper" ref="wrapperRef">
     <VueFlow
       v-model:nodes="vfNodes"
       v-model:edges="vfEdges"
       :node-types="nodeTypes"
-      :edge-types="edgeTypes"
       :default-edge-options="defaultEdgeOptions"
       :connection-line-style="{ stroke: 'var(--accent-primary)', strokeWidth: 2 }"
       :snap-to-grid="true"
       :snap-grid="[16, 16]"
       fit-view-on-init
-      :fit-view-options="{ padding: 0.3 }"
+      :fit-view-options="{ padding: 0.25 }"
       :min-zoom="0.15"
       :max-zoom="2"
       :nodes-draggable="true"
@@ -24,15 +23,11 @@
       @pane-click="onPaneClick"
     >
       <Background :gap="20" :size="1" pattern-color="var(--border-primary)" />
-      <Controls position="bottom-left" />
+      <Controls position="bottom-left" :show-interactive="false" />
       <MiniMap :node-stroke-color="minimapNodeStroke as any" :node-color="minimapNodeColor as any" pannable zoomable />
 
       <template #node-scene-node="props">
         <SceneNode v-bind="props" @edit="$emit('edit', $event)" @delete="$emit('deleteNode', $event)" />
-      </template>
-
-      <template #edge-custom="props">
-        <CustomEdge v-bind="props" />
       </template>
     </VueFlow>
 
@@ -43,14 +38,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, markRaw, watch } from 'vue'
+import { ref, computed, markRaw, watch, onMounted, nextTick } from 'vue'
 import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
-import type { Node, Edge, Connection, EdgeChange, NodeChange } from '@vue-flow/core'
+import type { Node, Edge, Connection, NodeChange } from '@vue-flow/core'
 import SceneNode from './DagSceneNode.vue'
-import CustomEdge from './DagCustomEdge.vue'
 import type { NodeDTO, EdgeDTO } from '@/types'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -75,14 +69,47 @@ const nodeTypes: Record<string, any> = {
   'scene-node': markRaw(SceneNode),
 }
 
-const edgeTypes: Record<string, any> = {
-  'custom': markRaw(CustomEdge),
+const wrapperRef = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  nextTick(() => injectArrowMarkers())
+})
+
+function injectArrowMarkers() {
+  const svg = wrapperRef.value?.querySelector('.vue-flow svg')
+  if (!svg) return
+  if (svg.querySelector('#vf-arrowhead')) return
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+
+  const colors = [
+    { id: 'vf-arrowhead', fill: 'var(--text-tertiary)' },
+    { id: 'vf-arrowhead-true', fill: '#2ecc71' },
+    { id: 'vf-arrowhead-false', fill: '#e74c3c' },
+  ]
+
+  for (const c of colors) {
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
+    marker.setAttribute('id', c.id)
+    marker.setAttribute('viewBox', '0 0 10 10')
+    marker.setAttribute('refX', '9')
+    marker.setAttribute('refY', '5')
+    marker.setAttribute('markerWidth', '7')
+    marker.setAttribute('markerHeight', '7')
+    marker.setAttribute('orient', 'auto-start-reverse')
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z')
+    path.setAttribute('fill', c.fill)
+    marker.appendChild(path)
+    defs.appendChild(marker)
+  }
+
+  svg.insertBefore(defs, svg.firstChild)
 }
 
 const defaultEdgeOptions = computed(() => ({
-  type: 'custom',
+  type: 'smoothstep',
   style: { stroke: 'var(--text-tertiary)', strokeWidth: 2 },
-  markerEnd: undefined,
+  markerEnd: 'url(#arrowhead)',
 }))
 
 function parsePosition(posStr: string): { x: number; y: number } {
@@ -104,16 +131,118 @@ function getNodeIcon(type: string) {
   return map[type] || '?'
 }
 
+function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>()
+  const hasCustomPosition = newNodes.some(n => {
+    const pos = parsePosition(n.position)
+    return pos.x !== 0 || pos.y !== 0
+  })
+  if (hasCustomPosition) {
+    for (const n of newNodes) {
+      positions.set(n.id, parsePosition(n.position))
+    }
+    return positions
+  }
+
+  const nodeIds = new Set(newNodes.map(n => n.id))
+  const children = new Map<string, Set<string>>()
+  const parents = new Map<string, Set<string>>()
+
+  for (const n of newNodes) {
+    children.set(n.id, new Set())
+    parents.set(n.id, new Set())
+  }
+
+  for (const e of newEdges) {
+    if (nodeIds.has(e.from_node) && nodeIds.has(e.to_node)) {
+      children.get(e.from_node)!.add(e.to_node)
+      parents.get(e.to_node)!.add(e.from_node)
+    }
+  }
+
+  const levels = new Map<string, number>()
+  const visited = new Set<string>()
+
+  function assignLevel(nodeId: string): number {
+    if (levels.has(nodeId)) return levels.get(nodeId)!
+    if (visited.has(nodeId)) {
+      levels.set(nodeId, 0)
+      return 0
+    }
+    visited.add(nodeId)
+
+    const parentIds = parents.get(nodeId)!
+    if (parentIds.size === 0) {
+      levels.set(nodeId, 0)
+      return 0
+    }
+
+    let maxParentLevel = -1
+    for (const pid of parentIds) {
+      maxParentLevel = Math.max(maxParentLevel, assignLevel(pid))
+    }
+    const level = maxParentLevel + 1
+    levels.set(nodeId, level)
+    return level
+  }
+
+  for (const n of newNodes) {
+    assignLevel(n.id)
+  }
+
+  const levelGroups = new Map<number, string[]>()
+  for (const n of newNodes) {
+    const lv = levels.get(n.id) ?? 0
+    if (!levelGroups.has(lv)) levelGroups.set(lv, [])
+    levelGroups.get(lv)!.push(n.id)
+  }
+
+  const NODE_W = 300
+  const NODE_H = 90
+  const GAP_X = 60
+  const GAP_Y = 40
+  const MAX_COLS = 4
+
+  const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b)
+
+  for (const lv of sortedLevels) {
+    const group = levelGroups.get(lv)!
+    group.sort((a, b) => {
+      const idxA = newNodes.findIndex(n => n.id === a)
+      const idxB = newNodes.findIndex(n => n.id === b)
+      return idxA - idxB
+    })
+
+    const cols = Math.min(group.length, MAX_COLS)
+    const rows = Math.ceil(group.length / cols)
+    const gridW = cols * NODE_W + (cols - 1) * GAP_X
+    const startX = -gridW / 2
+
+    group.forEach((nid, idx) => {
+      const col = idx % cols
+      const row = Math.floor(idx / cols)
+      positions.set(nid, {
+        x: startX + col * (NODE_W + GAP_X),
+        y: lv * (NODE_H + GAP_Y) + row * (NODE_H * 0.15),
+      })
+    })
+  }
+
+  return positions
+}
+
 const vfNodes = ref<Node[]>([])
 const vfEdges = ref<Edge[]>([])
 
 watch([() => props.nodes, () => props.edges], ([newNodes, newEdges]) => {
-  vfNodes.value = newNodes.map((n, i) => {
-    const pos = parsePosition(n.position)
+  const layoutPositions = buildLayout(newNodes, newEdges)
+
+  vfNodes.value = newNodes.map(n => {
+    const pos = layoutPositions.get(n.id) || parsePosition(n.position)
     return {
       id: n.id,
       type: 'scene-node',
-      position: pos.x !== 0 || pos.y !== 0 ? pos : { x: 50 + (i % 3) * 320, y: 50 + Math.floor(i / 3) * 120 },
+      position: pos,
       data: {
         label: n.name,
         nodeType: n.type,
@@ -124,18 +253,35 @@ watch([() => props.nodes, () => props.edges], ([newNodes, newEdges]) => {
     }
   })
 
-  vfEdges.value = newEdges.map(e => ({
-    id: e.id,
-    source: e.from_node,
-    target: e.to_node,
-    type: 'default',
-    data: {
-      condition: e.condition,
-      edgeId: e.id,
-    },
-    label: (e.condition === '__if_true__' ? 'TRUE' : e.condition === '__if_false__' ? 'FALSE' : '') || undefined,
-    animated: false,
-  }))
+  vfEdges.value = newEdges.map(e => {
+    let markerEndId = 'url(#vf-arrowhead)'
+    let strokeColor = 'var(--text-tertiary)'
+    if (e.condition === '__if_true__') {
+      markerEndId = 'url(#vf-arrowhead-true)'
+      strokeColor = '#2ecc71'
+    } else if (e.condition === '__if_false__') {
+      markerEndId = 'url(#vf-arrowhead-false)'
+      strokeColor = '#e74c3c'
+    }
+    return {
+      id: e.id,
+      source: e.from_node,
+      target: e.to_node,
+      type: 'smoothstep',
+      data: {
+        condition: e.condition,
+        edgeId: e.id,
+      },
+      label: (e.condition === '__if_true__' ? 'TRUE' : e.condition === '__if_false__' ? 'FALSE' : '') || undefined,
+      labelStyle: { fontSize: '10px', fontWeight: 700, fill: strokeColor },
+      labelBgStyle: { fill: 'var(--bg-secondary)' },
+      labelBgPadding: [4, 8] as [number, number],
+      labelBgBorderRadius: 6,
+      animated: false,
+      style: { stroke: strokeColor, strokeWidth: 2 },
+      markerEnd: markerEndId,
+    }
+  })
 }, { immediate: true })
 
 let positionSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -208,7 +354,7 @@ function minimapNodeColor(node: any) {
   min-height: 420px;
   position: relative;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .vue-flow-canvas {
@@ -259,6 +405,8 @@ function minimapNodeColor(node: any) {
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-md) !important;
   overflow: hidden;
+  bottom: 12px !important;
+  left: 12px !important;
 }
 
 .vue-flow__controls-button {
@@ -301,5 +449,16 @@ function minimapNodeColor(node: any) {
   stroke: var(--accent-primary);
   stroke-width: 2;
   stroke-dasharray: 5;
+}
+
+.vue-flow__edge-textbg {
+  rx: 6;
+  ry: 6;
+  fill-opacity: 0.85;
+}
+
+.vue-flow__edge-textwrapper .vue-flow__edge-text {
+  font-size: 10px;
+  font-weight: 700;
 }
 </style>
