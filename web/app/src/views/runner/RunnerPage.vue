@@ -45,7 +45,7 @@
 
       <div class="card status-card">
         <h3>运行状态</h3>
-        <div v-if="activeRuns.length === 0" class="empty">暂无运行中的场景</div>
+        <div v-if="activeRuns.length === 0 && recentFailedRuns.length === 0" class="empty">暂无运行中的场景</div>
         <div v-for="run in activeRuns" :key="run.id" class="run-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
@@ -59,6 +59,18 @@
             <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
           </div>
           <button class="btn-stop" @click="handleStop(run.scene_id)">停止</button>
+        </div>
+        <div v-for="run in recentFailedRuns" :key="'fail-'+run.id" class="run-item failed-item">
+          <div class="run-header">
+            <span class="run-name">Scene #{{ run.scene_id }}</span>
+            <span class="status failed">FAILED</span>
+          </div>
+          <div v-if="run.error_msg" class="error-msg">{{ run.error_msg }}</div>
+          <div class="run-metrics">
+            <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
+            <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
+            <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
+          </div>
         </div>
       </div>
     </div>
@@ -93,11 +105,13 @@
         </tbody>
       </table>
     </div>
+
+    <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
 import type { SceneDTO, RunRecordDTO } from '@/types'
@@ -107,6 +121,8 @@ const runs = ref<RunRecordDTO[]>([])
 const activeRuns = ref<RunRecordDTO[]>([])
 const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
+const toastMsg = ref('')
+const toastType = ref('info')
 
 const form = reactive({
   scene_id: '',
@@ -148,19 +164,40 @@ async function fetchRuns() {
   } catch { /* ignore */ }
 }
 
+const recentFailedRuns = computed(() => {
+  return runs.value
+    .filter((r) => r.status === 'failed')
+    .slice(0, 5)
+})
+
+function showToast(msg: string, type = 'info') {
+  toastMsg.value = msg
+  toastType.value = type
+  setTimeout(() => { toastMsg.value = '' }, 5000)
+}
+
 async function handleStart() {
   if (!form.scene_id) return
   starting.value = true
   try {
-    await startScene({
+    const resp = await startScene({
       scene_id: form.scene_id,
       workers: form.workers,
       run_mode: form.run_mode,
       duration: form.duration * 1e9,
       count: form.count,
     })
+    if (resp.code === 0) {
+      showToast('测试已启动')
+      fetchRuns()
+    } else {
+      showToast(resp.message || '启动失败', 'error')
+      fetchRuns()
+    }
+  } catch (e: any) {
+    showToast('启动失败: ' + (e.message || '未知错误'), 'error')
     fetchRuns()
-  } catch { /* ignore */ }
+  }
   starting.value = false
 }
 
@@ -238,4 +275,16 @@ onUnmounted(() => {
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .status-badge.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+.status.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+.failed-item { border-left: 3px solid var(--accent-danger); }
+.error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 10px 20px;
+  border-radius: var(--radius-md); font-size: 13px; z-index: 200;
+  animation: slideIn 0.3s ease;
+}
+.toast.info { background: var(--accent-primary); color: #fff; }
+.toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>

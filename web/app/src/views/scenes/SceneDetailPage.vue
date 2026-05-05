@@ -37,32 +37,17 @@
             <p>暂无请求节点，点击上方按钮添加</p>
           </div>
 
-          <div class="dag-flow" v-else>
-          <template v-for="(node, idx) in sortedNodes" :key="node.id">
-            <div
-              :class="['dag-node', node.type, { active: selectedNode?.id === node.id }]"
-              @click="selectNode(node)"
-            >
-              <div :class="['node-icon', node.type]">{{ nodeIcon(node.type) }}</div>
-              <div class="node-info">
-                <span class="node-name">{{ node.name }}</span>
-                <span class="node-type-badge">{{ nodeTypeLabel(node.type) }}</span>
-              </div>
-              <div class="node-actions">
-                <button class="node-btn" @click.stop="editNode(node)" title="编辑">✎</button>
-                <button class="node-btn danger" @click.stop="handleDeleteNode(node.id)" title="删除">✕</button>
-              </div>
-            </div>
-            <div v-if="idx < sortedNodes.length - 1" class="dag-edge">
-              <div class="edge-line"></div>
-              <div v-if="getEdgeCondition(sortedNodes[idx].id, sortedNodes[idx + 1].id)" class="edge-condition">
-                {{ getEdgeCondition(sortedNodes[idx].id, sortedNodes[idx + 1].id) }}
-              </div>
-              <div class="edge-arrow">▼</div>
-              <button class="edge-delete" @click="deleteEdgeBetween(idx)" title="删除连线">✕</button>
-            </div>
-          </template>
-        </div>
+          <DagFlow
+            v-else
+            :nodes="nodes"
+            :edges="edges"
+            @edit="editNode"
+            @delete-node="handleDeleteNode"
+            @add-edge="onDagAddEdge"
+            @delete-edge="handleDeleteEdge"
+            @node-select="selectNode"
+            @node-position-update="saveNodePosition"
+          />
       </div>
     </div>
 
@@ -163,8 +148,26 @@
           <input v-model="ifElseConfig.expr" placeholder='${order_id} != ""' @change="saveNodeConfig" />
         </div>
         <div class="form-row">
-          <label class="hint-label">表达式求值为 true 时走 IF 分支，false 时走 ELSE 分支。连线条件使用 __if_true__ / __if_false__ 标识。</label>
+          <label>IF 分支目标 (true)</label>
+          <select v-model="ifElseConfig.trueTarget" @change="saveIfElseBranches">
+            <option value="">选择 IF 分支目标节点</option>
+            <option v-for="n in availableIfElseTargets" :key="n.id" :value="n.id">{{ n.name }} ({{ nodeTypeLabel(n.type) }})</option>
+          </select>
         </div>
+        <div class="form-row">
+          <label>ELSE 分支目标 (false)</label>
+          <select v-model="ifElseConfig.falseTarget" @change="saveIfElseBranches">
+            <option value="">选择 ELSE 分支目标节点</option>
+            <option v-for="n in availableIfElseTargets" :key="n.id" :value="n.id">{{ n.name }} ({{ nodeTypeLabel(n.type) }})</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="hint-label">表达式求值为 true 时走 IF 分支，false 时走 ELSE 分支。</label>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode">保存配置</button>
       </div>
     </div>
     </div>
@@ -235,6 +238,14 @@
             <option value="if-else">IF-ELSE 分支</option>
             <option value="teardown">Teardown (清理)</option>
           </select>
+        </div>
+        <div v-if="!editingNode && nodes.length > 0" class="form-group">
+          <label>连接到（父节点）</label>
+          <select v-model="nodeForm.parentId">
+            <option value="">不连接（作为起始节点）</option>
+            <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }} ({{ nodeTypeLabel(n.type) }})</option>
+          </select>
+          <span class="field-hint">选择新节点的上游父节点，留空则作为DAG起始节点</span>
         </div>
         <template v-if="nodeForm.type === 'http' || nodeForm.type === 'setup' || nodeForm.type === 'teardown'">
           <div class="form-group">
@@ -313,6 +324,7 @@ import { getScene, createScene, startScene } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
 import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
+import DagFlow from './DagFlow.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -351,6 +363,7 @@ const nodeForm = reactive({
   delayMs: 1000,
   conditionExpr: '',
   extract: '',
+  parentId: '',
 })
 
 const editingConfig = reactive({ name: '' })
@@ -366,7 +379,7 @@ const httpConfig = reactive({
 })
 const delayConfig = reactive({ ms: 1000 })
 const conditionConfig = reactive({ expr: '' })
-const ifElseConfig = reactive({ expr: '' })
+const ifElseConfig = reactive({ expr: '', trueTarget: '', falseTarget: '' })
 
 const generatorCategories = ref<GeneratorCategoryInfo[]>([])
 const selectedGeneratorCategory = ref('')
@@ -377,6 +390,136 @@ const filteredGenerators = computed<GeneratorInfo[]>(() => {
   const cat = generatorCategories.value.find(c => c.key === selectedGeneratorCategory.value)
   return cat?.generators || []
 })
+
+const availableIfElseTargets = computed(() => {
+  if (!selectedNode.value) return []
+  return nodes.value.filter(n => n.id !== selectedNode.value?.id)
+})
+
+async function saveIfElseBranches() {
+  if (!selectedNode.value) return
+  const sceneId = route.params.id as string
+  const nodeId = selectedNode.value.id
+  
+  const existingEdges = edges.value.filter(e => e.from_node === nodeId)
+  for (const e of existingEdges) {
+    await deleteEdge(e.id)
+  }
+  
+  if (ifElseConfig.trueTarget) {
+    await addEdge({ scene_id: sceneId, from_node: nodeId, to_node: ifElseConfig.trueTarget, condition: '__if_true__' })
+  }
+  if (ifElseConfig.falseTarget) {
+    await addEdge({ scene_id: sceneId, from_node: nodeId, to_node: ifElseConfig.falseTarget, condition: '__if_false__' })
+  }
+  
+  fetchEdges()
+  showToast('分支配置已保存')
+}
+
+interface DagTreeNode {
+  node: NodeDTO
+  level: number
+  children: { edge: EdgeDTO; child: DagTreeNode }[]
+}
+
+const dagTree = computed((): DagTreeNode[] => {
+  if (nodes.value.length === 0) return []
+
+  const nodeMap = new Map<string, NodeDTO>()
+  for (const n of nodes.value) nodeMap.set(n.id, n)
+
+  const outEdgesMap = new Map<string, EdgeDTO[]>()
+  for (const e of edges.value) {
+    outEdgesMap.set(e.from_node, [...(outEdgesMap.get(e.from_node) || []), e])
+  }
+
+  const rootNodes = nodes.value.filter(n => !edges.value.some(e => e.to_node === n.id))
+  const visited = new Set<string>()
+
+  function buildTree(nodeId: string, level: number): DagTreeNode | null {
+    if (visited.has(nodeId)) return null
+    visited.add(nodeId)
+    
+    const node = nodeMap.get(nodeId)
+    if (!node) return null
+    
+    const childrenOut = outEdgesMap.get(nodeId) || []
+    const children: { edge: EdgeDTO; child: DagTreeNode }[] = []
+    
+    for (const e of childrenOut) {
+      const childTree = buildTree(e.to_node, level + 1)
+      if (childTree) {
+        children.push({ edge: e, child: childTree })
+      }
+    }
+
+    return { node, level, children }
+  }
+
+  const result: DagTreeNode[] = []
+  for (const root of rootNodes) {
+    const tree = buildTree(root.id, 0)
+    if (tree) result.push(tree)
+  }
+
+  for (const n of nodes.value) {
+    if (!visited.has(n.id)) {
+      result.push({ node: n, level: 0, children: [] })
+    }
+  }
+
+  return result
+})
+
+function flattenDagLevels(): { nodes: NodeDTO[]; isBranch: boolean; branchFrom?: string; branchLabel?: string }[][] {
+  const levels: { nodes: NodeDTO[]; isBranch: boolean; branchFrom?: string; branchLabel?: string }[][] = [[]]
+  const added = new Set<string>()
+  
+  function addNodeToLevel(node: NodeDTO, levelIdx: number, branchInfo?: { from: string; label: string }) {
+    while (levels.length <= levelIdx) levels.push([])
+    if (!added.has(node.id)) {
+      added.add(node.id)
+      levels[levelIdx].push({
+        nodes: [node],
+        isBranch: !!branchInfo,
+        branchFrom: branchInfo?.from,
+        branchLabel: branchInfo?.label,
+      })
+    }
+  }
+
+  function traverse(treeNodes: DagTreeNode[], startLevel: number) {
+    for (const tree of treeNodes) {
+      addNodeToLevel(tree.node, startLevel)
+      
+      if (tree.children.length > 1) {
+        for (const c of tree.children) {
+          const label = c.edge.condition === '__if_true__' ? 'TRUE' : 
+                       c.edge.condition === '__if_false__' ? 'FALSE' : 
+                       c.edge.condition || ''
+          addNodeToLevel(c.child.node, startLevel + 1, { from: tree.node.id, label })
+          traverse([c.child], startLevel + 2)
+        }
+      } else if (tree.children.length === 1) {
+        traverse([tree.children[0].child], startLevel + 1)
+      }
+    }
+  }
+
+  traverse(dagTree.value, 0)
+  return levels
+}
+
+const dagLevels = computed(() => flattenDagLevels())
+
+function getOutEdgesOfNode(nodeId: string): EdgeDTO[] {
+  return edges.value.filter(e => e.from_node === nodeId)
+}
+
+function getInEdgeOfNode(nodeId: string): EdgeDTO | undefined {
+  return edges.value.find(e => e.to_node === nodeId)
+}
 
 const sortedNodes = computed(() => {
   if (nodes.value.length === 0) return []
@@ -549,6 +692,7 @@ function addNode(type: string) {
   nodeForm.delayMs = 1000
   nodeForm.conditionExpr = ''
   nodeForm.extract = ''
+  nodeForm.parentId = ''
   showNodeEditor.value = true
 }
 
@@ -635,7 +779,13 @@ async function handleSaveNode() {
     })
     if (resp.code === 0) {
       const newNode = resp.data
-      if (nodes.value.length > 0) {
+      if (nodeForm.parentId) {
+        await addEdge({
+          scene_id: sceneId,
+          from_node: nodeForm.parentId,
+          to_node: newNode.id,
+        })
+      } else if (nodes.value.length > 0) {
         const lastNode = sortedNodes.value[sortedNodes.value.length - 1]
         if (lastNode) {
           await addEdge({
@@ -665,11 +815,18 @@ async function confirmDeleteNode() {
   const id = pendingDeleteNodeId.value
   showConfirm.value = false
   pendingDeleteNodeId.value = ''
+  
+  const relatedEdges = edges.value.filter(e => e.from_node === id || e.to_node === id)
+  for (const edge of relatedEdges) {
+    await deleteEdge(edge.id)
+  }
+  
   const resp = await apiDeleteNode(id)
   if (resp.code === 0) {
-    showToast('节点已删除')
+    showToast('节点已删除（关联连线已自动清理）')
     if (selectedNode.value?.id === id) selectedNode.value = null
     fetchNodes()
+    fetchEdges()
   } else {
     showToast(resp.message || '删除失败', 'error')
   }
@@ -687,7 +844,11 @@ async function deleteEdgeBetween(idx: number) {
   }
 }
 
-function selectNode(node: NodeDTO) {
+function selectNode(node: NodeDTO | null) {
+  if (!node) {
+    selectedNode.value = null
+    return
+  }
   selectedNode.value = node
   editingConfig.name = node.name
   try {
@@ -703,7 +864,36 @@ function selectNode(node: NodeDTO) {
     delayConfig.ms = cfg.ms || 1000
     conditionConfig.expr = cfg.expr || ''
     ifElseConfig.expr = cfg.expr || ''
+    
+    if (node.type === 'if-else') {
+      const nodeEdges = edges.value.filter(e => e.from_node === node.id)
+      const trueEdge = nodeEdges.find(e => e.condition === '__if_true__')
+      const falseEdge = nodeEdges.find(e => e.condition === '__if_false__')
+      ifElseConfig.trueTarget = trueEdge?.to_node || ''
+      ifElseConfig.falseTarget = falseEdge?.to_node || ''
+    } else {
+      ifElseConfig.trueTarget = ''
+      ifElseConfig.falseTarget = ''
+    }
   } catch { /* ignore */ }
+}
+
+async function onDagAddEdge(from: string, to: string) {
+  const sceneId = route.params.id as string
+  await addEdge({ scene_id: sceneId, from_node: from, to_node: to })
+  fetchEdges()
+  showToast('连线已创建')
+}
+
+async function handleDeleteEdge(id: string) {
+  await deleteEdge(id)
+  fetchEdges()
+  showToast('连线已删除')
+}
+
+async function saveNodePosition(id: string, x: number, y: number) {
+  const sceneId = route.params.id as string
+  await apiUpdateNode({ id, position: JSON.stringify({ x: Math.round(x), y: Math.round(y) }) })
 }
 
 async function saveNodeConfig() {
@@ -736,12 +926,21 @@ async function saveNodeConfig() {
     config = JSON.stringify({ expr: ifElseConfig.expr })
   }
 
-  await apiUpdateNode({
-    id: selectedNode.value.id,
-    name: editingConfig.name || selectedNode.value.name,
-    config,
-  })
-  fetchNodes()
+  try {
+    const resp = await apiUpdateNode({
+      id: selectedNode.value.id,
+      name: editingConfig.name || selectedNode.value.name,
+      config,
+    })
+    if (resp.code === 0) {
+      showToast('配置已保存')
+      fetchNodes()
+    } else {
+      showToast(resp.message || '保存失败', 'error')
+    }
+  } catch (e: any) {
+    showToast('保存失败: ' + (e.message || '网络错误'), 'error')
+  }
 }
 
 async function handleStart() {
@@ -881,11 +1080,92 @@ onMounted(() => {
 .section-header h3 { font-size: 14px; font-weight: 600; }
 .dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.dag-canvas { padding: 20px; min-height: 200px; overflow-y: auto; flex: 1; }
+.dag-canvas { padding: 0; min-height: 480px; flex: 1; position: relative; }
 .dag-empty { text-align: center; padding: 40px 0; color: var(--text-tertiary); }
 .empty-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
 
 .dag-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+.dag-branch-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 16px 0;
+}
+
+.dag-level {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.dag-level-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.branch-item .dag-nodes-in-level::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 2px;
+  height: 16px;
+  background: var(--border-primary);
+}
+
+.branch-label { margin-bottom: 4px; }
+.label-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  padding: 2px 10px; border-radius: 10px;
+}
+.true-label { background: rgba(46,204,113,0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+.false-label { background: rgba(231,76,60,0.12); color: #e74c3c; border: 1px solid rgba(231,76,60,0.25); }
+
+.dag-nodes-in-level {
+  display: flex;
+  gap: 12px;
+}
+
+.branch-split-lines {
+  display: flex;
+  gap: 40px;
+  margin-top: 4px;
+  position: relative;
+}
+
+.split-line-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.split-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.split-condition {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.5px;
+  padding: 1px 6px; border-radius: 8px; margin-bottom: 2px;
+}
+.true-line .split-condition { background: rgba(46,204,113,0.15); color: #2ecc71; }
+.false-line .split-condition { background: rgba(231,76,60,0.12); color: #e74c3c; }
+
+.split-svg {
+  width: 40px; height: 50px; overflow: visible;
+}
+.true-line .split-svg path { stroke: #2ecc71; stroke-dasharray: none; opacity: 0.7; }
+.false-line .split-svg path { stroke: #e74c3c; stroke-dasharray: none; opacity: 0.7; }
 
 .dag-node {
   display: flex; align-items: center; gap: 10px;
@@ -1018,6 +1298,9 @@ onMounted(() => {
 .gen-category-select, .gen-name-select { flex: 1 1 120px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
 .gen-category-select:focus, .gen-name-select:focus { border-color: var(--accent-primary); }
 .hint-label { font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
+.field-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; display: block; }
+.panel-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-secondary); }
+.btn-save-panel { width: 100%; padding: 10px; font-size: 14px; }
 
 @media (max-width: 900px) {
   .workspace-split { flex-direction: column; overflow-y: auto; }
