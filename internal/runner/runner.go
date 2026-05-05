@@ -210,12 +210,16 @@ func (r *Runner) Run(ctx context.Context) error {
 		close(r.done)
 	}()
 
-	runLog.Info("scene run started",
+	startFields := []logger.Field{
 		logger.F("workers", r.cfg.Workers),
 		logger.F("run_mode", r.cfg.RunMode),
-		logger.F("count", r.cfg.Count),
-		logger.F("duration", r.cfg.Duration),
-	)
+	}
+	if r.cfg.RunMode == RunModeCount {
+		startFields = append(startFields, logger.F("count", r.cfg.Count))
+	} else {
+		startFields = append(startFields, logger.F("duration", r.cfg.Duration))
+	}
+	runLog.Info("scene run started", startFields...)
 
 	scene, err := r.scenes.GetByID(r.ctx, r.cfg.SceneID)
 	if err != nil {
@@ -410,6 +414,9 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
 		defer cancel()
 
+		chainID := r.nodeGen.Generate()
+		taskCtx = context.WithValue(taskCtx, dag.ChainIDKey, chainID.String())
+
 		var execOpts []dag.ExecutorOption
 		if r.tracer != nil {
 			hook := &dag.HookAdapter{Tracer: r.tracer}
@@ -421,6 +428,7 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 		resolvedVars := variable.ResolveAll(scope)
 		execLog.Info("resolved scene variables",
+			logger.F("chain_id", chainID.String()),
 			logger.F("variable_count", len(resolvedVars)),
 			logger.F("variables", fmt.Sprintf("%v", resolvedVars)),
 		)
@@ -521,14 +529,16 @@ func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
+	chainID, _ := ctx.Value(dag.ChainIDKey).(string)
 	nodeLog := n.log.With(
 		logger.F("trace_id", n.traceID),
+		logger.F("chain_id", chainID),
 		logger.F("node_id", n.id),
 		logger.F("node_type", n.nodeType),
 	)
 
 	switch n.nodeType {
-	case model.NodeTypeHTTP:
+	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
 		return n.executeHTTP(ctx, input, nodeLog)
 	case model.NodeTypeDelay:
 		return n.executeDelay(ctx, nodeLog)
@@ -557,7 +567,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	url := cfg.URL
 
 	genReg := builtin.DefaultRegistry()
-	url = resolveGeneratorRefs(url, genReg)
+	url = resolveGeneratorRefs(url, genReg, nodeLog)
 	nodeLog.Info("resolved generator references in URL", logger.F("url", url))
 
 	if input != nil && input.Variables != nil {
@@ -594,11 +604,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	for k, v := range req.Headers {
-		req.Headers[k] = resolveGeneratorRefs(v, genReg)
+		req.Headers[k] = resolveGeneratorRefs(v, genReg, nodeLog)
 	}
 
 	if cfg.Body != "" {
-		body := resolveGeneratorRefs(cfg.Body, genReg)
+		body := resolveGeneratorRefs(cfg.Body, genReg, nodeLog)
 		if input != nil && input.Variables != nil {
 			body = resolveWithVariables(body, input.Variables)
 		}
@@ -842,7 +852,7 @@ func schemaFromTemplate(tmpl map[string]any) *generator.Schema {
 
 var generatorRefRe = regexp.MustCompile(`\$\{generator\.([a-zA-Z0-9_-]+)\}`)
 
-func resolveGeneratorRefs(str string, reg *generator.Registry) string {
+func resolveGeneratorRefs(str string, reg *generator.Registry, log logger.Logger) string {
 	if str == "" || reg == nil {
 		return str
 	}
@@ -859,7 +869,19 @@ func resolveGeneratorRefs(str string, reg *generator.Registry) string {
 		}
 		val, err := reg.Generate(schema)
 		if err != nil {
+			if log != nil {
+				log.Warn("generator function failed",
+					logger.F("function", genName),
+					logger.F("error", err),
+				)
+			}
 			return match
+		}
+		if log != nil {
+			log.Info("generator function called",
+				logger.F("function", genName),
+				logger.F("output", fmt.Sprintf("%v", val)),
+			)
 		}
 		return fmt.Sprintf("%v", val)
 	})

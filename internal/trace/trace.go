@@ -41,16 +41,18 @@ const (
 
 // Span records the execution details of a single DAG node.
 type Span struct {
-	ID        snowflake.ID `json:"id"`
-	TraceID   snowflake.ID `json:"trace_id"`
-	NodeID    string       `json:"node_id"`
-	Status    SpanStatus   `json:"status"`
-	Error     string       `json:"error,omitempty"`
-	Input     string       `json:"input,omitempty"`
-	Output    string       `json:"output,omitempty"`
-	StartedAt time.Time    `json:"started_at"`
-	FinishedAt time.Time   `json:"finished_at"`
-	Duration  time.Duration `json:"duration"`
+	ID           snowflake.ID `json:"id"`
+	TraceID      snowflake.ID `json:"trace_id"`
+	ChainID      string       `json:"chain_id"`
+	NodeID       string       `json:"node_id"`
+	ParentNodeID string       `json:"parent_node_id,omitempty"`
+	Status       SpanStatus   `json:"status"`
+	Error        string       `json:"error,omitempty"`
+	Input        string       `json:"input,omitempty"`
+	Output       string       `json:"output,omitempty"`
+	StartedAt    time.Time    `json:"started_at"`
+	FinishedAt   time.Time    `json:"finished_at"`
+	Duration     time.Duration `json:"duration"`
 }
 
 // Trace records the full execution history of a single DAG run.
@@ -135,6 +137,18 @@ type SpanBuilder struct {
 // SetInput records a summary of the span input.
 func (b *SpanBuilder) SetInput(s string) *SpanBuilder {
 	b.span.Input = s
+	return b
+}
+
+// SetChainID sets the chain ID for this span.
+func (b *SpanBuilder) SetChainID(chainID string) *SpanBuilder {
+	b.span.ChainID = chainID
+	return b
+}
+
+// SetParentNodeID sets the parent node ID for this span.
+func (b *SpanBuilder) SetParentNodeID(parentNodeID string) *SpanBuilder {
+	b.span.ParentNodeID = parentNodeID
 	return b
 }
 

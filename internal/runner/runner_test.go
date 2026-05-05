@@ -253,41 +253,41 @@ func TestResolveGeneratorRefs(t *testing.T) {
 	reg := builtin.DefaultRegistry()
 
 	t.Run("email generator", func(t *testing.T) {
-		result := resolveGeneratorRefs(`{"email":"${generator.email}"}`, reg)
+		result := resolveGeneratorRefs(`{"email":"${generator.email}"}`, reg, nil)
 		assert.NotContains(t, result, "${generator.email}")
 		assert.Contains(t, result, "@")
 	})
 
 	t.Run("uuid generator", func(t *testing.T) {
-		result := resolveGeneratorRefs(`{"id":"${generator.uuid}"}`, reg)
+		result := resolveGeneratorRefs(`{"id":"${generator.uuid}"}`, reg, nil)
 		assert.NotContains(t, result, "${generator.uuid}")
 		assert.Contains(t, result, "-")
 	})
 
 	t.Run("multiple generators in one string", func(t *testing.T) {
-		result := resolveGeneratorRefs(`${generator.email},${generator.uuid}`, reg)
+		result := resolveGeneratorRefs(`${generator.email},${generator.uuid}`, reg, nil)
 		assert.NotContains(t, result, "${generator.")
 		assert.Contains(t, result, ",")
 		assert.Contains(t, result, "@")
 	})
 
 	t.Run("unknown generator preserved", func(t *testing.T) {
-		result := resolveGeneratorRefs(`${generator.nonexistent}`, reg)
+		result := resolveGeneratorRefs(`${generator.nonexistent}`, reg, nil)
 		assert.Contains(t, result, "${generator.nonexistent}")
 	})
 
 	t.Run("empty string returns empty", func(t *testing.T) {
-		result := resolveGeneratorRefs("", reg)
+		result := resolveGeneratorRefs("", reg, nil)
 		assert.Equal(t, "", result)
 	})
 
 	t.Run("nil registry returns original", func(t *testing.T) {
-		result := resolveGeneratorRefs(`${generator.email}`, nil)
+		result := resolveGeneratorRefs(`${generator.email}`, nil, nil)
 		assert.Equal(t, `${generator.email}`, result)
 	})
 
 	t.Run("mixed with literal text", func(t *testing.T) {
-		result := resolveGeneratorRefs(`{"name":"perf_test_user","email":"${generator.email}"}`, reg)
+		result := resolveGeneratorRefs(`{"name":"perf_test_user","email":"${generator.email}"}`, reg, nil)
 		assert.Contains(t, result, `"name":"perf_test_user"`)
 		assert.NotContains(t, result, "${generator.email}")
 		assert.Contains(t, result, "@")

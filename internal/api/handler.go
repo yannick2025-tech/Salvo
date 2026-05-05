@@ -1022,16 +1022,18 @@ func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
 	spans := make([]dto.SpanDTO, 0, len(tr.Spans))
 	for _, sp := range tr.Spans {
 		spans = append(spans, dto.SpanDTO{
-			ID:         sp.ID,
-			TraceID:    sp.TraceID,
-			NodeID:     sp.NodeID,
-			Status:     string(sp.Status),
-			Error:      sp.Error,
-			Input:      sp.Input,
-			Output:     sp.Output,
-			StartedAt:  sp.StartedAt,
-			FinishedAt: sp.FinishedAt,
-			Duration:   sp.Duration.Nanoseconds(),
+			ID:           sp.ID,
+			TraceID:      sp.TraceID,
+			ChainID:      sp.ChainID,
+			NodeID:       sp.NodeID,
+			ParentNodeID: sp.ParentNodeID,
+			Status:       string(sp.Status),
+			Error:        sp.Error,
+			Input:        sp.Input,
+			Output:       sp.Output,
+			StartedAt:    sp.StartedAt,
+			FinishedAt:   sp.FinishedAt,
+			Duration:     sp.Duration.Nanoseconds(),
 		})
 	}
 

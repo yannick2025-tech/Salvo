@@ -62,6 +62,8 @@ const (
 	NodeTypeIfElse    = "if-else"
 	NodeTypeLoop      = "loop"
 	NodeTypeGroup     = "group"
+	NodeTypeSetup     = "setup"
+	NodeTypeTeardown  = "teardown"
 )
 
 // Edge represents a directed edge between two DAG nodes.

@@ -10,6 +10,10 @@ import (
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
 )
 
+// ChainIDKey is the context key for the chain ID propagated through
+// a single DAG execution.
+const ChainIDKey = "salvo_chain_id"
+
 // TraceHook is called by the executor when a node starts and finishes.
 // It decouples the executor from the concrete tracing implementation.
 type TraceHook interface {
@@ -31,6 +35,10 @@ type TraceContext interface {
 type SpanContext interface {
 	// SetInput records the span input summary.
 	SetInput(s string)
+	// SetChainID sets the chain ID for this span.
+	SetChainID(chainID string)
+	// SetParentNodeID sets the parent node ID for this span.
+	SetParentNodeID(parentNodeID string)
 	// Finish completes the span with output and error.
 	Finish(output string, err error)
 	// Skip marks the span as skipped.
@@ -81,6 +89,16 @@ type spanAdapter struct {
 // SetInput records the span input summary.
 func (s *spanAdapter) SetInput(v string) {
 	s.builder.SetInput(v)
+}
+
+// SetChainID sets the chain ID for this span.
+func (s *spanAdapter) SetChainID(chainID string) {
+	s.builder.SetChainID(chainID)
+}
+
+// SetParentNodeID sets the parent node ID for this span.
+func (s *spanAdapter) SetParentNodeID(parentNodeID string) {
+	s.builder.SetParentNodeID(parentNodeID)
 }
 
 // Finish completes the span.
@@ -135,6 +153,8 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 		return nil, fmt.Errorf("executor context already cancelled: %w", err)
 	}
 
+	chainID, _ := ctx.Value(ChainIDKey).(string)
+
 	order, err := e.dag.TopologicalSort()
 	if err != nil {
 		return nil, fmt.Errorf("topological sort failed: %w", err)
@@ -165,12 +185,19 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			}
 
 			inEdges := e.dag.InEdges(n.ID())
+			var parentNodeID string
+			if len(inEdges) > 0 {
+				parentNodeID = inEdges[0].From
+			}
+
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
 				case <-ctx.Done():
 					span := tctx.StartSpan(n.ID())
+					span.SetChainID(chainID)
+					span.SetParentNodeID(parentNodeID)
 					span.Skip("parent cancelled")
 					errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
 					close(sig)
@@ -184,6 +211,8 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 					if !e.evalCondition(ctx, edge.Condition, parentOutput) {
 						span := tctx.StartSpan(n.ID())
+						span.SetChainID(chainID)
+						span.SetParentNodeID(parentNodeID)
 						span.Skip(fmt.Sprintf("condition not met: %s", edge.Condition))
 						close(sig)
 						return
@@ -201,6 +230,8 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			}
 
 			span := tctx.StartSpan(n.ID())
+			span.SetChainID(chainID)
+			span.SetParentNodeID(parentNodeID)
 
 			var lastOutput *Output
 			for i := 0; i < loopCount; i++ {

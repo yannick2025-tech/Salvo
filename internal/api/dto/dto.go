@@ -328,16 +328,18 @@ type GetTraceByRunRequest struct {
 
 // SpanDTO is the span detail returned in API responses.
 type SpanDTO struct {
-	ID         snowflake.ID `json:"id"`
-	TraceID    snowflake.ID `json:"trace_id"`
-	NodeID     string       `json:"node_id"`
-	Status     string       `json:"status"`
-	Error      string       `json:"error,omitempty"`
-	Input      string       `json:"input,omitempty"`
-	Output     string       `json:"output,omitempty"`
-	StartedAt  time.Time    `json:"started_at"`
-	FinishedAt time.Time    `json:"finished_at"`
-	Duration   int64        `json:"duration_ns"`
+	ID           snowflake.ID `json:"id"`
+	TraceID      snowflake.ID `json:"trace_id"`
+	ChainID      string       `json:"chain_id"`
+	NodeID       string       `json:"node_id"`
+	ParentNodeID string       `json:"parent_node_id,omitempty"`
+	Status       string       `json:"status"`
+	Error        string       `json:"error,omitempty"`
+	Input        string       `json:"input,omitempty"`
+	Output       string       `json:"output,omitempty"`
+	StartedAt    time.Time    `json:"started_at"`
+	FinishedAt   time.Time    `json:"finished_at"`
+	Duration     int64        `json:"duration_ns"`
 }
 
 // TraceDTO is the trace detail returned in API responses.
