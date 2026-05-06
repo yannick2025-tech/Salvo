@@ -1075,12 +1075,12 @@ onMounted(() => {
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 
-.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: visible; flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-secondary); flex-shrink: 0; }
 .section-header h3 { font-size: 14px; font-weight: 600; }
 .dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.dag-canvas { padding: 0; min-height: 480px; flex: 1; position: relative; }
+.dag-canvas { padding: 0; min-height: 480px; flex: 1; position: relative; padding-bottom: 8px; }
 .dag-empty { text-align: center; padding: 40px 0; color: var(--text-tertiary); }
 .empty-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
 
