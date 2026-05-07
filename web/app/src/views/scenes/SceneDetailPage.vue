@@ -727,9 +727,22 @@ function closeNodeEditor() {
   editingNode.value = null
 }
 
+const SQL_INJECTION_PATTERN = /['";]|--|\/\*|\*\//
+
+function validateNodeName(name: string, excludeId?: string): string | null {
+  if (!name || !name.trim()) return '节点名称不能为空'
+  const trimmed = name.trim()
+  if (trimmed.length > 50) return '节点名称不能超过50个字符'
+  if (SQL_INJECTION_PATTERN.test(trimmed)) return '节点名称包含非法字符（不允许引号、分号、注释符）'
+  const duplicate = nodes.value.find(n => n.name === trimmed && n.id !== excludeId)
+  if (duplicate) return `节点名称 "${trimmed}" 已存在，请使用唯一名称`
+  return null
+}
+
 async function handleSaveNode() {
-  if (!nodeForm.name) {
-    showToast('请输入节点名称', 'error')
+  const nameError = validateNodeName(nodeForm.name, editingNode.value?.id)
+  if (nameError) {
+    showToast(nameError, 'error')
     return
   }
 
@@ -912,6 +925,14 @@ async function saveNodePosition(id: string, x: number, y: number) {
 
 async function saveNodeConfig() {
   if (!selectedNode.value) return
+
+  const newName = editingConfig.name || selectedNode.value.name
+  const nameError = validateNodeName(newName, selectedNode.value.id)
+  if (nameError) {
+    showToast(nameError, 'error')
+    return
+  }
+
   let config = '{}'
   const nodeType = selectedNode.value.type
   if (nodeType === 'http' || nodeType === 'setup' || nodeType === 'teardown') {
@@ -943,7 +964,7 @@ async function saveNodeConfig() {
   try {
     const resp = await apiUpdateNode({
       id: selectedNode.value.id,
-      name: editingConfig.name || selectedNode.value.name,
+      name: newName,
       config,
     })
     if (resp.code === 0) {

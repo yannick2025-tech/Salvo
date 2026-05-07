@@ -227,33 +227,90 @@ function autoLayout() {
   showToast('布局已重新排列', 'success')
 }
 
+function toYamlValue(val: any, indent: string): string {
+  if (val === null || val === undefined) return 'null'
+  if (typeof val === 'boolean') return val ? 'true' : 'false'
+  if (typeof val === 'number') return String(val)
+  if (typeof val === 'string') {
+    if (val === '') return "''"
+    if (/^[a-zA-Z0-9_\-.\/@$:{}[\]() ]+$/.test(val) && !/^(\d|true|false|null|yes|no|on|off)/i.test(val)) {
+      return val
+    }
+    const escaped = val.replace(/'/g, "''")
+    return `'${escaped}'`
+  }
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '[]'
+    const items = val.map((item, i) => {
+      const v = toYamlValue(item, indent + '  ')
+      return `${indent}  - ${v}`
+    })
+    return '\n' + items.join('\n')
+  }
+  if (typeof val === 'object') {
+    const keys = Object.keys(val)
+    if (keys.length === 0) return '{}'
+    const items = keys.map(k => {
+      const v = toYamlValue(val[k], indent + '  ')
+      if (typeof val[k] === 'object' && val[k] !== null && !Array.isArray(val[k]) && Object.keys(val[k]).length > 0) {
+        return `${indent}  ${k}:\n${v}`
+      }
+      if (Array.isArray(val[k]) && val[k].length > 0) {
+        return `${indent}  ${k}:${v}`
+      }
+      return `${indent}  ${k}: ${v}`
+    })
+    return items.join('\n')
+  }
+  return String(val)
+}
+
 function generateYaml(): string {
   const lines: string[] = []
   lines.push('# DAG 场景配置导出')
   lines.push('')
 
+  const idToName = new Map<string, string>()
+  for (const n of props.nodes) {
+    idToName.set(n.id, n.name)
+  }
+
   lines.push('nodes:')
   for (const n of props.nodes) {
-    let configStr = ''
+    lines.push(`  - name: ${toYamlValue(n.name, '')}`)
+    lines.push(`    type: ${n.type}`)
     try {
       const parsed = JSON.parse(n.config || '{}')
-      configStr = JSON.stringify(parsed).replace(/"/g, "'")
+      if (Object.keys(parsed).length > 0) {
+        lines.push(`    config:`)
+        for (const [k, v] of Object.entries(parsed)) {
+          const yv = toYamlValue(v, '      ')
+          if (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v as object).length > 0) {
+            lines.push(`      ${k}:`)
+            lines.push(yv)
+          } else if (Array.isArray(v) && (v as any[]).length > 0) {
+            lines.push(`      ${k}:${yv}`)
+          } else {
+            lines.push(`      ${k}: ${yv}`)
+          }
+        }
+      }
     } catch {
-      configStr = n.config || '{}'
+      lines.push(`    config: {}`)
     }
-    lines.push(`  - id: ${n.id}`)
-    lines.push(`    name: ${n.name}`)
-    lines.push(`    type: ${n.type}`)
-    lines.push(`    config: ${configStr}`)
-    lines.push(`    loop_count: ${n.loop_count}`)
+    if (n.loop_count && n.loop_count > 0) {
+      lines.push(`    loop_count: ${n.loop_count}`)
+    }
     lines.push('')
   }
 
   lines.push('edges:')
   for (const e of props.edges) {
+    const fromName = idToName.get(e.from_node) || e.from_node
+    const toName = idToName.get(e.to_node) || e.to_node
     const cond = e.condition || '(default)'
-    lines.push(`  - from: ${e.from_node}`)
-    lines.push(`    to: ${e.to_node}`)
+    lines.push(`  - from: ${toYamlValue(fromName, '')}`)
+    lines.push(`    to: ${toYamlValue(toName, '')}`)
     lines.push(`    condition: ${cond}`)
     lines.push('')
   }

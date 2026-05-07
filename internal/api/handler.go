@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
@@ -134,6 +136,9 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	allNodes = append(allNodes, ys.Teardown...)
 
 	for _, yn := range allNodes {
+		if err := validateNodeName(yn.Name); err != nil {
+			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", yn.Name, err))
+		}
 		configBytes, _ := json.Marshal(yn.Config)
 		node := &model.Node{
 			SceneID: scene.ID,
@@ -339,6 +344,22 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 
 // --- Node Handlers ---
 
+var sqlInjectionPattern = regexp.MustCompile(`['";]|--|/\*|\*/`)
+
+func validateNodeName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("node name is required")
+	}
+	if len(name) > 50 {
+		return fmt.Errorf("node name must be at most 50 characters")
+	}
+	if sqlInjectionPattern.MatchString(name) {
+		return fmt.Errorf("node name contains invalid characters")
+	}
+	return nil
+}
+
 func (h *Handler) AddNode(r *http.Request) dto.Response {
 	req, err := decode[dto.AddNodeRequest](r)
 	if err != nil {
@@ -349,6 +370,9 @@ func (h *Handler) AddNode(r *http.Request) dto.Response {
 	}
 	if req.Name == "" {
 		return dto.ErrorResp(400, "name is required")
+	}
+	if err := validateNodeName(req.Name); err != nil {
+		return dto.ErrorResp(400, err.Error())
 	}
 	if req.Type == "" {
 		return dto.ErrorResp(400, "type is required")
@@ -388,6 +412,9 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 	}
 
 	if req.Name != "" {
+		if err := validateNodeName(req.Name); err != nil {
+			return dto.ErrorResp(400, err.Error())
+		}
 		node.Name = req.Name
 	}
 	if req.Type != "" {
