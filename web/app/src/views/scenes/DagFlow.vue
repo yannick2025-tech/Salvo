@@ -15,10 +15,12 @@
       :nodes-draggable="true"
       :nodes-connectable="true"
       :elements-selectable="true"
+      :edges-updatable="true"
       class="vue-flow-canvas"
       ref="vueFlowRef"
       @node-click="onNodeClick"
       @connect="onConnect"
+      @edge-update="onEdgeUpdate"
       @edge-click="onEdgeClick"
       @nodes-change="onNodesChange"
       @pane-click="onPaneClick"
@@ -63,6 +65,7 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge, Connection, NodeChange } from '@vue-flow/core'
+import dagre from 'dagre'
 import SceneNode from './DagSceneNode.vue'
 import type { NodeDTO, EdgeDTO } from '@/types'
 import '@vue-flow/core/dist/style.css'
@@ -78,7 +81,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   edit: [node: NodeDTO]
   deleteNode: [id: string]
-  addEdge: [from: string, to: string, condition?: string]
+  addEdge: [from: string, to: string, condition?: string, sourceHandle?: string, targetHandle?: string]
+  updateEdge: [edgeId: string, newSource: string, newTarget: string, newSourceHandle?: string, newTargetHandle?: string]
   deleteEdge: [id: string]
   nodeSelect: [node: NodeDTO | null]
   nodePositionUpdate: [id: string, x: number, y: number]
@@ -110,158 +114,41 @@ function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x:
   const positions = new Map<string, { x: number; y: number }>()
   if (newNodes.length === 0) return positions
 
-  const nodeIds = new Set(newNodes.map(n => n.id))
-  const fwdChildren = new Map<string, Set<string>>()
-  const fwdParents = new Map<string, Set<string>>()
-  for (const n of newNodes) {
-    fwdChildren.set(n.id, new Set())
-    fwdParents.set(n.id, new Set())
-  }
-
-  for (const e of newEdges) {
-    if (nodeIds.has(e.from_node) && nodeIds.has(e.to_node)) {
-      fwdChildren.get(e.from_node)!.add(e.to_node)
-      fwdParents.get(e.to_node)!.add(e.from_node)
-    }
-  }
-
-  const backEdges = new Set<string>()
-  const allVisited = new Set<string>()
-
-  for (const startNode of newNodes) {
-    if (allVisited.has(startNode.id)) continue
-    const stack: Array<{ id: string; childrenIter: IterableIterator<string> }> = []
-    const inStack = new Set<string>()
-    let current: { id: string; childrenIter: IterableIterator<string> } | undefined = { id: startNode.id, childrenIter: fwdChildren.get(startNode.id)! [Symbol.iterator]() }
-
-    while (current) {
-      const u = current.id
-      allVisited.add(u)
-      inStack.add(u)
-
-      let foundUnvisited = false
-      for (const v of current.childrenIter) {
-        if (!allVisited.has(v)) {
-          foundUnvisited = true
-          stack.push(current!)
-          current = { id: v, childrenIter: fwdChildren.get(v)! [Symbol.iterator]() }
-          break
-        } else if (inStack.has(v)) {
-          backEdges.add(`${u}->${v}`)
-        }
-      }
-
-      if (!foundUnvisited) {
-        inStack.delete(u)
-        current = stack.pop()
-      }
-    }
-  }
-
-  const children = new Map<string, Set<string>>()
-  const parents = new Map<string, Set<string>>()
-  for (const n of newNodes) {
-    children.set(n.id, new Set(fwdChildren.get(n.id)!))
-    parents.set(n.id, new Set(fwdParents.get(n.id)!))
-  }
-
-  for (const be of backEdges) {
-    const [from, to] = be.split('->')
-    if (from && to) {
-      children.get(from)!.delete(to)
-      parents.get(to)!.delete(from)
-    }
-  }
-
-  const levels = new Map<string, number>()
-  const inDegree = new Map<string, number>()
-  for (const n of newNodes) {
-    inDegree.set(n.id, parents.get(n.id)!.size)
-  }
-
-  let currentLevel = 0
-  const queue: string[] = []
-  for (const n of newNodes) {
-    if ((inDegree.get(n.id) || 0) === 0) {
-      queue.push(n.id)
-      levels.set(n.id, 0)
-    }
-  }
-
-  while (queue.length > 0) {
-    const nextQueue: string[] = []
-    for (const nid of queue) {
-      for (const childId of children.get(nid) || []) {
-        const deg = (inDegree.get(childId) || 0) - 1
-        inDegree.set(childId, deg)
-        if (!levels.has(childId)) {
-          levels.set(childId, currentLevel + 1)
-        }
-        if (deg === 0 && !nextQueue.includes(childId)) {
-          nextQueue.push(childId)
-        }
-      }
-    }
-    currentLevel++
-    queue.length = 0
-    queue.push(...nextQueue)
-  }
-
-  for (const n of newNodes) {
-    if (!levels.has(n.id)) {
-      levels.set(n.id, currentLevel)
-    }
-  }
-
-  const levelGroups = new Map<number, string[]>()
-  for (const n of newNodes) {
-    const lv = levels.get(n.id)!
-    if (!levelGroups.has(lv)) levelGroups.set(lv, [])
-    levelGroups.get(lv)!.push(n.id)
-  }
-
-  function reduceCrossings() {
-    const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b)
-    for (let iter = 0; iter < 5; iter++) {
-      for (let i = 1; i < sortedLevels.length; i++) {
-        const prevGroup = levelGroups.get(sortedLevels[i - 1])!
-        const currGroup = levelGroups.get(sortedLevels[i])!
-
-        const barycenters = new Map<string, number>()
-        for (const nid of currGroup) {
-          let sum = 0
-          let count = 0
-          for (const pid of parents.get(nid) || []) {
-            const idx = prevGroup.indexOf(pid)
-            if (idx >= 0) { sum += idx; count++ }
-          }
-          barycenters.set(nid, count > 0 ? sum / count : currGroup.indexOf(nid))
-        }
-        currGroup.sort((a, b) => (barycenters.get(a) ?? 0) - (barycenters.get(b) ?? 0))
-      }
-    }
-  }
-
-  reduceCrossings()
+  const g = new dagre.graphlib.Graph()
+  g.setGraph({
+    rankdir: 'TB',
+    nodesep: 60,
+    ranksep: 100,
+    edgesep: 30,
+    marginx: 20,
+    marginy: 20,
+  })
+  g.setDefaultEdgeLabel(() => ({}))
 
   const NODE_W = 300
   const NODE_H = 90
-  const GAP_X = 50
-  const GAP_Y = 50
 
-  const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b)
+  for (const n of newNodes) {
+    g.setNode(n.id, { width: NODE_W, height: NODE_H })
+  }
 
-  for (const lv of sortedLevels) {
-    const group = levelGroups.get(lv)!
-    const totalW = group.length * NODE_W + (group.length - 1) * GAP_X
-    const startX = -totalW / 2
+  const nodeIds = new Set(newNodes.map(n => n.id))
+  for (const e of newEdges) {
+    if (nodeIds.has(e.from_node) && nodeIds.has(e.to_node)) {
+      g.setEdge(e.from_node, e.to_node)
+    }
+  }
 
-    group.forEach((nid, col) => {
-      positions.set(nid, {
-        x: startX + col * (NODE_W + GAP_X),
-        y: lv * (NODE_H + GAP_Y),
+  dagre.layout(g)
+
+  for (const n of newNodes) {
+    const node = g.node(n.id)
+    if (node) {
+      positions.set(n.id, {
+        x: node.x - NODE_W / 2,
+        y: node.y - NODE_H / 2,
       })
-    })
+    }
   }
 
   return positions
@@ -269,6 +156,7 @@ function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x:
 
 const vfNodes = ref<Node[]>([])
 const vfEdges = ref<Edge[]>([])
+const handleOverrides = ref<Map<string, { sourceHandle: string; targetHandle: string }>>(new Map())
 
 function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
   const layoutPositions = buildLayout(newNodes, newEdges)
@@ -302,10 +190,16 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       strokeColor = '#e74c3c'
     }
 
+    const override = handleOverrides.value.get(e.id)
+    const sourceHandle = override?.sourceHandle || 's-bottom'
+    const targetHandle = override?.targetHandle || 't-top'
+
     return {
       id: e.id,
       source: e.from_node,
       target: e.to_node,
+      sourceHandle,
+      targetHandle,
       type: edgeType,
       data: {
         condition: e.condition,
@@ -319,7 +213,7 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       animated: false,
       style: { stroke: strokeColor, strokeWidth: 2 },
       markerEnd,
-    }
+    } as Edge
   })
 }
 
@@ -424,7 +318,37 @@ function onPaneClick() {
 }
 
 function onConnect(params: Connection) {
-  emit('addEdge', params.source!, params.target!)
+  emit('addEdge', params.source!, params.target!, undefined, params.sourceHandle || 's-bottom', params.targetHandle || 't-top')
+}
+
+function onEdgeUpdate({ edge, connection }: { edge: Edge; connection: Connection }) {
+  const newSourceHandle = (connection.sourceHandle || edge.sourceHandle || 's-bottom') as string
+  const newTargetHandle = (connection.targetHandle || edge.targetHandle || 't-top') as string
+  const newSource = connection.source || edge.source
+  const newTarget = connection.target || edge.target
+
+  handleOverrides.value.set(edge.id, {
+    sourceHandle: newSourceHandle,
+    targetHandle: newTargetHandle,
+  })
+
+  vfEdges.value = vfEdges.value.map(e => {
+    if (e.id === edge.id) {
+      return {
+        ...e,
+        source: newSource,
+        target: newTarget,
+        sourceHandle: newSourceHandle,
+        targetHandle: newTargetHandle,
+        type: 'smoothstep',
+      }
+    }
+    return e
+  })
+
+  if (newSource !== edge.source || newTarget !== edge.target) {
+    emit('updateEdge', edge.id, newSource, newTarget, newSourceHandle, newTargetHandle)
+  }
 }
 
 const showEdgeMenu = ref(false)

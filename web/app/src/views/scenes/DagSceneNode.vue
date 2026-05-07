@@ -1,6 +1,10 @@
 <template>
   <div :class="['scene-node', data.nodeType, { selected: selected }]">
-    <Handle type="target" :position="Position.Top" class="handle-target" />
+    <Handle type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
+    <Handle type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
+    <Handle type="target" id="t-left" :position="Position.Left" class="handle-target handle-left" />
+    <Handle type="target" id="t-right" :position="Position.Right" class="handle-target handle-right" />
+
     <div class="node-body">
       <div :class="['node-icon-wrap', data.nodeType]">
         <span class="node-icon">{{ data.icon }}</span>
@@ -14,7 +18,11 @@
         <button class="action-btn del" @click.stop="$emit('delete', id)" title="删除">✕</button>
       </div>
     </div>
-    <Handle type="source" :position="Position.Bottom" class="handle-source" />
+
+    <Handle type="source" id="s-top" :position="Position.Top" class="handle-source handle-top" />
+    <Handle type="source" id="s-bottom" :position="Position.Bottom" class="handle-source handle-bottom" />
+    <Handle type="source" id="s-left" :position="Position.Left" class="handle-source handle-left" />
+    <Handle type="source" id="s-right" :position="Position.Right" class="handle-source handle-right" />
   </div>
 </template>
 
@@ -156,8 +164,10 @@ defineEmits<{
 .action-btn.edit:hover { background: rgba(88,166,255,0.12); color: var(--accent-primary); }
 .action-btn.del:hover { background: rgba(248,81,73,0.1); color: var(--accent-danger); }
 
-.handle-target { top: -6px !important; }
-.handle-source { bottom: -6px !important; }
+.handle-top { top: -6px !important; }
+.handle-bottom { bottom: -6px !important; }
+.handle-left { left: -6px !important; }
+.handle-right { right: -6px !important; }
 </style>
 
 <style>
@@ -166,7 +176,9 @@ defineEmits<{
   transition: opacity 0.15s ease;
 }
 
-.vue-flow__node:hover .vue-flow__handle {
+.vue-flow__node:hover .vue-flow__handle,
+.vue-flow__connection-line-active ~ .vue-flow__node .vue-flow__handle,
+.vue-flow__handle.connecting {
   opacity: 1;
 }
 </style>

@@ -45,6 +45,7 @@
             @delete-node="handleDeleteNode"
             @add-edge="onDagAddEdge"
             @delete-edge="handleDeleteEdge"
+            @update-edge="handleUpdateEdge"
             @node-select="selectNode"
             @node-position-update="saveNodePosition"
           />
@@ -889,6 +890,19 @@ async function handleDeleteEdge(id: string) {
   await deleteEdge(id)
   fetchEdges()
   showToast('连线已删除')
+}
+
+async function handleUpdateEdge(edgeId: string, newSource: string, newTarget: string, _newSourceHandle?: string, _newTargetHandle?: string) {
+  const edge = edges.value.find(e => e.id === edgeId)
+  if (!edge) return
+  const sceneId = route.params.id as string
+  await deleteEdge(edgeId)
+  await addEdge({ scene_id: sceneId, from_node: newSource, to_node: newTarget, condition: edge.condition || undefined })
+  const idx = edges.value.findIndex(e => e.id === edgeId)
+  if (idx >= 0) {
+    edges.value[idx] = { ...edges.value[idx], from_node: newSource, to_node: newTarget }
+  }
+  showToast('连线已重新连接')
 }
 
 async function saveNodePosition(id: string, x: number, y: number) {
