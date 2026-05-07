@@ -55,7 +55,8 @@ async function fetchReports() {
 
 function extractMetric(r: ReportDTO, key: string): string {
   try {
-    const detail = typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail
+    const source = r.summary || r.detail
+    const detail = typeof source === 'string' ? JSON.parse(source) : source
     return detail?.[key] ?? '-'
   } catch { return '-' }
 }

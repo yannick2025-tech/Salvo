@@ -61,13 +61,17 @@ func New(cfg Config) *Server {
 		globalVars: cfg.Variables,
 	}
 
-	tracer, err := tracelib.NewTracer(tracelib.Config{BufferSize: 1000})
+	h.traceStore = tracestore.New(cfg.DB.DB)
+
+	tracer, err := tracelib.NewTracer(tracelib.Config{
+		BufferSize: 1000,
+		Persister:  h.traceStore,
+	})
 	if err != nil {
 		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
 	}
 	h.tracer = tracer
-	h.traceStore = tracestore.New(cfg.DB.DB)
-	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.tracer, cfg.Logger)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.tracer, cfg.Logger)
 
 	s := &Server{
 		db:      cfg.DB,

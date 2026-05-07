@@ -182,14 +182,24 @@ type Config struct {
 	// BufferSize is the maximum number of completed traces kept in
 	// the in-memory ring buffer. Older traces are evicted when full.
 	BufferSize int
+
+	// Persister is an optional hook for persisting traces to long-term
+	// storage (e.g. SQLite). Called after each trace is recorded.
+	Persister TracePersister
+}
+
+// TracePersister is the interface for persisting traces to long-term storage.
+type TracePersister interface {
+	SaveTrace(ctx context.Context, tr *Trace) error
 }
 
 // Tracer manages trace lifecycle and storage.
 type Tracer struct {
-	cfg    Config
-	buffer []*Trace
-	mu     sync.RWMutex
-	node   *snowflake.Node
+	cfg       Config
+	buffer    []*Trace
+	mu        sync.RWMutex
+	node      *snowflake.Node
+	persister TracePersister
 }
 
 // NewTracer creates a new Tracer with the given configuration.
@@ -204,9 +214,10 @@ func NewTracer(cfg Config) (*Tracer, error) {
 	}
 
 	return &Tracer{
-		cfg:    cfg,
-		buffer: make([]*Trace, 0, cfg.BufferSize),
-		node:   n,
+		cfg:       cfg,
+		buffer:    make([]*Trace, 0, cfg.BufferSize),
+		node:      n,
+		persister: cfg.Persister,
 	}, nil
 }
 
@@ -230,7 +241,7 @@ func (t *Tracer) Start(ctx context.Context, sceneID, runID snowflake.ID) *Contex
 	}
 }
 
-// record adds a completed trace to the in-memory buffer.
+// record adds a completed trace to the in-memory buffer and persists it.
 // When the buffer is full, the oldest trace is evicted.
 func (t *Tracer) record(tr *Trace) {
 	t.mu.Lock()
@@ -240,6 +251,12 @@ func (t *Tracer) record(tr *Trace) {
 		t.buffer = t.buffer[1:]
 	}
 	t.buffer = append(t.buffer, tr)
+
+	if t.persister != nil {
+		go func() {
+			_ = t.persister.SaveTrace(context.Background(), tr)
+		}()
+	}
 }
 
 // Get retrieves a trace by ID from the in-memory buffer.

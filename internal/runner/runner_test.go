@@ -141,13 +141,13 @@ func TestRunnerDurationAfterFinish(t *testing.T) {
 
 func TestNewRunnerValidation(t *testing.T) {
 	cfg := Config{Workers: 0, RunMode: RunModeCount, Count: 10}
-	_, err := New(cfg, nil, nil, nil, nil, nil, nil)
+	_, err := New(cfg, nil, nil, nil, nil, nil, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "scene_id is required")
 }
 
 func TestManagerStartDuplicate(t *testing.T) {
-	m := NewManager(nil, nil, nil, nil, nil, nil)
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil)
 
 	r := &Runner{
 		cfg:   Config{SceneID: 42},
@@ -161,20 +161,20 @@ func TestManagerStartDuplicate(t *testing.T) {
 }
 
 func TestManagerStopNotRunning(t *testing.T) {
-	m := NewManager(nil, nil, nil, nil, nil, nil)
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil)
 	err := m.Stop(999)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not running")
 }
 
 func TestManagerGetNotRunning(t *testing.T) {
-	m := NewManager(nil, nil, nil, nil, nil, nil)
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil)
 	_, ok := m.Get(999)
 	assert.False(t, ok)
 }
 
 func TestManagerList(t *testing.T) {
-	m := NewManager(nil, nil, nil, nil, nil, nil)
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil)
 	r1 := &Runner{cfg: Config{SceneID: 1}, stats: &Stats{}, done: make(chan struct{})}
 	r2 := &Runner{cfg: Config{SceneID: 2}, stats: &Stats{}, done: make(chan struct{})}
 	m.runners[1] = r1

@@ -150,6 +150,7 @@ type Runner struct {
 	nodes   repo.NodeRepo
 	edges   repo.EdgeRepo
 	runs    repo.RunRecordRepo
+	reports repo.ReportRepo
 	tracer  *tracelib.Tracer
 	runID   snowflake.ID
 	nodeGen *snowflake.Node
@@ -158,7 +159,7 @@ type Runner struct {
 	finishedAt time.Time
 }
 
-func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, tracer *tracelib.Tracer, log logger.Logger) (*Runner, error) {
+func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, log logger.Logger) (*Runner, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -175,6 +176,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		nodes:   nodes,
 		edges:   edges,
 		runs:    runs,
+		reports: reports,
 		tracer:  tracer,
 		nodeGen: n,
 		runID:   n.Generate(),
@@ -337,6 +339,11 @@ func (r *Runner) Run(ctx context.Context) error {
 			logger.F("duration_s", runRecord.Duration),
 		)
 	}
+
+	if err := r.createReport(runRecord); err != nil {
+		runLog.Error("failed to create report", logger.F("error", err))
+	}
+
 	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
 
 	return err
@@ -364,6 +371,52 @@ func (r *Runner) RunID() snowflake.ID {
 
 func (r *Runner) Workers() int {
 	return r.cfg.Workers
+}
+
+func (r *Runner) createReport(runRecord *model.RunRecord) error {
+	successRate := float64(0)
+	if runRecord.TotalReqs > 0 {
+		successRate = float64(runRecord.SuccessReqs) / float64(runRecord.TotalReqs) * 100
+	}
+
+	summary := map[string]any{
+		"scene_id":      runRecord.SceneID,
+		"run_id":        runRecord.ID,
+		"status":        runRecord.Status,
+		"worker_count":  runRecord.WorkerCount,
+		"run_mode":      runRecord.RunMode,
+		"duration_s":    runRecord.Duration,
+		"total_reqs":    runRecord.TotalReqs,
+		"success_reqs":  runRecord.SuccessReqs,
+		"failed_reqs":   runRecord.FailedReqs,
+		"success_rate":  fmt.Sprintf("%.1f%%", successRate),
+		"avg_latency_s": runRecord.AvgLatency,
+		"p50_latency_s": runRecord.P50Latency,
+		"p95_latency_s": runRecord.P95Latency,
+		"p99_latency_s": runRecord.P99Latency,
+		"p50":           fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
+		"p95":           fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
+		"p99":           fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
+	}
+	summaryBytes, _ := json.Marshal(summary)
+
+	reportStatus := model.ReportStatusSuccess
+	if runRecord.Status == model.RunStatusFailed {
+		reportStatus = model.ReportStatusFailed
+	} else if runRecord.FailedReqs > 0 && runRecord.SuccessReqs > 0 {
+		reportStatus = model.ReportStatusPartial
+	}
+
+	report := &model.Report{
+		SceneID:    runRecord.SceneID,
+		RunID:      runRecord.ID,
+		Status:     reportStatus,
+		Summary:    string(summaryBytes),
+		StartedAt:  runRecord.StartedAt,
+		FinishedAt: runRecord.FinishedAt,
+	}
+
+	return r.reports.Create(context.Background(), report)
 }
 
 func (r *Runner) Done() <-chan struct{} {
@@ -537,6 +590,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		logger.F("node_type", n.nodeType),
 	)
 
+	nodeLog.Info("node execution started")
+
 	switch n.nodeType {
 	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
 		return n.executeHTTP(ctx, input, nodeLog)
@@ -647,44 +702,69 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
-		DurationMs int64 `json:"duration_ms"`
+		Ms int64 `json:"ms"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
+		nodeLog.Error("failed to parse delay config", logger.F("error", err))
 		return nil, fmt.Errorf("parse delay config: %w", err)
 	}
 
-	dur := time.Duration(cfg.DurationMs) * time.Millisecond
+	dur := time.Duration(cfg.Ms) * time.Millisecond
 	if dur <= 0 {
 		dur = 100 * time.Millisecond
 	}
 
-	nodeLog.Info("delay started", logger.F("duration_ms", cfg.DurationMs))
+	nodeLog.Info("delay node started",
+		logger.F("duration_ms", cfg.Ms),
+		logger.F("resolved_duration", dur.String()),
+	)
 
 	select {
 	case <-time.After(dur):
 		if n.stats != nil {
 			n.stats.RecordLatency(dur, true)
 		}
-		nodeLog.Info("delay completed", logger.F("duration_ms", cfg.DurationMs))
-		return &dag.Output{Response: map[string]any{"delay_ms": cfg.DurationMs}}, nil
+		nodeLog.Info("delay node completed",
+			logger.F("duration_ms", cfg.Ms),
+			logger.F("actual_ms", dur.Milliseconds()),
+		)
+		return &dag.Output{Response: map[string]any{"delay_ms": cfg.Ms}}, nil
 	case <-ctx.Done():
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
-		nodeLog.Warn("delay cancelled", logger.F("error", ctx.Err()))
+		nodeLog.Warn("delay node cancelled", logger.F("error", ctx.Err()))
 		return nil, ctx.Err()
 	}
 }
 
 func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
-	nodeLog.Info("condition evaluated", logger.F("result", true))
+	var cfg struct {
+		Expr string `json:"expr"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse condition config", logger.F("error", err))
+		return nil, fmt.Errorf("parse condition config: %w", err)
+	}
+
+	resolvedExpr := cfg.Expr
+	if input != nil && input.Variables != nil {
+		resolvedExpr = resolveWithVariables(cfg.Expr, input.Variables)
+	}
+
+	result := resolvedExpr != "" && resolvedExpr != "false" && resolvedExpr != "0"
+	nodeLog.Info("condition node evaluated",
+		logger.F("expr", cfg.Expr),
+		logger.F("resolved_expr", resolvedExpr),
+		logger.F("result", result),
+	)
 	if n.stats != nil {
 		n.stats.RecordLatency(0, true)
 	}
-	return &dag.Output{Response: map[string]any{"condition": true}}, nil
+	return &dag.Output{Response: map[string]any{"condition": result}}, nil
 }
 
 func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
@@ -692,11 +772,16 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 		Expr string `json:"expr"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse if-else config", logger.F("error", err))
 		return nil, fmt.Errorf("parse if-else config: %w", err)
 	}
 
 	result := evaluateExpression(cfg.Expr, input)
-	nodeLog.Info("if-else evaluated", logger.F("expr", cfg.Expr), logger.F("result", result))
+	nodeLog.Info("if-else node evaluated",
+		logger.F("expr", cfg.Expr),
+		logger.F("result", result),
+		logger.F("branch", map[bool]string{true: "if_true", false: "if_false"}[result]),
+	)
 	if n.stats != nil {
 		n.stats.RecordLatency(0, true)
 	}

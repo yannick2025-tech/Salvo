@@ -998,7 +998,9 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 	for _, tr := range traces {
 		items = append(items, toTraceDTO(tr))
 	}
-	return dto.OK(items)
+	return dto.OK(dto.ListResponse[[]dto.TraceDTO]{
+		Items: items,
+	})
 }
 
 func (h *Handler) GetTrace(r *http.Request) dto.Response {
@@ -1188,7 +1190,7 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	rangeSeconds := req.RangeSeconds
 	if rangeSeconds <= 0 {
-		rangeSeconds = 300
+		rangeSeconds = 3600
 	}
 
 	runRecords, err := h.runs.List(r.Context(), repo.Filter{Limit: 50})
