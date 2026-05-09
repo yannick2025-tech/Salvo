@@ -17,12 +17,15 @@
             <th>描述</th>
             <th>状态</th>
             <th>创建时间</th>
+            <th>测试开始时间</th>
+            <th>结束时间</th>
+            <th>持续时间</th>
             <th>操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="scenes.length === 0">
-            <td colspan="6" class="empty">暂无场景</td>
+            <td colspan="9" class="empty">暂无场景</td>
           </tr>
           <tr v-for="s in scenes" :key="s.id">
             <td class="mono">{{ s.id }}</td>
@@ -30,6 +33,9 @@
             <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
+            <td class="time-cell">{{ getSceneLatestRun(s)?.started_at ? formatDateTime(getSceneLatestRun(s)!.started_at) : '-' }}</td>
+            <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? 'Now' : '-') }}</td>
+            <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
             <td class="actions">
               <button class="btn-sm" @click="editScene(s)">编辑</button>
               <button class="btn-sm danger" @click="handleDelete(s.id)">删除</button>
@@ -408,7 +414,92 @@ function formatTime(t: string) {
   return new Date(t).toLocaleString()
 }
 
-onMounted(fetchScenes)
+function formatDateTime(timeStr?: string): string {
+  if (!timeStr) return '-'
+  return new Date(timeStr).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+interface SceneRunInfo {
+  started_at?: string
+  finished_at?: string
+  status?: string
+  duration?: number
+}
+
+const sceneRunsMap = ref<Map<string, SceneRunInfo[]>>(new Map())
+
+async function fetchSceneRuns() {
+  try {
+    const { dashboardOverview } = await import('@/api/dashboard')
+    const resp = await dashboardOverview(86400 * 7)
+    if (resp.code === 0 && resp.data?.recent_runs) {
+      const runsMap = new Map<string, SceneRunInfo[]>()
+      resp.data.recent_runs.forEach((run: any) => {
+        const sceneId = String(run.scene_id)
+        const info: SceneRunInfo = {
+          started_at: run.started_at,
+          finished_at: run.finished_at,
+          status: run.status,
+          duration: run.duration,
+        }
+        if (!runsMap.has(sceneId)) {
+          runsMap.set(sceneId, [])
+        }
+        runsMap.get(sceneId)!.push(info)
+      })
+      sceneRunsMap.value = runsMap
+    }
+  } catch (e) {
+    console.error('Failed to fetch scene runs:', e)
+  }
+}
+
+function getSceneLatestRun(scene: any): SceneRunInfo | undefined {
+  const runs = sceneRunsMap.value.get(scene.id)
+  if (!runs || runs.length === 0) return undefined
+  return runs[runs.length - 1]
+}
+
+function isSceneRunning(scene: any): boolean {
+  const latest = getSceneLatestRun(scene)
+  return latest?.status === 'running'
+}
+
+function calculateSceneDuration(scene: any): string {
+  const latest = getSceneLatestRun(scene)
+  if (!latest?.started_at) return '-'
+  
+  const start = new Date(latest.started_at).getTime()
+  const end = latest.status === 'running' ? Date.now() : (latest.finished_at ? new Date(latest.finished_at).getTime() : Date.now())
+  
+  const durationMs = end - start
+  if (durationMs <= 0) return '-'
+  
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  
+  if (hours > 0) {
+    return `${hours}小时${minutes}分${seconds}秒`
+  } else if (minutes > 0) {
+    return `${minutes}分${seconds}秒`
+  } else {
+    return `${seconds}秒`
+  }
+}
+
+onMounted(() => {
+  fetchScenes()
+  fetchSceneRuns()
+})
 </script>
 
 <style scoped>
@@ -427,14 +518,53 @@ onMounted(fetchScenes)
   background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
 }
 .btn-sm {
-  padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
-  background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
-.btn-sm.danger { color: var(--accent-danger); border-color: var(--accent-danger); }
 
-.table-wrapper { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: auto; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
+.btn-sm:hover {
+  background: var(--accent-danger);
+  color: #fff;
+  border-color: var(--accent-danger);
+}
+
+.btn-sm.danger {
+  color: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+
+.btn-sm.danger:hover {
+  background: var(--accent-danger);
+  color: #fff;
+}
+
+.table-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.data-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-secondary);
+  white-space: nowrap;
+}
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .data-table td { color: var(--text-primary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
@@ -442,6 +572,7 @@ onMounted(fetchScenes)
 .desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
+.time-cell { font-size: 13px; color: var(--text-primary); white-space: nowrap; }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.draft { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
 .status-badge.ready { background: rgba(63,185,80,0.15); color: var(--accent-success); }

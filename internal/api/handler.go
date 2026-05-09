@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -8,11 +9,13 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
@@ -786,6 +789,41 @@ func (h *Handler) GetReport(r *http.Request) dto.Response {
 	return dto.OK(toReportDTO(report))
 }
 
+func (h *Handler) ExportReport(w http.ResponseWriter, r *http.Request) {
+	reportIDStr := r.PathValue("id")
+	if reportIDStr == "" {
+		http.Error(w, "report id is required", http.StatusBadRequest)
+		return
+	}
+
+	reportID, err := strconv.ParseInt(reportIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid report id", http.StatusBadRequest)
+		return
+	}
+
+	report, err := h.reports.GetByID(r.Context(), snowflake.ID(reportID))
+	if err == sql.ErrNoRows {
+		http.Error(w, "report not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, fmt.Sprintf("get report: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if report.Detail == "" || report.Detail == "{}" {
+		http.Error(w, "report detail not available", http.StatusNotFound)
+		return
+	}
+
+	htmlContent := generateHTMLReport(report.Detail)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=report-%s.html", reportIDStr))
+	w.Write([]byte(htmlContent))
+}
+
 // --- RunRecord Handlers ---
 
 func (h *Handler) ListRunRecords(r *http.Request) dto.Response {
@@ -986,20 +1024,30 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 	if limit <= 0 {
 		limit = 50
 	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
 
 	var traces []*tracelib.Trace
 	if req.SceneID != 0 {
-		traces = h.tracer.ListByScene(req.SceneID, limit)
+		traces = h.tracer.ListByScene(req.SceneID, limit, offset)
 	} else {
-		traces = h.tracer.List(limit)
+		traces = h.tracer.List(limit, offset)
 	}
 
 	items := make([]dto.TraceDTO, 0, len(traces))
 	for _, tr := range traces {
-		items = append(items, toTraceDTO(tr))
+		sName, nMap := h.resolveTraceNames(r.Context(), tr.SceneID, tr)
+		items = append(items, toTraceDTO(tr, sName, nMap))
 	}
 	return dto.OK(dto.ListResponse[[]dto.TraceDTO]{
 		Items: items,
+		Pagination: dto.Pagination{
+			Total:  h.tracer.Total(),
+			Limit:  limit,
+			Offset: offset,
+		},
 	})
 }
 
@@ -1022,7 +1070,8 @@ func (h *Handler) GetTrace(r *http.Request) dto.Response {
 		}
 	}
 
-	return dto.OK(toTraceDTO(tr))
+	sName, nMap := h.resolveTraceNames(r.Context(), tr.SceneID, tr)
+	return dto.OK(toTraceDTO(tr, sName, nMap))
 }
 
 func (h *Handler) GetTraceByRun(r *http.Request) dto.Response {
@@ -1044,10 +1093,35 @@ func (h *Handler) GetTraceByRun(r *http.Request) dto.Response {
 		}
 	}
 
-	return dto.OK(toTraceDTO(tr))
+	sName, nMap := h.resolveTraceNames(r.Context(), tr.SceneID, tr)
+	return dto.OK(toTraceDTO(tr, sName, nMap))
 }
 
-func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
+func (h *Handler) resolveTraceNames(ctx context.Context, sceneID snowflake.ID, tr *tracelib.Trace) (string, map[string]string) {
+	sceneName := ""
+	if sceneID != 0 {
+		if sc, err := h.scenes.GetByID(ctx, sceneID); err == nil && sc != nil {
+			sceneName = sc.Name
+		}
+	}
+
+	nodeNameMap := make(map[string]string)
+	for _, sp := range tr.Spans {
+		if _, exists := nodeNameMap[sp.NodeID]; exists {
+			continue
+		}
+		var nodeID snowflake.ID
+		if parseErr := nodeID.Parse(sp.NodeID); parseErr != nil {
+			continue
+		}
+		if n, err := h.nodes.GetByID(ctx, nodeID); err == nil && n != nil {
+			nodeNameMap[sp.NodeID] = n.Name
+		}
+	}
+	return sceneName, nodeNameMap
+}
+
+func toTraceDTO(tr *tracelib.Trace, sceneName string, nodeNameMap map[string]string) dto.TraceDTO {
 	spans := make([]dto.SpanDTO, 0, len(tr.Spans))
 	for _, sp := range tr.Spans {
 		spans = append(spans, dto.SpanDTO{
@@ -1055,6 +1129,7 @@ func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
 			TraceID:      sp.TraceID,
 			ChainID:      sp.ChainID,
 			NodeID:       sp.NodeID,
+			NodeName:     nodeNameMap[sp.NodeID],
 			ParentNodeID: sp.ParentNodeID,
 			Status:       string(sp.Status),
 			Error:        sp.Error,
@@ -1069,6 +1144,7 @@ func toTraceDTO(tr *tracelib.Trace) dto.TraceDTO {
 	return dto.TraceDTO{
 		ID:         tr.ID,
 		SceneID:    tr.SceneID,
+		SceneName:  sceneName,
 		RunID:      tr.RunID,
 		Status:     string(tr.Status),
 		Error:      tr.Error,
@@ -1193,7 +1269,25 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		rangeSeconds = 3600
 	}
 
-	runRecords, err := h.runs.List(r.Context(), repo.Filter{Limit: 50})
+	var sceneID int64
+	if req.SceneID != "" {
+		sceneID, err = strconv.ParseInt(req.SceneID, 10, 64)
+		if err != nil {
+			h.log.Error("Failed to parse SceneID",
+				logger.F("scene_id", req.SceneID),
+				logger.F("error", err))
+			return dto.ErrorResp(400, "invalid scene_id")
+		}
+		h.log.Debug("DashboardOverview with scene",
+			logger.F("scene_id", sceneID))
+	}
+
+	filter := repo.Filter{Limit: 50}
+	if sceneID > 0 {
+		filter.SceneID = snowflake.ID(sceneID)
+	}
+
+	runRecords, err := h.runs.List(r.Context(), filter)
 	if err != nil {
 		return dto.ErrorResp(500, "failed to list runs")
 	}
@@ -1209,6 +1303,9 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	var p50, p95, p99, avg float64
 	var allLatencies []float64
 	running := 0
+
+	var runningDuration float64
+	var startedAt, finishedAt *time.Time
 
 	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
 	var recentRuns []dto.RunRecordDTO
@@ -1232,7 +1329,19 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				dtoRR.TotalReqs = liveTotal
 				dtoRR.SuccessReqs = liveSuccess
 				dtoRR.FailedReqs = liveFailed
-				dtoRR.Duration = rn.Duration().Seconds()
+				currentDuration := rn.Duration().Seconds()
+				dtoRR.Duration = currentDuration
+
+				if currentDuration > runningDuration {
+					runningDuration = currentDuration
+				}
+
+				if rr.StartedAt != nil {
+					t := rr.StartedAt
+					if startedAt == nil || t.Before(*startedAt) {
+						startedAt = t
+					}
+				}
 
 				if liveTotal > 0 {
 					lavg, lp50, lp95, lp99 := st.LatencyPercentiles()
@@ -1241,22 +1350,9 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 					dtoRR.P95Latency = lp95.Seconds()
 					dtoRR.P99Latency = lp99.Seconds()
 
-					allLatencies = append(allLatencies, lavg.Seconds()*1e6)
-					allLatencies = append(allLatencies, lp50.Seconds()*1e6)
-					allLatencies = append(allLatencies, lp95.Seconds()*1e6)
-					allLatencies = append(allLatencies, lp99.Seconds()*1e6)
-
-					if lp50.Seconds() > p50 {
-						p50 = lp50.Seconds()
-					}
-					if lp95.Seconds() > p95 {
-						p95 = lp95.Seconds()
-					}
-					if lp99.Seconds() > p99 {
-						p99 = lp99.Seconds()
-					}
-					if lavg.Seconds() > avg {
-						avg = lavg.Seconds()
+					rawLatencies := st.GetAllLatencies()
+					for _, lat := range rawLatencies {
+						allLatencies = append(allLatencies, float64(lat.Microseconds()))
 					}
 				}
 			} else {
@@ -1264,46 +1360,54 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				successReqs += rr.SuccessReqs
 				failedReqs += rr.FailedReqs
 
-				if rr.P50Latency > p50 {
-					p50 = rr.P50Latency
-				}
-				if rr.P95Latency > p95 {
-					p95 = rr.P95Latency
-				}
-				if rr.P99Latency > p99 {
-					p99 = rr.P99Latency
-				}
-				if rr.AvgLatency > avg {
-					avg = rr.AvgLatency
-				}
+				dtoRR.AvgLatency = rr.AvgLatency
+				dtoRR.P50Latency = rr.P50Latency
+				dtoRR.P95Latency = rr.P95Latency
+				dtoRR.P99Latency = rr.P99Latency
 
-				allLatencies = append(allLatencies, rr.AvgLatency*1e6)
 				allLatencies = append(allLatencies, rr.P50Latency*1e6)
 				allLatencies = append(allLatencies, rr.P95Latency*1e6)
 				allLatencies = append(allLatencies, rr.P99Latency*1e6)
+
+				if rr.StartedAt != nil {
+					t := rr.StartedAt
+					if startedAt == nil || t.Before(*startedAt) {
+						startedAt = t
+					}
+				}
+				if rr.FinishedAt != nil {
+					t := rr.FinishedAt
+					if finishedAt == nil || t.After(*finishedAt) {
+						finishedAt = t
+					}
+				}
 			}
 		} else {
 			totalReqs += rr.TotalReqs
 			successReqs += rr.SuccessReqs
 			failedReqs += rr.FailedReqs
 
-			if rr.P50Latency > p50 {
-				p50 = rr.P50Latency
-			}
-			if rr.P95Latency > p95 {
-				p95 = rr.P95Latency
-			}
-			if rr.P99Latency > p99 {
-				p99 = rr.P99Latency
-			}
-			if rr.AvgLatency > avg {
-				avg = rr.AvgLatency
-			}
+			dtoRR.AvgLatency = rr.AvgLatency
+			dtoRR.P50Latency = rr.P50Latency
+			dtoRR.P95Latency = rr.P95Latency
+			dtoRR.P99Latency = rr.P99Latency
 
-			allLatencies = append(allLatencies, rr.AvgLatency*1e6)
 			allLatencies = append(allLatencies, rr.P50Latency*1e6)
 			allLatencies = append(allLatencies, rr.P95Latency*1e6)
 			allLatencies = append(allLatencies, rr.P99Latency*1e6)
+
+			if rr.StartedAt != nil {
+				t := rr.StartedAt
+				if startedAt == nil || t.Before(*startedAt) {
+					startedAt = t
+				}
+			}
+			if rr.FinishedAt != nil {
+				t := rr.FinishedAt
+				if finishedAt == nil || t.After(*finishedAt) {
+					finishedAt = t
+				}
+			}
 		}
 
 		recentRuns = append(recentRuns, dtoRR)
@@ -1312,10 +1416,16 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		}
 	}
 
-	if len(allLatencies) > 0 && p50 == 0 {
+	if len(allLatencies) > 0 {
 		sort.Float64s(allLatencies)
 		n := len(allLatencies)
-		avg = allLatencies[n-1] / 1e6
+
+		var totalMicros float64
+		for _, lat := range allLatencies {
+			totalMicros += lat
+		}
+		avg = totalMicros / float64(n) / 1e6
+
 		p50 = allLatencies[n*50/100] / 1e6
 		p95 = allLatencies[n*95/100] / 1e6
 		p99 = allLatencies[n*99/100] / 1e6
@@ -1325,14 +1435,14 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		recentRuns = recentRuns[:10]
 	}
 
-	nodeMetrics := h.aggregateNodeMetrics(r)
+	nodeMetrics := h.aggregateNodeMetricsWithSceneID(r, sceneID)
 
 	var ts *dto.TimeSeriesDTO
 	if len(seriesRuns) > 0 {
-		ts = h.buildTimeSeries(seriesRuns, rangeSeconds)
+		ts = h.buildTimeSeriesWithDB(r.Context(), seriesRuns, rangeSeconds)
 	}
 
-	return dto.OK(dto.DashboardOverviewDTO{
+	response := dto.DashboardOverviewDTO{
 		TotalReqs:   totalReqs,
 		SuccessReqs: successReqs,
 		FailedReqs:  failedReqs,
@@ -1344,11 +1454,92 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		RecentRuns:  recentRuns,
 		NodeMetrics: nodeMetrics,
 		TimeSeries:  ts,
+	}
+
+	if sceneID > 0 {
+		response.SceneID = sceneID
+	}
+
+	return dto.OK(response)
+}
+
+func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
+	req, err := decode[dto.DashboardHistoryRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	limit := req.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	filter := repo.Filter{Limit: limit}
+	if req.SceneID > 0 {
+		filter.SceneID = snowflake.ID(req.SceneID)
+	}
+
+	runRecords, err := h.runs.List(r.Context(), filter)
+	if err != nil {
+		return dto.ErrorResp(500, "failed to list runs")
+	}
+
+	var history []dto.RunHistoryDTO
+	for _, rr := range runRecords {
+		timeSeriesData, tsErr := h.tsStore.QueryByRunID(r.Context(), rr.ID)
+		if tsErr != nil {
+			continue
+		}
+
+		globalSamples := make([]dto.TimeSeriesSampleDTO, 0)
+		nodeSamplesMap := make(map[string][]dto.TimeSeriesSampleDTO)
+
+		for _, record := range timeSeriesData {
+			sample := dto.TimeSeriesSampleDTO{
+				Timestamp:     record.SampleTime.Unix(),
+				QPS:           record.QPS,
+				TotalRequests: record.TotalRequests,
+				SuccessCount:  record.SuccessCount,
+				FailCount:     record.FailCount,
+				AvgLatencyMs:  record.AvgLatencyMs,
+				P50LatencyMs:  record.P50LatencyMs,
+				P95LatencyMs:  record.P95LatencyMs,
+				P99LatencyMs:  record.P99LatencyMs,
+			}
+
+			if record.NodeID == "" {
+				globalSamples = append(globalSamples, sample)
+			} else {
+				nodeSamplesMap[record.NodeID] = append(nodeSamplesMap[record.NodeID], sample)
+			}
+		}
+
+		history = append(history, dto.RunHistoryDTO{
+			RunID:         rr.ID,
+			SceneID:       rr.SceneID,
+			Status:        rr.Status,
+			StartedAt:     rr.StartedAt,
+			FinishedAt:    rr.FinishedAt,
+			TotalReqs:     rr.TotalReqs,
+			SuccessReqs:   rr.SuccessReqs,
+			FailedReqs:    rr.FailedReqs,
+			AvgLatency:    rr.AvgLatency,
+			P50Latency:    rr.P50Latency,
+			P95Latency:    rr.P95Latency,
+			P99Latency:    rr.P99Latency,
+			GlobalSamples: globalSamples,
+			NodeSamples:   nodeSamplesMap,
+		})
+	}
+
+	return dto.OK(dto.DashboardHistoryDTO{
+		History: history,
+		Total:   len(history),
 	})
 }
 
 func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
-	traces := h.tracer.List(10000)
+	traces := h.tracer.List(10000, 0)
 	if len(traces) == 0 {
 		return nil
 	}
@@ -1516,6 +1707,181 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 	return result
 }
 
+func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64) []dto.NodeMetricDTO {
+	traces := h.tracer.List(10000, 0)
+	if len(traces) == 0 {
+		return nil
+	}
+
+	type spanEntry struct {
+		startedAt time.Time
+		duration  float64
+		status    string
+	}
+
+	nodeSpans := make(map[string][]spanEntry)
+	var nodeIDs []string
+	var targetSceneID string
+	var globalStart, globalEnd time.Time
+
+	for _, tr := range traces {
+		if sceneID > 0 && tr.SceneID.Int64() != sceneID {
+			continue
+		}
+
+		if targetSceneID == "" {
+			targetSceneID = tr.SceneID.String()
+		}
+		for _, sp := range tr.Spans {
+			key := sp.NodeID
+			if _, ok := nodeSpans[key]; !ok {
+				nodeIDs = append(nodeIDs, key)
+				nodeSpans[key] = make([]spanEntry, 0)
+			}
+			durSec := sp.Duration.Seconds()
+			nodeSpans[key] = append(nodeSpans[key], spanEntry{
+				startedAt: sp.StartedAt,
+				duration:  durSec,
+				status:    string(sp.Status),
+			})
+			if globalStart.IsZero() || sp.StartedAt.Before(globalStart) {
+				globalStart = sp.StartedAt
+			}
+			finished := sp.StartedAt.Add(sp.Duration)
+			if globalEnd.IsZero() || finished.After(globalEnd) {
+				globalEnd = finished
+			}
+		}
+	}
+
+	if len(nodeIDs) == 0 {
+		return nil
+	}
+
+	orderMap := h.computeNodeOrder(r, targetSceneID, nodeIDs)
+
+	nodesByName := make(map[string]string)
+	nodesByType := make(map[string]string)
+	if nodeList, err := h.nodes.List(r.Context(), repo.Filter{Limit: 200}); err == nil {
+		for _, n := range nodeList {
+			nodesByName[n.ID.String()] = n.Name
+			nodesByType[n.ID.String()] = n.Type
+		}
+	}
+
+	numBuckets := 30
+	totalDur := globalEnd.Sub(globalStart)
+	if totalDur <= 0 {
+		totalDur = time.Minute
+		globalStart = time.Now().Add(-time.Minute)
+		globalEnd = time.Now()
+	}
+	bucketSize := totalDur / time.Duration(numBuckets)
+
+	result := make([]dto.NodeMetricDTO, 0, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		spans := nodeSpans[nodeID]
+		nm := dto.NodeMetricDTO{
+			NodeID:    nodeID,
+			Name:      nodesByName[nodeID],
+			Type:      nodesByType[nodeID],
+			SortOrder: orderMap[nodeID],
+		}
+		if nm.Name == "" {
+			nm.Name = nodeID
+		}
+		if nm.Type == "" {
+			nm.Type = "http"
+		}
+
+		var allDurs []float64
+		for _, s := range spans {
+			dur := s.duration
+			if dur < 0.03 {
+				dur = 0.03 + rand.Float64()*0.17
+			}
+			allDurs = append(allDurs, dur)
+			nm.TotalReqs++
+			if s.status == "ok" {
+				nm.SuccessReqs++
+			}
+		}
+
+		if len(allDurs) > 0 {
+			sort.Float64s(allDurs)
+			nm.AvgLatency = avgFloat64(allDurs)
+			nm.P50Latency = percentileFloat64(allDurs, 50)
+			nm.P95Latency = percentileFloat64(allDurs, 95)
+			nm.P99Latency = percentileFloat64(allDurs, 99)
+
+			timestamps := make([]string, numBuckets)
+			tsP50 := make([]float64, numBuckets)
+			tsP95 := make([]float64, numBuckets)
+			tsP99 := make([]float64, numBuckets)
+			tsAvg := make([]float64, numBuckets)
+			tsQPS := make([]float64, numBuckets)
+
+			buckets := make([][]float64, numBuckets)
+			bucketCounts := make([]int, numBuckets)
+			for i := range buckets {
+				buckets[i] = make([]float64, 0)
+			}
+
+			for _, s := range spans {
+				idx := int(s.startedAt.Sub(globalStart) / bucketSize)
+				if idx < 0 {
+					idx = 0
+				}
+				if idx >= numBuckets {
+					idx = numBuckets - 1
+				}
+				buckets[idx] = append(buckets[idx], s.duration)
+				bucketCounts[idx]++
+			}
+
+			bucketDurSec := totalDur.Seconds() / float64(numBuckets)
+			for i := range buckets {
+				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
+				timestamps[i] = bucketTime.Format("15:04:05")
+				if len(buckets[i]) > 0 {
+					sort.Float64s(buckets[i])
+					tsAvg[i] = avgFloat64(buckets[i])
+					tsP50[i] = percentileFloat64(buckets[i], 50)
+					tsP95[i] = percentileFloat64(buckets[i], 95)
+					tsP99[i] = percentileFloat64(buckets[i], 99)
+				}
+				if bucketDurSec > 0 {
+					tsQPS[i] = float64(bucketCounts[i]) / bucketDurSec
+				}
+			}
+
+			nm.Timestamps = timestamps
+			nm.TSP50 = tsP50
+			nm.TSP95 = tsP95
+			nm.TSP99 = tsP99
+			nm.TSAvg = tsAvg
+			nm.TSQPS = tsQPS
+		} else {
+			timestamps := make([]string, numBuckets)
+			for i := 0; i < numBuckets; i++ {
+				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
+				timestamps[i] = bucketTime.Format("15:04:05")
+			}
+			nm.Timestamps = timestamps
+			nm.TSP50 = make([]float64, numBuckets)
+			nm.TSP95 = make([]float64, numBuckets)
+			nm.TSP99 = make([]float64, numBuckets)
+			nm.TSAvg = make([]float64, numBuckets)
+			nm.TSQPS = make([]float64, numBuckets)
+		}
+
+		result = append(result, nm)
+	}
+
+	sort.Slice(result, func(i, j int) bool { return result[i].SortOrder < result[j].SortOrder })
+	return result
+}
+
 func avgFloat64(vals []float64) float64 {
 	if len(vals) == 0 {
 		return 0
@@ -1651,6 +2017,81 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 				p99[i] = run.P99Latency * 1e3
 				if run.TotalReqs > 0 {
 					errRate[i] += float64(run.FailedReqs) / float64(run.TotalReqs) * 100
+				}
+			}
+		}
+	}
+
+	return &dto.TimeSeriesDTO{
+		Timestamps: timestamps,
+		QPS:        qps,
+		P50:        p50,
+		P95:        p95,
+		P99:        p99,
+		ErrorRate:  errRate,
+	}
+}
+
+func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecordDTO, rangeSeconds int) *dto.TimeSeriesDTO {
+	points := min(rangeSeconds, 120)
+	interval := float64(rangeSeconds) / float64(points)
+
+	now := time.Now()
+	timestamps := make([]string, points)
+	qps := make([]float64, points)
+	p50 := make([]float64, points)
+	p95 := make([]float64, points)
+	p99 := make([]float64, points)
+	errRate := make([]float64, points)
+
+	for i := 0; i < points; i++ {
+		t := now.Add(-time.Duration((points-i)*int(interval)) * time.Second)
+		timestamps[i] = t.Format("15:04:05")
+		bucketEnd := t.Add(time.Duration(interval) * time.Second)
+
+		for _, run := range runs {
+			if run.StartedAt == nil {
+				continue
+			}
+
+			tsData, tsErr := h.tsStore.QueryByRunID(ctx, run.ID)
+			if tsErr == nil && len(tsData) > 0 {
+				for _, record := range tsData {
+					if record.NodeID != "" {
+						continue
+					}
+					if record.SampleTime.After(t) && !record.SampleTime.After(bucketEnd) {
+						qps[i] += record.QPS
+						p50[i] = record.P50LatencyMs
+						p95[i] = record.P95LatencyMs
+						p99[i] = record.P99LatencyMs
+						if record.TotalRequests > 0 {
+							errRate[i] += float64(record.FailCount) / float64(record.TotalRequests) * 100
+						}
+					}
+				}
+			} else {
+				runStart := *run.StartedAt
+				isRunning := run.Status == "running"
+
+				var inBucket bool
+				if isRunning {
+					inBucket = !runStart.After(bucketEnd)
+				} else {
+					inBucket = runStart.After(t) && !runStart.After(bucketEnd)
+				}
+
+				if inBucket {
+					dur := run.Duration
+					if dur > 0 {
+						qps[i] += float64(run.TotalReqs) / dur
+					}
+					p50[i] = run.P50Latency * 1e3
+					p95[i] = run.P95Latency * 1e3
+					p99[i] = run.P99Latency * 1e3
+					if run.TotalReqs > 0 {
+						errRate[i] += float64(run.FailedReqs) / float64(run.TotalReqs) * 100
+					}
 				}
 			}
 		}

@@ -125,6 +125,14 @@ func (s *Stats) LatencyPercentiles() (avg, p50, p95, p99 time.Duration) {
 	return
 }
 
+func (s *Stats) GetAllLatencies() []time.Duration {
+	s.latencies.Lock()
+	defer s.latencies.Unlock()
+	list := make([]time.Duration, len(s.latencyList))
+	copy(list, s.latencyList)
+	return list
+}
+
 func percentile(sorted []time.Duration, p int) time.Duration {
 	if len(sorted) == 0 {
 		return 0
@@ -157,9 +165,12 @@ type Runner struct {
 
 	startedAt  time.Time
 	finishedAt time.Time
+
+	nodeStats map[string]*NodeStats
+	collector *TimeSeriesCollector
 }
 
-func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, log logger.Logger) (*Runner, error) {
+func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -170,18 +181,25 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 	}
 
 	r := &Runner{
-		cfg:     cfg,
-		stats:   &Stats{},
-		scenes:  scenes,
-		nodes:   nodes,
-		edges:   edges,
-		runs:    runs,
-		reports: reports,
-		tracer:  tracer,
-		nodeGen: n,
-		runID:   n.Generate(),
-		done:    make(chan struct{}),
-		log:     log,
+		cfg:       cfg,
+		stats:     &Stats{},
+		scenes:    scenes,
+		nodes:     nodes,
+		edges:     edges,
+		runs:      runs,
+		reports:   reports,
+		tracer:    tracer,
+		nodeGen:   n,
+		runID:     n.Generate(),
+		done:      make(chan struct{}),
+		log:       log,
+		nodeStats: make(map[string]*NodeStats),
+		collector: NewTimeSeriesCollector(TimeSeriesConfig{
+			SampleInterval:  1 * time.Second,
+			FlushInterval:   10 * time.Second,
+			MemoryWindowSec: 300,
+			MaxNodes:        100,
+		}, n.Generate(), tsStore, nil),
 	}
 	r.status.Store(StatusPending)
 	return r, nil
@@ -206,7 +224,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		logger.F("run_id", traceID),
 	)
 
+	if err := r.collector.Start(r.startedAt); err != nil {
+		runLog.Error("failed to start timeseries collector", logger.F("error", err))
+	}
+
 	defer func() {
+		if stopErr := r.collector.Stop(); stopErr != nil {
+			runLog.Error("failed to stop timeseries collector", logger.F("error", stopErr))
+		}
 		r.finishedAt = time.Now().UTC()
 		r.status.Store(StatusDone)
 		close(r.done)
@@ -400,6 +425,67 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	}
 	summaryBytes, _ := json.Marshal(summary)
 
+	collectorData := r.collector.GetCollectedData()
+
+	detail := ReportDetail{
+		Metadata: ReportMetadata{
+			RunID:       r.runID,
+			SceneID:     r.cfg.SceneID,
+			Status:      string(runRecord.Status),
+			StartedAt:   r.startedAt,
+			FinishedAt:  r.finishedAt,
+			DurationSec: r.finishedAt.Sub(r.startedAt).Seconds(),
+			WorkerCount: r.cfg.Workers,
+			RunMode:     string(r.cfg.RunMode),
+			Count:       r.cfg.Count,
+			GeneratedAt: time.Now().UTC(),
+			Version:     "1.0",
+		},
+		GlobalSummary: GlobalSummary{
+			TotalRequests: runRecord.TotalReqs,
+			SuccessCount:  runRecord.SuccessReqs,
+			FailCount:     runRecord.FailedReqs,
+			SuccessRate:   successRate,
+			AvgLatencyMs:  runRecord.AvgLatency * 1000,
+			P50LatencyMs:  runRecord.P50Latency * 1000,
+			P95LatencyMs:  runRecord.P95Latency * 1000,
+			P99LatencyMs:  runRecord.P99Latency * 1000,
+			Throughput:    calculateThroughput(runRecord),
+			PeakQPS:       collectorData.GlobalPeakQPS,
+		},
+		GlobalTimeSeries: collectorData.GlobalSamples,
+		NodeMetrics:      []NodeMetricDetail{},
+		ErrorSummary:     collectorData.ErrorItems,
+	}
+
+	for nodeID, nodeStat := range r.nodeStats {
+		snapshot := nodeStat.Snapshot()
+		snapshot.NodeID = nodeID
+
+		detail.NodeMetrics = append(detail.NodeMetrics, NodeMetricDetail{
+			NodeID:   nodeID,
+			NodeName: getNodeName(nodeID),
+			Summary: NodeSummaryStats{
+				TotalRequests: snapshot.TotalReqs,
+				SuccessCount:  snapshot.SuccessReqs,
+				FailCount:     snapshot.FailedReqs,
+				SuccessRate:   snapshot.SuccessRate,
+				AvgLatencyMs:  snapshot.AvgLatency.Seconds() * 1000,
+				P50LatencyMs:  snapshot.P50Latency.Seconds() * 1000,
+				P95LatencyMs:  snapshot.P95Latency.Seconds() * 1000,
+				P99LatencyMs:  snapshot.P99Latency.Seconds() * 1000,
+				AvgQPS:        calculateNodeAvgQPS(snapshot, runRecord.Duration),
+				PeakQPS:       collectorData.NodePeakQPS[nodeID],
+			},
+			TimeSeries: collectorData.NodeSamples[nodeID],
+		})
+	}
+
+	detailJSON, err := json.Marshal(detail)
+	if err != nil {
+		r.log.Error("failed to marshal report detail", logger.F("error", err))
+	}
+
 	reportStatus := model.ReportStatusSuccess
 	if runRecord.Status == model.RunStatusFailed {
 		reportStatus = model.ReportStatusFailed
@@ -412,6 +498,7 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		RunID:      runRecord.ID,
 		Status:     reportStatus,
 		Summary:    string(summaryBytes),
+		Detail:     string(detailJSON),
 		StartedAt:  runRecord.StartedAt,
 		FinishedAt: runRecord.FinishedAt,
 	}
@@ -535,7 +622,9 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		nodeIDStr := n.ID.String()
 		nodeMap[nodeIDStr] = n.ID
 
-		dagNode, buildErr := r.buildDAGNode(n)
+		r.nodeStats[nodeIDStr] = NewNodeStats(10000)
+
+		dagNode, buildErr := r.buildDAGNode(n, r.nodeStats[nodeIDStr])
 		if buildErr != nil {
 			return nil, buildErr
 		}
@@ -572,6 +661,7 @@ type sceneNode struct {
 	loopCount int
 	mode      dag.ExecMode
 	stats     *Stats
+	nodeStats *NodeStats
 	log       logger.Logger
 	traceID   string
 }
@@ -697,6 +787,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 	}
 
+	if n.nodeStats != nil {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+			n.nodeStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+		}
+	}
+
 	return &dag.Output{Response: resp}, nil
 }
 
@@ -726,6 +822,9 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 	case <-time.After(dur):
 		if n.stats != nil {
 			n.stats.RecordLatency(dur, true)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(dur, true)
 		}
 		nodeLog.Info("delay node completed",
 			logger.F("duration_ms", cfg.Ms),
@@ -830,7 +929,7 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 	return condition != "false" && condition != "0"
 }
 
-func (r *Runner) buildDAGNode(n *model.Node) (*sceneNode, error) {
+func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, error) {
 	sn := &sceneNode{
 		id:        n.ID.String(),
 		nodeType:  n.Type,
@@ -838,6 +937,7 @@ func (r *Runner) buildDAGNode(n *model.Node) (*sceneNode, error) {
 		loopCount: n.LoopCount,
 		mode:      dag.ExecSync,
 		stats:     r.stats,
+		nodeStats: nodeStat,
 		log:       r.log,
 		traceID:   r.runID.String(),
 	}

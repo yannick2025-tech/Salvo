@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
 
 const client = axios.create({
@@ -31,6 +31,11 @@ client.interceptors.response.use(
 
 export async function post<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
   const resp = await client.post<ApiResponse<T>>(url, data)
+  return resp.data
+}
+
+export async function get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  const resp = await client.get<T>(url, config)
   return resp.data
 }
 

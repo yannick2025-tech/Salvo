@@ -128,7 +128,7 @@ func TestTracerList(t *testing.T) {
 		tctx.Finish()
 	}
 
-	traces := tracer.List(3)
+	traces := tracer.List(3, 0)
 	assert.Len(t, traces, 3)
 }
 
@@ -144,7 +144,7 @@ func TestTracerListByScene(t *testing.T) {
 	tctx := tracer.Start(context.Background(), newID(t), newID(t))
 	tctx.Finish()
 
-	traces := tracer.ListByScene(sceneID, 10)
+	traces := tracer.ListByScene(sceneID, 10, 0)
 	assert.Len(t, traces, 3)
 	for _, tr := range traces {
 		assert.Equal(t, sceneID, tr.SceneID)
@@ -183,7 +183,7 @@ func TestTracerBufferEviction(t *testing.T) {
 	_, ok := tracer.Get(firstTraceID)
 	assert.False(t, ok, "oldest trace should be evicted")
 
-	traces := tracer.List(10)
+	traces := tracer.List(10, 0)
 	assert.Len(t, traces, 3)
 }
 

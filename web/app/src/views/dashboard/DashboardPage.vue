@@ -1,10 +1,35 @@
 <template>
   <div class="dashboard-page">
+    <div class="scene-selector">
+      <div class="selector-header">
+        <h3>📊 场景选择</h3>
+        <select v-model="selectedSceneId" @change="onSceneChange" class="scene-select">
+          <option 
+            v-for="scene in allScenes" 
+            :key="scene.scene_id" 
+            :value="String(scene.scene_id)"
+          >
+            {{ scene.name || `场景#${String(scene.scene_id).slice(-8)}` }}
+            {{ scene.status === 'running' ? '(运行中)' : `(已结束)` }}
+          </option>
+          <option v-if="allScenes.length === 0" value="" disabled>加载中...</option>
+          <option v-if="allScenes.length === 0 && !loading" value="" disabled>暂无场景</option>
+        </select>
+      </div>
+      <div v-if="selectedSceneId" class="time-window-info">
+        <span class="window-label">时间范围:</span>
+        <span class="window-value">{{ timeWindowDisplay }}</span>
+        <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
+        <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
+      </div>
+    </div>
+
     <div class="metrics-row">
-      <div class="metric-card" v-for="m in summaryMetrics" :key="m.label">
+      <div class="metric-card" v-for="m in summaryMetrics" :key="m.label" :class="{ 'time-info-card': m.isTimeCard }">
         <div class="metric-label">{{ m.label }}</div>
-        <div class="metric-value" :style="{ color: m.color }">{{ m.value }}</div>
-        <div class="metric-sub" v-if="m.sub">{{ m.sub }}</div>
+        <div v-if="!m.isTimeCard" class="metric-value" :style="{ color: m.color }">{{ m.value }}</div>
+        <div v-if="m.isTimeCard" class="metric-value" :style="{ color: m.color }">{{ m.value }}</div>
+        <div v-if="m.sub && !m.isTimeCard" class="metric-sub">{{ m.sub }}</div>
       </div>
     </div>
 
@@ -76,21 +101,25 @@
             <div class="node-bars">
               <div class="bar-row">
                 <span class="bar-label">P50</span>
-                <div class="bar-track"><div class="bar-fill p50" :style="{ width: barWidth(node.p50_latency) }"></div></div>
+                <div class="bar-track bar-tooltip" data-tooltip="全周期中位数：整个测试期间所有请求的P50延迟"><div class="bar-fill p50" :style="{ width: barWidth(node.p50_latency, getNodeMaxLatency(node)) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p50_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P95</span>
-                <div class="bar-track"><div class="bar-fill p95" :style="{ width: barWidth(node.p95_latency) }"></div></div>
+                <div class="bar-track bar-tooltip" data-tooltip="全周期P95：整个测试期间所有请求的P95延迟"><div class="bar-fill p95" :style="{ width: barWidth(node.p95_latency, getNodeMaxLatency(node)) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p95_latency) }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">P99</span>
-                <div class="bar-track"><div class="bar-fill p99" :style="{ width: barWidth(node.p99_latency) }"></div></div>
+                <div class="bar-track bar-tooltip" data-tooltip="全周期P99：整个测试期间所有请求的P99延迟"><div class="bar-fill p99" :style="{ width: barWidth(node.p99_latency, getNodeMaxLatency(node)) }"></div></div>
                 <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
               </div>
             </div>
             <div v-if="expandedNodeId === node.node_id" class="node-detail" @click.stop>
+              <div class="node-time-range">
+                <span class="time-range-label">时间区间:</span>
+                <span class="time-range-value">{{ getNodeTimeRange(node) }}</span>
+              </div>
               <div class="detail-grid">
                 <div class="detail-item"><span class="detail-label">总请求数</span><span class="detail-val">{{ formatNum(node.total_reqs) }}</span></div>
                 <div class="detail-item"><span class="detail-label">成功数</span><span class="detail-val success">{{ formatNum(node.success_reqs) }}</span></div>
@@ -114,8 +143,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { dashboardOverview } from '@/api/dashboard'
-import type { DashboardOverviewDTO } from '@/types'
+import { dashboardHistory } from '@/api/dashboard'
+import type { DashboardOverviewDTO, RunHistoryDTO } from '@/types'
 
 const qpsChartRef = ref<HTMLElement>()
 const latencyChartRef = ref<HTMLElement>()
@@ -125,12 +154,222 @@ let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
 const nodeChartType = ref<'smooth' | 'step'>('smooth')
 
 const overview = ref<DashboardOverviewDTO | null>(null)
+
+const historyData = ref<RunHistoryDTO[]>([])
+const selectedSceneId = ref<string>('')
+const sceneList = ref<SceneInfo[]>([])
+const loading = ref(true)
+const TIME_WINDOW_HOURS = 48
+
+interface SceneInfo {
+  scene_id: string
+  name?: string
+  status: 'running' | 'done' | 'failed'
+  started_at?: string
+  finished_at?: string
+}
+
+const runningScenes = computed<SceneInfo[]>(() => {
+  return sceneList.value.filter(s => s.status === 'running')
+})
+
+const historyScenes = computed<SceneInfo[]>(() => {
+  return sceneList.value.filter(s => s.status !== 'running').slice(0, 10)
+})
+
+const allScenes = computed<SceneInfo[]>(() => {
+  return [...runningScenes.value, ...historyScenes.value]
+})
+
+const isSceneRunning = computed(() => {
+  if (!selectedSceneId.value) return runningScenes.value.length > 0
+  return runningScenes.value.some(s => s.scene_id === selectedSceneId.value)
+})
+
+const timeWindowDisplay = computed(() => {
+  if (!selectedSceneId.value) return '全部场景'
+
+  const scene = allScenes.value.find(s => s.scene_id === selectedSceneId.value)
+  if (!scene) return '-'
+
+  if (scene.status === 'running' && scene.started_at) {
+    const start = formatDateTime(scene.started_at)
+    return `${start} ~ Now`
+  }
+
+  if (scene.started_at && scene.finished_at) {
+    const start = formatDateTime(scene.started_at)
+    const end = formatDateTime(scene.finished_at)
+    return `${start} ~ ${end}`
+  }
+
+  return '-'
+})
+
+const durationDisplay = computed(() => {
+  if (!selectedSceneId.value) return ''
+
+  const runs = overview.value?.recent_runs
+  if (!runs?.length) return ''
+
+  const runningRun = runs.find(r => r.status === 'running')
+  if (runningRun && runningRun.started_at) {
+    return formatDuration((Date.now() - new Date(runningRun.started_at).getTime()) / 1000)
+  }
+
+  const doneRun = runs[0]
+  if (doneRun && doneRun.duration) {
+    return formatDuration(doneRun.duration)
+  }
+
+  return ''
+})
+
+function selectScene(sceneId: string) {
+  selectedSceneId.value = sceneId
+  fetchOverview()
+}
+
+function onSceneChange() {
+  fetchOverview()
+}
+
+async function loadHistoryData() {
+  try {
+    console.log('Scene-based history loading enabled')
+  } catch (e) {
+    console.error('Failed to load history data:', e)
+  }
+}
+
+async function fetchSceneList() {
+  try {
+    loading.value = true
+    const token = localStorage.getItem('salvo_token')
+    const fetchResp = await fetch('/api/v1/dashboard/history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ limit: 50 })
+    })
+
+    const resp = await fetchResp.json()
+
+    console.log('📋 fetchSceneList response:', resp)
+    console.log('📋 resp.code:', resp.code)
+    console.log('📋 resp.data:', resp.data)
+
+    if (resp.code === 0 && (resp.data?.history || resp.data?.runs)) {
+      const runs = resp.data.history || resp.data.runs
+      console.log('📋 runs data:', runs)
+
+      const sceneMap = new Map<string, SceneInfo>()
+
+      runs.forEach((run: any) => {
+        console.log('📋 run:', run)
+        const sid = String(run.scene_id)
+        if (!sceneMap.has(sid) || run.status === 'running') {
+          sceneMap.set(sid, {
+            scene_id: sid,
+            name: run.scene_name || '',
+            status: run.status,
+            started_at: run.started_at,
+            finished_at: run.finished_at,
+          })
+        }
+      })
+
+      sceneList.value = Array.from(sceneMap.values())
+      console.log('📋 final sceneList:', sceneList.value)
+
+      if (!selectedSceneId.value && sceneList.value.length > 0) {
+        selectedSceneId.value = sceneList.value[0].scene_id
+        console.log('📋 auto-selected scene:', selectedSceneId.value)
+      }
+    } else {
+      console.error('❌ Invalid response format or no data')
+    }
+  } catch (e) {
+    console.error('❌ Failed to fetch scene list:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatTime(timeStr?: string): string {
+  if (!timeStr) return '-'
+  return new Date(timeStr).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function formatDateTime(timeStr?: string): string {
+  if (!timeStr) return '-'
+  return new Date(timeStr).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '0秒'
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  
+  if (hours > 0) {
+    return `${hours}小时${minutes}分${secs}秒`
+  } else if (minutes > 0) {
+    return `${minutes}分${secs}秒`
+  } else {
+    return `${secs}秒`
+  }
+}
+
+function getDuration(run: RunHistoryDTO): number {
+  if (!run.started_at || !run.finished_at) return 0
+  const start = new Date(run.started_at).getTime()
+  const end = new Date(run.finished_at).getTime()
+  return (end - start) / 1000
+}
+
+function renderChartsFromHistory(run: RunHistoryDTO) {
+  const samples = run.global_samples
+  if (!samples?.length) return
+
+  const timestamps = samples.map(s => new Date(s.timestamp * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
+  const qpsData = samples.map(s => s.qps)
+  const p50Data = samples.map(s => s.p50_latency_ms)
+  const p95Data = samples.map(s => s.p95_latency_ms)
+  const p99Data = samples.map(s => s.p99_latency_ms)
+  const errorRateData = samples.map(s => s.total_requests > 0 ? (s.fail_count / s.total_requests) * 100 : 0)
+
+  renderQpsChartWithData(timestamps, qpsData)
+  renderLatencyChartWithData(timestamps, p50Data, p95Data, p99Data)
+  renderErrorChartWithData(timestamps, errorRateData)
+}
+
+function renderChartsFromOverview() {
+  renderQpsChart()
+  renderLatencyChart()
+  renderErrorChart()
+}
 
 const runTimeRange = computed(() => {
   const runs = overview.value?.recent_runs
@@ -140,6 +379,31 @@ const runTimeRange = computed(() => {
   const fmt = (t?: string) => t ? new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'
   return `${fmt(first.started_at)} ~ ${fmt(last.started_at)}`
 })
+
+function getNodeTimeRange(node: any): string {
+  const runningRun = overview.value?.recent_runs?.find(r => r.status === 'running')
+  
+  if (runningRun && overview.value?.recent_runs?.[0]?.started_at) {
+    const start = formatDateTime(overview.value.recent_runs[0].started_at)
+    return `${start} ~ Now`
+  }
+  
+  if (overview.value && overview.value.recent_runs && overview.value.recent_runs.length > 0) {
+    const lastRun = overview.value.recent_runs[0]
+    if (lastRun.started_at) {
+      const start = formatDateTime(lastRun.started_at)
+      if (lastRun.status === 'running') {
+        return `${start} ~ Now`
+      } else if (lastRun.finished_at) {
+        return `${start} ~ ${formatDateTime(lastRun.finished_at)}`
+      } else {
+        return `${start} ~ Now`
+      }
+    }
+  }
+  
+  return '-'
+}
 
 function toggleNodeExpand(nodeId: string) {
   expandedNodeId.value = expandedNodeId.value === nodeId ? '' : nodeId
@@ -167,17 +431,25 @@ const summaryMetrics = computed(() => {
       { label: 'P50 延迟', value: '-', color: 'var(--accent-info)', sub: '' },
       { label: 'P95 延迟', value: '-', color: 'var(--accent-warning)', sub: '' },
       { label: 'P99 延迟', value: '-', color: 'var(--accent-danger)', sub: '' },
-      { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '' },
+      { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: null },
     ]
   }
   const rate = d.total_reqs > 0 ? ((d.success_reqs / d.total_reqs) * 100).toFixed(1) + '%' : '0%'
+
+  const runningRun = d.recent_runs?.find(r => r.status === 'running')
+  const timeInfo = runningRun ? {
+    startedAt: runningRun.started_at ? formatDateTime(runningRun.started_at) : '-',
+    finishedAt: runningRun.status === 'running' ? '--' : (runningRun.finished_at ? formatDateTime(runningRun.finished_at) : '-'),
+    duration: formatDuration(runningRun.status === 'running' ? (Date.now() - new Date(runningRun.started_at || '').getTime()) / 1000 : runningRun.duration)
+  } : null
+
   return [
     { label: '总请求数', value: formatNum(d.total_reqs), color: 'var(--accent-primary)', sub: '' },
     { label: '成功率', value: rate, color: 'var(--accent-success)', sub: '' },
     { label: 'P50 延迟', value: formatMs(d.p50_latency), color: 'var(--accent-info)', sub: '' },
     { label: 'P95 延迟', value: formatMs(d.p95_latency), color: 'var(--accent-warning)', sub: '' },
     { label: 'P99 延迟', value: formatMs(d.p99_latency), color: 'var(--accent-danger)', sub: '' },
-    { label: '运行中', value: String(d.running), color: 'var(--accent-primary)', sub: '' },
+    { label: '运行中', value: String(d.running), color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: timeInfo },
   ]
 })
 
@@ -195,11 +467,22 @@ function formatMs(sec: number): string {
   return (ms / 1000).toFixed(3) + 's'
 }
 
-function barWidth(val: number): string {
+function barWidth(val: number, maxVal?: number): string {
   if (!val) return '0%'
   const ms = val * 1000
-  const pct = Math.min((ms / 500) * 100, 100)
+  const maxMs = (maxVal || val) * 1000
+  const safeMax = Math.max(maxMs, 1)
+  const pct = Math.min((ms / safeMax) * 100, 100)
   return pct + '%'
+}
+
+function getNodeMaxLatency(node: any): number {
+  return Math.max(
+    node.p50_latency || 0,
+    node.p95_latency || 0,
+    node.p99_latency || 0,
+    0.001
+  )
 }
 
 function nodeQPS(node: any): string {
@@ -241,13 +524,99 @@ function getChartTheme() {
   }
 }
 
+function getTooltipConfig() {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+
+  const bgColor = isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.96)'
+  const borderColor = isDark ? 'rgba(71, 85, 105, 0.3)' : 'rgba(148, 163, 184, 0.2)'
+  const titleColor = isDark ? '#e2e8f0' : '#1e293b'
+  const labelColor = isDark ? '#cbd5e1' : '#475569'
+  const valueColor = isDark ? '#94a3b8' : '#64748b'
+
+  return {
+    trigger: 'axis' as const,
+    confine: true,
+    backgroundColor: bgColor,
+    borderColor: borderColor,
+    borderWidth: 1,
+    padding: [12, 16],
+    textStyle: { fontSize: 11, color: labelColor },
+    extraCssText: `
+      border-radius: 12px;
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        0 8px 24px rgba(0, 0, 0, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    `,
+    formatter: (params: any[]) => {
+      if (!Array.isArray(params)) params = [params]
+      let result = `<div style="font-size:11.5px;color:${titleColor};margin-bottom:10px;font-weight:600;letter-spacing:0.3px">${params[0].axisValue}</div>`
+      for (const param of params) {
+        const rawVal = Number(param.value)
+        const val = isNaN(rawVal) ? '-' : (param.seriesName === 'QPS' || param.seriesName === '错误率' || param.seriesName === 'error_rate' ? rawVal.toFixed(3) : rawVal.toFixed(3))
+        const unit = param.seriesName === 'QPS' ? '' : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? '%' : 'ms')
+        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${param.seriesName}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
+      }
+      return result
+    }
+  }
+}
+
+function getFilteredTimeSeries() {
+  const ts = overview.value?.time_series
+  if (!ts || !ts.timestamps.length) return null
+
+  const runs = overview.value?.recent_runs
+  if (!runs?.length) return ts
+
+  const earliestStart = runs.reduce((earliest: string | null, run: any) => {
+    if (!run.started_at) return earliest
+    if (!earliest || new Date(run.started_at) < new Date(earliest)) {
+      return run.started_at
+    }
+    return earliest
+  }, null)
+
+  if (!earliestStart) return ts
+
+  const startTime = new Date(earliestStart).getTime()
+  const minTime = startTime - 60 * 1000
+
+  let startIndex = 0
+  for (let i = 0; i < ts.timestamps.length; i++) {
+    const tsStr = ts.timestamps[i]
+    const tsParts = tsStr.split(':')
+    if (tsParts.length === 3) {
+      const [hours, minutes, seconds] = tsParts.map(Number)
+      const today = new Date()
+      const tsDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds)
+      if (tsDate.getTime() >= minTime) {
+        startIndex = i
+        break
+      }
+    }
+  }
+
+  if (startIndex === 0) return ts
+
+  return {
+    timestamps: ts.timestamps.slice(startIndex),
+    qps: ts.qps?.slice(startIndex),
+    p50: ts.p50?.slice(startIndex),
+    p95: ts.p95?.slice(startIndex),
+    p99: ts.p99?.slice(startIndex),
+    error_rate: ts.error_rate?.slice(startIndex),
+  }
+}
+
 function renderQpsChart() {
   if (!qpsChartRef.value) return
   if (!qpsChart) {
     qpsChart = echarts.init(qpsChartRef.value)
   }
   const theme = getChartTheme()
-  const ts = overview.value?.time_series
+  const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     qpsChart.setOption({
       backgroundColor: theme.bgColor,
@@ -265,14 +634,7 @@ function renderQpsChart() {
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
-    tooltip: { 
-      trigger: 'axis',
-      formatter: (params: any[]) => {
-        const param = params[0]
-        const value = Number(param.value).toFixed(3)
-        return `<div style="font-size:12px">${param.axisValue}</div><div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}QPS</span><b>${value}</b></div>`
-      }
-    },
+    tooltip: getTooltipConfig(),
   }, true)
 }
 
@@ -282,7 +644,7 @@ function renderLatencyChart() {
     latencyChart = echarts.init(latencyChartRef.value)
   }
   const theme = getChartTheme()
-  const ts = overview.value?.time_series
+  const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     latencyChart.setOption({
       backgroundColor: theme.bgColor,
@@ -304,17 +666,7 @@ function renderLatencyChart() {
       { name: 'P95', data: ts.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
       { name: 'P99', data: ts.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
     ],
-    tooltip: { 
-      trigger: 'axis',
-      formatter: (params: any[]) => {
-        let result = `<div style="font-size:12px;margin-bottom:6px">${params[0].axisValue}</div>`
-        for (const param of params) {
-          const value = Number(param.value).toFixed(3)
-          result += `<div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}${param.seriesName}</span><b>${value}ms</b></div>`
-        }
-        return result
-      }
-    },
+    tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
   }, true)
 }
@@ -325,7 +677,7 @@ function renderErrorChart() {
     errorChart = echarts.init(errorChartRef.value)
   }
   const theme = getChartTheme()
-  const ts = overview.value?.time_series
+  const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     errorChart.setOption({
       backgroundColor: theme.bgColor,
@@ -343,14 +695,93 @@ function renderErrorChart() {
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: ts.error_rate.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
     series: [{ data: ts.error_rate, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: theme.colors.danger }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.3)` }]) } }],
-    tooltip: { 
-      trigger: 'axis',
-      formatter: (params: any[]) => {
-        const param = params[0]
-        const value = Number(param.value).toFixed(3)
-        return `<div style="font-size:12px">${param.axisValue}</div><div style="display:flex;justify-content:space-between;gap:16px"><span>${param.marker}错误率</span><b>${value}%</b></div>`
-      }
-    },
+    tooltip: getTooltipConfig(),
+  }, true)
+}
+
+function renderQpsChartWithData(timestamps: string[], qpsData: number[]) {
+  if (!qpsChartRef.value) return
+  if (!qpsChart) {
+    qpsChart = echarts.init(qpsChartRef.value)
+  }
+  const theme = getChartTheme()
+  if (!timestamps.length) {
+    qpsChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
+  qpsChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 20, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    series: [{ data: qpsData, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
+    tooltip: getTooltipConfig(),
+  }, true)
+}
+
+function renderLatencyChartWithData(timestamps: string[], p50Data: number[], p95Data: number[], p99Data: number[]) {
+  if (!latencyChartRef.value) return
+  if (!latencyChart) {
+    latencyChart = echarts.init(latencyChartRef.value)
+  }
+  const theme = getChartTheme()
+  if (!timestamps.length) {
+    latencyChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
+  latencyChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
+    series: [
+      { name: 'P50', data: p50Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
+      { name: 'P95', data: p95Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
+      { name: 'P99', data: p99Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
+    ],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderErrorChartWithData(timestamps: string[], errorRateData: number[]) {
+  if (!errorChartRef.value) return
+  if (!errorChart) {
+    errorChart = echarts.init(errorChartRef.value)
+  }
+  const theme = getChartTheme()
+  if (!timestamps.length) {
+    errorChart.setOption({
+      backgroundColor: theme.bgColor,
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: [],
+    })
+    return
+  }
+  errorChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 20, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: errorRateData.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
+    series: [{ data: errorRateData, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: theme.colors.danger }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.3)` }]) } }],
+    tooltip: getTooltipConfig(),
   }, true)
 }
 
@@ -407,14 +838,7 @@ function renderNodeDetailChart(nodeId: string) {
         { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
         { type: 'value', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}' } },
       ] : { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
-      tooltip: { trigger: 'axis', confine: true, formatter: (p: any[]) => {
-        let s = `<div style="font-size:11px">${p[0].axisValue}</div>`
-        for (const pt of p) {
-          const val = pt.seriesName === 'QPS' ? pt.value.toFixed(3) : pt.value.toFixed(3) + 'ms'
-          s += `<div style="display:flex;justify-content:space-between;gap:12px"><span>${pt.marker}${pt.seriesName}</span><b>${val}</b></div>`
-        }
-        return s
-      }},
+      tooltip: getTooltipConfig(),
       series: series.map((s, idx) => ({
         name: s.name,
         type: s.type || 'line',
@@ -446,22 +870,34 @@ function renderNodeDetailChart(nodeId: string) {
           ]),
         },
       }],
-      tooltip: { trigger: 'axis', formatter: (p: any[]) => {
-        const val = (p[0].value / 1000).toFixed(3)
-        return `${p[0].name}: ${val}ms`
-      } },
+      tooltip: getTooltipConfig(),
     }, true)
   }
 }
 
 async function fetchOverview() {
   try {
-    // Fetch all available data without time range limit
-    const resp = await dashboardOverview(0)
+    const sceneId = selectedSceneId.value || undefined
+    const requestData = { range_seconds: 0, scene_id: sceneId }
+
+    const token = localStorage.getItem('salvo_token')
+    const fetchResp = await fetch('/api/v1/dashboard/overview', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(requestData)
+    })
+
+    const resp = await fetchResp.json()
+
     if (resp.code === 0) {
       overview.value = resp.data
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    console.error('❌ Dashboard fetch error:', e)
+  }
 }
 
 function handleResize() {
@@ -471,13 +907,30 @@ function handleResize() {
 }
 
 onMounted(() => {
+  fetchSceneList()
   fetchOverview()
+  loadHistoryData()
+
+  pollTimer = setInterval(() => {
+    fetchSceneList()
+    fetchOverview()
+  }, 5000)
+
   setTimeout(() => {
     renderQpsChart()
     renderLatencyChart()
     renderErrorChart()
   }, 100)
   window.addEventListener('resize', handleResize)
+  
+  watch(allScenes, (scenes) => {
+    if (scenes.length > 0 && !selectedSceneId.value) {
+      const firstRunning = scenes.find(s => s.status === 'running')
+      selectedSceneId.value = (firstRunning || scenes[0]).scene_id
+      console.log('🔄 Auto-selected scene:', selectedSceneId.value)
+    }
+  }, { immediate: true })
+  
   pollTimer = setInterval(() => {
     fetchOverview()
     setTimeout(() => {
@@ -486,11 +939,18 @@ onMounted(() => {
       renderErrorChart()
     }, 100)
   }, 5000)
+
+  timeRefreshTimer = setInterval(() => {
+    if (overview.value?.recent_runs?.some(r => r.status === 'running')) {
+      overview.value = { ...overview.value }
+    }
+  }, 1000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
   qpsChart?.dispose()
   latencyChart?.dispose()
   errorChart?.dispose()
@@ -502,6 +962,166 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.scene-selector {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.selector-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.scene-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 250px;
+  transition: all 0.2s;
+}
+
+.scene-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.scene-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+}
+
+.scene-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.scene-tab {
+  padding: 6px 14px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.scene-tab:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.scene-tab.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.scene-tab.running {
+  border-color: #3fb950;
+  background: rgba(63,185,80,0.08);
+}
+
+.scene-tab.running.active {
+  background: #3fb950;
+  border-color: #3fb950;
+}
+
+.scene-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.scene-status-dot.running {
+  background: #3fb950;
+  box-shadow: 0 0 4px rgba(63,185,80,0.5);
+  animation: pulse 2s infinite;
+}
+
+.scene-status-dot.done {
+  background: var(--text-tertiary);
+}
+
+.scene-status-dot.failed {
+  background: #f85149;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.running-badge {
+  background: rgba(63,185,80,0.15);
+  color: #3fb950;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.time-window-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.window-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.window-value {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.duration-value {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.live-indicator {
+  color: #3fb950;
+  font-weight: 700;
+  font-size: 11px;
+  animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .metrics-row {
@@ -535,6 +1155,45 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
+.time-info-card {
+  grid-column: span 1;
+  min-height: 120px;
+}
+
+.time-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-secondary);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.time-item {
+  display: contents;
+  font-size: 11px;
+}
+
+.time-label {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.time-value {
+  color: var(--text-secondary);
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 10.5px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.time-value.duration {
+  color: var(--accent-primary);
+  font-weight: 700;
+  font-size: 11px;
+}
+
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -563,6 +1222,12 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.chart-tip {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
 }
 
 .chart-controls {
@@ -765,7 +1430,85 @@ onUnmounted(() => {
   height: 8px;
   background: rgba(0,0,0,0.1);
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+}
+
+.bar-tooltip {
+  cursor: pointer;
+}
+
+.bar-tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  font-size: 11.5px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  max-width: 380px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.bar-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.04));
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.bar-tooltip:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.bar-tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Dark theme tooltip */
+[data-theme='dark'] .bar-tooltip::before {
+  background: rgba(30, 41, 59, 0.95);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.3);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .bar-tooltip::after {
+  border-top-color: rgba(30, 41, 59, 0.95);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.2));
 }
 
 .bar-fill {
@@ -979,6 +1722,30 @@ onUnmounted(() => {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border-secondary);
+}
+
+.node-time-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 11.5px;
+}
+
+.time-range-label {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.time-range-value {
+  color: var(--accent-primary);
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
 .detail-grid {

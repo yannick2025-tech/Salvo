@@ -45,6 +45,7 @@ type Config struct {
 
 func New(cfg Config) *Server {
 	h := &Handler{
+		log:        cfg.Logger,
 		scenes:     sqlite.NewSceneRepo(cfg.DB),
 		nodes:      sqlite.NewNodeRepo(cfg.DB),
 		edges:      sqlite.NewEdgeRepo(cfg.DB),
@@ -71,7 +72,15 @@ func New(cfg Config) *Server {
 		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
 	}
 	h.tracer = tracer
-	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.tracer, cfg.Logger)
+
+	if err := h.tracer.LoadFromDB(context.Background()); err != nil {
+		cfg.Logger.Warn("failed to load traces from db on startup", logger.F("error", err))
+	} else {
+		cfg.Logger.Info("loaded traces from database on startup", logger.F("count", h.tracer.Total()))
+	}
+
+	h.tsStore = runner.NewSQLiteTimeSeriesStore(cfg.DB.DB)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.tracer, h.tsStore, cfg.Logger)
 
 	s := &Server{
 		db:      cfg.DB,
@@ -169,6 +178,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/reset-password", s.handleAuth(s.handler.ResetPassword))
 
 	mux.HandleFunc("POST /api/v1/dashboard/overview", s.handleAuth(s.handler.DashboardOverview))
+	mux.HandleFunc("POST /api/v1/dashboard/history", s.handleAuth(s.handler.DashboardHistory))
 
 	mux.HandleFunc("POST /api/v1/scenes/list", s.handleAuth(s.handler.ListScenes))
 	mux.HandleFunc("POST /api/v1/scenes/create", s.handleAuth(s.handler.CreateScene))
@@ -196,6 +206,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/reports/list", s.handleAuth(s.handler.ListReports))
 	mux.HandleFunc("POST /api/v1/reports/get", s.handleAuth(s.handler.GetReport))
+	mux.HandleFunc("GET /api/v1/reports/{id}/export", s.authMiddleware(s.handler.ExportReport))
 
 	mux.HandleFunc("POST /api/v1/runs/list", s.handleAuth(s.handler.ListRunRecords))
 	mux.HandleFunc("POST /api/v1/runs/get", s.handleAuth(s.handler.GetRunRecord))
@@ -309,6 +320,33 @@ func (s *Server) handleAuth(h handlerFunc) http.HandlerFunc {
 	}
 }
 
+func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			writeJSON(w, dto.ErrorResp(401, "missing authorization header"))
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenStr == authHeader {
+			writeJSON(w, dto.ErrorResp(401, "invalid authorization format"))
+			return
+		}
+
+		claims, err := s.jwt.Parse(tokenStr)
+		if err != nil {
+			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
+			return
+		}
+
+		ctx := auth.WithUserID(r.Context(), claims.UserID)
+		ctx = auth.WithRoleID(ctx, claims.RoleID)
+
+		next(w, r.WithContext(ctx))
+	}
+}
+
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -368,6 +406,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 }
 
 type Handler struct {
+	log        logger.Logger
 	scenes     repo.SceneRepo
 	nodes      repo.NodeRepo
 	edges      repo.EdgeRepo
@@ -381,6 +420,7 @@ type Handler struct {
 	rp         repo.RolePermissionRepo
 	tracer     *tracelib.Tracer
 	traceStore *tracestore.Store
+	tsStore    runner.TimeSeriesStore
 	runnerMgr  *runner.Manager
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker

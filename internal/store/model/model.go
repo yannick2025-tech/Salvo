@@ -186,3 +186,22 @@ type RolePermission struct {
 	RoleID       snowflake.ID `json:"role_id,string"`
 	PermissionID snowflake.ID `json:"permission_id,string"`
 }
+
+// TimeSeriesSample represents a time-series metric sample for a run or node.
+type TimeSeriesSample struct {
+	ID            int64        `json:"id"`
+	RunID         snowflake.ID  `json:"run_id,string"`
+	NodeID        string       `json:"node_id"`
+	SampleTime    time.Time     `json:"sample_time"`
+	WindowDuration int          `json:"window_duration"`
+	QPS           float64      `json:"qps"`
+	TotalRequests int64         `json:"total_requests"`
+	SuccessCount  int64         `json:"success_count"`
+	FailCount     int64         `json:"fail_count"`
+	AvgLatencyMs  float64      `json:"avg_latency_ms"`
+	P50LatencyMs  float64      `json:"p50_latency_ms"`
+	P95LatencyMs  float64      `json:"p95_latency_ms"`
+	P99LatencyMs  float64      `json:"p99_latency_ms"`
+	MinLatencyMs  float64      `json:"min_latency_ms"`
+	MaxLatencyMs  float64      `json:"max_latency_ms"`
+}

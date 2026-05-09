@@ -198,3 +198,49 @@ func (s *Store) listSpans(ctx context.Context, traceID snowflake.ID) ([]*traceli
 
 	return spans, rows.Err()
 }
+
+// ListAllTraces returns all traces with their spans, ordered by started_at DESC.
+// Used for loading historical data into memory on startup.
+func (s *Store) ListAllTraces(ctx context.Context, limit int) ([]*tracelib.Trace, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, scene_id, run_id, status, error, started_at, finished_at, duration_ns
+		FROM traces ORDER BY started_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("tracestore: list all traces: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var traces []*tracelib.Trace
+	for rows.Next() {
+		tr := &tracelib.Trace{}
+		var status, errMsg string
+		var durationNs int64
+		var finishedAt sql.NullTime
+
+		if err := rows.Scan(&tr.ID, &tr.SceneID, &tr.RunID, &status, &errMsg,
+			&tr.StartedAt, &finishedAt, &durationNs); err != nil {
+			return nil, err
+		}
+
+		tr.Status = tracelib.SpanStatus(status)
+		tr.Error = errMsg
+		tr.Duration = time.Duration(durationNs)
+		if finishedAt.Valid {
+			tr.FinishedAt = finishedAt.Time
+		}
+
+		spans, err := s.listSpans(ctx, tr.ID)
+		if err != nil {
+			return nil, err
+		}
+		tr.Spans = spans
+
+		traces = append(traces, tr)
+	}
+
+	return traces, rows.Err()
+}

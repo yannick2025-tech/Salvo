@@ -44,7 +44,7 @@
         <div class="user-area">
           <span class="user-name">{{ authStore.user?.nickname || authStore.user?.email }}</span>
           <span class="user-role badge">{{ authStore.userRole }}</span>
-          <button class="btn-logout" @click="handleLogout">退出</button>
+          <button class="btn-logout" @click="showLogoutConfirm = true">退出</button>
         </div>
       </header>
 
@@ -52,11 +52,29 @@
         <router-view />
       </main>
     </div>
+
+    <div v-if="showLogoutConfirm" class="modal-overlay" @click.self="showLogoutConfirm = false">
+      <div class="confirm-dialog">
+        <div class="confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h3 class="confirm-title">确认退出</h3>
+        <p class="confirm-msg">确定要退出登录吗？</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="showLogoutConfirm = false">取消</button>
+          <button class="btn-danger-confirm" @click="handleLogout">确认退出</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, h } from 'vue'
+import { computed, ref, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -65,6 +83,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const showLogoutConfirm = ref(false)
 
 const DashboardIcon = {
   render() {
@@ -160,6 +179,7 @@ function isActive(path: string) {
 }
 
 function handleLogout() {
+  showLogoutConfirm.value = false
   authStore.doLogout()
   router.push('/login')
 }
@@ -305,17 +325,102 @@ function handleLogout() {
   font-size: 13px;
   padding: 4px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-primary);
+  border: 1px solid var(--accent-danger);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--accent-danger);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-logout:hover {
   background: var(--accent-danger);
-  color: var(--text-inverse);
+  color: #fff;
   border-color: var(--accent-danger);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-danger);
+}
+
+.confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.confirm-msg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-cancel {
+  padding: 8px 20px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--bg-hover);
+}
+
+.btn-danger-confirm {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn-danger-confirm:hover {
+  opacity: 0.88;
 }
 
 .page-content {

@@ -24,6 +24,7 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -259,6 +260,38 @@ func (t *Tracer) record(tr *Trace) {
 	}
 }
 
+// LoadFromDB loads historical traces from the persistence store into memory.
+// Called on startup to restore data after process restart.
+func (t *Tracer) LoadFromDB(ctx context.Context) error {
+	if t.persister == nil {
+		return nil
+	}
+
+	loader, ok := t.persister.(interface {
+		ListAllTraces(context.Context, int) ([]*Trace, error)
+	})
+	if !ok {
+		return nil
+	}
+
+	traces, err := loader.ListAllTraces(ctx, t.cfg.BufferSize)
+	if err != nil {
+		return fmt.Errorf("tracer: load from db: %w", err)
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, tr := range traces {
+		if len(t.buffer) >= t.cfg.BufferSize {
+			break
+		}
+		t.buffer = append(t.buffer, tr)
+	}
+
+	return nil
+}
+
 // Get retrieves a trace by ID from the in-memory buffer.
 func (t *Tracer) Get(id snowflake.ID) (*Trace, bool) {
 	t.mu.RLock()
@@ -274,7 +307,7 @@ func (t *Tracer) Get(id snowflake.ID) (*Trace, bool) {
 
 // List returns traces from the in-memory buffer, most recent first.
 // The limit parameter caps the number of results; 0 means use default.
-func (t *Tracer) List(limit int) []*Trace {
+func (t *Tracer) List(limit int, offset int) []*Trace {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -283,19 +316,30 @@ func (t *Tracer) List(limit int) []*Trace {
 	}
 
 	n := len(t.buffer)
-	if n > limit {
-		n = limit
+	start := n - 1 - offset
+	if start < 0 {
+		return nil
+	}
+	end := start - limit
+	if end < -1 {
+		end = -1
 	}
 
-	result := make([]*Trace, n)
-	for i := 0; i < n; i++ {
-		result[i] = t.buffer[len(t.buffer)-1-i]
+	result := make([]*Trace, 0, limit)
+	for i := start; i > end; i-- {
+		result = append(result, t.buffer[i])
 	}
 	return result
 }
 
+func (t *Tracer) Total() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.buffer)
+}
+
 // ListByScene returns traces for a specific scene ID, most recent first.
-func (t *Tracer) ListByScene(sceneID snowflake.ID, limit int) []*Trace {
+func (t *Tracer) ListByScene(sceneID snowflake.ID, limit int, offset int) []*Trace {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -303,13 +347,21 @@ func (t *Tracer) ListByScene(sceneID snowflake.ID, limit int) []*Trace {
 		limit = 50
 	}
 
-	var result []*Trace
-	for i := len(t.buffer) - 1; i >= 0 && len(result) < limit; i-- {
+	var all []*Trace
+	for i := len(t.buffer) - 1; i >= 0; i-- {
 		if t.buffer[i].SceneID == sceneID {
-			result = append(result, t.buffer[i])
+			all = append(all, t.buffer[i])
 		}
 	}
-	return result
+
+	if offset >= len(all) {
+		return nil
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end]
 }
 
 // ByRunID returns a trace for a specific run ID.

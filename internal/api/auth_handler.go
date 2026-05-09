@@ -23,15 +23,15 @@ func (h *Handler) Login(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, err.Error())
 	}
 	if req.Email == "" || req.Password == "" {
-		return dto.ErrorResp(400, "email and password are required")
+		return dto.ErrorResp(400, "邮箱和密码不能为空")
 	}
 	if !isValidEmail(req.Email) {
-		return dto.ErrorResp(400, "invalid email format")
+		return dto.ErrorResp(400, "邮箱格式不正确")
 	}
 
 	user, err := h.users.GetByEmail(r.Context(), req.Email)
 	if err == sql.ErrNoRows {
-		return dto.ErrorResp(401, "invalid email or password")
+		return dto.ErrorResp(401, "邮箱或密码错误")
 	}
 	if err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("get user: %v", err))
@@ -107,27 +107,27 @@ func (h *Handler) ChangePassword(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, err.Error())
 	}
 	if req.OldPassword == "" || req.NewPassword == "" {
-		return dto.ErrorResp(400, "old_password and new_password are required")
+		return dto.ErrorResp(400, "当前密码和新密码不能为空")
 	}
 
 	userID := auth.UserIDFromCtx(r.Context())
 	user, err := h.users.GetByID(r.Context(), userID)
 	if err != nil {
-		return dto.ErrorResp(404, "user not found")
+		return dto.ErrorResp(404, "用户不存在")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
-		return dto.ErrorResp(401, "old password is incorrect")
+		return dto.ErrorResp(401, "当前密码不正确")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return dto.ErrorResp(500, "failed to hash password")
+		return dto.ErrorResp(500, "密码加密失败")
 	}
 
 	user.PasswordHash = string(hash)
 	if err := h.users.Update(r.Context(), user); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update user: %v", err))
+		return dto.ErrorResp(500, fmt.Sprintf("更新用户失败: %v", err))
 	}
 
 	return dto.OK(nil)
@@ -139,15 +139,15 @@ func (h *Handler) ResetPassword(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, err.Error())
 	}
 	if req.UserID == 0 || req.NewPassword == "" {
-		return dto.ErrorResp(400, "user_id and new_password are required")
+		return dto.ErrorResp(400, "用户ID和新密码不能为空")
 	}
 
 	user, err := h.users.GetByID(r.Context(), req.UserID)
 	if err == sql.ErrNoRows {
-		return dto.ErrorResp(404, "user not found")
+		return dto.ErrorResp(404, "用户不存在")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get user: %v", err))
+		return dto.ErrorResp(500, fmt.Sprintf("获取用户失败: %v", err))
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
@@ -205,15 +205,15 @@ func (h *Handler) CreateUser(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, err.Error())
 	}
 	if req.Email == "" || req.Password == "" {
-		return dto.ErrorResp(400, "email and password are required")
+		return dto.ErrorResp(400, "邮箱和密码不能为空")
 	}
 	if !isValidEmail(req.Email) {
-		return dto.ErrorResp(400, "invalid email format")
+		return dto.ErrorResp(400, "邮箱格式不正确")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return dto.ErrorResp(500, "failed to hash password")
+		return dto.ErrorResp(500, "密码加密失败")
 	}
 
 	user := &model.User{

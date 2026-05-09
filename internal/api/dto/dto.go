@@ -332,6 +332,7 @@ type SpanDTO struct {
 	TraceID      snowflake.ID `json:"trace_id"`
 	ChainID      string       `json:"chain_id"`
 	NodeID       string       `json:"node_id"`
+	NodeName     string       `json:"node_name,omitempty"`
 	ParentNodeID string       `json:"parent_node_id,omitempty"`
 	Status       string       `json:"status"`
 	Error        string       `json:"error,omitempty"`
@@ -346,6 +347,7 @@ type SpanDTO struct {
 type TraceDTO struct {
 	ID         snowflake.ID `json:"id"`
 	SceneID    snowflake.ID `json:"scene_id"`
+	SceneName  string       `json:"scene_name,omitempty"`
 	RunID      snowflake.ID `json:"run_id"`
 	Status     string       `json:"status"`
 	Error      string       `json:"error,omitempty"`
@@ -479,7 +481,8 @@ type ListRolesRequest struct {
 // --- Dashboard ---
 
 type DashboardOverviewRequest struct {
-	RangeSeconds int `json:"range_seconds,omitempty"`
+	RangeSeconds int    `json:"range_seconds,omitempty"`
+	SceneID      string `json:"scene_id,omitempty"`
 }
 
 type DashboardOverviewDTO struct {
@@ -491,6 +494,7 @@ type DashboardOverviewDTO struct {
 	P99Latency  float64         `json:"p99_latency"`
 	AvgLatency  float64         `json:"avg_latency"`
 	Running     int             `json:"running"`
+	SceneID     int64           `json:"scene_id,omitempty"`
 	RecentRuns  []RunRecordDTO  `json:"recent_runs"`
 	NodeMetrics []NodeMetricDTO `json:"node_metrics"`
 	TimeSeries  *TimeSeriesDTO  `json:"time_series,omitempty"`
@@ -522,4 +526,45 @@ type TimeSeriesDTO struct {
 	P95        []float64 `json:"p95"`
 	P99        []float64 `json:"p99"`
 	ErrorRate  []float64 `json:"error_rate"`
+}
+
+// --- Dashboard History DTOs ---
+
+type DashboardHistoryRequest struct {
+	SceneID int64 `json:"scene_id,omitempty"`
+	Limit   int   `json:"limit,omitempty"`
+}
+
+type DashboardHistoryDTO struct {
+	History []RunHistoryDTO `json:"history"`
+	Total   int             `json:"total"`
+}
+
+type RunHistoryDTO struct {
+	RunID         snowflake.ID                     `json:"run_id,string"`
+	SceneID       snowflake.ID                     `json:"scene_id,string"`
+	Status        string                           `json:"status"`
+	StartedAt     *time.Time                       `json:"started_at,omitempty"`
+	FinishedAt    *time.Time                       `json:"finished_at,omitempty"`
+	TotalReqs     int64                            `json:"total_reqs"`
+	SuccessReqs   int64                            `json:"success_reqs"`
+	FailedReqs    int64                            `json:"failed_reqs"`
+	AvgLatency    float64                          `json:"avg_latency"`
+	P50Latency    float64                          `json:"p50_latency"`
+	P95Latency    float64                          `json:"p95_latency"`
+	P99Latency    float64                          `json:"p99_latency"`
+	GlobalSamples []TimeSeriesSampleDTO            `json:"global_samples,omitempty"`
+	NodeSamples   map[string][]TimeSeriesSampleDTO `json:"node_samples,omitempty"`
+}
+
+type TimeSeriesSampleDTO struct {
+	Timestamp     int64   `json:"timestamp"`
+	QPS           float64 `json:"qps"`
+	TotalRequests int64   `json:"total_requests"`
+	SuccessCount  int64   `json:"success_count"`
+	FailCount     int64   `json:"fail_count"`
+	AvgLatencyMs  float64 `json:"avg_latency_ms"`
+	P50LatencyMs  float64 `json:"p50_latency_ms"`
+	P95LatencyMs  float64 `json:"p95_latency_ms"`
+	P99LatencyMs  float64 `json:"p99_latency_ms"`
 }

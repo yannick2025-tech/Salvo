@@ -51,14 +51,36 @@
             <span class="run-name">Scene #{{ run.scene_id }}</span>
             <span class="status running">RUNNING</span>
           </div>
-          <div class="run-metrics">
-            <div class="metric"><span class="metric-label">Workers</span><span class="metric-val">{{ run.worker_count }}</span></div>
-            <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
-            <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
-            <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
-            <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
+          <div class="run-footer">
+            <div class="run-metrics">
+              <div class="metric"><span class="metric-label">Workers</span><span class="metric-val">{{ run.worker_count }}</span></div>
+              <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
+              <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
+              <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
+              <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
+            </div>
+            <button class="btn-sm danger" @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">停止</button>
           </div>
-          <button class="btn-stop" @click="handleStop(run.scene_id)">停止</button>
+        </div>
+        
+        <div v-if="stopConfirm.visible" class="modal-overlay" @click.self="cancelStop">
+          <div class="confirm-dialog">
+            <div class="confirm-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <h3 class="confirm-title">确认停止</h3>
+            <p class="confirm-msg">{{ stopConfirm.message }}</p>
+            <div class="confirm-actions">
+              <button class="btn-cancel" @click="cancelStop">取消</button>
+              <button class="btn-danger-confirm" @click="confirmStop" :disabled="stopConfirm.loading">
+                {{ stopConfirm.loading ? '停止中...' : '确认停止' }}
+              </button>
+            </div>
+          </div>
         </div>
         <div v-for="run in recentFailedRuns" :key="'fail-'+run.id" class="run-item failed-item">
           <div class="run-header">
@@ -123,6 +145,14 @@ const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
 const toastMsg = ref('')
 const toastType = ref('info')
+
+const stopConfirm = reactive({
+  visible: false,
+  sceneId: '',
+  sceneName: '',
+  message: '',
+  loading: false,
+})
 
 const form = reactive({
   scene_id: '',
@@ -208,6 +238,36 @@ async function handleStop(sceneId: string) {
   } catch { /* ignore */ }
 }
 
+function showStopConfirm(sceneId: string, sceneName: string) {
+  stopConfirm.visible = true
+  stopConfirm.sceneId = sceneId
+  stopConfirm.sceneName = sceneName
+  stopConfirm.message = `确定要停止场景「${sceneName}」的运行吗？此操作不可撤销。`
+  stopConfirm.loading = false
+}
+
+function cancelStop() {
+  stopConfirm.visible = false
+  stopConfirm.sceneId = ''
+  stopConfirm.sceneName = ''
+  stopConfirm.message = ''
+  stopConfirm.loading = false
+}
+
+async function confirmStop() {
+  if (!stopConfirm.sceneId) return
+  
+  stopConfirm.loading = true
+  try {
+    await handleStop(stopConfirm.sceneId)
+    cancelStop()
+    showToast('场景已停止', 'success')
+  } catch (e: any) {
+    showToast('停止失败: ' + (e.message || '未知错误'), 'error')
+    stopConfirm.loading = false
+  }
+}
+
 function formatMs(sec: number): string {
   if (!sec) return '0ms'
   const ms = sec * 1000
@@ -219,6 +279,11 @@ function formatMs(sec: number): string {
 function formatTime(t?: string) {
   if (!t) return '-'
   return new Date(t).toLocaleString()
+}
+
+function getSceneName(sceneId: string): string {
+  const scene = scenes.value.find(s => s.id === sceneId)
+  return scene?.name || `Scene #${sceneId}`
 }
 
 onMounted(() => {
@@ -238,21 +303,129 @@ onUnmounted(() => {
 .runner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 .card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 20px; }
-.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
-
-.form-group { margin-bottom: 12px; }
-.form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-.form-group input, .form-group select {
-  width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none;
-}
-.form-group input:focus, .form-group select:focus { border-color: var(--accent-primary); }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
+.form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.form-group label { font-size: 12px; color: var(--text-secondary); }
+.form-group input, .form-group select { height: 34px; padding: 0 8px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .btn-primary { padding: 8px 20px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; margin-top: 8px; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .no-dag-warning { margin-top: 8px; font-size: 12px; color: #f0ad4e; background: rgba(240,173,78,0.1); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(240,173,78,0.3); }
-.btn-stop { padding: 4px 12px; border: 1px solid var(--accent-danger); border-radius: var(--radius-sm); background: transparent; color: var(--accent-danger); font-size: 12px; cursor: pointer; margin-top: 8px; }
+
+.btn-sm {
+  padding: 5px 12px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sm:hover {
+  background: var(--accent-danger);
+  color: #fff;
+  border-color: var(--accent-danger);
+}
+
+.btn-sm.danger {
+  color: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+
+.btn-sm.danger:hover {
+  background: var(--accent-danger);
+  color: #fff;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.confirm-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--accent-danger);
+}
+
+.confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.confirm-msg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-cancel {
+  padding: 8px 20px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--bg-hover);
+}
+
+.btn-danger-confirm {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn-danger-confirm:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.btn-danger-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .empty { text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 24px 0; }
 .run-item { padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 8px; }
@@ -260,6 +433,7 @@ onUnmounted(() => {
 .run-name { font-size: 13px; font-weight: 500; }
 .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+.run-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 .run-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric-label { font-size: 11px; color: var(--text-tertiary); }

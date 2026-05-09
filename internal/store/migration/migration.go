@@ -27,6 +27,7 @@ func Migrate(db *sql.DB) error {
 		{"permissions", createPermissionsTable},
 		{"role_permissions", createRolePermissionsTable},
 		{"users", createUsersTable},
+		{"time_series_samples", createTimeSeriesSamplesTable},
 	}
 
 	for _, m := range migrations {
@@ -296,3 +297,28 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 func CurrentVersion() int {
 	return currentVersion
 }
+
+const createTimeSeriesSamplesTable = `
+CREATE TABLE IF NOT EXISTS time_series_samples (
+	id              INTEGER PRIMARY KEY AUTOINCREMENT,
+	run_id          INTEGER    NOT NULL,
+	node_id         TEXT       NOT NULL DEFAULT '',
+	sample_time     DATETIME   NOT NULL,
+	window_duration INTEGER    NOT NULL DEFAULT 1,
+	qps             REAL       NOT NULL DEFAULT 0,
+	total_requests  INTEGER    NOT NULL DEFAULT 0,
+	success_count   INTEGER    NOT NULL DEFAULT 0,
+	fail_count      INTEGER    NOT NULL DEFAULT 0,
+	avg_latency_ms  REAL       NOT NULL DEFAULT 0,
+	p50_latency_ms  REAL       NOT NULL DEFAULT 0,
+	p95_latency_ms  REAL       NOT NULL DEFAULT 0,
+	p99_latency_ms  REAL       NOT NULL DEFAULT 0,
+	min_latency_ms  REAL       NOT NULL DEFAULT 0,
+	max_latency_ms  REAL       NOT NULL DEFAULT 0,
+	created_at      DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT uk_run_node_time UNIQUE (run_id, node_id, sample_time)
+);
+CREATE INDEX IF NOT EXISTS idx_ts_run_node ON time_series_samples (run_id, node_id);
+CREATE INDEX IF NOT EXISTS idx_ts_run_time ON time_series_samples (run_id, sample_time);
+CREATE INDEX IF NOT EXISTS idx_ts_sample_time ON time_series_samples (sample_time);
+`

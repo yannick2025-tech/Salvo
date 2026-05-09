@@ -279,9 +279,9 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
-		// Add random delay between 30-200ms for all API endpoints except health
+		// Add random delay between 30-2000ms for all API endpoints except health
 		if r.URL.Path != "/mock/health" {
-			delayMs := rand.Intn(171) + 30 // 30-200ms
+			delayMs := rand.Intn(1971) + 30 // 30-2000ms
 			time.Sleep(time.Duration(delayMs) * time.Millisecond)
 		}
 

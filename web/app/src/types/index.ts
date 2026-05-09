@@ -111,6 +111,7 @@ export interface RunRecordDTO {
 export interface TraceDTO {
   id: string
   scene_id: string
+  scene_name?: string
   run_id: string
   status: string
   error?: string
@@ -123,7 +124,10 @@ export interface TraceDTO {
 export interface SpanDTO {
   id: string
   trace_id: string
+  chain_id?: string
   node_id: string
+  node_name?: string
+  parent_node_id?: string
   status: string
   error?: string
   input?: string
@@ -255,6 +259,7 @@ export interface DashboardOverviewDTO {
   p99_latency: number
   avg_latency: number
   running: number
+  scene_id?: number
   recent_runs: RunRecordDTO[]
   node_metrics: NodeMetricDTO[]
   time_series?: TimeSeriesDTO
@@ -286,6 +291,40 @@ export interface TimeSeriesDTO {
   p95: number[]
   p99: number[]
   error_rate: number[]
+}
+
+export interface TimeSeriesSampleDTO {
+  timestamp: number
+  qps: number
+  total_requests: number
+  success_count: number
+  fail_count: number
+  avg_latency_ms: number
+  p50_latency_ms: number
+  p95_latency_ms: number
+  p99_latency_ms: number
+}
+
+export interface RunHistoryDTO {
+  run_id: string
+  scene_id: string
+  status: string
+  started_at?: string
+  finished_at?: string
+  total_reqs: number
+  success_reqs: number
+  failed_reqs: number
+  avg_latency: number
+  p50_latency: number
+  p95_latency: number
+  p99_latency: number
+  global_samples?: TimeSeriesSampleDTO[]
+  node_samples?: Record<string, TimeSeriesSampleDTO[]>
+}
+
+export interface DashboardHistoryDTO {
+  history: RunHistoryDTO[]
+  total: number
 }
 
 export interface GeneratorParamInfo {
