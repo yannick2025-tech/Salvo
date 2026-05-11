@@ -99,6 +99,7 @@
 
     <div class="card">
       <h3>运行历史</h3>
+      <div class="table-scroll">
       <table class="data-table">
         <thead>
           <tr>
@@ -106,26 +107,33 @@
             <th>场景</th>
             <th>状态</th>
             <th>并发</th>
+            <th>运行模式</th>
+            <th>配置值</th>
             <th>总请求</th>
             <th>成功率</th>
             <th>P99</th>
             <th>开始时间</th>
+            <th>结束时间</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="runs.length === 0"><td colspan="8" class="empty">暂无运行记录</td></tr>
+          <tr v-if="runs.length === 0"><td colspan="11" class="empty">暂无运行记录</td></tr>
           <tr v-for="r in runs" :key="r.id">
             <td class="mono">{{ r.id }}</td>
             <td>{{ r.scene_id }}</td>
             <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
-            <td>{{ r.worker_count }}</td>
+            <td>{{ Math.round(r.worker_count || 0) }}</td>
+            <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? 'Duration' : 'Count' }}</span></td>
+            <td class="mono">{{ r.run_mode === 'duration' ? Math.round(r.duration || 0) + 's' : (r.count || 0).toLocaleString() }}</td>
             <td>{{ r.total_reqs }}</td>
-            <td>{{ ((r.success_reqs / Math.max(r.total_reqs, 1)) * 100).toFixed(1) }}%</td>
+            <td>{{ ((r.success_reqs / Math.max(r.total_reqs, 1)) * 100).toFixed(2) }}%</td>
             <td>{{ formatMs(r.p99_latency) }}</td>
             <td>{{ formatTime(r.started_at) }}</td>
+            <td>{{ r.status === 'running' ? '--' : formatTime(r.finished_at) }}</td>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
@@ -214,7 +222,7 @@ async function handleStart() {
       scene_id: form.scene_id,
       workers: form.workers,
       run_mode: form.run_mode,
-      duration: form.duration * 1e9,
+      duration: form.duration,
       count: form.count,
     })
     if (resp.code === 0) {
@@ -442,13 +450,17 @@ onUnmounted(() => {
 .metric-val.danger { color: var(--accent-danger); }
 
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); white-space: nowrap; }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .mono { font-family: monospace; font-size: 12px; }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .status-badge.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+.mode-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.mode-tag.duration { background: rgba(210,153,34,0.15); color: #9a6700; }
+.mode-tag.count { background: rgba(130,80,223,0.15); color: #8250df; }
 .status.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
 .failed-item { border-left: 3px solid var(--accent-danger); }
 .error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }

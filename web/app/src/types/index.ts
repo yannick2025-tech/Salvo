@@ -94,6 +94,7 @@ export interface RunRecordDTO {
   worker_count: number
   run_mode: string
   duration: number
+  count: number
   total_reqs: number
   success_reqs: number
   failed_reqs: number

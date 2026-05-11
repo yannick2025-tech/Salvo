@@ -26,7 +26,7 @@
           <tr v-for="r in reports" :key="r.id">
             <td class="mono">{{ r.id }}</td>
             <td>{{ r.scene_id }}</td>
-            <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
+            <td><span :class="['status-badge', r.status]" class="tooltip-wrapper" :data-tooltip="getReportStatusTooltip(r.status)">{{ r.status }}</span></td>
             <td>{{ extractMetric(r, 'total_reqs') }}</td>
             <td>{{ extractMetric(r, 'success_rate') }}</td>
             <td>{{ extractMetric(r, 'p50') }}</td>
@@ -92,6 +92,20 @@ function calculateDuration(startedAt?: string, finishedAt?: string): string {
 }
 
 onMounted(fetchReports)
+
+function getReportStatusTooltip(status: string): string {
+  const map: Record<string, string> = {
+    success: '全部请求成功（100% 成功率）',
+    partial: '部分失败：成功率 ≥95% 但 <100%（存在少量失败请求）',
+    failed: '测试失败：成功率 <95% 或运行时发生错误',
+    completed: '测试运行已成功完成',
+    running: '测试正在运行中',
+    pending: '测试等待开始',
+    cancelled: '测试在完成前被取消',
+    canceled: '测试在完成前被取消',
+  }
+  return map[status] || status
+}
 </script>
 
 <style scoped>
@@ -101,8 +115,7 @@ onMounted(fetchReports)
   background: var(--bg-card);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: visible;
 }
 
 .data-table {
@@ -117,6 +130,7 @@ onMounted(fetchReports)
   font-size: 13px;
   border-bottom: 1px solid var(--border-secondary);
   white-space: nowrap;
+  position: relative;
 }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); white-space: nowrap; }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
@@ -129,4 +143,66 @@ onMounted(fetchReports)
 .status-badge.success { background: rgba(63,185,80,0.15); color: #3fb950; }
 .status-badge.failed { background: rgba(248,81,73,0.15); color: #f85149; }
 .status-badge.partial { background: rgba(210,153,34,0.15); color: #d29922; }
+
+/* Tooltip */
+.tooltip-wrapper {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip-wrapper::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  font-size: 11.5px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 24px -4px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.tooltip-wrapper::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.04));
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.tooltip-wrapper:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-wrapper:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
 </style>

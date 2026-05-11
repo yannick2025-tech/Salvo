@@ -36,6 +36,15 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
+	alterMigrations := []string{
+		`ALTER TABLE run_records ADD COLUMN p90_latency REAL DEFAULT 0`,
+		`ALTER TABLE time_series_samples ADD COLUMN p90_latency_ms REAL DEFAULT 0`,
+		`ALTER TABLE run_records ADD COLUMN count INTEGER DEFAULT 0`,
+	}
+	for _, sql := range alterMigrations {
+		db.Exec(sql)
+	}
+
 	return ensureSchemaVersion(db)
 }
 
@@ -156,11 +165,13 @@ CREATE TABLE IF NOT EXISTS run_records (
 	worker_count    INTEGER DEFAULT 1,
 	run_mode        TEXT    DEFAULT 'count',
 	duration        REAL    DEFAULT 0,
+	count           INTEGER DEFAULT 0,
 	total_reqs      INTEGER DEFAULT 0,
 	success_reqs    INTEGER DEFAULT 0,
 	failed_reqs     INTEGER DEFAULT 0,
 	avg_latency     REAL    DEFAULT 0,
 	p50_latency     REAL    DEFAULT 0,
+	p90_latency     REAL    DEFAULT 0,
 	p95_latency     REAL    DEFAULT 0,
 	p99_latency     REAL    DEFAULT 0,
 	error_msg       TEXT    DEFAULT '',
@@ -311,6 +322,7 @@ CREATE TABLE IF NOT EXISTS time_series_samples (
 	fail_count      INTEGER    NOT NULL DEFAULT 0,
 	avg_latency_ms  REAL       NOT NULL DEFAULT 0,
 	p50_latency_ms  REAL       NOT NULL DEFAULT 0,
+	p90_latency_ms  REAL       NOT NULL DEFAULT 0,
 	p95_latency_ms  REAL       NOT NULL DEFAULT 0,
 	p99_latency_ms  REAL       NOT NULL DEFAULT 0,
 	min_latency_ms  REAL       NOT NULL DEFAULT 0,

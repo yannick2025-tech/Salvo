@@ -293,11 +293,13 @@ type RunRecordDTO struct {
 	WorkerCount int          `json:"worker_count"`
 	RunMode     string       `json:"run_mode"`
 	Duration    float64      `json:"duration"`
+	Count       int64        `json:"count"`
 	TotalReqs   int64        `json:"total_reqs"`
 	SuccessReqs int64        `json:"success_reqs"`
 	FailedReqs  int64        `json:"failed_reqs"`
 	AvgLatency  float64      `json:"avg_latency"`
 	P50Latency  float64      `json:"p50_latency"`
+	P90Latency  float64      `json:"p90_latency"`
 	P95Latency  float64      `json:"p95_latency"`
 	P99Latency  float64      `json:"p99_latency"`
 	ErrorMsg    string       `json:"error_msg"`

@@ -36,6 +36,7 @@ func (mw *multiWriter) Write(p []byte) (n int, err error) {
 var (
 	reqLogOnce sync.Once
 	reqLog     *log.Logger
+	errorCodes = []int{500, 401, 400, 502, 504, 503}
 )
 
 func initRequestLog() {
@@ -279,10 +280,16 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
-		// Add random delay between 30-2000ms for all API endpoints except health
 		if r.URL.Path != "/mock/health" {
-			delayMs := rand.Intn(1971) + 30 // 30-2000ms
+			delayMs := rand.Intn(1971) + 30
 			time.Sleep(time.Duration(delayMs) * time.Millisecond)
+		}
+
+		if r.URL.Path != "/mock/health" && rand.Float64() < 0.30 {
+			code := errorCodes[rand.Intn(len(errorCodes))]
+			writeJSON(rw, code, map[string]any{"code": code, "message": http.StatusText(code), "_injected": true})
+			reqLog.Printf("%s %s | %d | %.2fms [INJECTED]", r.Method, r.URL.Path, code, float64(time.Since(start).Microseconds())/1000)
+			return
 		}
 
 		next(rw, r)

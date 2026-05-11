@@ -19,14 +19,8 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "configs/salvo.yaml", "path to configuration file")
-	showVersion := flag.Bool("version", false, "print version and exit")
+	configPath := flag.String("config", "configs/salvo.yaml", "path to config file")
 	flag.Parse()
-
-	if *showVersion {
-		fmt.Println("Salvo v0.1.0")
-		os.Exit(0)
-	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -41,87 +35,89 @@ func main() {
 		MaxSize:    cfg.Log.MaxSize,
 		MaxBackups: cfg.Log.MaxBackups,
 		MaxAge:     cfg.Log.MaxAge,
+		Compress:   cfg.Log.Compress,
 		TimeFormat: cfg.Log.TimeFormat,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize logger: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer func() { _ = log.Sync() }()
 
 	db, err := sqlite.Open(cfg.Database.DSN, 1)
 	if err != nil {
-		log.Fatal("failed to open database", logger.F("dsn", cfg.Database.DSN), logger.F("error", err))
+		log.Error("failed to open database", logger.F("error", err))
+		os.Exit(1)
 	}
-	defer func() { _ = db.Close() }()
+	defer db.Close()
 
 	if err := migration.Migrate(db.DB); err != nil {
-		log.Fatal("failed to run migrations", logger.F("error", err))
+		log.Error("failed to run migrations", logger.F("error", err))
+		os.Exit(1)
 	}
 
-	jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, 24*time.Hour)
+	jwtMgr := auth.NewJWTManager(cfg.Auth.JWTSecret, 24*time.Hour)
+	rbacChecker := auth.NewRBACChecker(
+		sqlite.NewPermissionRepo(db),
+		sqlite.NewRolePermissionRepo(db),
+	)
 
-	users := sqlite.NewUserRepo(db)
-	roles := sqlite.NewRoleRepo(db)
-	perms := sqlite.NewPermissionRepo(db)
-	rp := sqlite.NewRolePermissionRepo(db)
-
-	rbacChecker := auth.NewRBACChecker(perms, rp)
-
-	seedCfg := auth.DefaultSeedConfig()
-	seed := auth.NewSeeders(users, roles, perms, rp, seedCfg)
-	if err := seed.Seed(context.Background()); err != nil {
-		log.Fatal("failed to seed data", logger.F("error", err))
+	seeders := auth.NewSeeders(
+		sqlite.NewUserRepo(db),
+		sqlite.NewRoleRepo(db),
+		sqlite.NewPermissionRepo(db),
+		sqlite.NewRolePermissionRepo(db),
+		auth.DefaultSeedConfig(),
+	)
+	if err := seeders.Seed(context.Background()); err != nil {
+		log.Error("failed to seed initial data", logger.F("error", err))
+		os.Exit(1)
 	}
 
 	srv := api.New(api.Config{
 		Addr:      cfg.ServerAddr(),
 		DB:        db,
 		Logger:    log,
-		JWT:       jwtManager,
+		JWT:       jwtMgr,
 		RBAC:      rbacChecker,
 		WebDir:    cfg.Server.WebDir,
 		Variables: cfg.Variables,
 	})
 
-	go func() {
-		if err := srv.Start(); err != nil {
-			log.Fatal("api server error", logger.F("error", err))
-		}
-	}()
-
 	var mockSrv *mock.MockServer
 	if cfg.Mock.Enabled {
 		mockSrv = mock.NewMockServer(cfg.Mock.Port)
-		if err := mockSrv.Start(); err != nil {
-			log.Error("mock server start error", logger.F("error", err))
-		} else {
-			log.Info("mock HTTP server started", logger.F("port", cfg.Mock.Port))
-		}
+		go func() {
+			if err := mockSrv.Start(); err != nil {
+				log.Error("mock server stopped", logger.F("error", err))
+			}
+		}()
+		log.Info("mock server started", logger.F("port", cfg.Mock.Port))
 	}
+
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Error("api server stopped", logger.F("error", err))
+		}
+	}()
 
 	log.Info("salvo started",
 		logger.F("addr", cfg.ServerAddr()),
-		logger.F("pool_workers", cfg.Pool.WorkerCount),
-		logger.F("run_mode", string(cfg.Pool.RunMode)),
+		logger.F("config", *configPath),
 	)
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 
-	sig := <-sigCh
-	log.Info("received shutdown signal", logger.F("signal", sig.String()))
+	log.Info("shutting down...")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Error("server shutdown error", logger.F("error", err))
-	}
+	srv.Shutdown(ctx)
 
 	if mockSrv != nil {
-		_ = mockSrv.Stop()
-		log.Info("mock server stopped")
+		mockSrv.Stop()
 	}
 
 	log.Info("salvo stopped")

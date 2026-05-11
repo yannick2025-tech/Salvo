@@ -21,6 +21,7 @@ type Sample struct {
 
 	AvgLatencyMs float64 `json:"avg_ms"`
 	P50LatencyMs float64 `json:"p50_ms"`
+	P90LatencyMs float64 `json:"p90_ms"`
 	P95LatencyMs float64 `json:"p95_ms"`
 	P99LatencyMs float64 `json:"p99_ms"`
 	MinLatencyMs float64 `json:"min_ms"`
@@ -223,6 +224,7 @@ func (c *TimeSeriesCollector) takeSnapshot(now time.Time) {
 			FailCount:     globalSnap.FailCount,
 			AvgLatencyMs:  globalSnap.AvgLatencyMs,
 			P50LatencyMs:  globalSnap.P50LatencyMs,
+			P90LatencyMs:  globalSnap.P90LatencyMs,
 			P95LatencyMs:  globalSnap.P95LatencyMs,
 			P99LatencyMs:  globalSnap.P99LatencyMs,
 			MinLatencyMs:  globalSnap.MinLatencyMs,
@@ -252,6 +254,7 @@ func (c *TimeSeriesCollector) takeSnapshot(now time.Time) {
 			FailCount:     snap.FailCount,
 			AvgLatencyMs:  snap.AvgLatencyMs,
 			P50LatencyMs:  snap.P50LatencyMs,
+			P90LatencyMs:  snap.P90LatencyMs,
 			P95LatencyMs:  snap.P95LatencyMs,
 			P99LatencyMs:  snap.P99LatencyMs,
 			MinLatencyMs:  snap.MinLatencyMs,

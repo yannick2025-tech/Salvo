@@ -1,661 +1,1215 @@
 <template>
   <div class="report-detail">
     <div class="page-header">
-      <button class="btn-back" @click="$router.push('/reports')">← 返回</button>
-      <h2>测试报告详情</h2>
+      <button class="btn-back" @click="$router.push('/reports')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back
+      </button>
+      <h2>Test Report</h2>
       <button class="btn-export" @click="exportHTML" :disabled="!report">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        导出HTML报告
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export HTML
       </button>
     </div>
 
-    <div v-if="report && metrics" ref="reportRef">
+    <div v-if="report && metrics">
+
+      <!-- Metrics Row: expanded with Peak QPS / Throughput / TTFB / Min -->
       <div class="metrics-row">
-        <div v-for="m in metricCards" :key="m.key" class="metric-card" :class="'card-' + m.level">
-          <div class="metric-label">{{ m.label }}</div>
-          <div class="metric-value">{{ m.value }}</div>
-          <div v-if="m.sub" class="metric-sub">{{ m.sub }}</div>
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="成功请求数占总请求数的百分比">Success Rate</div>
+          <div class="metric-value" :style="{ color: successRateColor }">{{ formatSuccessRate(metrics.success_rate) }}</div>
+          <div class="metric-sub">{{ metrics.success_reqs }} / {{ metrics.total_reqs }} requests</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间发送的 HTTP 请求总数">Total Requests</div>
+          <div class="metric-value" style="color: var(--accent-primary)">{{ Number(metrics.total_reqs || 0).toLocaleString() }}</div>
+          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(1) + 's' : '-' }} duration</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">Peak QPS</div>
+          <div class="metric-value" style="color: var(--accent-info)">{{ fmtPeakQPS }}</div>
+          <div class="metric-sub">{{ calcQPS }} avg QPS</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">Throughput</div>
+          <div class="metric-value" style="color: var(--accent-success)">{{ fmtThroughput }}</div>
+          <div class="metric-sub">{{ metrics.worker_count || '-' }} workers</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="所有请求的平均响应时间（算术平均值）">Avg Latency</div>
+          <div class="metric-value" style="color: var(--accent-info)">{{ fmtLatency3(metrics.avg_latency_s) }}</div>
+          <div class="metric-sub">P50 {{ fmtLatency3(metrics.p50_latency_s) }}</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="第90百分位延迟 - 90% 的请求在此时间内完成">P90 Latency</div>
+          <div class="metric-value" style="color: var(--accent-warning)">{{ fmtLatency3(metrics.p90_latency_s) }}</div>
+          <div class="metric-sub">P95 {{ fmtLatency3(metrics.p95_latency_s) }}</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="首字节时间 - 等待第一个响应字节的平均时间">TTFB</div>
+          <div class="metric-value" style="color: var(--accent-primary)">{{ fmtTTFB }}</div>
+          <div class="metric-sub">Min {{ fmtMinLatency }}</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label tooltip-wrapper" data-tooltip="第99百分位延迟 - 99% 的请求在此时间内完成（最坏情况）">P99 Latency</div>
+          <div class="metric-value" style="color: var(--accent-danger)">{{ fmtLatency3(metrics.p99_latency_s) }}</div>
+          <div class="metric-sub">{{ fmtErrorRate }} error rate</div>
         </div>
       </div>
 
-      <div class="charts-grid">
-        <div class="chart-card wide">
-          <h3>QPS 趋势</h3>
-          <div ref="qpsChartRef" class="chart-body"></div>
-        </div>
-        <div class="chart-card wide">
-          <h3>延迟趋势 (P50/P95/P99)</h3>
-          <div ref="latencyTrendChartRef" class="chart-body"></div>
-        </div>
+      <!-- Charts Row: Request Distribution + Error Rate Trend -->
+      <div class="charts-row">
         <div class="chart-card">
-          <h3>延迟分布</h3>
-          <div ref="latencyChartRef" class="chart-body"></div>
+          <div class="chart-header">
+            <h3>Request Distribution</h3>
+            <div class="chart-tip">Success vs Failed breakdown</div>
+          </div>
+          <div class="chart-body" ref="overviewChartRef"></div>
         </div>
+
         <div class="chart-card">
-          <h3>请求概览</h3>
-          <div ref="overviewChartRef" class="chart-body"></div>
+          <div class="chart-header">
+            <h3>Error Rate Trend</h3>
+            <div class="chart-tip">Failed / Total per interval</div>
+          </div>
+          <div class="chart-body" ref="errorRateChartRef"></div>
+          <div class="chart-type-toggle">
+            <button :class="['type-btn', { active: errorRateChartType === 'smooth' }]" @click="switchErrorRateChartType('smooth')">平滑</button>
+            <button :class="['type-btn', { active: errorRateChartType === 'step' }]" @click="switchErrorRateChartType('step')">阶梯</button>
+          </div>
         </div>
       </div>
 
-      <div v-if="nodeTimeSeries && nodeTimeSeries.length > 0" class="node-charts-section">
-        <h3 class="section-title">各节点性能趋势</h3>
-        <div v-for="(node, idx) in nodeTimeSeries" :key="node.node_id" class="chart-card wide">
-          <h4>{{ node.name || node.node_id }}</h4>
-          <div :ref="el => setNodeChartRef(idx, el as HTMLElement)" class="chart-body"></div>
+      <!-- Error Breakdown by Reason -->
+      <div class="charts-row" v-if="errorBreakdown.length > 0">
+        <div class="chart-card wide">
+          <div class="chart-header">
+            <h3>Error Breakdown</h3>
+            <div class="chart-tip">Errors grouped by HTTP status code</div>
+          </div>
+          <div class="chart-body" ref="errorBreakdownChartRef"></div>
         </div>
       </div>
 
-      <div class="info-sections">
+      <!-- Latency Percentiles Bar Chart -->
+      <div class="charts-row">
+        <div class="chart-card wide">
+          <div class="chart-header">
+            <h3>Latency Percentiles</h3>
+            <div class="chart-tip">Avg / P50 / P90 / P95 / P99 (ms)</div>
+          </div>
+          <div class="chart-body" ref="latencyChartRef"></div>
+        </div>
+      </div>
+
+      <!-- Run Info & Performance Summary -->
+      <div class="info-section">
         <div class="info-card">
-          <h3>运行信息</h3>
+          <h3>Run Configuration</h3>
           <table class="info-table">
-            <tbody>
-            <tr><td class="info-label">场景ID</td><td>{{ report.scene_id }}</td></tr>
-            <tr><td class="info-label">运行ID</td><td class="mono">{{ report.run_id }}</td></tr>
-            <tr><td class="info-label">状态</td><td><span :class="['status-badge', 'st-' + report.status]">{{ report.status.toUpperCase() }}</span></td></tr>
-            <tr><td class="info-label">运行模式</td><td>{{ metrics.run_mode || '-' }}</td></tr>
-            <tr><td class="info-label">并发数</td><td>{{ metrics.worker_count || '-' }}</td></tr>
-            <tr><td class="info-label">开始时间</td><td>{{ formatTime(report.started_at) }}</td></tr>
-            <tr><td class="info-label">结束时间</td><td>{{ formatTime(report.finished_at) }}</td></tr>
-            <tr><td class="info-label">总耗时</td><td>{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(2) + 's' : '-' }}</td></tr>
-            </tbody>
+            <tr><td class="info-label">Mode</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
+            <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">Planned Duration</td><td>{{ getPlannedDuration() }}s</td></tr>
+            <tr v-if="metrics.run_mode === 'count'"><td class="info-label">Planned Count</td><td>{{ getPlannedCount() }} times</td></tr>
+            <tr><td class="info-label">Actual {{ metrics.run_mode === 'duration' ? 'Duration' : 'Count' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(2) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' times' }}</td></tr>
+            <tr><td class="info-label">Concurrency</td><td>{{ metrics.worker_count || '-' }}</td></tr>
+            <tr><td class="info-label">Status</td><td>
+              <span :class="['status-badge', report.status]" class="tooltip-wrapper" :data-tooltip="getStatusTooltip(report.status)">{{ getStatusLabel(report.status) }}</span>
+            </td></tr>
+            <tr><td class="info-label">Time Range</td><td class="mono-sm">{{ formatTime(report.started_at) }} ~ {{ formatTime(report.finished_at) }}</td></tr>
           </table>
         </div>
 
         <div class="info-card">
-          <h3>性能指标</h3>
-          <table class="info-table">
+          <h3>Performance Summary</h3>
+          <div class="perf-list">
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有请求的平均延迟（算术平均值）">Avg</span><span class="perf-v">{{ fmtLatency3(metrics.avg_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第50百分位 - 中位数延迟，50% 的请求快于此值">P50</span><span class="perf-v">{{ fmtLatency3(metrics.p50_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第90百分位 - 90% 的请求在此时间内完成">P90</span><span class="perf-v">{{ fmtLatency3(metrics.p90_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第95百分位 - 95% 的请求在此时间内完成">P95</span><span class="perf-v">{{ fmtLatency3(metrics.p95_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第99百分位 - 99% 的请求完成（最坏情况尾部延迟）">P99</span><span class="perf-v">{{ fmtLatency3(metrics.p99_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="观察到的最小响应时间（最快请求）">Min</span><span class="perf-v">{{ fmtMinLatency }}</span></div>
+            <div class="perf-divider"></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="首字节时间 - 等待第一个响应字节的平均时间">TTFB</span><span class="perf-v">{{ fmtTTFB }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">Peak QPS</span><span class="perf-v highlight-blue">{{ fmtPeakQPS }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">Throughput</span><span class="perf-v success">{{ fmtThroughput }}</span></div>
+            <div class="perf-divider"></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="成功的 HTTP 请求总数（2xx/3xx 状态码）">Success</span><span class="perf-v success">{{ Number(metrics.success_reqs || 0).toLocaleString() }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="失败的请求总数（4xx/5xx/错误/超时）">Failed</span><span class="perf-v danger">{{ Number(metrics.failed_reqs || 0).toLocaleString() }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trend Charts Section -->
+      <section class="charts-section">
+        <div class="charts-toolbar">
+          <h3>Trend Analysis</h3>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>QPS Trend</h3>
+            </div>
+            <div class="chart-body" ref="qpsChartRef"></div>
+            <div class="chart-type-toggle">
+              <button :class="['type-btn', { active: qpsChartType === 'smooth' }]" @click="switchQpsChartType('smooth')">平滑</button>
+              <button :class="['type-btn', { active: qpsChartType === 'step' }]" @click="switchQpsChartType('step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Latency Trend</h3>
+              <div class="chart-tip">P50 / P90 / P95 / P99</div>
+            </div>
+            <div class="chart-body" ref="latencyTrendChartRef"></div>
+            <div class="chart-type-toggle">
+              <button :class="['type-btn', { active: latTrendChartType === 'smooth' }]" @click="switchLatTrendChartType('smooth')">平滑</button>
+              <button :class="['type-btn', { active: latTrendChartType === 'step' }]" @click="switchLatTrendChartType('step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Node Ranking Table -->
+      <section v-if="nodeTimeSeries && nodeTimeSeries.length > 0" class="nodes-section">
+        <h3>Node Ranking</h3>
+        <div class="ranking-table-wrap">
+          <table class="ranking-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Node</th>
+                <th>Total Reqs</th>
+                <th>Success</th>
+                <th>Failed</th>
+                <th>Success Rate</th>
+                <th>P50</th>
+                <th>P90</th>
+                <th>P95</th>
+                <th>Avg QPS</th>
+                <th>Peak QPS</th>
+              </tr>
+            </thead>
             <tbody>
-            <tr><td class="info-label">总请求数</td><td class="bold">{{ metrics.total_reqs ?? '-' }}</td></tr>
-            <tr><td class="info-label">成功请求</td><td class="text-success">{{ metrics.success_reqs ?? '-' }}</td></tr>
-            <tr><td class="info-label">失败请求</td><td class="text-danger">{{ metrics.failed_reqs ?? '-' }}</td></tr>
-            <tr><td class="info-label">成功率</td><td class="bold">{{ metrics.success_rate ?? '-' }}</td></tr>
-            <tr><td class="info-label">平均延迟</td><td>{{ fmtLatency(metrics.avg_latency_s) }}</td></tr>
-            <tr><td class="info-label">P50 延迟</td><td>{{ fmtLatency(metrics.p50_latency_s) }}</td></tr>
-            <tr><td class="info-label">P95 延迟</td><td>{{ fmtLatency(metrics.p95_latency_s) }}</td></tr>
-            <tr><td class="info-label">P99 延迟</td><td>{{ fmtLatency(metrics.p99_latency_s) }}</td></tr>
+              <tr v-for="(node, idx) in rankedNodes" :key="node.node_id">
+                <td class="rank-cell">{{ idx + 1 }}</td>
+                <td class="node-name-cell">{{ node.name || node.node_id }}</td>
+                <td>{{ Number(node.summary?.total_requests || 0).toLocaleString() }}</td>
+                <td class="success-text">{{ Number(node.summary?.success_count || 0).toLocaleString() }}</td>
+                <td class="danger-text">{{ Number(node.summary?.fail_count || 0).toLocaleString() }}</td>
+                <td>{{ fmtPercent(node.summary?.success_rate) }}</td>
+                <td>{{ fmtLatencyMs(node.summary?.p50_latency_ms) }}</td>
+                <td>{{ fmtLatencyMs(node.summary?.p90_latency_ms) }}</td>
+                <td>{{ fmtLatencyMs(node.summary?.p95_latency_ms) }}</td>
+                <td>{{ (node.summary?.avg_qps || 0).toFixed(1) }}</td>
+                <td>{{ (node.summary?.peak_qps || 0).toFixed(1) }}</td>
+              </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
+
+      <!-- Node Details with charts -->
+      <section v-if="nodeTimeSeries && nodeTimeSeries.length > 0" class="nodes-section">
+        <h3>Node Details</h3>
+        <div v-for="(node, idx) in nodeTimeSeries" :key="node.node_id" class="chart-card">
+          <div class="chart-header">
+            <h3>{{ node.name || node.node_id }}</h3>
+            <div class="node-badges" v-if="node.summary">
+              <span class="node-badge">QPS {{ (node.summary.avg_qps || 0).toFixed(1) }}</span>
+              <span class="node-badge">P50 {{ fmtLatencyMs(node.summary.p50_latency_ms) }}</span>
+              <span class="node-badge">P90 {{ fmtLatencyMs(node.summary.p90_latency_ms) }}</span>
+              <span class="node-badge">P95 {{ fmtLatencyMs(node.summary.p95_latency_ms) }}</span>
+              <span class="node-badge">TTFB {{ fmtLatencyMs(node.summary.ttfb_ms) }}</span>
+            </div>
+          </div>
+          <div :ref="el => setNodeChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body"></div>
+          <div class="chart-type-toggle">
+            <button :class="['type-btn', { active: nodeChartType === 'smooth' }]" @click.stop="switchNodeChartType('smooth')">平滑</button>
+            <button :class="['type-btn', { active: nodeChartType === 'step' }]" @click.stop="switchNodeChartType('step')">阶梯</button>
+          </div>
+        </div>
+      </section>
     </div>
-    <div v-else-if="!report" class="empty">加载中...</div>
+
+    <div v-else-if="!report" class="empty-state">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getReport } from '@/api/report'
-// import { exportReportHTML } from '@/api/report'
 import type { ReportDTO } from '@/types'
 import * as echarts from 'echarts'
 
 const route = useRoute()
 const report = ref<ReportDTO | null>(null)
 const metrics = ref<Record<string, any> | null>(null)
-const reportRef = ref<HTMLElement>()
-const latencyChartRef = ref<HTMLElement>()
-const overviewChartRef = ref<HTMLElement>()
 const qpsChartRef = ref<HTMLElement>()
 const latencyTrendChartRef = ref<HTMLElement>()
-let latChart: echarts.ECharts | null = null
-let ovChart: echarts.ECharts | null = null
+const latencyChartRef = ref<HTMLElement>()
+const overviewChartRef = ref<HTMLElement>()
+const errorRateChartRef = ref<HTMLElement>()
+const errorBreakdownChartRef = ref<HTMLElement>()
+
 let qpsChart: echarts.ECharts | null = null
 let latTrendChart: echarts.ECharts | null = null
+let latChart: echarts.ECharts | null = null
+let ovChart: echarts.ECharts | null = null
+let errRateChart: echarts.ECharts | null = null
+let errBreakdownChart: echarts.ECharts | null = null
 
 interface NodeTimeSeries {
   node_id: string
   name?: string
+  summary?: any
   timestamps?: string[]
   ts_qps?: number[]
   ts_p50?: number[]
+  ts_p90?: number[]
   ts_p95?: number[]
   ts_p99?: number[]
+}
+
+interface ErrorItem {
+  error_type?: string
+  code?: string
+  status?: string
+  message?: string
+  msg?: string
+  count?: number
 }
 
 const nodeTimeSeries = ref<NodeTimeSeries[]>([])
 const nodeChartRefs = new Map<number, HTMLElement>()
 const nodeCharts = new Map<number, echarts.ECharts>()
+const errorRateChartType = ref<'smooth' | 'step'>('smooth')
+const qpsChartType = ref<'smooth' | 'step'>('smooth')
+const latTrendChartType = ref<'smooth' | 'step'>('smooth')
+const nodeChartType = ref<'smooth' | 'step'>('smooth')
 
 function setNodeChartRef(idx: number, el: HTMLElement | null) {
-  if (el) {
-    nodeChartRefs.set(idx, el)
-  }
+  if (el) nodeChartRefs.set(idx, el)
 }
 
 function parseMetrics(r: ReportDTO): Record<string, any> {
   try {
     let result: Record<string, any> = {}
-    
     if (r.summary) {
       const summaryData = typeof r.summary === 'string' ? JSON.parse(r.summary) : r.summary
       result = { ...result, ...summaryData }
-      console.log('📊 Parsed summary:', Object.keys(summaryData))
     }
-    
     if (r.detail) {
       const detailData = typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail
-      console.log('📊 Parsed detail keys:', Object.keys(detailData))
-      console.log('📊 Detail structure:', {
-        hasMetadata: !!detailData.metadata,
-        hasGlobalSummary: !!detailData.global_summary,
-        hasGlobalTimeSeries: !!detailData.global_time_series,
-        globalTimeSeriesType: typeof detailData.global_time_series,
-        globalTimeSeriesIsArray: Array.isArray(detailData.global_time_series),
-        globalTimeSeriesLength: Array.isArray(detailData.global_time_series) ? detailData.global_time_series.length : 'N/A',
-        hasNodeMetrics: !!detailData.node_metrics,
-        nodeMetricsType: typeof detailData.node_metrics,
-        nodeMetricsIsArray: Array.isArray(detailData.node_metrics),
-        nodeMetricsLength: Array.isArray(detailData.node_metrics) ? detailData.node_metrics.length : 'N/A',
-      })
-      
-      if (detailData.global_summary) {
-        result = { ...result, ...detailData.global_summary }
-        console.log('✅ Merged global_summary:', Object.keys(detailData.global_summary))
-      }
-      
+      if (detailData.global_summary) result = { ...result, ...detailData.global_summary }
       if (detailData.global_time_series && Array.isArray(detailData.global_time_series)) {
         result.global_time_series = detailData.global_time_series
-        console.log('✅ Found global_time_series with', detailData.global_time_series.length, 'samples')
-        if (detailData.global_time_series.length > 0) {
-          console.log('📈 First sample:', JSON.stringify(detailData.global_time_series[0]))
-          console.log('📈 Last sample:', JSON.stringify(detailData.global_time_series[detailData.global_time_series.length - 1]))
-        }
-      } else {
-        console.warn('⚠️ No global_time_series found or not array')
-        console.warn('   detailData.global_time_series value:', detailData.global_time_series)
-        console.warn('   All available keys in detailData:', Object.keys(detailData))
-        
-        // 尝试查找可能的时序数据字段
-        const timeSeriesKeys = Object.keys(detailData).filter(k => 
-          k.toLowerCase().includes('time') || 
-          k.toLowerCase().includes('series') || 
-          k.toLowerCase().includes('sample') ||
-          k.toLowerCase().includes('qps') ||
-          k.toLowerCase().includes('latency')
-        )
-        if (timeSeriesKeys.length > 0) {
-          console.warn('   Possible time series keys found:', timeSeriesKeys)
-          timeSeriesKeys.forEach(k => {
-            console.warn(`   ${k}:`, typeof detailData[k], Array.isArray(detailData[k]) ? `array[${detailData[k].length}]` : detailData[k])
-          })
-        }
+        const ts = detailData.global_time_series as any[]
+        result.timestamps = ts.map(s => s.t || s.Timestamp)
+        result.ts_qps = ts.map(s => s.qps || s.QPS || 0)
+        result.ts_total = ts.map(s => s.total || s.TotalRequests || 0)
+        result.ts_success = ts.map(s => s.success || s.SuccessCount || 0)
+        result.ts_fail = ts.map(s => s.fail || s.FailCount || 0)
+        result.ts_p50 = ts.map(s => s.p50_ms || s.P50LatencyMs || 0)
+        result.ts_p90 = ts.map(s => s.p90_ms || s.P90LatencyMs || 0)
+        result.ts_p95 = ts.map(s => s.p95_ms || s.P95LatencyMs || 0)
+        result.ts_p99 = ts.map(s => s.p99_ms || s.P99LatencyMs || 0)
       }
-      
+      if (detailData.error_summary && Array.isArray(detailData.error_summary)) {
+        result.error_breakdown = detailData.error_summary
+      }
       if (detailData.node_metrics && Array.isArray(detailData.node_metrics)) {
-        result.node_metrics = detailData.node_metrics
-        console.log('✅ Found node_metrics with', detailData.node_metrics.length, 'nodes')
+        result.node_metrics = detailData.node_metrics.map((node: any) => ({
+          node_id: node.node_id,
+          name: node.node_name || node.node_id,
+          summary: node.summary,
+          time_series: node.time_series,
+          timestamps: (node.time_series || []).map((s: any) => s.t || s.Timestamp || ''),
+          ts_qps: (node.time_series || []).map((s: any) => s.qps || s.QPS || 0),
+          ts_total: (node.time_series || []).map((s: any) => s.total || s.TotalRequests || 0),
+          ts_success: (node.time_series || []).map((s: any) => s.success || s.SuccessCount || 0),
+          ts_fail: (node.time_series || []).map((s: any) => s.fail || s.FailCount || 0),
+          ts_p50: (node.time_series || []).map((s: any) => s.p50_ms || s.P50LatencyMs || 0),
+          ts_p90: (node.time_series || []).map((s: any) => s.p90_ms || s.P90LatencyMs || 0),
+          ts_p95: (node.time_series || []).map((s: any) => s.p95_ms || s.P95LatencyMs || 0),
+          ts_p99: (node.time_series || []).map((s: any) => s.p99_ms || s.P99LatencyMs || 0),
+        }))
       }
-      
-      if (detailData.metadata) {
-        result = { ...result, ...detailData.metadata }
-        console.log('✅ Merged metadata:', Object.keys(detailData.metadata))
-      }
+      if (detailData.metadata) result = { ...result, ...detailData.metadata }
     }
-    
     return result
   } catch (e) {
-    console.error('❌ Parse metrics error:', e)
+    console.error('Parse metrics error:', e)
     return {}
   }
 }
 
-const metricCards = computed(() => {
+const calcQPS = computed(() => {
   const m = metrics.value
-  if (!m) return []
-  const totalReqs = Number(m.total_reqs || 0)
-  
-  let successRate: number
-  if (typeof m.success_rate === 'string') {
-    successRate = parseFloat(m.success_rate.replace('%', '') || '0')
-  } else if (typeof m.success_rate === 'number') {
-    successRate = m.success_rate * 100  // 转换为百分比
-  } else {
-    successRate = 0
-  }
-  
-  const p99ms = parseFloat(m.p99 || '0')
-  
-  const successRateDisplay = typeof m.success_rate === 'string' 
-    ? m.success_rate 
-    : `${(successRate).toFixed(1)}%`
-    
-  return [
-    { key: 'total', label: '总请求数', value: totalReqs.toLocaleString(), sub: '', level: 'primary' },
-    { key: 'success', label: '成功率', value: successRateDisplay, sub: `${m.success_reqs}/${totalReqs}`, level: successRate >= 99 ? 'success' : successRate >= 90 ? 'warn' : 'danger' },
-    { key: 'p50', label: 'P50 延迟', value: m.p50 || '-', sub: `P95: ${m.p95 || '-'} / P99: ${m.p99 || '-'}`, level: p99ms < 500 ? 'ok' : p99ms < 1000 ? 'warn' : 'danger' },
-    { key: 'duration', label: '总耗时', value: m.duration_s ? Number(m.duration_s).toFixed(1) + 's' : '-', sub: m.worker_count ? `${m.worker_count} 并发` : '', level: 'info' },
-  ]
+  if (!m) return '-'
+  const dur = Number(m.duration_s || 0)
+  const total = Number(m.total_reqs || 0)
+  if (dur <= 0 || total <= 0) return '-'
+  return (total / dur).toFixed(1)
+})
+
+const fmtPeakQPS = computed(() => {
+  const m = metrics.value
+  if (!m) return '-'
+  const peak = Number(m.peak_qps || 0)
+  if (peak <= 0) return '-'
+  return peak.toFixed(1)
+})
+
+const fmtThroughput = computed(() => {
+  const m = metrics.value
+  if (!m) return '-'
+  const tp = Number(m.throughput || 0)
+  if (tp <= 0) return '-'
+  return tp.toFixed(1) + '/s'
+})
+
+const fmtTTFB = computed(() => {
+  const m = metrics.value
+  if (!m) return '-'
+  const ttfb = Number(m.ttfb_ms || m.min_latency_ms || 0)
+  if (ttfb <= 0) return '-'
+  if (ttfb >= 1000) return (ttfb / 1000).toFixed(3) + 's'
+  return ttfb.toFixed(3) + 'ms'
+})
+
+const fmtMinLatency = computed(() => {
+  const m = metrics.value
+  if (!m) return '-'
+  const min = Number(m.min_latency_ms || 0)
+  if (min <= 0) return '-'
+  if (min >= 1000) return (min / 1000).toFixed(3) + 's'
+  return min.toFixed(3) + 'ms'
+})
+
+const fmtErrorRate = computed(() => {
+  const m = metrics.value
+  if (!m) return '-'
+  const total = Number(m.total_reqs || 0)
+  const fail = Number(m.failed_reqs || 0)
+  if (total <= 0) return '0%'
+  return ((fail / total) * 100).toFixed(2) + '%'
+})
+
+const successRateColor = computed(() => {
+  const m = metrics.value
+  if (!m) return 'var(--accent-success)'
+  const total = Number(m.total_reqs || 0)
+  const succ = Number(m.success_reqs || 0)
+  if (total <= 0) return 'var(--accent-success)'
+  const rate = (succ / total) * 100
+  if (rate >= 99) return 'var(--accent-success)'
+  if (rate >= 95) return 'var(--accent-success)'
+  if (rate >= 80) return 'var(--accent-warning)'
+  return 'var(--accent-danger)'
+})
+
+const rankedNodes = computed(() => {
+  const nodes = [...(nodeTimeSeries.value || [])]
+  nodes.sort((a, b) => {
+    const aRate = Number(a.summary?.success_rate || 0)
+    const bRate = Number(b.summary?.success_rate || 0)
+    if (aRate !== bRate) return bRate - aRate
+    const aP95 = Number(a.summary?.p95_latency_ms || 0)
+    const bP95 = Number(b.summary?.p95_latency_ms || 0)
+    return aP95 - bP95
+  })
+  return nodes
+})
+
+const errorBreakdown = computed((): ErrorItem[] => {
+  const m = metrics.value
+  if (!m?.error_breakdown) return []
+  return m.error_breakdown as ErrorItem[]
 })
 
 async function fetchReport() {
   const id = route.params.id as string
   if (!id) return
   try {
-    console.log('📊 Fetching report:', id)
     const resp = await getReport(id)
     if (resp.code === 0) {
       report.value = resp.data
-      console.log('📋 Report data received:', {
-        scene_id: resp.data.scene_id,
-        run_id: resp.data.run_id,
-        hasSummary: !!resp.data.summary,
-        hasDetail: !!resp.data.detail,
-        summaryLength: resp.data.summary?.length || 0,
-        detailLength: resp.data.detail?.length || 0
-      })
-      
-      const parsed = parseMetrics(resp.data)
-      
-      console.log('🔍 Parsed metrics keys:', Object.keys(parsed))
-      console.log('🔍 Global time series:', parsed.global_time_series, 'type:', typeof parsed.global_time_series, 'isArray:', Array.isArray(parsed.global_time_series))
-      
-      if (parsed.global_time_series && Array.isArray(parsed.global_time_series)) {
-        const ts = parsed.global_time_series as any[]
-        console.log('✅ Time series found! Length:', ts.length)
-        if (ts.length > 0) {
-          console.log('📈 First sample:', JSON.stringify(ts[0]))
-          console.log('📈 Last sample:', JSON.stringify(ts[ts.length - 1]))
-        }
-        
-        parsed.timestamps = ts.map(s => s.t || s.Timestamp)
-        parsed.ts_qps = ts.map(s => s.qps || s.QPS || 0)
-        parsed.ts_p50 = ts.map(s => s.p50_ms || s.P50LatencyMs || 0)
-        parsed.ts_p95 = ts.map(s => s.p95_ms || s.P95LatencyMs || 0)
-        parsed.ts_p99 = ts.map(s => s.p99_ms || s.P99LatencyMs || 0)
-        
-        console.log('🎯 Converted time series:')
-        console.log('   - timestamps count:', parsed.timestamps?.length)
-        console.log('   - ts_qps count:', parsed.ts_qps?.length)
-        console.log('   - ts_p50 count:', parsed.ts_p50?.length)
-      } else {
-        console.warn('⚠️ No global_time_series found or not array')
-        console.warn('   Available keys:', Object.keys(parsed).filter(k => k.includes('time') || k.includes('series')))
-      }
-      
-      metrics.value = parsed
-      
-      const m = metrics.value || {}
-      nodeTimeSeries.value = (m.node_metrics as NodeTimeSeries[]) || []
-      console.log('📦 Node time series count:', nodeTimeSeries.value.length)
-      
+      metrics.value = parseMetrics(resp.data)
+      nodeTimeSeries.value = (metrics.value?.node_metrics as NodeTimeSeries[]) || []
       await nextTick()
-      renderCharts()
+      renderAll()
     }
-  } catch (e) { 
-    console.error('❌ Fetch report error:', e)
-  }
+  } catch (e) { console.error('Fetch report error:', e) }
 }
 
-function getTheme() {
-  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+function isDark(): boolean {
+  return document.documentElement.getAttribute('data-theme') !== 'light'
+}
+
+function themeColors() {
+  const dark = isDark()
   return {
-    textColor: '#8b949e',
-    lineColor: '#30363d',
-    bgColor: 'transparent',
-    gridColor: isDark ? '#21262d' : '#f6f8fa',
-    colors: ['#58a6ff', '#3fb950', '#d29922', '#f85149'],
+    textColor: dark ? '#c9d1d9' : '#656d76',
+    lineColor: dark ? '#30363d' : '#dde2e8',
+    gridColor: dark ? '#21262d' : '#f6f8fa',
+    bg: 'transparent',
+    gridLineDash: dark ? [4, 3] : [4, 3],
+    colors: [
+      dark ? '#58a6ff' : '#0969da',
+      dark ? '#3fb950' : '#1a7f37',
+      dark ? '#d29922' : '#9a6700',
+      dark ? '#f85149' : '#cf222e',
+      dark ? '#bc8cff' : '#8250df',
+    ],
+    latencyColors: [
+      dark ? '#89d0ff' : '#0969da',
+      dark ? '#3fb950' : '#1a7f37',
+      dark ? '#d29922' : '#9a6700',
+      dark ? '#f85149' : '#cf222e',
+    ],
   }
 }
 
-function renderCharts() {
+function renderAll() {
   if (!latencyChartRef.value || !overviewChartRef.value) return
-  const t = getTheme()
+  const tc = themeColors()
   const m = metrics.value || {}
 
-  if (latChart) latChart.dispose()
-  latChart = echarts.init(latencyChartRef.value)
-  latChart.setOption({
-    backgroundColor: t.bgColor,
-    color: t.colors,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: 40, right: 16, top: 16, bottom: 30 },
-    xAxis: { type: 'category', data: ['Avg', 'P50', 'P95', 'P99'], axisLabel: { color: t.textColor, fontSize: 11 }, axisLine: { lineStyle: { color: t.lineColor } } },
-    yAxis: { type: 'value', name: 'ms', axisLabel: { color: t.textColor, fontSize: 11 }, splitLine: { lineStyle: { color: t.gridColor } } },
-    series: [{
-      type: 'bar',
-      barWidth: '45%',
-      data: [
-        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: { color: t.colors[0] } },
-        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: { color: t.colors[1] } },
-        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: { color: t.colors[2] } },
-        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: { color: t.colors[3] } },
-      ],
-      label: { show: true, position: 'top', formatter: '{c}ms', color: t.textColor, fontSize: 10 },
-    }],
-  })
-
+  // Request distribution donut chart
   if (ovChart) ovChart.dispose()
   ovChart = echarts.init(overviewChartRef.value)
-  const total = Number(m.total_reqs || 0)
-  const succ = Number(m.success_reqs || 0)
-  const fail = Number(m.failed_reqs || 0)
   ovChart.setOption({
-    backgroundColor: t.bgColor,
-    color: [t.colors[1], t.colors[3]],
+    backgroundColor: tc.bg,
+    color: [tc.colors[1], tc.colors[3]],
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: 16, top: 'center', textStyle: { color: t.textColor, fontSize: 12 } },
+    legend: { orient: 'vertical', right: 16, top: 'center', textStyle: { color: tc.textColor, fontSize: 12 } },
     series: [{
       type: 'pie',
-      radius: ['42%', '68%'],
+      radius: ['45%', '70%'],
       center: ['38%', '50%'],
       avoidLabelOverlap: false,
       label: { show: false },
       emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
       data: [
-        { value: succ, name: '成功' },
-        { value: fail, name: '失败' },
+        { value: Number(m.success_reqs || 0), name: 'Success' },
+        { value: Number(m.failed_reqs || 0), name: 'Failed' },
       ],
     }],
   })
 
-  renderQPSTrend(t, m)
-  renderLatencyTrend(t, m)
-  renderNodeCharts(t)
-  
-  console.log('✅ All charts rendered successfully')
+  // Error rate trend chart
+  if (errorRateChartRef.value) {
+    if (errRateChart) errRateChart.dispose()
+    errRateChart = echarts.init(errorRateChartRef.value)
+
+    const timestamps = m.timestamps as string[] | undefined
+    const totals = (m.ts_total as number[]|undefined)||[]
+    const fails = (m.ts_fail as number[]|undefined)||[]
+
+    const errRates: number[] = []
+    for (let i = 0; i < totals.length; i++) {
+      errRates.push(totals[i] > 0 ? (fails[i] / totals[i]) * 100 : 0)
+    }
+
+    if (timestamps?.length && errRates.length) {
+      const timeLabels = timestamps.map(ts => formatTimeShort(ts))
+      const maxErrRate = Math.max(...errRates, 0.01)
+      const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100)
+      errRateChart.setOption({
+        backgroundColor: tc.bg,
+        tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params
+          const idx = p[0]?.dataIndex ?? 0
+          return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+        }},
+        grid: { left: 50, right: 16, top: 20, bottom: 44 },
+        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(248,81,73,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+        xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+        yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+        markLine: {
+          silent: true,
+          data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.colors[3], fontSize: 9 }, lineStyle: { color: tc.colors[3], type: 'dashed', width: 1 } }],
+          symbol: 'none',
+        },
+        series: [{
+          name: 'Error Rate',
+          type: 'line',
+          smooth: errorRateChartType.value === 'smooth',
+          step: errorRateChartType.value === 'step' ? 'middle' as const : undefined,
+          data: errRates,
+          lineStyle: { width: 2, color: tc.colors[3] },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(248,81,73,0.18)' },
+            { offset: 1, color: 'rgba(248,81,73,0.01)' }
+          ])},
+          symbol: 'none',
+        }]
+      })
+    }
+  }
+
+  // Latency percentile bar chart (with P90)
+  if (latChart) latChart.dispose()
+  latChart = echarts.init(latencyChartRef.value)
+  latChart.setOption({
+    backgroundColor: tc.bg,
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+      const p = Array.isArray(params) ? params[0] : params
+      return `${p.name}: <strong>${Number(p.value).toFixed(1)}</strong>ms`
+    }},
+    grid: { left: 40, right: 16, top: 14, bottom: 28 },
+    xAxis: { type: 'category', data: ['Avg', 'P50', 'P90', 'P95', 'P99'], axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 11 } },
+    yAxis: { type: 'value', name: 'ms', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+    series: [{
+      type: 'bar',
+      barWidth: '42%',
+      data: [
+        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: { color: tc.colors[0] } },
+        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: { color: tc.colors[1] } },
+        { value: parseFloat(m.p90_latency_s || '0') * 1000, itemStyle: { color: tc.colors[2] } },
+        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: { color: tc.colors[3] } },
+        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: { color: tc.colors[4] } },
+      ],
+      label: { show: true, position: 'top', formatter: (p: any) => p.value.toFixed(1) + 'ms', color: tc.textColor, fontSize: 10 },
+      itemStyle: { borderRadius: [4, 4, 0, 0] },
+    }],
+  })
+
+  renderQPSTrend(tc, m)
+  renderLatencyTrend(tc, m)
+  renderNodeCharts(tc)
+  renderErrorBreakdownChart(tc)
 }
 
-function renderQPSTrend(t: any, m: any) {
-  console.log('🎨 Rendering QPS trend chart...')
-  if (!qpsChartRef.value) {
-    console.warn('⚠️ qpsChartRef not found')
-    return
-  }
+function switchErrorRateChartType(type: 'smooth' | 'step') {
+  errorRateChartType.value = type
+  renderAll()
+}
+
+function switchQpsChartType(type: 'smooth' | 'step') {
+  qpsChartType.value = type
+  const m = metrics.value
+  if (m) renderQPSTrend(themeColors(), m)
+}
+
+function switchLatTrendChartType(type: 'smooth' | 'step') {
+  latTrendChartType.value = type
+  const m = metrics.value
+  if (m) renderLatencyTrend(themeColors(), m)
+}
+
+function switchNodeChartType(type: 'smooth' | 'step') {
+  nodeChartType.value = type
+  renderNodeCharts(themeColors())
+}
+
+function renderQPSTrend(tc: any, m: any) {
+  if (!qpsChartRef.value) return
   if (qpsChart) qpsChart.dispose()
   qpsChart = echarts.init(qpsChartRef.value)
 
   const timestamps = m.timestamps as string[] | undefined
   const qpsData = (m.ts_qps as number[] | undefined) || []
 
-  console.log('📊 QPS data check:', {
-    timestampsLength: timestamps?.length || 0,
-    qpsDataLength: qpsData.length,
-    hasTimestamps: !!timestamps,
-    timestampsSample: timestamps?.slice(0, 3),
-    qpsSample: qpsData.slice(0, 3)
-  })
-
-  if (!timestamps || timestamps.length === 0 || qpsData.length === 0) {
-    console.warn('⚠️ No QPS time series data - showing empty message')
-    qpsChart.setOption({
-      title: { text: '暂无QPS时间序列数据', left: 'center', top: 'center', textStyle: { color: t.textColor, fontSize: 14 } }
-    })
+  if (!timestamps?.length || !qpsData.length) {
+    qpsChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
     return
   }
 
   const timeLabels = timestamps.map(ts => formatTimeShort(ts))
-  console.log('📈 QPS chart rendering with', timeLabels.length, 'data points')
 
   qpsChart.setOption({
-    backgroundColor: t.bgColor,
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['QPS'], top: 8, textStyle: { color: t.textColor } },
-    grid: { left: 50, right: 20, top: 40, bottom: 30 },
-    xAxis: { 
-      type: 'category', 
-      data: timeLabels, 
-      axisLabel: { color: t.textColor, fontSize: 10, rotate: 30 },
-      axisLine: { lineStyle: { color: t.lineColor } }
-    },
-    yAxis: { 
-      type: 'value', 
-      name: 'req/s',
-      axisLabel: { color: t.textColor, fontSize: 11 }, 
-      splitLine: { lineStyle: { color: t.gridColor } } 
-    },
+    backgroundColor: tc.bg,
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+      const p = Array.isArray(params) ? params[0] : params
+      const idx = p[0]?.dataIndex ?? 0
+      return `<strong>${timeLabels[idx]}</strong><br/>QPS: <strong>${Number(p[0]?.value || 0).toFixed(2)}</strong>`
+    }},
+    grid: { left: 50, right: 16, top: 16, bottom: 44 },
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.12)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+    xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+    yAxis: { type: 'value', name: 'req/s', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10 }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
     series: [{
       name: 'QPS',
       type: 'line',
-      smooth: true,
+      smooth: qpsChartType.value === 'smooth',
+      step: qpsChartType.value === 'step' ? 'middle' as const : undefined,
       data: qpsData,
-      lineStyle: { width: 2, color: '#58a6ff' },
+      lineStyle: { width: 2, color: tc.colors[0] },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: 'rgba(88,166,255,0.3)' },
-        { offset: 1, color: 'rgba(88,166,255,0.02)' }
+        { offset: 0, color: 'rgba(88,166,255,0.15)' },
+        { offset: 1, color: 'rgba(88,166,255,0.01)' }
       ])},
       symbol: 'none',
     }]
   })
 }
 
-function renderLatencyTrend(t: any, m: any) {
+function renderLatencyTrend(tc: any, m: any) {
   if (!latencyTrendChartRef.value) return
   if (latTrendChart) latTrendChart.dispose()
   latTrendChart = echarts.init(latencyTrendChartRef.value)
 
   const timestamps = m.timestamps as string[] | undefined
-  const p50Data = (m.ts_p50 as number[] | undefined) || []
-  const p95Data = (m.ts_p95 as number[] | undefined) || []
-  const p99Data = (m.ts_p99 as number[] | undefined) || []
+  const p50 = (m.ts_p50 as number[]|undefined)||[]
+  const p90 = (m.ts_p90 as number[]|undefined)||[]
+  const p95 = (m.ts_p95 as number[]|undefined)||[]
+  const p99 = (m.ts_p99 as number[]|undefined)||[]
 
-  if (!timestamps || timestamps.length === 0) {
-    latTrendChart.setOption({
-      title: { text: '暂无延迟时间序列数据', left: 'center', top: 'center', textStyle: { color: t.textColor, fontSize: 14 } }
-    })
+  if (!timestamps?.length) {
+    latTrendChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
     return
   }
 
   const timeLabels = timestamps.map(ts => formatTimeShort(ts))
+  const lc = tc.latencyColors
 
   latTrendChart.setOption({
-    backgroundColor: t.bgColor,
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['P50', 'P95', 'P99'], top: 8, textStyle: { color: t.textColor } },
-    grid: { left: 50, right: 20, top: 40, bottom: 30 },
-    xAxis: { 
-      type: 'category', 
-      data: timeLabels, 
-      axisLabel: { color: t.textColor, fontSize: 10, rotate: 30 },
-      axisLine: { lineStyle: { color: t.lineColor } }
-    },
-    yAxis: { 
-      type: 'value', 
-      name: 'ms',
-      axisLabel: { color: t.textColor, fontSize: 11 }, 
-      splitLine: { lineStyle: { color: t.gridColor } } 
-    },
+    backgroundColor: tc.bg,
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+      if (!Array.isArray(params)) return ''
+      const i = params[0]?.dataIndex ?? 0
+      let h = `<strong>${timeLabels[i]}</strong><br/>`
+      params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(1)}</strong>ms<br/>` })
+      return h
+    }},
+    legend: { data: ['P50','P90','P95','P99'], top: 2, textStyle: { color: tc.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3, itemGap: 16 },
+    grid: { left: 52, right: 16, top: 28, bottom: 44 },
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.08)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+    xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+    yAxis: { type: 'value', name: 'ms', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
     series: [
-      {
-        name: 'P50',
-        type: 'line',
-        smooth: true,
-        data: p50Data.map(v => v * 1000),
-        lineStyle: { width: 2, color: '#3fb950' },
-        symbol: 'none',
-      },
-      {
-        name: 'P95',
-        type: 'line',
-        smooth: true,
-        data: p95Data.map(v => v * 1000),
-        lineStyle: { width: 2, color: '#d29922' },
-        symbol: 'none',
-      },
-      {
-        name: 'P99',
-        type: 'line',
-        smooth: true,
-        data: p99Data.map(v => v * 1000),
-        lineStyle: { width: 2, color: '#f85149' },
-        symbol: 'none',
-      },
+      { name:'P50', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p50, lineStyle:{width:2,color:lc[0]}, symbol:'none' },
+      { name:'P90', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p90, lineStyle:{width:2,color:lc[1]}, symbol:'none' },
+      { name:'P95', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p95, lineStyle:{width:2,color:lc[2]}, symbol:'none' },
+      { name:'P99', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p99, lineStyle:{width:2,color:lc[3]}, symbol:'none' },
     ]
   })
 }
 
-function renderNodeCharts(t: any) {
+function renderNodeCharts(tc: any) {
   nodeTimeSeries.value.forEach((node, idx) => {
     const el = nodeChartRefs.get(idx)
     if (!el) return
-
     const chart = echarts.init(el)
     nodeCharts.set(idx, chart)
 
     const timestamps = node.timestamps || []
     const timeLabels = timestamps.map((ts: string) => formatTimeShort(ts))
-    
-    const qpsData = node.ts_qps || []
-    const p95Data = (node.ts_p95 || []).map((v: number) => v * 1000)
 
+    if (!timeLabels.length) {
+      chart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+      return
+    }
+
+    const lc = tc.latencyColors
     chart.setOption({
-      backgroundColor: t.bgColor,
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['QPS', 'P95'], top: 4, textStyle: { color: t.textColor, fontSize: 11 } },
-      grid: { left: 55, right: 20, top: 35, bottom: 25 },
-      xAxis: {
-        type: 'category',
-        data: timeLabels,
-        axisLabel: { color: t.textColor, fontSize: 9, rotate: 20 },
-        axisLine: { lineStyle: { color: t.lineColor } }
-      },
+      backgroundColor: tc.bg,
+      tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+        if (!Array.isArray(params)) return ''
+        const i = params[0]?.dataIndex ?? 0
+        let h = `<strong>${timeLabels[i]}</strong><br/>`
+        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(2) : Number(item.value).toFixed(1)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
+        return h
+      }},
+      legend: { data: ['QPS','P50','P90','P95','P99'], top: 2, textStyle: { color: tc.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3, itemGap: 12 },
+      grid: { left: 52, right: 48, top: 28, bottom: 44 },
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.08)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+      xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
       yAxis: [
-        {
-          type: 'value',
-          name: 'QPS',
-          position: 'left',
-          axisLabel: { color: t.textColor, fontSize: 10 },
-          splitLine: { lineStyle: { color: t.gridColor } }
-        },
-        {
-          type: 'value',
-          name: 'P95(ms)',
-          position: 'right',
-          axisLabel: { color: t.textColor, fontSize: 10 },
-        }
+        { type: 'value', name: 'req/s', position: 'left', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        { type: 'value', name: 'ms', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) } },
       ],
       series: [
-        {
-          name: 'QPS',
-          type: 'bar',
-          yAxisIndex: 0,
-          data: qpsData,
-          itemStyle: { color: '#58a6ff', opacity: 0.7 },
-          barWidth: '40%',
-        },
-        {
-          name: 'P95',
-          type: 'line',
-          yAxisIndex: 1,
-          smooth: true,
-          data: p95Data,
-          lineStyle: { width: 2, color: '#f85149' },
-          symbol: 'circle',
-          symbolSize: 4,
-        }
+        { name:'QPS', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_qps||[], yAxisIndex:0, lineStyle:{width:2,color:tc.colors[0]}, symbol:'none', areaStyle:{ color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(88,166,255,0.12)'},{offset:1,color:'rgba(88,166,255,0.01)'}])} },
+        { name:'P50', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p50||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[0]}, symbol:'none' },
+        { name:'P90', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p90||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[1]}, symbol:'none' },
+        { name:'P95', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p95||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[2]}, symbol:'none' },
+        { name:'P99', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p99||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[3]}, symbol:'none' },
       ]
     })
   })
 }
 
-function formatTimeShort(timeStr?: string): string {
-  if (!timeStr) return ''
-  const d = new Date(timeStr)
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+function renderErrorBreakdownChart(tc: any) {
+  if (!errorBreakdownChartRef.value) return
+  if (errBreakdownChart) errBreakdownChart.dispose()
+  errBreakdownChart = echarts.init(errorBreakdownChartRef.value)
+
+  const items = errorBreakdown.value
+  if (!items.length) {
+    errBreakdownChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+    return
+  }
+
+  const sorted = [...items].sort((a, b) => (b.count || 0) - (a.count || 0))
+  const labels = sorted.map(e => e.error_type || e.code || e.status || 'Unknown')
+  const counts = sorted.map(e => Number(e.count || 0))
+  const maxCount = Math.max(...counts, 1)
+
+  errBreakdownChart.setOption({
+    backgroundColor: tc.bg,
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+      const p = Array.isArray(params) ? params[0] : params
+      return `${p.name}: <strong>${Number(p.value).toLocaleString()}</strong> (${(Number(p.value) / maxCount * 100).toFixed(1)}%)`
+    }},
+    grid: { left: 100, right: 28, top: 12, bottom: 8 },
+    xAxis: { type: 'value', show: false },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      inverse: true,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: tc.textColor, fontSize: 11, width: 90, overflow: 'truncate' },
+      splitLine: { show: false },
+    },
+    series: [{
+      type: 'bar',
+      data: counts,
+      barMaxWidth: 20,
+      itemStyle: {
+        borderRadius: [0, 4, 4, 0],
+        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
+          { offset: 1, color: isDark() ? 'rgba(248,81,73,0.4)' : 'rgba(248,81,73,0.15)' }
+        ])
+      },
+      label: { show: true, position: 'right', formatter: (p: any) => Number(p.value).toLocaleString(), color: tc.textColor, fontSize: 10, fontWeight: 500 },
+    }],
+  })
 }
 
-function fmtLatency(v: any): string {
-  if (!v) return '-'
-  const s = Number(v)
-  if (s <= 0) return '-'
-  if (s < 1) return (s * 1000).toFixed(1) + 'ms'
-  return s.toFixed(3) + 's'
+// ===== Formatting helpers =====
+function formatSuccessRate(v: any): string {
+  if (v == null) return '-'
+  const n = Number(v)
+  if (isNaN(n)) return '-'
+  return n.toFixed(2) + '%'
 }
 
-function formatTime(t?: string) {
+function fmtLatency3(v: any): string {
+  if (v == null || v === '' || v === 0) return '-'
+  const ms = Number(v) * 1000
+  if (isNaN(ms)) return '-'
+  if (ms >= 1000) return (ms / 1000).toFixed(3) + 's'
+  return ms.toFixed(3) + 'ms'
+}
+
+function fmtLatencyMs(v: any): string {
+  if (v == null || v === '' || v === 0) return '-'
+  const ms = Number(v)
+  if (isNaN(ms)) return '-'
+  if (ms >= 1000) return (ms / 1000).toFixed(3) + 's'
+  return ms.toFixed(3) + 'ms'
+}
+
+function fmtPercent(v: any): string {
+  if (v == null) return '-'
+  const n = Number(v)
+  if (isNaN(n)) return '-'
+  return n.toFixed(2) + '%'
+}
+
+function formatTime(t: any): string {
   if (!t) return '-'
-  return new Date(t).toLocaleString()
+  try {
+    const d = new Date(t)
+    if (isNaN(d.getTime())) return String(t)
+    return d.toLocaleString()
+  } catch { return String(t) }
 }
 
-async function exportHTML() {
-  if (!report.value || !metrics.value) return
-  alert('HTML 报告导出功能开发中，敬请期待！')
+function formatTimeShort(t: string): string {
+  if (!t) return ''
+  try {
+    const d = new Date(t)
+    if (isNaN(d.getTime())) return t
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch { return t }
 }
 
-onMounted(fetchReport)
+function getRunModeLabel(): string {
+  const m = metrics.value
+  if (!m) return '-'
+  switch (m.run_mode) {
+    case 'duration': return 'Duration Mode'
+    case 'count': return 'Count Mode'
+    default: return m.run_mode || '-'
+  }
+}
 
-let resizeTimer: ReturnType<typeof setTimeout>
+function getPlannedDuration(): string {
+  return String(metrics.value?.planned_duration || metrics.value?.duration || '-')
+}
+
+function getPlannedCount(): string {
+  return String(metrics.value?.planned_count || metrics.value?.total_requests || '-')
+}
+
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    completed: 'Completed',
+    running: 'Running',
+    failed: 'Failed',
+    partial: 'Partial',
+    pending: 'Pending',
+    cancelled: 'Cancelled',
+    canceled: 'Cancelled',
+  }
+  return map[status] || status
+}
+
+function getStatusTooltip(status: string): string {
+  const map: Record<string, string> = {
+    success: '全部请求成功（100% 成功率）',
+    partial: '部分失败：成功率 ≥95% 但 <100%（存在少量失败请求）',
+    failed: '测试失败：成功率 <95% 或运行时发生错误',
+    completed: '测试运行已成功完成',
+    running: '测试正在运行中',
+    pending: '测试等待开始',
+    cancelled: '测试在完成前被取消',
+    canceled: '测试在完成前被取消',
+  }
+  return map[status] || status
+}
+
+function exportHTML() {
+  console.log('Export HTML clicked')
+}
+
+// ===== Resize handling =====
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
 window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer)
+  if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
-    latChart?.resize()
-    ovChart?.resize()
-    qpsChart?.resize()
-    latTrendChart?.resize()
-    nodeCharts.forEach(chart => chart.resize())
+    qpsChart?.resize(); latTrendChart?.resize(); latChart?.resize(); ovChart?.resize(); errRateChart?.resize()
+    nodeCharts.forEach(c => c.resize())
   }, 150)
 })
 
+onMounted(() => fetchReport())
 onUnmounted(() => {
-  latChart?.dispose()
-  ovChart?.dispose()
-  qpsChart?.dispose()
-  latTrendChart?.dispose()
-  nodeCharts.forEach(chart => chart.dispose())
+  qpsChart?.dispose(); latTrendChart?.dispose(); latChart?.dispose(); ovChart?.dispose(); errRateChart?.dispose()
+  nodeCharts.forEach(c => c.dispose())
 })
 </script>
 
 <style scoped>
-.report-detail { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; align-items: center; gap: 12px; }
+/* ===== Base ===== */
+.report-detail { display: flex; flex-direction: column; gap: 20px; max-width: 1280px; margin: 0 auto; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-secondary);
+}
 .page-header h2 { font-size: 18px; font-weight: 600; flex: 1; }
-.btn-back { padding: 6px 12px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
-.btn-export { display: flex; align-items: center; gap: 6px; padding: 7px 16px; border: 1px solid var(--accent-primary); border-radius: var(--radius-sm); background: rgba(88,166,255,0.08); color: var(--accent-primary); font-size: 13px; cursor: pointer; transition: all 0.15s; }
-.btn-export:hover:not(:disabled) { background: rgba(88,166,255,0.16); }
+
+.btn-back {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-back:hover { background: var(--bg-hover); border-color: var(--accent-primary); color: var(--accent-primary); }
+
+.btn-export {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-primary);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-export:hover:not(:disabled) { background: rgba(88,166,255,0.08); }
 .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.metric-card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 18px 20px; text-align: center; border-left: 3px solid transparent; }
-.card-primary { border-left-color: var(--accent-primary); }
-.card-success { border-left-color: var(--accent-success); }
-.card-warn { border-left-color: var(--accent-warning); }
-.card-danger { border-left-color: var(--accent-danger); }
-.card-info { border-left-color: var(--accent-info); }
-.metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-tertiary); margin-bottom: 6px; }
-.metric-value { font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+/* ===== Metrics Row ===== */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(8px, 1.5vw, 16px); margin-bottom: 16px; }
+
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  text-align: center;
+}
+.metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 6px; }
+.metric-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
 .metric-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
 
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.chart-card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; }
+/* ===== Chart Cards ===== */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
 .chart-card.wide { grid-column: span 2; }
-.chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); }
-.chart-card h4 { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+.chart-header { padding: 14px 16px 10px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+.chart-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.chart-tip { font-size: 11px; color: var(--text-tertiary); }
 .chart-body { height: 260px; }
 
-.node-charts-section {
-  margin-top: 8px;
+/* ===== Info Section ===== */
+.info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.info-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px;
 }
+.info-card h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 10px;
-  padding-left: 4px;
-}
-
-.info-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.info-card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; }
-.info-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); }
 .info-table { width: 100%; border-collapse: collapse; }
 .info-table td { padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .info-table tr:last-child td { border-bottom: none; }
-.info-label { color: var(--text-secondary); min-width: 80px; }
-.mono { font-family: monospace; font-size: 12px; }
-.bold { font-weight: 600; }
-.text-success { color: var(--accent-success); }
-.text-danger { color: var(--accent-danger); }
+.info-label { color: var(--text-secondary); min-width: 110px; }
+.mono-sm { font-family: monospace; font-size: 12px; }
 
-.status-badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; }
-.st-success { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.25); }
-.st-failed { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.25); }
-.st-partial { background: rgba(210,153,34,0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.25); }
+.mode-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(88,166,255,0.1);
+  color: var(--accent-primary);
+}
+.actual-val { color: var(--accent-success); font-weight: 500; }
 
-.empty { text-align: center; color: var(--text-tertiary); padding: 48px 0; }
+.status-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.status-badge.success { background: rgba(63,185,80,0.15); color: #238636; }
+.status-badge.partial { background: rgba(210,153,34,0.15); color: #9a6700; }
+.status-badge.failed { background: rgba(248,81,73,0.15); color: #cf222e; }
+.status-badge.running { background: rgba(88,166,255,0.15); color: #0550ae; }
+.status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
+.status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
-@media (max-width: 768px) {
-  .charts-grid, .info-sections { grid-template-columns: 1fr; }
-  .metrics-row { grid-template-columns: repeat(2, 1fr); }
+/* Performance List */
+.perf-list { display: flex; flex-direction: column; gap: 6px; }
+.perf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+.perf-k { font-size: 12px; font-weight: 600; color: var(--text-tertiary); min-width: 48px; }
+.perf-v { font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.perf-v.success { color: var(--accent-success); }
+.perf-v.danger { color: var(--accent-danger); }
+.perf-v.highlight-blue { color: var(--accent-info); }
+.perf-divider { height: 1px; background: var(--border-secondary); margin: 4px 0; }
+
+/* ===== Charts Toolbar ===== */
+.charts-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+.charts-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.charts-toolbar h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+/* ===== Node Ranking Table ===== */
+.ranking-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ranking-table thead th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  border-bottom: 2px solid var(--border-secondary);
+  white-space: nowrap;
+  background: var(--bg-tertiary);
+}
+.ranking-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ranking-table tbody tr:hover td { background: var(--bg-hover); }
+.rank-cell { font-weight: 700; color: var(--text-tertiary); width: 32px; }
+.node-name-cell { font-weight: 500; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.success-text { color: var(--accent-success); font-weight: 600; }
+.danger-text { color: var(--accent-danger); font-weight: 600; }
+
+/* ===== Nodes Section ===== */
+.nodes-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+.nodes-section h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
+.node-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.node-badge {
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.node-chart-body { height: 280px; }
+
+/* ===== Empty State ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 16px;
+  color: var(--text-tertiary);
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border-secondary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Chart Type Toggle ===== */
+.chart-type-toggle {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+  padding-bottom: 4px;
+}
+.type-btn {
+  padding: 3px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.type-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
+}
+.type-btn:hover:not(.active) {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+/* ===== Tooltip ===== */
+.tooltip-wrapper {
+  position: relative;
+  cursor: help;
+  display: inline-block;
+}
+
+.tooltip-wrapper::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  font-size: 11.5px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 24px -4px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.tooltip-wrapper::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.04));
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.tooltip-wrapper:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-wrapper:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .metrics-row { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+}
+@media (max-width: 900px) {
+  .info-section { grid-template-columns: 1fr; }
+  .charts-row { grid-template-columns: 1fr; }
+  .chart-card.wide { grid-column: span 1; }
+  .metrics-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}
+@media (max-width: 520px) {
+  .metrics-row { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
 </style>

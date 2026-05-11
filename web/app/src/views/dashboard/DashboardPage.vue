@@ -2,18 +2,18 @@
   <div class="dashboard-page">
     <div class="scene-selector">
       <div class="selector-header">
-        <h3>📊 场景选择</h3>
+        <h3>场景选择</h3>
         <select v-model="selectedSceneId" @change="onSceneChange" class="scene-select">
           <option 
             v-for="scene in allScenes" 
             :key="scene.scene_id" 
             :value="String(scene.scene_id)"
           >
-            {{ scene.name || `场景#${String(scene.scene_id).slice(-8)}` }}
+            {{ `场景-${String(scene.scene_id).slice(-8)}` }}
             {{ scene.status === 'running' ? '(运行中)' : `(已结束)` }}
           </option>
-          <option v-if="allScenes.length === 0" value="" disabled>加载中...</option>
-          <option v-if="allScenes.length === 0 && !loading" value="" disabled>暂无场景</option>
+          <option v-if="allScenes.length === 0 && loading" value="" disabled>加载中...</option>
+          <option v-else-if="allScenes.length === 0" value="" disabled>暂无场景</option>
         </select>
       </div>
       <div v-if="selectedSceneId" class="time-window-info">
@@ -55,7 +55,13 @@
       <div class="chart-card wide">
         <div class="chart-header">
           <h3>错误率</h3>
-          <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
+          <div class="chart-controls">
+            <div class="chart-type-toggle">
+              <button :class="['type-btn', { active: errorChartType === 'smooth' }]" @click="switchErrorChartType('smooth')">平滑</button>
+              <button :class="['type-btn', { active: errorChartType === 'step' }]" @click="switchErrorChartType('step')">阶梯</button>
+            </div>
+            <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
+          </div>
         </div>
         <div class="chart-body" ref="errorChartRef"></div>
       </div>
@@ -74,7 +80,7 @@
             <div class="run-metrics">
               <span>QPS: {{ formatNum(run.total_reqs / Math.max(run.duration, 1)) }}</span>
               <span>P99: {{ formatMs(run.p99_latency) }}</span>
-              <span>成功率: {{ ((run.success_reqs / Math.max(run.total_reqs, 1)) * 100).toFixed(1) }}%</span>
+              <span>成功率: {{ ((run.success_reqs / Math.max(run.total_reqs, 1)) * 100).toFixed(2) }}%</span>
             </div>
           </div>
         </div>
@@ -124,7 +130,7 @@
                 <div class="detail-item"><span class="detail-label">总请求数</span><span class="detail-val">{{ formatNum(node.total_reqs) }}</span></div>
                 <div class="detail-item"><span class="detail-label">成功数</span><span class="detail-val success">{{ formatNum(node.success_reqs) }}</span></div>
                 <div class="detail-item"><span class="detail-label">失败数</span><span class="detail-val danger">{{ formatNum(node.total_reqs - node.success_reqs) }}</span></div>
-                <div class="detail-item"><span class="detail-label">成功率</span><span class="detail-val">{{ node.total_reqs > 0 ? ((node.success_reqs / node.total_reqs) * 100).toFixed(1) : '0' }}%</span></div>
+                <div class="detail-item"><span class="detail-label">成功率</span><span class="detail-val">{{ node.total_reqs > 0 ? ((node.success_reqs / node.total_reqs) * 100).toFixed(2) : '0' }}%</span></div>
                 <div class="detail-item"><span class="detail-label">平均延迟</span><span class="detail-val">{{ formatMs(node.avg_latency) }}</span></div>
               </div>
               <div class="detail-chart" :ref="el => setNodeChartRef(node.node_id, el as HTMLElement)"></div>
@@ -159,6 +165,7 @@ const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
 const nodeChartType = ref<'smooth' | 'step'>('smooth')
+const errorChartType = ref<'smooth' | 'step'>('smooth')
 
 const overview = ref<DashboardOverviewDTO | null>(null)
 
@@ -196,21 +203,23 @@ const isSceneRunning = computed(() => {
 const timeWindowDisplay = computed(() => {
   if (!selectedSceneId.value) return '全部场景'
 
-  const scene = allScenes.value.find(s => s.scene_id === selectedSceneId.value)
-  if (!scene) return '-'
+  const runs = overview.value?.recent_runs
+  if (!runs?.length) return '-'
 
-  if (scene.status === 'running' && scene.started_at) {
-    const start = formatDateTime(scene.started_at)
-    return `${start} ~ Now`
+  const sceneRuns = runs.filter((r: any) => String(r.scene_id) === selectedSceneId.value)
+  if (!sceneRuns.length) return '-'
+
+  const run = sceneRuns[0]
+  if (!run.started_at) return '-'
+
+  const start = formatDateTime(run.started_at)
+  if (run.status === 'running') {
+    return `${start} ~ now`
   }
-
-  if (scene.started_at && scene.finished_at) {
-    const start = formatDateTime(scene.started_at)
-    const end = formatDateTime(scene.finished_at)
-    return `${start} ~ ${end}`
+  if (run.finished_at) {
+    return `${start} ~ ${formatDateTime(run.finished_at)}`
   }
-
-  return '-'
+  return `${start} ~ now`
 })
 
 const durationDisplay = computed(() => {
@@ -219,14 +228,17 @@ const durationDisplay = computed(() => {
   const runs = overview.value?.recent_runs
   if (!runs?.length) return ''
 
-  const runningRun = runs.find(r => r.status === 'running')
+  const sceneRuns = runs.filter((r: any) => String(r.scene_id) === selectedSceneId.value)
+  if (!sceneRuns.length) return ''
+
+  const runningRun = sceneRuns.find((r: any) => r.status === 'running')
   if (runningRun && runningRun.started_at) {
     return formatDuration((Date.now() - new Date(runningRun.started_at).getTime()) / 1000)
   }
 
-  const doneRun = runs[0]
-  if (doneRun && doneRun.duration) {
-    return formatDuration(doneRun.duration)
+  const doneRun = sceneRuns[0]
+  if (doneRun && doneRun.finished_at && doneRun.started_at) {
+    return formatDuration((new Date(doneRun.finished_at).getTime() - new Date(doneRun.started_at).getTime()) / 1000)
   }
 
   return ''
@@ -242,8 +254,21 @@ function onSceneChange() {
 }
 
 async function loadHistoryData() {
+  if (!selectedSceneId.value) return
   try {
-    console.log('Scene-based history loading enabled')
+    const token = localStorage.getItem('salvo_token')
+    const resp = await fetch('/api/v1/dashboard/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ scene_id: Number(selectedSceneId.value), limit: 5 })
+    })
+    const json = await resp.json()
+    if (json.code === 0 && json.data?.history?.length) {
+      historyData.value = json.data.history
+      renderQpsChart()
+      renderLatencyChart()
+      renderErrorChart()
+    }
   } catch (e) {
     console.error('Failed to load history data:', e)
   }
@@ -253,55 +278,54 @@ async function fetchSceneList() {
   try {
     loading.value = true
     const token = localStorage.getItem('salvo_token')
-    const fetchResp = await fetch('/api/v1/dashboard/history', {
+    const fetchResp = await fetch('/api/v1/scenes/list', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ limit: 50 })
+      body: JSON.stringify({ limit: 100 })
     })
 
     const resp = await fetchResp.json()
 
-    console.log('📋 fetchSceneList response:', resp)
-    console.log('📋 resp.code:', resp.code)
-    console.log('📋 resp.data:', resp.data)
-
-    if (resp.code === 0 && (resp.data?.history || resp.data?.runs)) {
-      const runs = resp.data.history || resp.data.runs
-      console.log('📋 runs data:', runs)
-
-      const sceneMap = new Map<string, SceneInfo>()
-
-      runs.forEach((run: any) => {
-        console.log('📋 run:', run)
-        const sid = String(run.scene_id)
-        if (!sceneMap.has(sid) || run.status === 'running') {
-          sceneMap.set(sid, {
-            scene_id: sid,
-            name: run.scene_name || '',
-            status: run.status,
-            started_at: run.started_at,
-            finished_at: run.finished_at,
-          })
-        }
-      })
-
-      sceneList.value = Array.from(sceneMap.values())
-      console.log('📋 final sceneList:', sceneList.value)
+    if (resp.code === 0 && resp.data?.items) {
+      const scenes = resp.data.items
+      sceneList.value = scenes.map((s: any) => ({
+        scene_id: String(s.id),
+        name: s.name || '',
+        status: (s.status === 'running' ? 'running' : s.status === 'failed' ? 'failed' : 'done') as 'running' | 'done' | 'failed',
+        started_at: s.started_at,
+        finished_at: s.finished_at,
+      }))
 
       if (!selectedSceneId.value && sceneList.value.length > 0) {
-        selectedSceneId.value = sceneList.value[0].scene_id
-        console.log('📋 auto-selected scene:', selectedSceneId.value)
+        const firstRunning = sceneList.value.find(s => s.status === 'running')
+        selectedSceneId.value = (firstRunning || sceneList.value[0]).scene_id
       }
+
+      syncRunningStatus()
     } else {
-      console.error('❌ Invalid response format or no data')
+      console.error('❌ Invalid scenes/list response:', resp)
     }
   } catch (e) {
     console.error('❌ Failed to fetch scene list:', e)
   } finally {
     loading.value = false
+  }
+}
+
+function syncRunningStatus() {
+  if (!overview.value?.recent_runs) return
+  const runningSceneIds = new Set(
+    overview.value.recent_runs
+      .filter((r: any) => r.status === 'running')
+      .map((r: any) => String(r.scene_id))
+  )
+  for (const s of sceneList.value) {
+    if (runningSceneIds.has(s.scene_id)) {
+      s.status = 'running'
+    }
   }
 }
 
@@ -317,14 +341,9 @@ function formatTime(timeStr?: string): string {
 
 function formatDateTime(timeStr?: string): string {
   if (!timeStr) return '-'
-  return new Date(timeStr).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
+  const d = new Date(timeStr)
+  const pad = (n: number, len: number) => String(n).padStart(len, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1,2)}-${pad(d.getDate(),2)} ${pad(d.getHours(),2)}:${pad(d.getMinutes(),2)}:${pad(d.getSeconds(),2)}.${pad(d.getMilliseconds(),3)}`
 }
 
 function formatDuration(seconds: number): string {
@@ -373,11 +392,25 @@ function renderChartsFromOverview() {
 
 const runTimeRange = computed(() => {
   const runs = overview.value?.recent_runs
-  if (!runs?.length) return '-'
+  if (!runs?.length) {
+    const firstHistory = historyData.value?.[0]
+    if (firstHistory?.started_at) {
+      const s = formatDateTime(firstHistory.started_at)
+      const e = firstHistory.finished_at ? formatDateTime(firstHistory.finished_at) : 'now'
+      return `${s} ~ ${e}`
+    }
+    return '-'
+  }
   const first = runs[runs.length - 1]
   const last = runs[0]
-  const fmt = (t?: string) => t ? new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-'
-  return `${fmt(first.started_at)} ~ ${fmt(last.started_at)}`
+  const s = first.started_at ? formatDateTime(first.started_at) : '-'
+  let e: string
+  if (last.status === 'running') {
+    e = 'now'
+  } else {
+    e = last.finished_at ? formatDateTime(last.finished_at) : '-'
+  }
+  return `${s} ~ ${e}`
 })
 
 function getNodeTimeRange(node: any): string {
@@ -385,7 +418,7 @@ function getNodeTimeRange(node: any): string {
   
   if (runningRun && overview.value?.recent_runs?.[0]?.started_at) {
     const start = formatDateTime(overview.value.recent_runs[0].started_at)
-    return `${start} ~ Now`
+    return `${start} ~ now`
   }
   
   if (overview.value && overview.value.recent_runs && overview.value.recent_runs.length > 0) {
@@ -393,11 +426,11 @@ function getNodeTimeRange(node: any): string {
     if (lastRun.started_at) {
       const start = formatDateTime(lastRun.started_at)
       if (lastRun.status === 'running') {
-        return `${start} ~ Now`
+        return `${start} ~ now`
       } else if (lastRun.finished_at) {
         return `${start} ~ ${formatDateTime(lastRun.finished_at)}`
       } else {
-        return `${start} ~ Now`
+        return `${start} ~ now`
       }
     }
   }
@@ -417,6 +450,11 @@ function switchNodeChartType(type: 'smooth' | 'step') {
   if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
 }
 
+function switchErrorChartType(type: 'smooth' | 'step') {
+  errorChartType.value = type
+  renderErrorChart()
+}
+
 function setNodeChartRef(nodeId: string, el: HTMLElement | null) {
   if (el) nodeChartRefs.set(nodeId, el)
   else nodeChartRefs.delete(nodeId)
@@ -434,12 +472,12 @@ const summaryMetrics = computed(() => {
       { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: null },
     ]
   }
-  const rate = d.total_reqs > 0 ? ((d.success_reqs / d.total_reqs) * 100).toFixed(1) + '%' : '0%'
+  const rate = d.total_reqs > 0 ? ((d.success_reqs / d.total_reqs) * 100).toFixed(2) + '%' : '0%'
 
   const runningRun = d.recent_runs?.find(r => r.status === 'running')
   const timeInfo = runningRun ? {
     startedAt: runningRun.started_at ? formatDateTime(runningRun.started_at) : '-',
-    finishedAt: runningRun.status === 'running' ? '--' : (runningRun.finished_at ? formatDateTime(runningRun.finished_at) : '-'),
+    finishedAt: runningRun.status === 'running' ? 'now' : (runningRun.finished_at ? formatDateTime(runningRun.finished_at) : '-'),
     duration: formatDuration(runningRun.status === 'running' ? (Date.now() - new Date(runningRun.started_at || '').getTime()) / 1000 : runningRun.duration)
   } : null
 
@@ -554,7 +592,7 @@ function getTooltipConfig() {
       let result = `<div style="font-size:11.5px;color:${titleColor};margin-bottom:10px;font-weight:600;letter-spacing:0.3px">${params[0].axisValue}</div>`
       for (const param of params) {
         const rawVal = Number(param.value)
-        const val = isNaN(rawVal) ? '-' : (param.seriesName === 'QPS' || param.seriesName === '错误率' || param.seriesName === 'error_rate' ? rawVal.toFixed(3) : rawVal.toFixed(3))
+        const val = isNaN(rawVal) ? '-' : (param.seriesName === 'QPS' ? rawVal.toFixed(1) : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? rawVal.toFixed(2) : rawVal.toFixed(1)))
         const unit = param.seriesName === 'QPS' ? '' : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? '%' : 'ms')
         result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${param.seriesName}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
       }
@@ -565,48 +603,62 @@ function getTooltipConfig() {
 
 function getFilteredTimeSeries() {
   const ts = overview.value?.time_series
-  if (!ts || !ts.timestamps.length) return null
+  if (ts && ts.timestamps?.length) {
+    const runs = overview.value?.recent_runs
+    if (!runs?.length) return ts
 
-  const runs = overview.value?.recent_runs
-  if (!runs?.length) return ts
-
-  const earliestStart = runs.reduce((earliest: string | null, run: any) => {
-    if (!run.started_at) return earliest
-    if (!earliest || new Date(run.started_at) < new Date(earliest)) {
-      return run.started_at
-    }
-    return earliest
-  }, null)
-
-  if (!earliestStart) return ts
-
-  const startTime = new Date(earliestStart).getTime()
-  const minTime = startTime - 60 * 1000
-
-  let startIndex = 0
-  for (let i = 0; i < ts.timestamps.length; i++) {
-    const tsStr = ts.timestamps[i]
-    const tsParts = tsStr.split(':')
-    if (tsParts.length === 3) {
-      const [hours, minutes, seconds] = tsParts.map(Number)
-      const today = new Date()
-      const tsDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds)
-      if (tsDate.getTime() >= minTime) {
-        startIndex = i
-        break
+    const earliestStart = runs.reduce((earliest: string | null, run: any) => {
+      if (!run.started_at) return earliest
+      if (!earliest || new Date(run.started_at) < new Date(earliest)) {
+        return run.started_at
       }
+      return earliest
+    }, null)
+
+    if (!earliestStart) return ts
+
+    const startTime = new Date(earliestStart).getTime()
+    const minTime = startTime - 60 * 1000
+
+    let startIndex = 0
+    for (let i = 0; i < ts.timestamps.length; i++) {
+      const tsStr = ts.timestamps[i]
+      const tsParts = tsStr.split(':')
+      if (tsParts.length === 3) {
+        const [hours, minutes, seconds] = tsParts.map(Number)
+        const today = new Date()
+        const tsDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds)
+        if (tsDate.getTime() >= minTime) {
+          startIndex = i
+          break
+        }
+      }
+    }
+
+    if (startIndex === 0) return ts
+
+    return {
+      timestamps: ts.timestamps.slice(startIndex),
+      qps: ts.qps?.slice(startIndex),
+      p50: ts.p50?.slice(startIndex),
+      p95: ts.p95?.slice(startIndex),
+      p99: ts.p99?.slice(startIndex),
+      error_rate: ts.error_rate?.slice(startIndex),
     }
   }
 
-  if (startIndex === 0) return ts
+  const firstRun = historyData.value?.[0]
+  const samples = firstRun?.global_samples
+  if (!samples?.length) return null
 
+  const timestamps = samples.map((s: any) => new Date(s.timestamp * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
   return {
-    timestamps: ts.timestamps.slice(startIndex),
-    qps: ts.qps?.slice(startIndex),
-    p50: ts.p50?.slice(startIndex),
-    p95: ts.p95?.slice(startIndex),
-    p99: ts.p99?.slice(startIndex),
-    error_rate: ts.error_rate?.slice(startIndex),
+    timestamps,
+    qps: samples.map((s: any) => s.qps),
+    p50: samples.map((s: any) => s.p50_latency_ms),
+    p95: samples.map((s: any) => s.p95_latency_ms),
+    p99: samples.map((s: any) => s.p99_latency_ms),
+    error_rate: samples.map((s: any) => s.total_requests > 0 ? (s.fail_count / s.total_requests) * 100 : 0),
   }
 }
 
@@ -688,13 +740,24 @@ function renderErrorChart() {
     })
     return
   }
+  const isSmooth = errorChartType.value === 'smooth'
+  const maxErrRate = Math.max(...ts.error_rate, 0.01)
   errorChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
-    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', min: 0, max: ts.error_rate.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ data: ts.error_rate, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: theme.colors.danger }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.3)` }]) } }],
+    grid: { top: 16, right: 16, bottom: 44, left: 50 },
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(ts.timestamps.length / 8) }, splitLine: { show: false } },
+    yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
+    series: [{
+      name: '错误率',
+      data: ts.error_rate,
+      type: 'line',
+      smooth: isSmooth,
+      step: isSmooth ? undefined : 'middle',
+      symbol: 'none',
+      lineStyle: { width: 2, color: theme.colors.danger },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.01)` }]) }
+    }],
     tooltip: getTooltipConfig(),
   }, true)
 }
@@ -774,13 +837,24 @@ function renderErrorChartWithData(timestamps: string[], errorRateData: number[])
     })
     return
   }
+  const isSmooth = errorChartType.value === 'smooth'
+  const maxErrRate = Math.max(...errorRateData, 0.01)
   errorChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
-    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', min: 0, max: errorRateData.some(v => v > 0) ? undefined : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ data: errorRateData, type: 'bar', barMinHeight: 3, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: theme.colors.danger }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.3)` }]) } }],
+    grid: { top: 16, right: 16, bottom: 44, left: 50 },
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+    xAxis: { type: 'category', data: timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(timestamps.length / 8) }, splitLine: { show: false } },
+    yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
+    series: [{
+      name: '错误率',
+      data: errorRateData,
+      type: 'line',
+      smooth: isSmooth,
+      step: isSmooth ? undefined : 'middle',
+      symbol: 'none',
+      lineStyle: { width: 2, color: theme.colors.danger },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.01)` }]) }
+    }],
     tooltip: getTooltipConfig(),
   }, true)
 }
@@ -894,6 +968,12 @@ async function fetchOverview() {
 
     if (resp.code === 0) {
       overview.value = resp.data
+      syncRunningStatus()
+      const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
+      const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
+      if (!hasRunning && !hasTimeSeries) {
+        loadHistoryData()
+      }
     }
   } catch (e) {
     console.error('❌ Dashboard fetch error:', e)

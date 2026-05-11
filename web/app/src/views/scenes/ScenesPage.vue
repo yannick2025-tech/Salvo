@@ -34,7 +34,7 @@
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
             <td class="time-cell">{{ getSceneLatestRun(s)?.started_at ? formatDateTime(getSceneLatestRun(s)!.started_at) : '-' }}</td>
-            <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? 'Now' : '-') }}</td>
+            <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? '--' : '-') }}</td>
             <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
             <td class="actions">
               <button class="btn-sm" @click="editScene(s)">编辑</button>

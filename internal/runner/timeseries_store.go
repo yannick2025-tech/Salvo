@@ -24,6 +24,7 @@ type TimeSeriesRecord struct {
 
 	AvgLatencyMs float64
 	P50LatencyMs float64
+	P90LatencyMs float64
 	P95LatencyMs float64
 	P99LatencyMs float64
 	MinLatencyMs float64
@@ -66,12 +67,12 @@ func (s *SQLiteTimeSeriesStore) BatchInsert(ctx context.Context, records []TimeS
 	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT OR IGNORE INTO time_series_samples 
+		INSERT OR IGNORE INTO time_series_samples
 			(run_id, node_id, sample_time, window_duration,
 			 qps, total_requests, success_count, fail_count,
-			 avg_latency_ms, p50_latency_ms, p95_latency_ms, p99_latency_ms,
+			 avg_latency_ms, p50_latency_ms, p90_latency_ms, p95_latency_ms, p99_latency_ms,
 			 min_latency_ms, max_latency_ms)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
@@ -90,6 +91,7 @@ func (s *SQLiteTimeSeriesStore) BatchInsert(ctx context.Context, records []TimeS
 			r.FailCount,
 			r.AvgLatencyMs,
 			r.P50LatencyMs,
+			r.P90LatencyMs,
 			r.P95LatencyMs,
 			r.P99LatencyMs,
 			r.MinLatencyMs,
@@ -115,9 +117,9 @@ func (s *SQLiteTimeSeriesStore) QueryByRunID(ctx context.Context, runID snowflak
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT run_id, node_id, sample_time, window_duration,
 			   qps, total_requests, success_count, fail_count,
-			   avg_latency_ms, p50_latency_ms, p95_latency_ms, p99_latency_ms,
+			   avg_latency_ms, p50_latency_ms, p90_latency_ms, p95_latency_ms, p99_latency_ms,
 			   min_latency_ms, max_latency_ms
-		FROM time_series_samples 
+		FROM time_series_samples
 		WHERE run_id = ?
 		ORDER BY sample_time ASC
 	`, runID)
@@ -137,9 +139,9 @@ func (s *SQLiteTimeSeriesStore) QueryByNodeID(ctx context.Context, runID snowfla
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT run_id, node_id, sample_time, window_duration,
 			   qps, total_requests, success_count, fail_count,
-			   avg_latency_ms, p50_latency_ms, p95_latency_ms, p99_latency_ms,
+			   avg_latency_ms, p50_latency_ms, p90_latency_ms, p95_latency_ms, p99_latency_ms,
 			   min_latency_ms, max_latency_ms
-		FROM time_series_samples 
+		FROM time_series_samples
 		WHERE run_id = ? AND node_id = ?
 		ORDER BY sample_time ASC
 	`, runID, nodeID)
@@ -190,6 +192,7 @@ func scanTimeSeriesRows(rows *sql.Rows) ([]TimeSeriesRecord, error) {
 			&r.FailCount,
 			&r.AvgLatencyMs,
 			&r.P50LatencyMs,
+			&r.P90LatencyMs,
 			&r.P95LatencyMs,
 			&r.P99LatencyMs,
 			&r.MinLatencyMs,

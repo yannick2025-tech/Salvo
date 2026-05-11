@@ -863,9 +863,10 @@ func (h *Handler) ListRunRecords(r *http.Request) dto.Response {
 				dtoRR.SuccessReqs = st.SuccessReqs.Load()
 				dtoRR.FailedReqs = st.FailedReqs.Load()
 				if dtoRR.TotalReqs > 0 {
-					avg, p50, p95, p99 := st.LatencyPercentiles()
+					avg, p50, p90, p95, p99 := st.LatencyPercentiles()
 					dtoRR.AvgLatency = avg.Seconds()
 					dtoRR.P50Latency = p50.Seconds()
+					dtoRR.P90Latency = p90.Seconds()
 					dtoRR.P95Latency = p95.Seconds()
 					dtoRR.P99Latency = p99.Seconds()
 				}
@@ -997,11 +998,13 @@ func toRunRecordDTO(rr *model.RunRecord) dto.RunRecordDTO {
 		WorkerCount: rr.WorkerCount,
 		RunMode:     rr.RunMode,
 		Duration:    rr.Duration,
+		Count:       rr.Count,
 		TotalReqs:   rr.TotalReqs,
 		SuccessReqs: rr.SuccessReqs,
 		FailedReqs:  rr.FailedReqs,
 		AvgLatency:  rr.AvgLatency,
 		P50Latency:  rr.P50Latency,
+		P90Latency:  rr.P90Latency,
 		P95Latency:  rr.P95Latency,
 		P99Latency:  rr.P99Latency,
 		ErrorMsg:    rr.ErrorMsg,
@@ -1344,9 +1347,10 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				}
 
 				if liveTotal > 0 {
-					lavg, lp50, lp95, lp99 := st.LatencyPercentiles()
+					lavg, lp50, lp90, lp95, lp99 := st.LatencyPercentiles()
 					dtoRR.AvgLatency = lavg.Seconds()
 					dtoRR.P50Latency = lp50.Seconds()
+					dtoRR.P90Latency = lp90.Seconds()
 					dtoRR.P95Latency = lp95.Seconds()
 					dtoRR.P99Latency = lp99.Seconds()
 
@@ -1362,11 +1366,12 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 				dtoRR.AvgLatency = rr.AvgLatency
 				dtoRR.P50Latency = rr.P50Latency
+				dtoRR.P90Latency = rr.P90Latency
 				dtoRR.P95Latency = rr.P95Latency
 				dtoRR.P99Latency = rr.P99Latency
 
 				allLatencies = append(allLatencies, rr.P50Latency*1e6)
-				allLatencies = append(allLatencies, rr.P95Latency*1e6)
+				allLatencies = append(allLatencies, rr.P90Latency*1e6)
 				allLatencies = append(allLatencies, rr.P99Latency*1e6)
 
 				if rr.StartedAt != nil {
@@ -1389,10 +1394,12 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 			dtoRR.AvgLatency = rr.AvgLatency
 			dtoRR.P50Latency = rr.P50Latency
+			dtoRR.P90Latency = rr.P90Latency
 			dtoRR.P95Latency = rr.P95Latency
 			dtoRR.P99Latency = rr.P99Latency
 
 			allLatencies = append(allLatencies, rr.P50Latency*1e6)
+			allLatencies = append(allLatencies, rr.P90Latency*1e6)
 			allLatencies = append(allLatencies, rr.P95Latency*1e6)
 			allLatencies = append(allLatencies, rr.P99Latency*1e6)
 
@@ -1412,6 +1419,8 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 		recentRuns = append(recentRuns, dtoRR)
 		if rr.StartedAt != nil && rr.StartedAt.After(cutoff) {
+			seriesRuns = append(seriesRuns, dtoRR)
+		} else if rr.FinishedAt != nil && rr.FinishedAt.After(cutoff) {
 			seriesRuns = append(seriesRuns, dtoRR)
 		}
 	}
@@ -2074,14 +2083,21 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 				runStart := *run.StartedAt
 				isRunning := run.Status == "running"
 
-				var inBucket bool
+				var runEnd time.Time
 				if isRunning {
-					inBucket = !runStart.After(bucketEnd)
+					runEnd = time.Now()
+				} else if run.FinishedAt != nil {
+					runEnd = *run.FinishedAt
 				} else {
-					inBucket = runStart.After(t) && !runStart.After(bucketEnd)
+					runEnd = runStart.Add(time.Duration(run.Duration) * time.Second)
 				}
 
-				if inBucket {
+				bucketStart := t
+				bucketEndTime := bucketEnd
+
+				overlaps := !(runEnd.Before(bucketStart) || runStart.After(bucketEndTime))
+
+				if overlaps {
 					dur := run.Duration
 					if dur > 0 {
 						qps[i] += float64(run.TotalReqs) / dur

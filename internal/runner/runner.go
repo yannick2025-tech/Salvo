@@ -84,6 +84,8 @@ type Stats struct {
 	TotalReqs   atomic.Int64
 	SuccessReqs atomic.Int64
 	FailedReqs  atomic.Int64
+	MinLatency  atomic.Int64
+	TTFB        atomic.Int64
 	latencies   sync.Mutex
 	latencyList []time.Duration
 }
@@ -95,19 +97,39 @@ func (s *Stats) RecordLatency(d time.Duration, success bool) {
 	} else {
 		s.FailedReqs.Add(1)
 	}
+
+	ns := d.Nanoseconds()
+
+	if success && ns > 0 {
+		for {
+			old := s.MinLatency.Load()
+			if old == 0 || ns < old {
+				if s.MinLatency.CompareAndSwap(old, ns) {
+					break
+				}
+				continue
+			}
+			break
+		}
+
+		if s.TTFB.Load() == 0 {
+			s.TTFB.CompareAndSwap(0, ns)
+		}
+	}
+
 	s.latencies.Lock()
 	s.latencyList = append(s.latencyList, d)
 	s.latencies.Unlock()
 }
 
-func (s *Stats) LatencyPercentiles() (avg, p50, p95, p99 time.Duration) {
+func (s *Stats) LatencyPercentiles() (avg, p50, p90, p95, p99 time.Duration) {
 	s.latencies.Lock()
 	list := make([]time.Duration, len(s.latencyList))
 	copy(list, s.latencyList)
 	s.latencies.Unlock()
 
 	if len(list) == 0 {
-		return 0, 0, 0, 0
+		return 0, 0, 0, 0, 0
 	}
 
 	var total time.Duration
@@ -116,10 +138,10 @@ func (s *Stats) LatencyPercentiles() (avg, p50, p95, p99 time.Duration) {
 	}
 	avg = total / time.Duration(len(list))
 
-	// Sort the list before calculating percentiles
 	sort.Slice(list, func(i, j int) bool { return list[i] < list[j] })
 
 	p50 = percentile(list, 50)
+	p90 = percentile(list, 90)
 	p95 = percentile(list, 95)
 	p99 = percentile(list, 99)
 	return
@@ -168,6 +190,7 @@ type Runner struct {
 
 	nodeStats map[string]*NodeStats
 	collector *TimeSeriesCollector
+	tsStore   TimeSeriesStore
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
@@ -200,6 +223,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 			MemoryWindowSec: 300,
 			MaxNodes:        100,
 		}, n.Generate(), tsStore, nil),
+		tsStore: tsStore,
 	}
 	r.status.Store(StatusPending)
 	return r, nil
@@ -223,6 +247,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		logger.F("scene_id", r.cfg.SceneID.String()),
 		logger.F("run_id", traceID),
 	)
+
+	r.collector.SetStatsProvider(r)
 
 	if err := r.collector.Start(r.startedAt); err != nil {
 		runLog.Error("failed to start timeseries collector", logger.F("error", err))
@@ -298,6 +324,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		Status:      model.RunStatusRunning,
 		WorkerCount: r.cfg.Workers,
 		RunMode:     string(r.cfg.RunMode),
+		Duration:    r.cfg.Duration.Seconds(),
+		Count:       r.cfg.Count,
 		StartedAt:   &r.startedAt,
 	}
 	if err := r.runs.Create(r.ctx, runRecord); err != nil {
@@ -310,14 +338,14 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.finishedAt = time.Now().UTC()
 	runRecord.Status = model.RunStatusCompleted
 	runRecord.FinishedAt = &r.finishedAt
-	runRecord.Duration = r.finishedAt.Sub(r.startedAt).Seconds()
 	runRecord.TotalReqs = r.stats.TotalReqs.Load()
 	runRecord.SuccessReqs = r.stats.SuccessReqs.Load()
 	runRecord.FailedReqs = r.stats.FailedReqs.Load()
 
-	avg, p50, p95, p99 := r.stats.LatencyPercentiles()
+	avg, p50, p90, p95, p99 := r.stats.LatencyPercentiles()
 	runRecord.AvgLatency = avg.Seconds()
 	runRecord.P50Latency = p50.Seconds()
+	runRecord.P90Latency = p90.Seconds()
 	runRecord.P95Latency = p95.Seconds()
 	runRecord.P99Latency = p99.Seconds()
 
@@ -417,9 +445,12 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		"success_rate":  fmt.Sprintf("%.1f%%", successRate),
 		"avg_latency_s": runRecord.AvgLatency,
 		"p50_latency_s": runRecord.P50Latency,
+		"p90_latency_s": runRecord.P90Latency,
 		"p95_latency_s": runRecord.P95Latency,
 		"p99_latency_s": runRecord.P99Latency,
+		"min_latency_ms": time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
 		"p50":           fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
+		"p90":           fmt.Sprintf("%.1fms", runRecord.P90Latency*1000),
 		"p95":           fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
 		"p99":           fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
 	}
@@ -427,19 +458,53 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 
 	collectorData := r.collector.GetCollectedData()
 
+	r.log.Info("creating report with collected data",
+		logger.F("global_samples_count", len(collectorData.GlobalSamples)),
+		logger.F("node_samples_count", len(collectorData.NodeSamples)),
+	)
+
+	dbRecords, dbErr := r.tsStore.QueryByRunID(r.ctx, r.runID)
+	if dbErr != nil {
+		r.log.Warn("failed to query full time series from db, falling back to in-memory", logger.F("error", dbErr))
+	} else {
+		r.log.Info("loaded full time series from database",
+			logger.F("db_record_count", len(dbRecords)),
+		)
+	}
+
+	globalTimeSeries := collectorData.GlobalSamples
+	nodeTimeSeriesMap := collectorData.NodeSamples
+	if len(dbRecords) > 0 {
+		globalTimeSeries = recordsToGlobalSamples(dbRecords)
+		nodeTimeSeriesMap = recordsToNodeSamples(dbRecords)
+		r.log.Info("using db time series for report",
+			logger.F("global_ts_count", len(globalTimeSeries)),
+			logger.F("node_ts_keys", len(nodeTimeSeriesMap)),
+		)
+	}
+
+	for nodeID, samples := range nodeTimeSeriesMap {
+		r.log.Debug("node time series data",
+			logger.F("node_id", nodeID),
+			logger.F("sample_count", len(samples)),
+		)
+	}
+
 	detail := ReportDetail{
 		Metadata: ReportMetadata{
-			RunID:       r.runID,
-			SceneID:     r.cfg.SceneID,
-			Status:      string(runRecord.Status),
-			StartedAt:   r.startedAt,
-			FinishedAt:  r.finishedAt,
-			DurationSec: r.finishedAt.Sub(r.startedAt).Seconds(),
-			WorkerCount: r.cfg.Workers,
-			RunMode:     string(r.cfg.RunMode),
-			Count:       r.cfg.Count,
-			GeneratedAt: time.Now().UTC(),
-			Version:     "1.0",
+			RunID:           r.runID,
+			SceneID:         r.cfg.SceneID,
+			Status:          string(runRecord.Status),
+			StartedAt:       r.startedAt,
+			FinishedAt:      r.finishedAt,
+			DurationSec:     r.finishedAt.Sub(r.startedAt).Seconds(),
+			WorkerCount:     r.cfg.Workers,
+			RunMode:         string(r.cfg.RunMode),
+			Count:           r.cfg.Count,
+			PlannedDuration: r.cfg.Duration.Seconds(),
+			PlannedCount:    r.cfg.Count,
+			GeneratedAt:     time.Now().UTC(),
+			Version:         "1.0",
 		},
 		GlobalSummary: GlobalSummary{
 			TotalRequests: runRecord.TotalReqs,
@@ -448,23 +513,38 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 			SuccessRate:   successRate,
 			AvgLatencyMs:  runRecord.AvgLatency * 1000,
 			P50LatencyMs:  runRecord.P50Latency * 1000,
+			P90LatencyMs:  runRecord.P90Latency * 1000,
 			P95LatencyMs:  runRecord.P95Latency * 1000,
 			P99LatencyMs:  runRecord.P99Latency * 1000,
+			MinLatencyMs:  time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
+			TTFB:          time.Duration(r.stats.TTFB.Load()).Seconds() * 1000,
 			Throughput:    calculateThroughput(runRecord),
 			PeakQPS:       collectorData.GlobalPeakQPS,
 		},
-		GlobalTimeSeries: collectorData.GlobalSamples,
+		GlobalTimeSeries: globalTimeSeries,
 		NodeMetrics:      []NodeMetricDetail{},
 		ErrorSummary:     collectorData.ErrorItems,
 	}
 
+	nodeNameMap := make(map[string]string)
+	if nodeList, err := r.nodes.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000}); err == nil {
+		for _, n := range nodeList {
+			nodeNameMap[n.ID.String()] = n.Name
+		}
+	}
+
+	aggErrorCodes := make(map[string]int64)
 	for nodeID, nodeStat := range r.nodeStats {
 		snapshot := nodeStat.Snapshot()
 		snapshot.NodeID = nodeID
 
+		for code, count := range snapshot.ErrorCodes {
+			aggErrorCodes[code] += count
+		}
+
 		detail.NodeMetrics = append(detail.NodeMetrics, NodeMetricDetail{
 			NodeID:   nodeID,
-			NodeName: getNodeName(nodeID),
+			NodeName: nodeNameMap[nodeID],
 			Summary: NodeSummaryStats{
 				TotalRequests: snapshot.TotalReqs,
 				SuccessCount:  snapshot.SuccessReqs,
@@ -472,12 +552,23 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 				SuccessRate:   snapshot.SuccessRate,
 				AvgLatencyMs:  snapshot.AvgLatency.Seconds() * 1000,
 				P50LatencyMs:  snapshot.P50Latency.Seconds() * 1000,
+				P90LatencyMs:  snapshot.P90Latency.Seconds() * 1000,
 				P95LatencyMs:  snapshot.P95Latency.Seconds() * 1000,
 				P99LatencyMs:  snapshot.P99Latency.Seconds() * 1000,
+				MinLatencyMs:  snapshot.MinLatency.Seconds() * 1000,
+				TTFB:          snapshot.TTFB.Seconds() * 1000,
 				AvgQPS:        calculateNodeAvgQPS(snapshot, runRecord.Duration),
 				PeakQPS:       collectorData.NodePeakQPS[nodeID],
 			},
-			TimeSeries: collectorData.NodeSamples[nodeID],
+			TimeSeries: nodeTimeSeriesMap[nodeID],
+		})
+	}
+
+	for code, count := range aggErrorCodes {
+		detail.ErrorSummary = append(detail.ErrorSummary, ErrorItem{
+			ErrorType: code,
+			Message:   code,
+			Count:     count,
 		})
 	}
 
@@ -790,6 +881,9 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	if n.nodeStats != nil {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
 			n.nodeStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+			if !httpResp.IsSuccess() {
+				n.nodeStats.RecordError(fmt.Sprintf("HTTP-%d", httpResp.StatusCode))
+			}
 		}
 	}
 
@@ -1070,4 +1164,89 @@ func resolveGeneratorRefs(str string, reg *generator.Registry, log logger.Logger
 		}
 		return fmt.Sprintf("%v", val)
 	})
+}
+
+// GlobalSnapshot implements StatsProvider interface for global statistics.
+func (r *Runner) GlobalSnapshot() *Sample {
+	totalReqs := r.stats.TotalReqs.Load()
+	successReqs := r.stats.SuccessReqs.Load()
+	failedReqs := r.stats.FailedReqs.Load()
+
+	avg, p50, p90, p95, p99 := r.stats.LatencyPercentiles()
+
+	duration := time.Since(r.startedAt).Seconds()
+	qps := float64(0)
+	if duration > 0 {
+		qps = float64(totalReqs) / duration
+	}
+
+	return &Sample{
+		Timestamp:     time.Now().UTC(),
+		WindowSeconds: 1,
+		QPS:           qps,
+		TotalRequests: totalReqs,
+		SuccessCount:  successReqs,
+		FailCount:     failedReqs,
+		AvgLatencyMs:  avg.Seconds() * 1000,
+		P50LatencyMs:  p50.Seconds() * 1000,
+		P90LatencyMs:  p90.Seconds() * 1000,
+		P95LatencyMs:  p95.Seconds() * 1000,
+		P99LatencyMs:  p99.Seconds() * 1000,
+		MinLatencyMs:  time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
+		MaxLatencyMs:  p99.Seconds() * 1000,
+	}
+}
+
+// NodeSnapshots implements StatsProvider interface for per-node statistics.
+func (r *Runner) NodeSnapshots() map[string]*Sample {
+	result := make(map[string]*Sample)
+
+	duration := time.Since(r.startedAt).Seconds()
+
+	r.log.Debug("NodeSnapshots called",
+		logger.F("node_count", len(r.nodeStats)),
+		logger.F("duration_s", duration),
+	)
+
+	for nodeID, nodeStat := range r.nodeStats {
+		snapshot := nodeStat.Snapshot()
+		if snapshot == nil {
+			r.log.Warn("nil snapshot for node", logger.F("node_id", nodeID))
+			continue
+		}
+
+		qps := float64(0)
+		if duration > 0 {
+			qps = float64(snapshot.TotalReqs) / duration
+		}
+
+		result[nodeID] = &Sample{
+			Timestamp:     time.Now().UTC(),
+			WindowSeconds: 1,
+			QPS:           qps,
+			TotalRequests: snapshot.TotalReqs,
+			SuccessCount:  snapshot.SuccessReqs,
+			FailCount:     snapshot.FailedReqs,
+			AvgLatencyMs:  snapshot.AvgLatency.Seconds() * 1000,
+			P50LatencyMs:  snapshot.P50Latency.Seconds() * 1000,
+			P90LatencyMs:  snapshot.P90Latency.Seconds() * 1000,
+			P95LatencyMs:  snapshot.P95Latency.Seconds() * 1000,
+			P99LatencyMs:  snapshot.P99Latency.Seconds() * 1000,
+			MinLatencyMs:  snapshot.MinLatency.Seconds() * 1000,
+			MaxLatencyMs:  snapshot.P99Latency.Seconds() * 1000,
+		}
+
+		r.log.Debug("collected node snapshot",
+			logger.F("node_id", nodeID),
+			logger.F("total_reqs", snapshot.TotalReqs),
+			logger.F("qps", qps),
+			logger.F("p50_ms", snapshot.P50Latency.Seconds()*1000),
+		)
+	}
+
+	r.log.Info("NodeSnapshots completed",
+		logger.F("returned_node_count", len(result)),
+	)
+
+	return result
 }
