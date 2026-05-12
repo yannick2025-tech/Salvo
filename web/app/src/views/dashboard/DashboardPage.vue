@@ -16,17 +16,19 @@
           <option v-else-if="allScenes.length === 0" value="" disabled>暂无场景</option>
         </select>
       </div>
-      <div v-if="selectedSceneId" class="time-window-info">
-        <span class="window-label">时间范围:</span>
-        <span class="window-value">{{ timeWindowDisplay }}</span>
-        <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
-        <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
-      </div>
-      <div v-if="showRefreshSelector" class="refresh-selector">
-        <span class="refresh-label">刷新频率:</span>
-        <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="refresh-select">
-          <option v-for="sec in refreshOptions" :key="sec" :value="sec">{{ sec }}秒</option>
-        </select>
+      <div v-if="selectedSceneId" class="time-window-row">
+        <div class="time-window-info">
+          <span class="window-label">时间范围:</span>
+          <span class="window-value">{{ timeWindowDisplay }}</span>
+          <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
+          <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
+        </div>
+        <div v-if="showRefreshSelector" class="refresh-selector">
+          <span class="refresh-label">刷新:</span>
+          <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="refresh-select">
+            <option v-for="sec in refreshOptions" :key="sec" :value="sec">{{ sec }}秒</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -179,7 +181,7 @@ const selectedSceneId = ref<string>('')
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
 
-const refreshInterval = ref<number>(5)
+const refreshInterval = ref<number>(Number(localStorage.getItem('dashboard_refresh_interval')) || 5)
 const refreshOptions = [1, 5, 10, 15, 30]
 const userAdjustedZoom = ref(false)
 
@@ -262,6 +264,7 @@ function onSceneChange() {
 }
 
 function onRefreshIntervalChange() {
+  localStorage.setItem('dashboard_refresh_interval', String(refreshInterval.value))
   restartPolling()
 }
 
@@ -833,6 +836,12 @@ async function fetchOverview() {
       if (!hasRunning && !hasTimeSeries) {
         loadHistoryData()
       }
+      renderQpsChart()
+      renderLatencyChart()
+      renderErrorChart()
+      if (expandedNodeId.value) {
+        renderNodeDetailChart(expandedNodeId.value)
+      }
     }
   } catch (e) {
     console.error('❌ Dashboard fetch error:', e)
@@ -1013,6 +1022,12 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
+.time-window-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .time-window-info {
   display: flex;
   align-items: center;
@@ -1021,6 +1036,7 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   font-size: 12px;
+  flex: 1;
 }
 
 .window-label {
@@ -1054,7 +1070,6 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   font-size: 12px;
-  margin-top: 8px;
 }
 
 .refresh-label {
