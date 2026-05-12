@@ -22,6 +22,12 @@
         <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
         <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
       </div>
+      <div v-if="showRefreshSelector" class="refresh-selector">
+        <span class="refresh-label">刷新频率:</span>
+        <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="refresh-select">
+          <option v-for="sec in refreshOptions" :key="sec" :value="sec">{{ sec }}秒</option>
+        </select>
+      </div>
     </div>
 
     <div class="metrics-row">
@@ -149,7 +155,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { dashboardHistory } from '@/api/dashboard'
 import type { DashboardOverviewDTO, RunHistoryDTO } from '@/types'
 
 const qpsChartRef = ref<HTMLElement>()
@@ -173,7 +178,10 @@ const historyData = ref<RunHistoryDTO[]>([])
 const selectedSceneId = ref<string>('')
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
-const TIME_WINDOW_HOURS = 48
+
+const refreshInterval = ref<number>(5)
+const refreshOptions = [1, 5, 10, 15, 30]
+const userAdjustedZoom = ref(false)
 
 interface SceneInfo {
   scene_id: string
@@ -198,6 +206,10 @@ const allScenes = computed<SceneInfo[]>(() => {
 const isSceneRunning = computed(() => {
   if (!selectedSceneId.value) return runningScenes.value.length > 0
   return runningScenes.value.some(s => s.scene_id === selectedSceneId.value)
+})
+
+const showRefreshSelector = computed(() => {
+  return overview.value?.time_series?.has_running === true
 })
 
 const timeWindowDisplay = computed(() => {
@@ -244,13 +256,23 @@ const durationDisplay = computed(() => {
   return ''
 })
 
-function selectScene(sceneId: string) {
-  selectedSceneId.value = sceneId
-  fetchOverview()
-}
-
 function onSceneChange() {
   fetchOverview()
+  userAdjustedZoom.value = false
+}
+
+function onRefreshIntervalChange() {
+  restartPolling()
+}
+
+function restartPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  const interval = refreshInterval.value * 1000
+  pollTimer = setInterval(() => {
+    if (!userAdjustedZoom.value) {
+      fetchOverview()
+    }
+  }, interval)
 }
 
 async function loadHistoryData() {
@@ -329,16 +351,6 @@ function syncRunningStatus() {
   }
 }
 
-function formatTime(timeStr?: string): string {
-  if (!timeStr) return '-'
-  return new Date(timeStr).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 function formatDateTime(timeStr?: string): string {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
@@ -351,43 +363,15 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = Math.floor(seconds % 60)
-  
+  const pad = (n: number) => String(n).padStart(2, '0')
+
   if (hours > 0) {
-    return `${hours}小时${minutes}分${secs}秒`
+    return `${hours}小时${pad(minutes)}分${pad(secs)}秒`
   } else if (minutes > 0) {
-    return `${minutes}分${secs}秒`
+    return `${minutes}分${pad(secs)}秒`
   } else {
     return `${secs}秒`
   }
-}
-
-function getDuration(run: RunHistoryDTO): number {
-  if (!run.started_at || !run.finished_at) return 0
-  const start = new Date(run.started_at).getTime()
-  const end = new Date(run.finished_at).getTime()
-  return (end - start) / 1000
-}
-
-function renderChartsFromHistory(run: RunHistoryDTO) {
-  const samples = run.global_samples
-  if (!samples?.length) return
-
-  const timestamps = samples.map(s => new Date(s.timestamp * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
-  const qpsData = samples.map(s => s.qps)
-  const p50Data = samples.map(s => s.p50_latency_ms)
-  const p95Data = samples.map(s => s.p95_latency_ms)
-  const p99Data = samples.map(s => s.p99_latency_ms)
-  const errorRateData = samples.map(s => s.total_requests > 0 ? (s.fail_count / s.total_requests) * 100 : 0)
-
-  renderQpsChartWithData(timestamps, qpsData)
-  renderLatencyChartWithData(timestamps, p50Data, p95Data, p99Data)
-  renderErrorChartWithData(timestamps, errorRateData)
-}
-
-function renderChartsFromOverview() {
-  renderQpsChart()
-  renderLatencyChart()
-  renderErrorChart()
 }
 
 const runTimeRange = computed(() => {
@@ -413,7 +397,7 @@ const runTimeRange = computed(() => {
   return `${s} ~ ${e}`
 })
 
-function getNodeTimeRange(node: any): string {
+function getNodeTimeRange(_node: any): string {
   const runningRun = overview.value?.recent_runs?.find(r => r.status === 'running')
   
   if (runningRun && overview.value?.recent_runs?.[0]?.started_at) {
@@ -604,47 +588,7 @@ function getTooltipConfig() {
 function getFilteredTimeSeries() {
   const ts = overview.value?.time_series
   if (ts && ts.timestamps?.length) {
-    const runs = overview.value?.recent_runs
-    if (!runs?.length) return ts
-
-    const earliestStart = runs.reduce((earliest: string | null, run: any) => {
-      if (!run.started_at) return earliest
-      if (!earliest || new Date(run.started_at) < new Date(earliest)) {
-        return run.started_at
-      }
-      return earliest
-    }, null)
-
-    if (!earliestStart) return ts
-
-    const startTime = new Date(earliestStart).getTime()
-    const minTime = startTime - 60 * 1000
-
-    let startIndex = 0
-    for (let i = 0; i < ts.timestamps.length; i++) {
-      const tsStr = ts.timestamps[i]
-      const tsParts = tsStr.split(':')
-      if (tsParts.length === 3) {
-        const [hours, minutes, seconds] = tsParts.map(Number)
-        const today = new Date()
-        const tsDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds)
-        if (tsDate.getTime() >= minTime) {
-          startIndex = i
-          break
-        }
-      }
-    }
-
-    if (startIndex === 0) return ts
-
-    return {
-      timestamps: ts.timestamps.slice(startIndex),
-      qps: ts.qps?.slice(startIndex),
-      p50: ts.p50?.slice(startIndex),
-      p95: ts.p95?.slice(startIndex),
-      p99: ts.p99?.slice(startIndex),
-      error_rate: ts.error_rate?.slice(startIndex),
-    }
+    return ts
   }
 
   const firstRun = historyData.value?.[0]
@@ -688,6 +632,10 @@ function renderQpsChart() {
     series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
     tooltip: getTooltipConfig(),
   }, true)
+  qpsChart.off('datazoom')
+  qpsChart.on('datazoom', () => {
+    userAdjustedZoom.value = true
+  })
 }
 
 function renderLatencyChart() {
@@ -721,6 +669,10 @@ function renderLatencyChart() {
     tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
   }, true)
+  latencyChart.off('datazoom')
+  latencyChart.on('datazoom', () => {
+    userAdjustedZoom.value = true
+  })
 }
 
 function renderErrorChart() {
@@ -760,103 +712,10 @@ function renderErrorChart() {
     }],
     tooltip: getTooltipConfig(),
   }, true)
-}
-
-function renderQpsChartWithData(timestamps: string[], qpsData: number[]) {
-  if (!qpsChartRef.value) return
-  if (!qpsChart) {
-    qpsChart = echarts.init(qpsChartRef.value)
-  }
-  const theme = getChartTheme()
-  if (!timestamps.length) {
-    qpsChart.setOption({
-      backgroundColor: theme.bgColor,
-      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
-      xAxis: { show: false },
-      yAxis: { show: false },
-      series: [],
-    })
-    return
-  }
-  qpsChart.setOption({
-    backgroundColor: theme.bgColor,
-    grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
-    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: qpsData, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
-    tooltip: getTooltipConfig(),
-  }, true)
-}
-
-function renderLatencyChartWithData(timestamps: string[], p50Data: number[], p95Data: number[], p99Data: number[]) {
-  if (!latencyChartRef.value) return
-  if (!latencyChart) {
-    latencyChart = echarts.init(latencyChartRef.value)
-  }
-  const theme = getChartTheme()
-  if (!timestamps.length) {
-    latencyChart.setOption({
-      backgroundColor: theme.bgColor,
-      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
-      xAxis: { show: false },
-      yAxis: { show: false },
-      series: [],
-    })
-    return
-  }
-  latencyChart.setOption({
-    backgroundColor: theme.bgColor,
-    grid: { top: 30, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
-    xAxis: { type: 'category', data: timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
-    series: [
-      { name: 'P50', data: p50Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
-      { name: 'P95', data: p95Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
-      { name: 'P99', data: p99Data, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
-    ],
-    tooltip: getTooltipConfig(),
-    legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
-  }, true)
-}
-
-function renderErrorChartWithData(timestamps: string[], errorRateData: number[]) {
-  if (!errorChartRef.value) return
-  if (!errorChart) {
-    errorChart = echarts.init(errorChartRef.value)
-  }
-  const theme = getChartTheme()
-  if (!timestamps.length) {
-    errorChart.setOption({
-      backgroundColor: theme.bgColor,
-      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
-      xAxis: { show: false },
-      yAxis: { show: false },
-      series: [],
-    })
-    return
-  }
-  const isSmooth = errorChartType.value === 'smooth'
-  const maxErrRate = Math.max(...errorRateData, 0.01)
-  errorChart.setOption({
-    backgroundColor: theme.bgColor,
-    grid: { top: 16, right: 16, bottom: 44, left: 50 },
-    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
-    xAxis: { type: 'category', data: timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(timestamps.length / 8) }, splitLine: { show: false } },
-    yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
-    series: [{
-      name: '错误率',
-      data: errorRateData,
-      type: 'line',
-      smooth: isSmooth,
-      step: isSmooth ? undefined : 'middle',
-      symbol: 'none',
-      lineStyle: { width: 2, color: theme.colors.danger },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.01)` }]) }
-    }],
-    tooltip: getTooltipConfig(),
-  }, true)
+  errorChart.off('datazoom')
+  errorChart.on('datazoom', () => {
+    userAdjustedZoom.value = true
+  })
 }
 
 function renderNodeDetailChart(nodeId: string) {
@@ -913,7 +772,7 @@ function renderNodeDetailChart(nodeId: string) {
         { type: 'value', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}' } },
       ] : { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
       tooltip: getTooltipConfig(),
-      series: series.map((s, idx) => ({
+      series: series.map((s) => ({
         name: s.name,
         type: s.type || 'line',
         smooth: isSmooth,
@@ -991,11 +850,6 @@ onMounted(() => {
   fetchOverview()
   loadHistoryData()
 
-  pollTimer = setInterval(() => {
-    fetchSceneList()
-    fetchOverview()
-  }, 5000)
-
   setTimeout(() => {
     renderQpsChart()
     renderLatencyChart()
@@ -1011,14 +865,7 @@ onMounted(() => {
     }
   }, { immediate: true })
   
-  pollTimer = setInterval(() => {
-    fetchOverview()
-    setTimeout(() => {
-      renderQpsChart()
-      renderLatencyChart()
-      renderErrorChart()
-    }, 100)
-  }, 5000)
+  restartPolling()
 
   timeRefreshTimer = setInterval(() => {
     if (overview.value?.recent_runs?.some(r => r.status === 'running')) {
@@ -1197,6 +1044,33 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 11px;
   animation: blink 1.5s infinite;
+}
+
+.refresh-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.refresh-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.refresh-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 @keyframes blink {

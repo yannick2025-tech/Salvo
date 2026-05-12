@@ -513,6 +513,20 @@ func (r *ReportRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Repor
 	return rp, nil
 }
 
+func (r *ReportRepo) GetByRunID(ctx context.Context, runID snowflake.ID) (*model.Report, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
+		FROM reports WHERE run_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, runID)
+	rp := &model.Report{}
+	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
+		&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+		&rp.CreatedAt, &rp.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return rp, nil
+}
+
 func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Report, error) {
 	query := `SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
 		FROM reports WHERE deleted_at IS NULL`

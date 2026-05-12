@@ -522,12 +522,15 @@ type NodeMetricDTO struct {
 }
 
 type TimeSeriesDTO struct {
-	Timestamps []string  `json:"timestamps"`
-	QPS        []float64 `json:"qps"`
-	P50        []float64 `json:"p50"`
-	P95        []float64 `json:"p95"`
-	P99        []float64 `json:"p99"`
-	ErrorRate  []float64 `json:"error_rate"`
+	Timestamps  []string  `json:"timestamps"`
+	QPS         []float64 `json:"qps"`
+	P50         []float64 `json:"p50"`
+	P95         []float64 `json:"p95"`
+	P99         []float64 `json:"p99"`
+	ErrorRate   []float64 `json:"error_rate"`
+	WindowStart string    `json:"window_start,omitempty"`
+	WindowEnd   string    `json:"window_end,omitempty"`
+	HasRunning  bool      `json:"has_running"`
 }
 
 // --- Dashboard History DTOs ---

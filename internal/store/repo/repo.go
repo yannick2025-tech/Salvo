@@ -82,6 +82,7 @@ type PluginConfigRepo interface {
 type ReportRepo interface {
 	Create(ctx context.Context, report *model.Report) error
 	GetByID(ctx context.Context, id snowflake.ID) (*model.Report, error)
+	GetByRunID(ctx context.Context, runID snowflake.ID) (*model.Report, error)
 	List(ctx context.Context, filter Filter) ([]*model.Report, error)
 	Update(ctx context.Context, report *model.Report) error
 	Delete(ctx context.Context, id snowflake.ID) error

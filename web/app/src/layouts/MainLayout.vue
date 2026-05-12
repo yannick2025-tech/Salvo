@@ -154,7 +154,7 @@ const SettingsIcon = {
 }
 
 const allMenuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+  { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
   { path: '/scenes', label: '场景管理', icon: SceneIcon },
   { path: '/runner', label: '运行控制', icon: RunnerIcon },
   { path: '/reports', label: '测试报告', icon: ReportIcon },
@@ -171,7 +171,7 @@ const menuItems = computed(() => {
 })
 
 const currentRouteLabel = computed(() => {
-  return (route.name as string) || 'Dashboard'
+  return (route.name as string) || '仪表盘'
 })
 
 function isActive(path: string) {

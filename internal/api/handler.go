@@ -1295,6 +1295,33 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, "failed to list runs")
 	}
 
+	if sceneID > 0 && len(runRecords) > 0 {
+		var earliest, latest time.Time
+		for _, rr := range runRecords {
+			if rr.StartedAt != nil && (earliest.IsZero() || rr.StartedAt.Before(earliest)) {
+				earliest = *rr.StartedAt
+			}
+			if rr.FinishedAt != nil && (latest.IsZero() || rr.FinishedAt.After(latest)) {
+				latest = *rr.FinishedAt
+			}
+		}
+
+		if !earliest.IsZero() {
+			now := time.Now()
+			var endTime time.Time
+			if !latest.IsZero() && latest.After(now) {
+				endTime = latest
+			} else {
+				endTime = now
+			}
+			timeSinceEarliest := int(endTime.Sub(earliest).Seconds())
+			sceneRange := timeSinceEarliest + 300
+			if sceneRange > rangeSeconds {
+				rangeSeconds = sceneRange
+			}
+		}
+	}
+
 	runningMap := make(map[string]*runner.Runner)
 	if rm := h.runnerMgr.List(); len(rm) > 0 {
 		for sceneID, rn := range rm {
@@ -1310,9 +1337,10 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	var runningDuration float64
 	var startedAt, finishedAt *time.Time
 
-	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
 	var recentRuns []dto.RunRecordDTO
 	var seriesRuns []dto.RunRecordDTO
+
+	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
 
 	for _, rr := range runRecords {
 		dtoRR := toRunRecordDTO(rr)
@@ -1449,6 +1477,8 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	var ts *dto.TimeSeriesDTO
 	if len(seriesRuns) > 0 {
 		ts = h.buildTimeSeriesWithDB(r.Context(), seriesRuns, rangeSeconds)
+	} else if len(recentRuns) > 0 && running == 0 {
+		ts = h.buildTimeSeriesWithDB(r.Context(), recentRuns, rangeSeconds)
 	}
 
 	response := dto.DashboardOverviewDTO{
@@ -1496,30 +1526,33 @@ func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 	var history []dto.RunHistoryDTO
 	for _, rr := range runRecords {
 		timeSeriesData, tsErr := h.tsStore.QueryByRunID(r.Context(), rr.ID)
-		if tsErr != nil {
-			continue
-		}
 
 		globalSamples := make([]dto.TimeSeriesSampleDTO, 0)
 		nodeSamplesMap := make(map[string][]dto.TimeSeriesSampleDTO)
 
-		for _, record := range timeSeriesData {
-			sample := dto.TimeSeriesSampleDTO{
-				Timestamp:     record.SampleTime.Unix(),
-				QPS:           record.QPS,
-				TotalRequests: record.TotalRequests,
-				SuccessCount:  record.SuccessCount,
-				FailCount:     record.FailCount,
-				AvgLatencyMs:  record.AvgLatencyMs,
-				P50LatencyMs:  record.P50LatencyMs,
-				P95LatencyMs:  record.P95LatencyMs,
-				P99LatencyMs:  record.P99LatencyMs,
+		if tsErr == nil && len(timeSeriesData) > 0 {
+			for _, record := range timeSeriesData {
+				sample := dto.TimeSeriesSampleDTO{
+					Timestamp:     record.SampleTime.Unix(),
+					QPS:           record.QPS,
+					TotalRequests: record.TotalRequests,
+					SuccessCount:  record.SuccessCount,
+					FailCount:     record.FailCount,
+					AvgLatencyMs:  record.AvgLatencyMs,
+					P50LatencyMs:  record.P50LatencyMs,
+					P95LatencyMs:  record.P95LatencyMs,
+					P99LatencyMs:  record.P99LatencyMs,
+				}
+				if record.NodeID == "" {
+					globalSamples = append(globalSamples, sample)
+				} else {
+					nodeSamplesMap[record.NodeID] = append(nodeSamplesMap[record.NodeID], sample)
+				}
 			}
-
-			if record.NodeID == "" {
-				globalSamples = append(globalSamples, sample)
-			} else {
-				nodeSamplesMap[record.NodeID] = append(nodeSamplesMap[record.NodeID], sample)
+		} else {
+			report, rptErr := h.reports.GetByRunID(r.Context(), rr.ID)
+			if rptErr == nil && report != nil && len(report.Detail) > 0 {
+				globalSamples, nodeSamplesMap = h.extractTimeSeriesFromReportDetail(report.Detail)
 			}
 		}
 
@@ -1545,6 +1578,77 @@ func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 		History: history,
 		Total:   len(history),
 	})
+}
+
+func (h *Handler) extractTimeSeriesFromReportDetail(detailJSON string) ([]dto.TimeSeriesSampleDTO, map[string][]dto.TimeSeriesSampleDTO) {
+	globalSamples := make([]dto.TimeSeriesSampleDTO, 0)
+	nodeSamplesMap := make(map[string][]dto.TimeSeriesSampleDTO)
+
+	var detail struct {
+		GlobalTimeSeries []struct {
+			Timestamp     time.Time `json:"t"`
+			QPS           float64   `json:"qps"`
+			TotalRequests int64     `json:"total"`
+			SuccessCount  int64     `json:"success"`
+			FailCount     int64     `json:"fail"`
+			AvgLatencyMs  float64   `json:"avg_ms"`
+			P50LatencyMs  float64   `json:"p50_ms"`
+			P90LatencyMs  float64   `json:"p90_ms"`
+			P95LatencyMs  float64   `json:"p95_ms"`
+			P99LatencyMs  float64   `json:"p99_ms"`
+		} `json:"global_time_series"`
+		NodeMetrics []struct {
+			NodeID     string `json:"node_id"`
+			TimeSeries []struct {
+				Timestamp     time.Time `json:"t"`
+				QPS           float64   `json:"qps"`
+				TotalRequests int64     `json:"total"`
+				SuccessCount  int64     `json:"success"`
+				FailCount     int64     `json:"fail"`
+				AvgLatencyMs  float64   `json:"avg_ms"`
+				P50LatencyMs  float64   `json:"p50_ms"`
+				P90LatencyMs  float64   `json:"p90_ms"`
+				P95LatencyMs  float64   `json:"p95_ms"`
+				P99LatencyMs  float64   `json:"p99_ms"`
+			} `json:"time_series"`
+		} `json:"node_metrics"`
+	}
+
+	if err := json.Unmarshal([]byte(detailJSON), &detail); err != nil {
+		return globalSamples, nodeSamplesMap
+	}
+
+	for _, ts := range detail.GlobalTimeSeries {
+		globalSamples = append(globalSamples, dto.TimeSeriesSampleDTO{
+			Timestamp:     ts.Timestamp.Unix(),
+			QPS:           ts.QPS,
+			TotalRequests: ts.TotalRequests,
+			SuccessCount:  ts.SuccessCount,
+			FailCount:     ts.FailCount,
+			AvgLatencyMs:  ts.AvgLatencyMs,
+			P50LatencyMs:  ts.P50LatencyMs,
+			P95LatencyMs:  ts.P95LatencyMs,
+			P99LatencyMs:  ts.P99LatencyMs,
+		})
+	}
+
+	for _, node := range detail.NodeMetrics {
+		for _, ts := range node.TimeSeries {
+			nodeSamplesMap[node.NodeID] = append(nodeSamplesMap[node.NodeID], dto.TimeSeriesSampleDTO{
+				Timestamp:     ts.Timestamp.Unix(),
+				QPS:           ts.QPS,
+				TotalRequests: ts.TotalRequests,
+				SuccessCount:  ts.SuccessCount,
+				FailCount:     ts.FailCount,
+				AvgLatencyMs:  ts.AvgLatencyMs,
+				P50LatencyMs:  ts.P50LatencyMs,
+				P95LatencyMs:  ts.P95LatencyMs,
+				P99LatencyMs:  ts.P99LatencyMs,
+			})
+		}
+	}
+
+	return globalSamples, nodeSamplesMap
 }
 
 func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
@@ -1675,7 +1779,7 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 			bucketDurSec := totalDur.Seconds() / float64(numBuckets)
 			for i := range buckets {
 				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
-				timestamps[i] = bucketTime.Format("15:04:05")
+				timestamps[i] = bucketTime.Local().Format("15:04:05")
 				if len(buckets[i]) > 0 {
 					sort.Float64s(buckets[i])
 					tsAvg[i] = avgFloat64(buckets[i])
@@ -1695,11 +1799,10 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 			nm.TSAvg = tsAvg
 			nm.TSQPS = tsQPS
 		} else {
-			// Generate empty time series for nodes with no duration data
 			timestamps := make([]string, numBuckets)
 			for i := 0; i < numBuckets; i++ {
 				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
-				timestamps[i] = bucketTime.Format("15:04:05")
+				timestamps[i] = bucketTime.Local().Format("15:04:05")
 			}
 			nm.Timestamps = timestamps
 			nm.TSP50 = make([]float64, numBuckets)
@@ -1851,7 +1954,7 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 			bucketDurSec := totalDur.Seconds() / float64(numBuckets)
 			for i := range buckets {
 				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
-				timestamps[i] = bucketTime.Format("15:04:05")
+				timestamps[i] = bucketTime.Local().Format("15:04:05")
 				if len(buckets[i]) > 0 {
 					sort.Float64s(buckets[i])
 					tsAvg[i] = avgFloat64(buckets[i])
@@ -1874,7 +1977,7 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 			timestamps := make([]string, numBuckets)
 			for i := 0; i < numBuckets; i++ {
 				bucketTime := globalStart.Add(time.Duration(i)*bucketSize + bucketSize/2)
-				timestamps[i] = bucketTime.Format("15:04:05")
+				timestamps[i] = bucketTime.Local().Format("15:04:05")
 			}
 			nm.Timestamps = timestamps
 			nm.TSP50 = make([]float64, numBuckets)
@@ -1999,7 +2102,7 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 
 	for i := 0; i < points; i++ {
 		t := now.Add(-time.Duration((points-i)*int(interval)) * time.Second)
-		timestamps[i] = t.Format("15:04:05")
+		timestamps[i] = t.Local().Format("15:04:05")
 		bucketEnd := t.Add(time.Duration(interval) * time.Second)
 
 		for _, run := range runs {
@@ -2042,10 +2145,42 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 }
 
 func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecordDTO, rangeSeconds int) *dto.TimeSeriesDTO {
-	points := min(rangeSeconds, 120)
-	interval := float64(rangeSeconds) / float64(points)
+	var windowStart, windowEnd time.Time
+	hasRunning := false
 
-	now := time.Now()
+	for _, run := range runs {
+		if run.StartedAt != nil {
+			runStart := *run.StartedAt
+			if windowStart.IsZero() || runStart.Before(windowStart) {
+				windowStart = runStart
+			}
+		}
+		if run.Status == "running" {
+			hasRunning = true
+			windowEnd = time.Now()
+		} else if run.FinishedAt != nil {
+			if windowEnd.IsZero() || run.FinishedAt.After(windowEnd) {
+				windowEnd = *run.FinishedAt
+			}
+		}
+	}
+
+	if !hasRunning && !windowStart.IsZero() && !windowEnd.IsZero() {
+		windowStart = windowStart.Add(-time.Minute)
+		windowEnd = windowEnd.Add(time.Minute)
+	} else if hasRunning && !windowStart.IsZero() {
+		windowStart = windowStart.Add(-time.Minute)
+		windowEnd = time.Now()
+	}
+
+	actualRangeSec := int(windowEnd.Sub(windowStart).Seconds())
+	if actualRangeSec < 60 {
+		actualRangeSec = 60
+	}
+
+	points := min(actualRangeSec, 120)
+	interval := float64(actualRangeSec) / float64(points)
+
 	timestamps := make([]string, points)
 	qps := make([]float64, points)
 	p50 := make([]float64, points)
@@ -2054,8 +2189,8 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 	errRate := make([]float64, points)
 
 	for i := 0; i < points; i++ {
-		t := now.Add(-time.Duration((points-i)*int(interval)) * time.Second)
-		timestamps[i] = t.Format("15:04:05")
+		t := windowStart.Add(time.Duration(float64(i)*interval) * time.Second)
+		timestamps[i] = t.Local().Format("15:04:05")
 		bucketEnd := t.Add(time.Duration(interval) * time.Second)
 
 		for _, run := range runs {
@@ -2114,11 +2249,14 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 	}
 
 	return &dto.TimeSeriesDTO{
-		Timestamps: timestamps,
-		QPS:        qps,
-		P50:        p50,
-		P95:        p95,
-		P99:        p99,
-		ErrorRate:  errRate,
+		Timestamps:  timestamps,
+		QPS:         qps,
+		P50:         p50,
+		P95:         p95,
+		P99:         p99,
+		ErrorRate:   errRate,
+		WindowStart: windowStart.Local().Format("2006-01-02T15:04:05"),
+		WindowEnd:   windowEnd.Local().Format("2006-01-02T15:04:05"),
+		HasRunning:  hasRunning,
 	}
 }

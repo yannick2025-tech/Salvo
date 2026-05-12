@@ -49,11 +49,11 @@
         <div v-for="run in activeRuns" :key="run.id" class="run-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
-            <span class="status running">RUNNING</span>
+            <span class="status running">运行中</span>
           </div>
           <div class="run-footer">
             <div class="run-metrics">
-              <div class="metric"><span class="metric-label">Workers</span><span class="metric-val">{{ run.worker_count }}</span></div>
+              <div class="metric"><span class="metric-label">工作线程</span><span class="metric-val">{{ run.worker_count }}</span></div>
               <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
               <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
               <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
@@ -85,7 +85,7 @@
         <div v-for="run in recentFailedRuns" :key="'fail-'+run.id" class="run-item failed-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
-            <span class="status failed">FAILED</span>
+            <span class="status failed">已失败</span>
           </div>
           <div v-if="run.error_msg" class="error-msg">{{ run.error_msg }}</div>
           <div class="run-metrics">
@@ -123,7 +123,7 @@
             <td>{{ r.scene_id }}</td>
             <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
             <td>{{ Math.round(r.worker_count || 0) }}</td>
-            <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? 'Duration' : 'Count' }}</span></td>
+            <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? '持续时间' : '请求数' }}</span></td>
             <td class="mono">{{ r.run_mode === 'duration' ? Math.round(r.duration || 0) + 's' : (r.count || 0).toLocaleString() }}</td>
             <td>{{ r.total_reqs }}</td>
             <td>{{ ((r.success_reqs / Math.max(r.total_reqs, 1)) * 100).toFixed(2) }}%</td>
@@ -286,7 +286,9 @@ function formatMs(sec: number): string {
 
 function formatTime(t?: string) {
   if (!t) return '-'
-  return new Date(t).toLocaleString()
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function getSceneName(sceneId: string): string {

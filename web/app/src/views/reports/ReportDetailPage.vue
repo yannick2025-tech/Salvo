@@ -3,12 +3,12 @@
     <div class="page-header">
       <button class="btn-back" @click="$router.push('/reports')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back
+        返回
       </button>
-      <h2>Test Report</h2>
+      <h2>测试报告</h2>
       <button class="btn-export" @click="exportHTML" :disabled="!report">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export HTML
+        导出 HTML
       </button>
     </div>
 
@@ -17,51 +17,51 @@
       <!-- Metrics Row: expanded with Peak QPS / Throughput / TTFB / Min -->
       <div class="metrics-row">
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="成功请求数占总请求数的百分比">Success Rate</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="成功请求数占总请求数的百分比">成功率</div>
           <div class="metric-value" :style="{ color: successRateColor }">{{ formatSuccessRate(metrics.success_rate) }}</div>
-          <div class="metric-sub">{{ metrics.success_reqs }} / {{ metrics.total_reqs }} requests</div>
+          <div class="metric-sub">{{ metrics.success_reqs }} / {{ metrics.total_reqs }} 次请求</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间发送的 HTTP 请求总数">Total Requests</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间发送的 HTTP 请求总数">总请求数</div>
           <div class="metric-value" style="color: var(--accent-primary)">{{ Number(metrics.total_reqs || 0).toLocaleString() }}</div>
-          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(1) + 's' : '-' }} duration</div>
+          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(1) + 's' : '-' }} 持续时间</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">Peak QPS</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">峰值QPS</div>
           <div class="metric-value" style="color: var(--accent-info)">{{ fmtPeakQPS }}</div>
-          <div class="metric-sub">{{ calcQPS }} avg QPS</div>
+          <div class="metric-sub">{{ calcQPS }} 平均QPS</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">Throughput</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">吞吐量</div>
           <div class="metric-value" style="color: var(--accent-success)">{{ fmtThroughput }}</div>
-          <div class="metric-sub">{{ metrics.worker_count || '-' }} workers</div>
+          <div class="metric-sub">{{ metrics.worker_count || '-' }} 工作线程</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="所有请求的平均响应时间（算术平均值）">Avg Latency</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="所有请求的平均响应时间（算术平均值）">平均延迟</div>
           <div class="metric-value" style="color: var(--accent-info)">{{ fmtLatency3(metrics.avg_latency_s) }}</div>
           <div class="metric-sub">P50 {{ fmtLatency3(metrics.p50_latency_s) }}</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="第90百分位延迟 - 90% 的请求在此时间内完成">P90 Latency</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="第90百分位延迟 - 90% 的请求在此时间内完成">P90延迟</div>
           <div class="metric-value" style="color: var(--accent-warning)">{{ fmtLatency3(metrics.p90_latency_s) }}</div>
           <div class="metric-sub">P95 {{ fmtLatency3(metrics.p95_latency_s) }}</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="首字节时间 - 等待第一个响应字节的平均时间">TTFB</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="首字节时间 - 等待第一个响应字节的平均时间">首字节时间</div>
           <div class="metric-value" style="color: var(--accent-primary)">{{ fmtTTFB }}</div>
-          <div class="metric-sub">Min {{ fmtMinLatency }}</div>
+          <div class="metric-sub">最小值 {{ fmtMinLatency }}</div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-label tooltip-wrapper" data-tooltip="第99百分位延迟 - 99% 的请求在此时间内完成（最坏情况）">P99 Latency</div>
+          <div class="metric-label tooltip-wrapper" data-tooltip="第99百分位延迟 - 99% 的请求在此时间内完成（最坏情况）">P99延迟</div>
           <div class="metric-value" style="color: var(--accent-danger)">{{ fmtLatency3(metrics.p99_latency_s) }}</div>
-          <div class="metric-sub">{{ fmtErrorRate }} error rate</div>
+          <div class="metric-sub">{{ fmtErrorRate }} 错误率</div>
         </div>
       </div>
 
@@ -69,16 +69,16 @@
       <div class="charts-row">
         <div class="chart-card">
           <div class="chart-header">
-            <h3>Request Distribution</h3>
-            <div class="chart-tip">Success vs Failed breakdown</div>
+            <h3>请求分布</h3>
+            <div class="chart-tip">成功/失败分布</div>
           </div>
           <div class="chart-body" ref="overviewChartRef"></div>
         </div>
 
         <div class="chart-card">
           <div class="chart-header">
-            <h3>Error Rate Trend</h3>
-            <div class="chart-tip">Failed / Total per interval</div>
+            <h3>错误率趋势</h3>
+            <div class="chart-tip">每区间失败/总数</div>
           </div>
           <div class="chart-body" ref="errorRateChartRef"></div>
           <div class="chart-type-toggle">
@@ -92,8 +92,8 @@
       <div class="charts-row" v-if="errorBreakdown.length > 0">
         <div class="chart-card wide">
           <div class="chart-header">
-            <h3>Error Breakdown</h3>
-            <div class="chart-tip">Errors grouped by HTTP status code</div>
+            <h3>错误明细</h3>
+            <div class="chart-tip">按HTTP状态码分组</div>
           </div>
           <div class="chart-body" ref="errorBreakdownChartRef"></div>
         </div>
@@ -103,8 +103,8 @@
       <div class="charts-row">
         <div class="chart-card wide">
           <div class="chart-header">
-            <h3>Latency Percentiles</h3>
-            <div class="chart-tip">Avg / P50 / P90 / P95 / P99 (ms)</div>
+            <h3>延迟百分位</h3>
+            <div class="chart-tip">均值/P50/P90/P95/P99 (ms)</div>
           </div>
           <div class="chart-body" ref="latencyChartRef"></div>
         </div>
@@ -113,36 +113,36 @@
       <!-- Run Info & Performance Summary -->
       <div class="info-section">
         <div class="info-card">
-          <h3>Run Configuration</h3>
+          <h3>运行时配置</h3>
           <table class="info-table">
-            <tr><td class="info-label">Mode</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
-            <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">Planned Duration</td><td>{{ getPlannedDuration() }}s</td></tr>
-            <tr v-if="metrics.run_mode === 'count'"><td class="info-label">Planned Count</td><td>{{ getPlannedCount() }} times</td></tr>
-            <tr><td class="info-label">Actual {{ metrics.run_mode === 'duration' ? 'Duration' : 'Count' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(2) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' times' }}</td></tr>
-            <tr><td class="info-label">Concurrency</td><td>{{ metrics.worker_count || '-' }}</td></tr>
-            <tr><td class="info-label">Status</td><td>
+            <tr><td class="info-label">运行模式</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
+            <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">计划持续时间</td><td>{{ getPlannedDuration() }}s</td></tr>
+            <tr v-if="metrics.run_mode === 'count'"><td class="info-label">计划请求数</td><td>{{ getPlannedCount() }} 次</td></tr>
+            <tr><td class="info-label">实际{{ metrics.run_mode === 'duration' ? '持续时间' : '请求数' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(2) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' 次' }}</td></tr>
+            <tr><td class="info-label">并发数</td><td>{{ metrics.worker_count || '-' }}</td></tr>
+            <tr><td class="info-label">状态</td><td>
               <span :class="['status-badge', report.status]" class="tooltip-wrapper" :data-tooltip="getStatusTooltip(report.status)">{{ getStatusLabel(report.status) }}</span>
             </td></tr>
-            <tr><td class="info-label">Time Range</td><td class="mono-sm">{{ formatTime(report.started_at) }} ~ {{ formatTime(report.finished_at) }}</td></tr>
+            <tr><td class="info-label">时间范围</td><td class="mono-sm">{{ formatTime(report.started_at) }} ~ {{ formatTime(report.finished_at) }}</td></tr>
           </table>
         </div>
 
         <div class="info-card">
-          <h3>Performance Summary</h3>
+          <h3>性能概览</h3>
           <div class="perf-list">
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有请求的平均延迟（算术平均值）">Avg</span><span class="perf-v">{{ fmtLatency3(metrics.avg_latency_s) }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有请求的平均延迟（算术平均值）">均值</span><span class="perf-v">{{ fmtLatency3(metrics.avg_latency_s) }}</span></div>
             <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第50百分位 - 中位数延迟，50% 的请求快于此值">P50</span><span class="perf-v">{{ fmtLatency3(metrics.p50_latency_s) }}</span></div>
             <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第90百分位 - 90% 的请求在此时间内完成">P90</span><span class="perf-v">{{ fmtLatency3(metrics.p90_latency_s) }}</span></div>
             <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第95百分位 - 95% 的请求在此时间内完成">P95</span><span class="perf-v">{{ fmtLatency3(metrics.p95_latency_s) }}</span></div>
             <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="第99百分位 - 99% 的请求完成（最坏情况尾部延迟）">P99</span><span class="perf-v">{{ fmtLatency3(metrics.p99_latency_s) }}</span></div>
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="观察到的最小响应时间（最快请求）">Min</span><span class="perf-v">{{ fmtMinLatency }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="观察到的最小响应时间（最快请求）">最小值</span><span class="perf-v">{{ fmtMinLatency }}</span></div>
             <div class="perf-divider"></div>
             <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="首字节时间 - 等待第一个响应字节的平均时间">TTFB</span><span class="perf-v">{{ fmtTTFB }}</span></div>
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">Peak QPS</span><span class="perf-v highlight-blue">{{ fmtPeakQPS }}</span></div>
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">Throughput</span><span class="perf-v success">{{ fmtThroughput }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="测试期间达到的最大每秒查询数">峰值QPS</span><span class="perf-v highlight-blue">{{ fmtPeakQPS }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="所有 worker 平均每秒处理的请求数">吞吐量</span><span class="perf-v success">{{ fmtThroughput }}</span></div>
             <div class="perf-divider"></div>
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="成功的 HTTP 请求总数（2xx/3xx 状态码）">Success</span><span class="perf-v success">{{ Number(metrics.success_reqs || 0).toLocaleString() }}</span></div>
-            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="失败的请求总数（4xx/5xx/错误/超时）">Failed</span><span class="perf-v danger">{{ Number(metrics.failed_reqs || 0).toLocaleString() }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="成功的 HTTP 请求总数（2xx/3xx 状态码）">成功数</span><span class="perf-v success">{{ Number(metrics.success_reqs || 0).toLocaleString() }}</span></div>
+            <div class="perf-row"><span class="perf-k tooltip-wrapper" data-tooltip="失败的请求总数（4xx/5xx/错误/超时）">失败数</span><span class="perf-v danger">{{ Number(metrics.failed_reqs || 0).toLocaleString() }}</span></div>
           </div>
         </div>
       </div>
@@ -150,13 +150,13 @@
       <!-- Trend Charts Section -->
       <section class="charts-section">
         <div class="charts-toolbar">
-          <h3>Trend Analysis</h3>
+          <h3>趋势分析</h3>
         </div>
 
         <div class="charts-row">
           <div class="chart-card wide">
             <div class="chart-header">
-              <h3>QPS Trend</h3>
+              <h3>QPS趋势</h3>
             </div>
             <div class="chart-body" ref="qpsChartRef"></div>
             <div class="chart-type-toggle">
@@ -169,7 +169,7 @@
         <div class="charts-row">
           <div class="chart-card wide">
             <div class="chart-header">
-              <h3>Latency Trend</h3>
+              <h3>延迟趋势</h3>
               <div class="chart-tip">P50 / P90 / P95 / P99</div>
             </div>
             <div class="chart-body" ref="latencyTrendChartRef"></div>
@@ -183,22 +183,22 @@
 
       <!-- Node Ranking Table -->
       <section v-if="nodeTimeSeries && nodeTimeSeries.length > 0" class="nodes-section">
-        <h3>Node Ranking</h3>
+        <h3>节点排名</h3>
         <div class="ranking-table-wrap">
           <table class="ranking-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Node</th>
-                <th>Total Reqs</th>
-                <th>Success</th>
-                <th>Failed</th>
-                <th>Success Rate</th>
+                <th>排名</th>
+                <th>节点</th>
+                <th>总请求</th>
+                <th>成功</th>
+                <th>失败</th>
+                <th>成功率</th>
                 <th>P50</th>
                 <th>P90</th>
                 <th>P95</th>
-                <th>Avg QPS</th>
-                <th>Peak QPS</th>
+                <th>平均QPS</th>
+                <th>峰值QPS</th>
               </tr>
             </thead>
             <tbody>
@@ -222,7 +222,7 @@
 
       <!-- Node Details with charts -->
       <section v-if="nodeTimeSeries && nodeTimeSeries.length > 0" class="nodes-section">
-        <h3>Node Details</h3>
+        <h3>节点详情</h3>
         <div v-for="(node, idx) in nodeTimeSeries" :key="node.node_id" class="chart-card">
           <div class="chart-header">
             <h3>{{ node.name || node.node_id }}</h3>
@@ -245,7 +245,7 @@
 
     <div v-else-if="!report" class="empty-state">
       <div class="spinner"></div>
-      <p>Loading...</p>
+      <p>加载中...</p>
     </div>
   </div>
 </template>
@@ -497,18 +497,87 @@ function renderAll() {
   ovChart.setOption({
     backgroundColor: tc.bg,
     color: [tc.colors[1], tc.colors[3]],
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: 16, top: 'center', textStyle: { color: tc.textColor, fontSize: 12 } },
+    tooltip: {
+      trigger: 'item',
+      confine: true,
+      backgroundColor: isDark() ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+      borderColor: isDark() ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: [12, 16],
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
+      formatter: (p: any) => {
+        const total = Number(m.total_reqs || 1)
+        const pct = ((p.value / total) * 100).toFixed(1)
+        return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> requests <span style="color:${isDark()?'#8b949e':'#656d76'}">(${pct}%)</span></div>`
+      }
+    },
+    graphic: [
+      {
+        type: 'text',
+        left: '30%',
+        top: '44%',
+        style: {
+          text: Number(m.total_reqs || 0).toLocaleString(),
+          fontSize: 22,
+          fontWeight: 700,
+          fill: tc.textColor,
+          textAlign: 'center',
+        },
+      },
+      {
+        type: 'text',
+        left: '30%',
+        top: '58%',
+        style: {
+          text: '总请求',
+          fontSize: 11,
+          fill: isDark() ? '#8b949e' : '#8c959f',
+          textAlign: 'center',
+        },
+      },
+    ],
+    legend: {
+      orient: 'vertical', right: 20, top: 'center',
+      itemWidth: 12, itemHeight: 12, itemGap: 14,
+      icon: 'roundRect',
+      formatter: (name: string) => {
+        const val = name === 'Success' ? Number(m.success_reqs || 0) : Number(m.failed_reqs || 0)
+        const total = Number(m.total_reqs || 1)
+        const pct = (val / total * 100).toFixed(1)
+        return `{name|${name}}   {val|${pct}%}`
+      },
+      textStyle: { rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
+    },
     series: [{
       type: 'pie',
-      radius: ['45%', '70%'],
-      center: ['38%', '50%'],
+      radius: ['50%', '72%'],
+      center: ['36%', '50%'],
       avoidLabelOverlap: false,
+      startAngle: 90,
+      padAngle: 2,
+      itemStyle: {
+        borderRadius: 8,
+        borderColor: tc.bg,
+        borderWidth: 3,
+      },
       label: { show: false },
-      emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+      emphasis: {
+        scale: true,
+        scaleSize: 8,
+        itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0,0,0,0.15)' },
+        label: { show: true, fontSize: 14, fontWeight: 'bold', color: tc.textColor }
+      },
       data: [
-        { value: Number(m.success_reqs || 0), name: 'Success' },
-        { value: Number(m.failed_reqs || 0), name: 'Failed' },
+        { value: Number(m.success_reqs || 0), name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+          { offset: 0, color: isDark() ? '#3fb950' : '#2da44e' },
+          { offset: 1, color: isDark() ? '#238636' : '#1a7f37' }
+        ])}},
+        { value: Number(m.failed_reqs || 0), name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+          { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
+          { offset: 1, color: isDark() ? '#da3633' : '#a40e26' }
+        ])}},
       ],
     }],
   })
@@ -569,25 +638,119 @@ function renderAll() {
   latChart = echarts.init(latencyChartRef.value)
   latChart.setOption({
     backgroundColor: tc.bg,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-      const p = Array.isArray(params) ? params[0] : params
-      return `${p.name}: <strong>${Number(p.value).toFixed(1)}</strong>ms`
-    }},
-    grid: { left: 40, right: 16, top: 14, bottom: 28 },
-    xAxis: { type: 'category', data: ['Avg', 'P50', 'P90', 'P95', 'P99'], axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 11 } },
-    yAxis: { type: 'value', name: 'ms', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(88,166,255,0.05)' : 'rgba(14,165,233,0.04)' } },
+      confine: true,
+      position: function (point: number[], params: any, dom: HTMLElement, rect: DOMRect, size: { contentSize: [number, number]; viewSize: [number, number] }) {
+        const x = point[0]
+        const y = point[1]
+        if (x < size.viewSize[0] / 2) {
+          return [x + 12, y - size.contentSize[1] - 12]
+        }
+        return [x - size.contentSize[0] - 12, y - size.contentSize[1] - 12]
+      },
+      backgroundColor: isDark() ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+      borderColor: isDark() ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: [12, 16],
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        const labels: Record<string, string> = { Avg: '平均延迟', P50: '中位数 (50%)', P90: 'P90 延迟', P95: 'P95 延迟', P99: 'P99 尾部延迟' }
+        return `<div style="font-weight:600;margin-bottom:4px">${labels[p.name] || p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toFixed(1)}</strong> ms</div>`
+      }
+    },
+    grid: { left: 44, right: 20, top: 24, bottom: 32 },
+    xAxis: {
+      type: 'category',
+      data: ['Avg', 'P50', 'P90', 'P95', 'P99'],
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: isDark() ? '#8b949e' : '#656d76',
+        fontSize: 12,
+        fontWeight: 600,
+        margin: 12,
+      },
+    },
+    yAxis: {
+      type: 'value',
+      name: '',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: isDark() ? '#6e7681' : '#8c959f', fontSize: 10, formatter: (v: number) => v.toFixed(0) },
+      splitLine: { lineStyle: { color: isDark() ? 'rgba(48,54,61,0.5)' : 'rgba(208,215,222,0.6)', type: 'dashed' as const } }
+    },
     series: [{
       type: 'bar',
-      barWidth: '42%',
+      barWidth: '40%',
       data: [
-        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: { color: tc.colors[0] } },
-        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: { color: tc.colors[1] } },
-        { value: parseFloat(m.p90_latency_s || '0') * 1000, itemStyle: { color: tc.colors[2] } },
-        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: { color: tc.colors[3] } },
-        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: { color: tc.colors[4] } },
+        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark() ? '#58a6ff' : '#0969da' },
+            { offset: 1, color: isDark() ? '#388bfd' : '#0550ae' }
+          ]),
+          borderRadius: [6, 6, 2, 2],
+          shadowColor: isDark() ? 'rgba(88,166,255,0.3)' : 'rgba(9,105,218,0.2)',
+          shadowBlur: 8,
+          shadowOffsetY: 2,
+        }},
+        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark() ? '#3fb950' : '#1a7f37' },
+            { offset: 1, color: isDark() ? '#238636' : '#116329' }
+          ]),
+          borderRadius: [6, 6, 2, 2],
+          shadowColor: isDark() ? 'rgba(63,185,80,0.25)' : 'rgba(26,127,55,0.15)',
+          shadowBlur: 8,
+          shadowOffsetY: 2,
+        }},
+        { value: parseFloat(m.p90_latency_s || '0') * 1000, itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark() ? '#d29922' : '#9a6700' },
+            { offset: 1, color: isDark() ? '#bb8009' : '#7a5200' }
+          ]),
+          borderRadius: [6, 6, 2, 2],
+          shadowColor: isDark() ? 'rgba(210,153,34,0.25)' : 'rgba(154,103,0,0.15)',
+          shadowBlur: 8,
+          shadowOffsetY: 2,
+        }},
+        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
+            { offset: 1, color: isDark() ? '#da3633' : '#a40e26' }
+          ]),
+          borderRadius: [6, 6, 2, 2],
+          shadowColor: isDark() ? 'rgba(248,81,73,0.28)' : 'rgba(207,34,46,0.18)',
+          shadowBlur: 8,
+          shadowOffsetY: 2,
+        }},
+        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isDark() ? '#bc8cff' : '#8250df' },
+            { offset: 1, color: isDark() ? '#a371f7' : '#6e40c9' }
+          ]),
+          borderRadius: [6, 6, 2, 2],
+          shadowColor: isDark() ? 'rgba(188,140,255,0.3)' : 'rgba(130,80,223,0.2)',
+          shadowBlur: 8,
+          shadowOffsetY: 2,
+        }},
       ],
-      label: { show: true, position: 'top', formatter: (p: any) => p.value.toFixed(1) + 'ms', color: tc.textColor, fontSize: 10 },
-      itemStyle: { borderRadius: [4, 4, 0, 0] },
+      label: {
+        show: true, position: 'top',
+        formatter: (p: any) => Number(p.value).toFixed(1),
+        color: isDark() ? '#8b949e' : '#656d76',
+        fontSize: 11,
+        fontWeight: 600,
+        offset: [0, -4]
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 18,
+        }
+      }
     }],
   })
 
@@ -620,6 +783,7 @@ function switchNodeChartType(type: 'smooth' | 'step') {
 }
 
 function renderQPSTrend(tc: any, m: any) {
+  const isSmooth = qpsChartType.value === 'smooth'
   if (!qpsChartRef.value) return
   if (qpsChart) qpsChart.dispose()
   qpsChart = echarts.init(qpsChartRef.value)
@@ -636,32 +800,45 @@ function renderQPSTrend(tc: any, m: any) {
 
   qpsChart.setOption({
     backgroundColor: tc.bg,
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-      const p = Array.isArray(params) ? params[0] : params
-      const idx = p[0]?.dataIndex ?? 0
-      return `<strong>${timeLabels[idx]}</strong><br/>QPS: <strong>${Number(p[0]?.value || 0).toFixed(2)}</strong>`
-    }},
-    grid: { left: 50, right: 16, top: 16, bottom: 44 },
-    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.12)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
-    xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
-    yAxis: { type: 'value', name: 'req/s', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10 }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+    tooltip: {
+      trigger: 'axis' as const,
+      confine: true,
+      backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+      borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: [12, 16],
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+      extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        const idx = p[0]?.dataIndex ?? 0
+        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p[0]?.value || 0).toFixed(1)}</strong>`
+      }
+    },
+    grid: { left: 50, right: 20, top: 20, bottom: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(1) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
     series: [{
       name: 'QPS',
       type: 'line',
-      smooth: qpsChartType.value === 'smooth',
-      step: qpsChartType.value === 'step' ? 'middle' as const : undefined,
+      smooth: isSmooth,
+      step: isSmooth ? false : 'middle',
       data: qpsData,
       lineStyle: { width: 2, color: tc.colors[0] },
+      itemStyle: { color: tc.colors[0] },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: 'rgba(88,166,255,0.15)' },
-        { offset: 1, color: 'rgba(88,166,255,0.01)' }
+        { offset: 0, color: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)` },
+        { offset: 1, color: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.01)` }
       ])},
       symbol: 'none',
     }]
-  })
+  }, true)
 }
 
 function renderLatencyTrend(tc: any, m: any) {
+  const isSmooth = latTrendChartType.value === 'smooth'
   if (!latencyTrendChartRef.value) return
   if (latTrendChart) latTrendChart.dispose()
   latTrendChart = echarts.init(latencyTrendChartRef.value)
@@ -682,28 +859,40 @@ function renderLatencyTrend(tc: any, m: any) {
 
   latTrendChart.setOption({
     backgroundColor: tc.bg,
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-      if (!Array.isArray(params)) return ''
-      const i = params[0]?.dataIndex ?? 0
-      let h = `<strong>${timeLabels[i]}</strong><br/>`
-      params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(1)}</strong>ms<br/>` })
-      return h
-    }},
-    legend: { data: ['P50','P90','P95','P99'], top: 2, textStyle: { color: tc.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3, itemGap: 16 },
-    grid: { left: 52, right: 16, top: 28, bottom: 44 },
-    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.08)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
-    xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
-    yAxis: { type: 'value', name: 'ms', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+    tooltip: {
+      trigger: 'axis' as const,
+      confine: true,
+      backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+      borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: [12, 16],
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+      extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+      formatter: (params: any) => {
+        if (!Array.isArray(params)) return ''
+        const i = params[0]?.dataIndex ?? 0
+        let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
+        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(1)}</strong>ms<br/>` })
+        return h
+      }
+    },
+    legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
-      { name:'P50', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p50, lineStyle:{width:2,color:lc[0]}, symbol:'none' },
-      { name:'P90', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p90, lineStyle:{width:2,color:lc[1]}, symbol:'none' },
-      { name:'P95', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p95, lineStyle:{width:2,color:lc[2]}, symbol:'none' },
-      { name:'P99', type:'line', smooth: latTrendChartType.value==='smooth', step: latTrendChartType.value==='step'?'middle':undefined, data:p99, lineStyle:{width:2,color:lc[3]}, symbol:'none' },
+      { name:'P50', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:p50, lineStyle:{width:2,color:lc[0]}, itemStyle:{color:lc[0]}, symbol:'none' },
+      { name:'P90', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:p90, lineStyle:{width:2,color:lc[1]}, itemStyle:{color:lc[1]}, symbol:'none' },
+      { name:'P95', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:p95, lineStyle:{width:2,color:lc[2]}, itemStyle:{color:lc[2]}, symbol:'none' },
+      { name:'P99', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:p99, lineStyle:{width:2,color:lc[3]}, itemStyle:{color:lc[3]}, symbol:'none' },
     ]
-  })
+  }, true)
 }
 
 function renderNodeCharts(tc: any) {
+  const isSmooth = nodeChartType.value === 'smooth'
   nodeTimeSeries.value.forEach((node, idx) => {
     const el = nodeChartRefs.get(idx)
     if (!el) return
@@ -720,30 +909,41 @@ function renderNodeCharts(tc: any) {
 
     const lc = tc.latencyColors
     chart.setOption({
-      backgroundColor: tc.bg,
-      tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-        if (!Array.isArray(params)) return ''
-        const i = params[0]?.dataIndex ?? 0
-        let h = `<strong>${timeLabels[i]}</strong><br/>`
-        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(2) : Number(item.value).toFixed(1)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
-        return h
-      }},
-      legend: { data: ['QPS','P50','P90','P95','P99'], top: 2, textStyle: { color: tc.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3, itemGap: 12 },
-      grid: { left: 52, right: 48, top: 28, bottom: 44 },
-      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(88,166,255,0.08)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
-      xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis' as const,
+        confine: true,
+        backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+        borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: [12, 16],
+        textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+        extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+        formatter: (params: any) => {
+          if (!Array.isArray(params)) return ''
+          const i = params[0]?.dataIndex ?? 0
+          let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
+          params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(1) : Number(item.value).toFixed(1)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
+          return h
+        }
+      },
+      legend: { data: ['QPS','P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
+      grid: { left: 50, right: 50, top: 30, bottom: 50 },
+      dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+      xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
       yAxis: [
         { type: 'value', name: 'req/s', position: 'left', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-        { type: 'value', name: 'ms', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(0) } },
+        { type: 'value', name: 'ms', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
       ],
       series: [
-        { name:'QPS', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_qps||[], yAxisIndex:0, lineStyle:{width:2,color:tc.colors[0]}, symbol:'none', areaStyle:{ color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(88,166,255,0.12)'},{offset:1,color:'rgba(88,166,255,0.01)'}])} },
-        { name:'P50', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p50||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[0]}, symbol:'none' },
-        { name:'P90', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p90||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[1]}, symbol:'none' },
-        { name:'P95', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p95||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[2]}, symbol:'none' },
-        { name:'P99', type:'line', smooth: nodeChartType.value==='smooth', step: nodeChartType.value==='step'?'middle':undefined, data:node.ts_p99||[], yAxisIndex:1, lineStyle:{width:1.5,color:lc[3]}, symbol:'none' },
+        { name:'QPS', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_qps||[], yAxisIndex:0, lineStyle:{width:2,color:tc.colors[0]}, itemStyle:{color:tc.colors[0]}, symbol:'none', areaStyle:{ color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:`rgba(${isDark()?'88,166,255':'14,165,233'},0.12)`},{offset:1,color:`rgba(${isDark()?'88,166,255':'14,165,233'},0.01)`}])} },
+        { name:'P50', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p50||[], yAxisIndex:1, lineStyle:{width:2,color:lc[0]}, itemStyle:{color:lc[0]}, symbol:'none' },
+        { name:'P90', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p90||[], yAxisIndex:1, lineStyle:{width:2,color:lc[1]}, itemStyle:{color:lc[1]}, symbol:'none' },
+        { name:'P95', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p95||[], yAxisIndex:1, lineStyle:{width:2,color:lc[2]}, itemStyle:{color:lc[2]}, symbol:'none' },
+        { name:'P99', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p99||[], yAxisIndex:1, lineStyle:{width:2,color:lc[3]}, itemStyle:{color:lc[3]}, symbol:'none' },
       ]
-    })
+    }, true)
   })
 }
 
@@ -761,15 +961,27 @@ function renderErrorBreakdownChart(tc: any) {
   const sorted = [...items].sort((a, b) => (b.count || 0) - (a.count || 0))
   const labels = sorted.map(e => e.error_type || e.code || e.status || 'Unknown')
   const counts = sorted.map(e => Number(e.count || 0))
+  const totalCount = Math.max(counts.reduce((s, c) => s + c, 0), 1)
   const maxCount = Math.max(...counts, 1)
 
   errBreakdownChart.setOption({
     backgroundColor: tc.bg,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-      const p = Array.isArray(params) ? params[0] : params
-      return `${p.name}: <strong>${Number(p.value).toLocaleString()}</strong> (${(Number(p.value) / maxCount * 100).toFixed(1)}%)`
-    }},
-    grid: { left: 100, right: 28, top: 12, bottom: 8 },
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(248,81,73,0.06)' : 'rgba(248,81,73,0.04)' } },
+      confine: true,
+      backgroundColor: isDark() ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+      borderColor: isDark() ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: [12, 16],
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> <span style="color:${isDark()?'#8b949e':'#656d76'}">(${(Number(p.value)/totalCount*100).toFixed(1)}%)</span></div>`
+      }
+    },
+    grid: { left: 105, right: 36, top: 16, bottom: 12 },
     xAxis: { type: 'value', show: false },
     yAxis: {
       type: 'category',
@@ -777,21 +989,46 @@ function renderErrorBreakdownChart(tc: any) {
       inverse: true,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: tc.textColor, fontSize: 11, width: 90, overflow: 'truncate' },
+      axisLabel: {
+        color: isDark() ? '#c9d1d9' : '#374151',
+        fontSize: 12,
+        fontWeight: 500,
+        width: 95,
+        overflow: 'truncate',
+        margin: 14,
+      },
       splitLine: { show: false },
     },
     series: [{
       type: 'bar',
-      data: counts,
-      barMaxWidth: 20,
-      itemStyle: {
-        borderRadius: [0, 4, 4, 0],
-        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-          { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
-          { offset: 1, color: isDark() ? 'rgba(248,81,73,0.4)' : 'rgba(248,81,73,0.15)' }
-        ])
+      data: counts.map((v, i) => ({
+        value: v,
+        itemStyle: {
+          borderRadius: [0, 6, 6, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: i === 0 ? (isDark() ? '#ff6b6b' : '#e53e3e') : (isDark() ? '#f85149' : '#cf222e') },
+            { offset: 1, color: i === 0 ? (isDark() ? 'rgba(255,107,107,0.25)' : 'rgba(229,62,62,0.12)') : (isDark() ? 'rgba(248,81,73,0.2)' : 'rgba(248,81,73,0.08)') }
+          ]),
+          shadowColor: isDark() ? 'rgba(248,81,73,0.25)' : 'rgba(207,34,46,0.15)',
+          shadowBlur: i === 0 ? 8 : 0,
+          shadowOffsetX: 0,
+        }
+      })),
+      barMaxWidth: 22,
+      label: {
+        show: true, position: 'right',
+        formatter: (p: any) => Number(p.value).toLocaleString(),
+        color: isDark() ? '#8b949e' : '#656d76',
+        fontSize: 11,
+        fontWeight: 600,
+        offset: [8, 0]
       },
-      label: { show: true, position: 'right', formatter: (p: any) => Number(p.value).toLocaleString(), color: tc.textColor, fontSize: 10, fontWeight: 500 },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 16,
+          shadowColor: isDark() ? 'rgba(248,81,73,0.4)' : 'rgba(207,34,46,0.3)',
+        }
+      }
     }],
   })
 }
@@ -832,7 +1069,8 @@ function formatTime(t: any): string {
   try {
     const d = new Date(t)
     if (isNaN(d.getTime())) return String(t)
-    return d.toLocaleString()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   } catch { return String(t) }
 }
 

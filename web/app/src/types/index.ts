@@ -292,6 +292,9 @@ export interface TimeSeriesDTO {
   p95: number[]
   p99: number[]
   error_rate: number[]
+  window_start?: string
+  window_end?: string
+  has_running?: boolean
 }
 
 export interface TimeSeriesSampleDTO {

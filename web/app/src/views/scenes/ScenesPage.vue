@@ -37,7 +37,7 @@
             <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? '--' : '-') }}</td>
             <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
             <td class="actions">
-              <button class="btn-sm" @click="editScene(s)">编辑</button>
+              <button class="btn-sm" :class="{ disabled: isSceneRunning(s) }" :disabled="isSceneRunning(s)" @click="editScene(s)">编辑</button>
               <button class="btn-sm danger" @click="handleDelete(s.id)">删除</button>
             </td>
           </tr>
@@ -411,19 +411,16 @@ async function handleImport() {
 
 function formatTime(t: string) {
   if (!t) return '-'
-  return new Date(t).toLocaleString()
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function formatDateTime(timeStr?: string): string {
   if (!timeStr) return '-'
-  return new Date(timeStr).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
+  const d = new Date(timeStr)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 interface SceneRunInfo {
@@ -475,22 +472,23 @@ function isSceneRunning(scene: any): boolean {
 function calculateSceneDuration(scene: any): string {
   const latest = getSceneLatestRun(scene)
   if (!latest?.started_at) return '-'
-  
+
   const start = new Date(latest.started_at).getTime()
   const end = latest.status === 'running' ? Date.now() : (latest.finished_at ? new Date(latest.finished_at).getTime() : Date.now())
-  
+
   const durationMs = end - start
   if (durationMs <= 0) return '-'
-  
+
   const totalSeconds = Math.floor(durationMs / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  
+  const pad = (n: number) => String(n).padStart(2, '0')
+
   if (hours > 0) {
-    return `${hours}小时${minutes}分${seconds}秒`
+    return `${hours}小时${pad(minutes)}分${pad(seconds)}秒`
   } else if (minutes > 0) {
-    return `${minutes}分${seconds}秒`
+    return `${minutes}分${pad(seconds)}秒`
   } else {
     return `${seconds}秒`
   }
@@ -542,6 +540,12 @@ onMounted(() => {
 .btn-sm.danger:hover {
   background: var(--accent-danger);
   color: #fff;
+}
+
+.btn-sm.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .table-wrapper {

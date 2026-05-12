@@ -16,12 +16,12 @@
     </div>
 
     <div v-if="trace && trace.spans" class="spans-card">
-      <h3>Spans <span class="count">(共 {{ trace.spans.length }} 个)</span></h3>
+      <h3>Span列表 <span class="count">(共 {{ trace.spans.length }} 个)</span></h3>
       <div class="legend">
-        <span class="legend-item"><i class="dot lat-ok"></i> &lt;200ms</span>
-        <span class="legend-item"><i class="dot lat-warn"></i> 200~600ms</span>
-        <span class="legend-item"><i class="dot lat-alert"></i> 600~1500ms</span>
-        <span class="legend-item"><i class="dot lat-critical"></i> ≥1500ms</span>
+        <span class="legend-item"><i class="dot lat-ok"></i> &lt;200毫秒</span>
+        <span class="legend-item"><i class="dot lat-warn"></i> 200~600毫秒</span>
+        <span class="legend-item"><i class="dot lat-alert"></i> 600~1500毫秒</span>
+        <span class="legend-item"><i class="dot lat-critical"></i> ≥1500毫秒</span>
       </div>
       <div class="span-list" ref="wrapperRef">
         <div v-for="(span, idx) in trace.spans" :key="span.id" class="span-item">
@@ -39,7 +39,7 @@
           </div>
           <div class="span-meta">
             <span :class="['latency-text', 'lat-' + latencyLevel(span)]">耗时: {{ formatDuration(span.duration_ns) }}</span>
-            <span v-if="span.chain_id" class="chain-id mono">chain: {{ span.chain_id }}</span>
+            <span v-if="span.chain_id" class="chain-id mono">链路ID: {{ span.chain_id }}</span>
             <span v-if="span.error" class="error-text">错误: {{ span.error }}</span>
           </div>
         </div>
@@ -79,7 +79,9 @@ function formatDuration(ns: number): string {
 
 function formatTime(t: string) {
   if (!t) return '-'
-  return new Date(t).toLocaleString()
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function latencyMs(span: SpanDTO): number {

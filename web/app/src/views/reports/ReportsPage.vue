@@ -67,7 +67,9 @@ function extractMetric(r: ReportDTO, key: string): string {
 
 function formatTime(t: string) {
   if (!t) return '-'
-  return new Date(t).toLocaleString()
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function calculateDuration(startedAt?: string, finishedAt?: string): string {
@@ -76,16 +78,17 @@ function calculateDuration(startedAt?: string, finishedAt?: string): string {
   const end = finishedAt ? new Date(finishedAt).getTime() : Date.now()
   const durationMs = end - start
   if (durationMs <= 0) return '-'
-  
+
   const totalSeconds = Math.floor(durationMs / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  
+  const pad = (n: number) => String(n).padStart(2, '0')
+
   if (hours > 0) {
-    return `${hours}小时${minutes}分${seconds}秒`
+    return `${hours}小时${pad(minutes)}分${pad(seconds)}秒`
   } else if (minutes > 0) {
-    return `${minutes}分${seconds}秒`
+    return `${minutes}分${pad(seconds)}秒`
   } else {
     return `${seconds}秒`
   }
