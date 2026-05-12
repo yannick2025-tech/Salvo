@@ -191,6 +191,7 @@ type Runner struct {
 	nodeStats map[string]*NodeStats
 	collector *TimeSeriesCollector
 	tsStore   TimeSeriesStore
+	stopWg    sync.WaitGroup
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
@@ -259,7 +260,9 @@ func (r *Runner) Run(ctx context.Context) error {
 			runLog.Error("failed to stop timeseries collector", logger.F("error", stopErr))
 		}
 		r.finishedAt = time.Now().UTC()
-		r.status.Store(StatusDone)
+		if r.Status() != StatusCanceled {
+			r.status.Store(StatusDone)
+		}
 		close(r.done)
 	}()
 
@@ -333,6 +336,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("runner: create run record: %w", err)
 	}
 
+	r.mu.Lock()
+	r.runID = runRecord.ID
+	r.mu.Unlock()
+
 	err = r.execute(dagObj, scope)
 
 	r.finishedAt = time.Now().UTC()
@@ -352,52 +359,58 @@ func (r *Runner) Run(ctx context.Context) error {
 	totalReqs := r.stats.TotalReqs.Load()
 	successReqs := r.stats.SuccessReqs.Load()
 
-	if err != nil && totalReqs == 0 {
-		runRecord.Status = model.RunStatusFailed
-		runRecord.ErrorMsg = err.Error()
-		r.status.Store(StatusFailed)
-	} else if totalReqs > 0 {
-		rate := float64(successReqs) / float64(totalReqs)
-		if rate < 0.95 {
+	if r.Status() == StatusCanceled {
+		runLog.Info("skip final save, already saved by Stop()", logger.F("run_id", r.runID))
+	} else {
+		if err != nil && totalReqs == 0 {
 			runRecord.Status = model.RunStatusFailed
-			if err != nil {
-				runRecord.ErrorMsg = err.Error()
-			} else {
-				runRecord.ErrorMsg = fmt.Sprintf("success rate %.1f%% below threshold", rate*100)
-			}
+			runRecord.ErrorMsg = err.Error()
 			r.status.Store(StatusFailed)
+		} else if totalReqs > 0 {
+			rate := float64(successReqs) / float64(totalReqs)
+			if rate < 0.95 {
+				runRecord.Status = model.RunStatusFailed
+				if err != nil {
+					runRecord.ErrorMsg = err.Error()
+				} else {
+					runRecord.ErrorMsg = fmt.Sprintf("success rate %.1f%% below threshold", rate*100)
+				}
+				r.status.Store(StatusFailed)
+			} else {
+				runRecord.Status = model.RunStatusCompleted
+				r.status.Store(StatusDone)
+			}
+		} else if r.ctx.Err() != nil {
+			runRecord.Status = model.RunStatusCancelled
+			r.status.Store(StatusCanceled)
 		} else {
 			runRecord.Status = model.RunStatusCompleted
 			r.status.Store(StatusDone)
 		}
-	} else if r.ctx.Err() != nil {
-		runRecord.Status = model.RunStatusCancelled
-		r.status.Store(StatusCanceled)
-	} else {
-		runRecord.Status = model.RunStatusCompleted
-		r.status.Store(StatusDone)
-	}
 
-	if err := r.runs.Update(r.ctx, runRecord); err != nil {
-		runLog.Error("failed to save run record", logger.F("error", err))
-	} else {
-		runLog.Info("run completed",
-			logger.F("status", runRecord.Status),
-			logger.F("total_reqs", runRecord.TotalReqs),
-			logger.F("success_reqs", runRecord.SuccessReqs),
-			logger.F("failed_reqs", runRecord.FailedReqs),
-			logger.F("p50", runRecord.P50Latency),
-			logger.F("p95", runRecord.P95Latency),
-			logger.F("p99", runRecord.P99Latency),
-			logger.F("duration_s", runRecord.Duration),
-		)
-	}
+		if err := r.runs.Update(r.ctx, runRecord); err != nil {
+			runLog.Error("failed to save run record", logger.F("error", err))
+		} else {
+			runLog.Info("run completed",
+				logger.F("status", runRecord.Status),
+				logger.F("total_reqs", runRecord.TotalReqs),
+				logger.F("success_reqs", runRecord.SuccessReqs),
+				logger.F("failed_reqs", runRecord.FailedReqs),
+				logger.F("p50", runRecord.P50Latency),
+				logger.F("p95", runRecord.P95Latency),
+				logger.F("p99", runRecord.P99Latency),
+				logger.F("duration_s", runRecord.Duration),
+			)
+		}
 
-	if err := r.createReport(runRecord); err != nil {
-		runLog.Error("failed to create report", logger.F("error", err))
+		if err := r.createReport(runRecord); err != nil {
+			runLog.Error("failed to create report", logger.F("error", err))
+		}
 	}
 
 	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
+
+	r.stopWg.Wait()
 
 	return err
 }
@@ -407,6 +420,78 @@ func (r *Runner) Stop() {
 	defer r.mu.Unlock()
 	if r.cancel != nil {
 		r.cancel()
+		r.status.Store(StatusCanceled)
+		r.stopWg.Add(1)
+		go func() {
+			r.saveFinalSnapshot()
+			r.stopWg.Done()
+		}()
+	}
+}
+
+func (r *Runner) saveFinalSnapshot() {
+	r.mu.Lock()
+	if r.runID == 0 || r.runs == nil {
+		r.mu.Unlock()
+		return
+	}
+	runID := r.runID
+	sceneID := r.cfg.SceneID
+	startedAt := r.startedAt
+	r.mu.Unlock()
+
+	time.Sleep(300 * time.Millisecond)
+
+	finishedAt := time.Now().UTC()
+
+	totalReqs := r.stats.TotalReqs.Load()
+	successReqs := r.stats.SuccessReqs.Load()
+	failedReqs := r.stats.FailedReqs.Load()
+
+	avg, p50, p90, p95, p99 := r.stats.LatencyPercentiles()
+
+	runRecord := &model.RunRecord{
+		Model:       model.Model{ID: runID},
+		SceneID:     sceneID,
+		Status:      model.RunStatusCancelled,
+		WorkerCount: r.cfg.Workers,
+		RunMode:     string(r.cfg.RunMode),
+		Duration:    finishedAt.Sub(startedAt).Seconds(),
+		TotalReqs:   totalReqs,
+		SuccessReqs: successReqs,
+		FailedReqs:  failedReqs,
+		AvgLatency:  avg.Seconds(),
+		P50Latency:  p50.Seconds(),
+		P90Latency:  p90.Seconds(),
+		P95Latency:  p95.Seconds(),
+		P99Latency:  p99.Seconds(),
+		StartedAt:   &startedAt,
+		FinishedAt:  &finishedAt,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := r.runs.Update(ctx, runRecord); err != nil {
+		r.log.Error("failed to save final snapshot on stop",
+			logger.F("run_id", runID),
+			logger.F("error", err))
+	} else {
+		r.log.Info("final snapshot saved on stop",
+			logger.F("run_id", runID),
+			logger.F("total_reqs", totalReqs),
+			logger.F("success_reqs", successReqs),
+			logger.F("failed_reqs", failedReqs),
+			logger.F("status", "cancelled"))
+	}
+
+	if reportErr := r.createReport(runRecord); reportErr != nil {
+		r.log.Error("failed to generate report on stop",
+			logger.F("run_id", runID),
+			logger.F("error", reportErr))
+	} else {
+		r.log.Info("report generated on stop",
+			logger.F("run_id", runID))
 	}
 }
 
@@ -433,26 +518,26 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	}
 
 	summary := map[string]any{
-		"scene_id":      runRecord.SceneID,
-		"run_id":        runRecord.ID,
-		"status":        runRecord.Status,
-		"worker_count":  runRecord.WorkerCount,
-		"run_mode":      runRecord.RunMode,
-		"duration_s":    runRecord.Duration,
-		"total_reqs":    runRecord.TotalReqs,
-		"success_reqs":  runRecord.SuccessReqs,
-		"failed_reqs":   runRecord.FailedReqs,
-		"success_rate":  fmt.Sprintf("%.1f%%", successRate),
-		"avg_latency_s": runRecord.AvgLatency,
-		"p50_latency_s": runRecord.P50Latency,
-		"p90_latency_s": runRecord.P90Latency,
-		"p95_latency_s": runRecord.P95Latency,
-		"p99_latency_s": runRecord.P99Latency,
+		"scene_id":       runRecord.SceneID,
+		"run_id":         runRecord.ID,
+		"status":         runRecord.Status,
+		"worker_count":   runRecord.WorkerCount,
+		"run_mode":       runRecord.RunMode,
+		"duration_s":     runRecord.Duration,
+		"total_reqs":     runRecord.TotalReqs,
+		"success_reqs":   runRecord.SuccessReqs,
+		"failed_reqs":    runRecord.FailedReqs,
+		"success_rate":   fmt.Sprintf("%.1f%%", successRate),
+		"avg_latency_s":  runRecord.AvgLatency,
+		"p50_latency_s":  runRecord.P50Latency,
+		"p90_latency_s":  runRecord.P90Latency,
+		"p95_latency_s":  runRecord.P95Latency,
+		"p99_latency_s":  runRecord.P99Latency,
 		"min_latency_ms": time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
-		"p50":           fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
-		"p90":           fmt.Sprintf("%.1fms", runRecord.P90Latency*1000),
-		"p95":           fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
-		"p99":           fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
+		"p50":            fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
+		"p90":            fmt.Sprintf("%.1fms", runRecord.P90Latency*1000),
+		"p95":            fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
+		"p99":            fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
 	}
 	summaryBytes, _ := json.Marshal(summary)
 

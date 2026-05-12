@@ -59,7 +59,11 @@
               <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
               <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
             </div>
-            <button class="btn-sm danger" @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">停止</button>
+            <button class="btn-sm danger" 
+                    :disabled="stoppingSceneIds.has(run.scene_id) || run.status !== 'running'" 
+                    @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
+              {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
+            </button>
           </div>
         </div>
         
@@ -162,6 +166,8 @@ const stopConfirm = reactive({
   loading: false,
 })
 
+const stoppingSceneIds = ref<Set<string>>(new Set())
+
 const form = reactive({
   scene_id: '',
   workers: 10,
@@ -198,6 +204,13 @@ async function fetchRuns() {
     if (resp.code === 0) {
       runs.value = resp.data.items || []
       activeRuns.value = runs.value.filter((r) => r.status === 'running')
+
+      for (const sceneId of stoppingSceneIds.value) {
+        const run = runs.value.find(r => r.scene_id === sceneId)
+        if (!run || run.status !== 'running') {
+          stoppingSceneIds.value.delete(sceneId)
+        }
+      }
     }
   } catch { /* ignore */ }
 }
@@ -264,14 +277,16 @@ function cancelStop() {
 
 async function confirmStop() {
   if (!stopConfirm.sceneId) return
-  
+
   stopConfirm.loading = true
+  stoppingSceneIds.value.add(stopConfirm.sceneId)
   try {
     await handleStop(stopConfirm.sceneId)
     cancelStop()
     showToast('场景已停止', 'success')
   } catch (e: any) {
     showToast('停止失败: ' + (e.message || '未知错误'), 'error')
+    stoppingSceneIds.value.delete(stopConfirm.sceneId)
     stopConfirm.loading = false
   }
 }
@@ -348,6 +363,12 @@ onUnmounted(() => {
 .btn-sm.danger:hover {
   background: var(--accent-danger);
   color: #fff;
+}
+
+.btn-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .modal-overlay {

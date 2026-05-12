@@ -197,7 +197,7 @@
         </div>
         <div v-if="runConfig.run_mode === 'duration'" class="form-group">
           <label>持续时间(秒)</label>
-          <input v-model.number="runConfig.duration" type="number" min="1" max="3600" step="1" @input="normalizeNumber($event, 'duration')" />
+          <input v-model.number="runConfig.duration" type="number" min="1" max="86400" step="1" @input="normalizeNumber($event, 'duration')" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
@@ -623,7 +623,7 @@ function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') 
   const limits: Record<string, { min: number; max: number }> = {
     workers: { min: 1, max: 1000 },
     count: { min: 1, max: 1000000 },
-    duration: { min: 1, max: 3600 },
+    duration: { min: 1, max: 86400 },
   }
   
   const limit = limits[field]

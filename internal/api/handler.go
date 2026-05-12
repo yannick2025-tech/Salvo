@@ -1329,6 +1329,11 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		}
 	}
 
+	h.log.Debug("DashboardOverview debug",
+		logger.F("scene_id", sceneID),
+		logger.F("run_records_count", len(runRecords)),
+		logger.F("running_map_count", len(runningMap)))
+
 	var totalReqs, successReqs, failedReqs int64
 	var p50, p95, p99, avg float64
 	var allLatencies []float64
@@ -1346,45 +1351,82 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		dtoRR := toRunRecordDTO(rr)
 
 		if rr.Status == "running" {
-			running++
 			if rn, ok := runningMap[rr.SceneID.String()]; ok {
+				rnStatus := rn.Status()
 				st := rn.Stats()
 				liveTotal := st.TotalReqs.Load()
 				liveSuccess := st.SuccessReqs.Load()
 				liveFailed := st.FailedReqs.Load()
 
-				totalReqs += liveTotal
-				successReqs += liveSuccess
-				failedReqs += liveFailed
-
-				dtoRR.TotalReqs = liveTotal
-				dtoRR.SuccessReqs = liveSuccess
-				dtoRR.FailedReqs = liveFailed
-				currentDuration := rn.Duration().Seconds()
-				dtoRR.Duration = currentDuration
-
-				if currentDuration > runningDuration {
-					runningDuration = currentDuration
-				}
-
-				if rr.StartedAt != nil {
-					t := rr.StartedAt
-					if startedAt == nil || t.Before(*startedAt) {
-						startedAt = t
+				if liveTotal > 0 || rnStatus == "running" {
+					if rnStatus == "running" {
+						running++
 					}
-				}
 
-				if liveTotal > 0 {
-					lavg, lp50, lp90, lp95, lp99 := st.LatencyPercentiles()
-					dtoRR.AvgLatency = lavg.Seconds()
-					dtoRR.P50Latency = lp50.Seconds()
-					dtoRR.P90Latency = lp90.Seconds()
-					dtoRR.P95Latency = lp95.Seconds()
-					dtoRR.P99Latency = lp99.Seconds()
+					totalReqs += liveTotal
+					successReqs += liveSuccess
+					failedReqs += liveFailed
 
-					rawLatencies := st.GetAllLatencies()
-					for _, lat := range rawLatencies {
-						allLatencies = append(allLatencies, float64(lat.Microseconds()))
+					dtoRR.TotalReqs = liveTotal
+					dtoRR.SuccessReqs = liveSuccess
+					dtoRR.FailedReqs = liveFailed
+					currentDuration := rn.Duration().Seconds()
+					dtoRR.Duration = currentDuration
+
+					if currentDuration > runningDuration {
+						runningDuration = currentDuration
+					}
+
+					if rr.StartedAt != nil {
+						t := rr.StartedAt
+						if startedAt == nil || t.Before(*startedAt) {
+							startedAt = t
+						}
+					}
+
+					if liveTotal > 0 {
+						lavg, lp50, lp90, lp95, lp99 := st.LatencyPercentiles()
+						dtoRR.AvgLatency = lavg.Seconds()
+						dtoRR.P50Latency = lp50.Seconds()
+						dtoRR.P90Latency = lp90.Seconds()
+						dtoRR.P95Latency = lp95.Seconds()
+						dtoRR.P99Latency = lp99.Seconds()
+
+						rawLatencies := st.GetAllLatencies()
+						for _, lat := range rawLatencies {
+							allLatencies = append(allLatencies, float64(lat.Microseconds()))
+						}
+					}
+				} else {
+					totalReqs += rr.TotalReqs
+					successReqs += rr.SuccessReqs
+					failedReqs += rr.FailedReqs
+
+					dtoRR.TotalReqs = rr.TotalReqs
+					dtoRR.SuccessReqs = rr.SuccessReqs
+					dtoRR.FailedReqs = rr.FailedReqs
+
+					dtoRR.AvgLatency = rr.AvgLatency
+					dtoRR.P50Latency = rr.P50Latency
+					dtoRR.P90Latency = rr.P90Latency
+					dtoRR.P95Latency = rr.P95Latency
+					dtoRR.P99Latency = rr.P99Latency
+
+					allLatencies = append(allLatencies, rr.P50Latency*1e6)
+					allLatencies = append(allLatencies, rr.P90Latency*1e6)
+					allLatencies = append(allLatencies, rr.P99Latency*1e6)
+
+					if rr.StartedAt != nil {
+						t := rr.StartedAt
+						if startedAt == nil || t.Before(*startedAt) {
+							startedAt = t
+						}
+					}
+					if rr.FinishedAt != nil {
+						t := rr.FinishedAt
+						if finishedAt == nil || t.After(*finishedAt) {
+							finishedAt = t
+						}
 					}
 				}
 			} else {
