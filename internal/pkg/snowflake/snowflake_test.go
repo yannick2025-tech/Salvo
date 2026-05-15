@@ -107,6 +107,34 @@ func TestIDUnmarshalJSONFromString(t *testing.T) {
 	assert.Equal(t, original, decoded)
 }
 
+func TestIDUnmarshalJSONFromNumber(t *testing.T) {
+	// Test unmarshaling from JSON number (not string)
+	// This is important for backward compatibility with old data
+	jsonWithNumber := `1234567890123456789`
+
+	var decoded ID
+	err := json.Unmarshal([]byte(jsonWithNumber), &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, ID(1234567890123456789), decoded)
+}
+
+func TestIDUnmarshalJSONInStructWithNumber(t *testing.T) {
+	// Test unmarshaling struct with numeric ID fields
+	type Sample struct {
+		ID   ID     `json:"id"`
+		Name string `json:"name"`
+	}
+
+	// JSON with numeric ID (not string)
+	jsonData := `{"id":1234567890123456789,"name":"test"}`
+
+	var s Sample
+	err := json.Unmarshal([]byte(jsonData), &s)
+	assert.NoError(t, err)
+	assert.Equal(t, ID(1234567890123456789), s.ID)
+	assert.Equal(t, "test", s.Name)
+}
+
 func TestIDMarshalInStruct(t *testing.T) {
 	node, err := NewNode(1)
 	assert.NoError(t, err)

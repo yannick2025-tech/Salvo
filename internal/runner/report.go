@@ -18,8 +18,8 @@ type ReportDetail struct {
 
 // ReportMetadata contains metadata about the test run.
 type ReportMetadata struct {
-	RunID       snowflake.ID `json:"run_id,string"`
-	SceneID     snowflake.ID `json:"scene_id,string"`
+	RunID       snowflake.ID `json:"run_id"`
+	SceneID     snowflake.ID `json:"scene_id"`
 	SceneName   string       `json:"scene_name,omitempty"`
 	Status      string       `json:"status"`
 	StartedAt   time.Time    `json:"started_at"`

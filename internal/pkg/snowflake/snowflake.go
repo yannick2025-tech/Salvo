@@ -120,19 +120,26 @@ func (id ID) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-// It expects a JSON string containing a decimal integer.
+// It accepts both JSON string and number formats.
 func (id *ID) UnmarshalJSON(data []byte) error {
 	str := string(data)
 	if str == "null" {
 		return nil
 	}
+	// Try to unmarshal as string first
 	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("snowflake ID must be a string, got %s", string(data))
+	if err := json.Unmarshal(data, &s); err == nil {
+		val, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid snowflake ID %q: %w", s, err)
+		}
+		*id = ID(val)
+		return nil
 	}
-	val, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return fmt.Errorf("invalid snowflake ID %q: %w", s, err)
+	// If string unmarshal fails, try to unmarshal as number
+	var val int64
+	if err := json.Unmarshal(data, &val); err != nil {
+		return fmt.Errorf("snowflake ID must be a string or number, got %s", string(data))
 	}
 	*id = ID(val)
 	return nil

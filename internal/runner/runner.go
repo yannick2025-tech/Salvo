@@ -663,10 +663,17 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	}
 
 	reportStatus := model.ReportStatusSuccess
-	if runRecord.Status == model.RunStatusFailed {
+	if runRecord.Status == model.RunStatusFailed || runRecord.Status == model.RunStatusCancelled {
 		reportStatus = model.ReportStatusFailed
-	} else if runRecord.FailedReqs > 0 && runRecord.SuccessReqs > 0 {
-		reportStatus = model.ReportStatusPartial
+	} else if runRecord.TotalReqs > 0 && runRecord.SuccessReqs > 0 {
+		successRate := float64(runRecord.SuccessReqs) / float64(runRecord.TotalReqs) * 100
+		if successRate >= 95.0 && runRecord.FailedReqs > 0 {
+			reportStatus = model.ReportStatusPartial
+		} else if successRate < 95.0 {
+			reportStatus = model.ReportStatusFailed
+		}
+	} else if runRecord.FailedReqs > 0 {
+		reportStatus = model.ReportStatusFailed
 	}
 
 	report := &model.Report{

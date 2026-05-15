@@ -48,6 +48,10 @@
           <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
         </div>
         <div class="chart-body" ref="qpsChartRef"></div>
+        <div class="chart-type-toggle center">
+          <button :class="['type-btn', { active: chartTypes.qpsTrend === 'smooth' }]" @click="switchChartType('qpsTrend', 'smooth')">平滑</button>
+          <button :class="['type-btn', { active: chartTypes.qpsTrend === 'step' }]" @click="switchChartType('qpsTrend', 'step')">阶梯</button>
+        </div>
       </div>
 
       <div class="chart-card">
@@ -56,6 +60,10 @@
           <div class="chart-tip">点击图例可显示/隐藏对应线条</div>
         </div>
         <div class="chart-body" ref="latencyChartRef"></div>
+        <div class="chart-type-toggle center">
+          <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
+          <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
+        </div>
       </div>
     </div>
 
@@ -63,15 +71,13 @@
       <div class="chart-card wide">
         <div class="chart-header">
           <h3>错误率</h3>
-          <div class="chart-controls">
-            <div class="chart-type-toggle">
-              <button :class="['type-btn', { active: errorChartType === 'smooth' }]" @click="switchErrorChartType('smooth')">平滑</button>
-              <button :class="['type-btn', { active: errorChartType === 'step' }]" @click="switchErrorChartType('step')">阶梯</button>
-            </div>
-            <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
-          </div>
+          <div class="chart-tip">拖动下方滑块或使用鼠标框选查看特定时间范围</div>
         </div>
         <div class="chart-body" ref="errorChartRef"></div>
+        <div class="chart-type-toggle center">
+          <button :class="['type-btn', { active: chartTypes.errorRate === 'smooth' }]" @click="switchChartType('errorRate', 'smooth')">平滑</button>
+          <button :class="['type-btn', { active: chartTypes.errorRate === 'step' }]" @click="switchChartType('errorRate', 'step')">阶梯</button>
+        </div>
       </div>
     </div>
 
@@ -142,9 +148,9 @@
                 <div class="detail-item"><span class="detail-label">平均延迟</span><span class="detail-val">{{ formatMs(node.avg_latency) }}</span></div>
               </div>
               <div class="detail-chart" :ref="el => setNodeChartRef(node.node_id, el as HTMLElement)"></div>
-              <div class="chart-type-toggle">
-                <button :class="['type-btn', { active: nodeChartType === 'smooth' }]" @click.stop="switchNodeChartType('smooth')">平滑</button>
-                <button :class="['type-btn', { active: nodeChartType === 'step' }]" @click.stop="switchNodeChartType('step')">阶梯</button>
+              <div class="chart-type-toggle center">
+                <button :class="['type-btn', { active: chartTypes[`node-${node.node_id}`] === 'smooth' }]" @click.stop="switchChartType(`node-${node.node_id}`, 'smooth')">平滑</button>
+                <button :class="['type-btn', { active: chartTypes[`node-${node.node_id}`] === 'step' }]" @click.stop="switchChartType(`node-${node.node_id}`, 'step')">阶梯</button>
               </div>
             </div>
           </div>
@@ -171,8 +177,25 @@ let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
-const nodeChartType = ref<'smooth' | 'step'>('smooth')
-const errorChartType = ref<'smooth' | 'step'>('smooth')
+const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
+  errorRate: 'smooth',
+  qpsTrend: 'smooth',
+  latTrend: 'smooth'
+})
+
+function initNodeChartTypes() {
+  overview.value?.node_metrics?.forEach(node => {
+    chartTypes.value[`node-${node.node_id}`] = 'smooth'
+  })
+}
+
+function switchChartType(chartId: string, type: 'smooth' | 'step') {
+  chartTypes.value[chartId] = type
+  if (chartId === 'errorRate') renderErrorChart()
+  else if (chartId === 'qpsTrend') renderQpsChart()
+  else if (chartId === 'latTrend') renderLatencyChart()
+  else if (chartId.startsWith('node-')) renderNodeDetailChart(chartId.slice(5))
+}
 
 const overview = ref<DashboardOverviewDTO | null>(null)
 
@@ -432,16 +455,6 @@ function toggleNodeExpand(nodeId: string) {
   }
 }
 
-function switchNodeChartType(type: 'smooth' | 'step') {
-  nodeChartType.value = type
-  if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
-}
-
-function switchErrorChartType(type: 'smooth' | 'step') {
-  errorChartType.value = type
-  renderErrorChart()
-}
-
 function setNodeChartRef(nodeId: string, el: HTMLElement | null) {
   if (el) nodeChartRefs.set(nodeId, el)
   else nodeChartRefs.delete(nodeId)
@@ -615,10 +628,10 @@ function renderQpsChart() {
     qpsChart = echarts.init(qpsChartRef.value)
   }
   const theme = getChartTheme()
+  const isSmooth = chartTypes.value.qpsTrend === 'smooth'
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     qpsChart.setOption({
-      backgroundColor: theme.bgColor,
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -632,7 +645,7 @@ function renderQpsChart() {
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: ts.qps, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
+    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
     tooltip: getTooltipConfig(),
   }, true)
   qpsChart.off('datazoom')
@@ -647,10 +660,10 @@ function renderLatencyChart() {
     latencyChart = echarts.init(latencyChartRef.value)
   }
   const theme = getChartTheme()
+  const isSmooth = chartTypes.value.latTrend === 'smooth'
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     latencyChart.setOption({
-      backgroundColor: theme.bgColor,
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -665,9 +678,9 @@ function renderLatencyChart() {
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
-      { name: 'P50', data: ts.p50, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
-      { name: 'P95', data: ts.p95, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
-      { name: 'P99', data: ts.p99, type: 'line', smooth: true, symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
+      { name: 'P50', data: ts.p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
+      { name: 'P95', data: ts.p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
+      { name: 'P99', data: ts.p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
     ],
     tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
@@ -695,7 +708,7 @@ function renderErrorChart() {
     })
     return
   }
-  const isSmooth = errorChartType.value === 'smooth'
+  const isSmooth = chartTypes.value.errorRate === 'smooth'
   const maxErrRate = Math.max(...ts.error_rate, 0.01)
   errorChart.setOption({
     backgroundColor: theme.bgColor,
@@ -708,7 +721,7 @@ function renderErrorChart() {
       data: ts.error_rate,
       type: 'line',
       smooth: isSmooth,
-      step: isSmooth ? undefined : 'middle',
+      step: isSmooth ? false : 'middle',
       symbol: 'none',
       lineStyle: { width: 2, color: theme.colors.danger },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.01)` }]) }
@@ -732,7 +745,7 @@ function renderNodeDetailChart(nodeId: string) {
   const node = overview.value?.node_metrics?.find(n => n.node_id === nodeId)
   if (!node) return
   const theme = getChartTheme()
-  const isSmooth = nodeChartType.value === 'smooth'
+  const isSmooth = chartTypes.value[`node-${nodeId}`] === 'smooth'
 
   const hasTimeSeries = node.timestamps && node.timestamps.length > 0
 
@@ -831,6 +844,7 @@ async function fetchOverview() {
     if (resp.code === 0) {
       overview.value = resp.data
       syncRunningStatus()
+      initNodeChartTypes()
       const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
       if (!hasRunning && !hasTimeSeries) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"archive/zip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -808,6 +809,7 @@ func (h *Handler) ExportReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		h.log.Error("failed to get report", logger.F("report_id", reportID), logger.F("error", err))
 		http.Error(w, fmt.Sprintf("get report: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -817,11 +819,78 @@ func (h *Handler) ExportReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	htmlContent := generateHTMLReport(report.Detail)
+	htmlContent, err := GenerateEnhancedHTML(report.Detail)
+	if err != nil {
+		h.log.Error("failed to generate enhanced HTML", logger.F("report_id", reportID), logger.F("error", err))
+		http.Error(w, fmt.Sprintf("generate report: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=report-%s.html", reportIDStr))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.html", generateReportFilename(report.SceneID)))
 	w.Write([]byte(htmlContent))
+}
+
+func (h *Handler) BatchExportReports(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ReportIDs []int64 `json:"report_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.ReportIDs) == 0 {
+		http.Error(w, "report_ids is required", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.ReportIDs) > 50 {
+		http.Error(w, "too many reports (max 50)", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=reports.zip")
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	for _, reportID := range req.ReportIDs {
+		report, err := h.reports.GetByID(r.Context(), snowflake.ID(reportID))
+		if err != nil {
+			continue
+		}
+
+		if report.Detail == "" || report.Detail == "{}" {
+			continue
+		}
+
+		htmlContent, err := GenerateEnhancedHTML(report.Detail)
+		if err != nil {
+			continue
+		}
+
+		filename := fmt.Sprintf("%s.html", generateReportFilename(report.SceneID))
+		f, err := zw.Create(filename)
+		if err != nil {
+			continue
+		}
+
+		f.Write([]byte(htmlContent))
+	}
+}
+
+func generateReportFilename(sceneID snowflake.ID) string {
+	sceneStr := sceneID.String()
+	last8 := ""
+	if len(sceneStr) > 8 {
+		last8 = sceneStr[len(sceneStr)-8:]
+	} else {
+		last8 = sceneStr
+	}
+	now := time.Now()
+	return fmt.Sprintf("report-%s-%s-%s", last8, now.Format("20060102"), now.Format("150405"))
 }
 
 // --- RunRecord Handlers ---

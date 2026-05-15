@@ -207,6 +207,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/reports/list", s.handleAuth(s.handler.ListReports))
 	mux.HandleFunc("POST /api/v1/reports/get", s.handleAuth(s.handler.GetReport))
 	mux.HandleFunc("GET /api/v1/reports/{id}/export", s.authMiddleware(s.handler.ExportReport))
+	mux.HandleFunc("POST /api/v1/reports/batch-export", s.authMiddleware(s.handler.BatchExportReports))
 
 	mux.HandleFunc("POST /api/v1/runs/list", s.handleAuth(s.handler.ListRunRecords))
 	mux.HandleFunc("POST /api/v1/runs/get", s.handleAuth(s.handler.GetRunRecord))

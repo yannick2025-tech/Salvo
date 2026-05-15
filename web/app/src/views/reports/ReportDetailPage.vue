@@ -81,9 +81,9 @@
             <div class="chart-tip">每区间失败/总数</div>
           </div>
           <div class="chart-body" ref="errorRateChartRef"></div>
-          <div class="chart-type-toggle">
-            <button :class="['type-btn', { active: errorRateChartType === 'smooth' }]" @click="switchErrorRateChartType('smooth')">平滑</button>
-            <button :class="['type-btn', { active: errorRateChartType === 'step' }]" @click="switchErrorRateChartType('step')">阶梯</button>
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes.errorRate === 'smooth' }]" @click="switchChartType('errorRate', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.errorRate === 'step' }]" @click="switchChartType('errorRate', 'step')">阶梯</button>
           </div>
         </div>
       </div>
@@ -115,6 +115,7 @@
         <div class="info-card">
           <h3>运行时配置</h3>
           <table class="info-table">
+            <tbody>
             <tr><td class="info-label">运行模式</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
             <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">计划持续时间</td><td>{{ getPlannedDuration() }}s</td></tr>
             <tr v-if="metrics.run_mode === 'count'"><td class="info-label">计划请求数</td><td>{{ getPlannedCount() }} 次</td></tr>
@@ -124,6 +125,7 @@
               <span :class="['status-badge', report.status]" class="tooltip-wrapper" :data-tooltip="getStatusTooltip(report.status)">{{ getStatusLabel(report.status) }}</span>
             </td></tr>
             <tr><td class="info-label">时间范围</td><td class="mono-sm">{{ formatTime(report.started_at) }} ~ {{ formatTime(report.finished_at) }}</td></tr>
+            </tbody>
           </table>
         </div>
 
@@ -159,9 +161,9 @@
               <h3>QPS趋势</h3>
             </div>
             <div class="chart-body" ref="qpsChartRef"></div>
-            <div class="chart-type-toggle">
-              <button :class="['type-btn', { active: qpsChartType === 'smooth' }]" @click="switchQpsChartType('smooth')">平滑</button>
-              <button :class="['type-btn', { active: qpsChartType === 'step' }]" @click="switchQpsChartType('step')">阶梯</button>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.qpsTrend === 'smooth' }]" @click="switchChartType('qpsTrend', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.qpsTrend === 'step' }]" @click="switchChartType('qpsTrend', 'step')">阶梯</button>
             </div>
           </div>
         </div>
@@ -173,9 +175,9 @@
               <div class="chart-tip">P50 / P90 / P95 / P99</div>
             </div>
             <div class="chart-body" ref="latencyTrendChartRef"></div>
-            <div class="chart-type-toggle">
-              <button :class="['type-btn', { active: latTrendChartType === 'smooth' }]" @click="switchLatTrendChartType('smooth')">平滑</button>
-              <button :class="['type-btn', { active: latTrendChartType === 'step' }]" @click="switchLatTrendChartType('step')">阶梯</button>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
             </div>
           </div>
         </div>
@@ -235,9 +237,9 @@
             </div>
           </div>
           <div :ref="el => setNodeChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body"></div>
-          <div class="chart-type-toggle">
-            <button :class="['type-btn', { active: nodeChartType === 'smooth' }]" @click.stop="switchNodeChartType('smooth')">平滑</button>
-            <button :class="['type-btn', { active: nodeChartType === 'step' }]" @click.stop="switchNodeChartType('step')">阶梯</button>
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'smooth' }]" @click.stop="switchChartType(`node-${idx}`, 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'step' }]" @click.stop="switchChartType(`node-${idx}`, 'step')">阶梯</button>
           </div>
         </div>
       </section>
@@ -254,6 +256,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getReport } from '@/api/report'
+import axios from 'axios'
 import type { ReportDTO } from '@/types'
 import * as echarts from 'echarts'
 
@@ -298,10 +301,27 @@ interface ErrorItem {
 const nodeTimeSeries = ref<NodeTimeSeries[]>([])
 const nodeChartRefs = new Map<number, HTMLElement>()
 const nodeCharts = new Map<number, echarts.ECharts>()
-const errorRateChartType = ref<'smooth' | 'step'>('smooth')
-const qpsChartType = ref<'smooth' | 'step'>('smooth')
-const latTrendChartType = ref<'smooth' | 'step'>('smooth')
-const nodeChartType = ref<'smooth' | 'step'>('smooth')
+const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
+  errorRate: 'smooth',
+  qpsTrend: 'smooth',
+  latTrend: 'smooth'
+})
+
+function initNodeChartTypes() {
+  nodeTimeSeries.value.forEach((_, idx) => {
+    chartTypes.value[`node-${idx}`] = 'smooth'
+  })
+}
+
+function switchChartType(chartId: string, type: 'smooth' | 'step') {
+  chartTypes.value[chartId] = type
+  const tc = themeColors()
+  const m = metrics.value || {}
+  if (chartId === 'errorRate') renderErrorRateChart(tc, m)
+  else if (chartId === 'qpsTrend') renderQPSTrend(tc, m)
+  else if (chartId === 'latTrend') renderLatencyTrend(tc, m)
+  else if (chartId.startsWith('node-')) renderNodeCharts(tc)
+}
 
 function setNodeChartRef(idx: number, el: HTMLElement | null) {
   if (el) nodeChartRefs.set(idx, el)
@@ -452,6 +472,7 @@ async function fetchReport() {
       report.value = resp.data
       metrics.value = parseMetrics(resp.data)
       nodeTimeSeries.value = (metrics.value?.node_metrics as NodeTimeSeries[]) || []
+      initNodeChartTypes()
       await nextTick()
       renderAll()
     }
@@ -483,6 +504,57 @@ function themeColors() {
       dark ? '#d29922' : '#9a6700',
       dark ? '#f85149' : '#cf222e',
     ],
+  }
+}
+
+function renderErrorRateChart(tc: any, m: any) {
+  if (!errorRateChartRef.value) return
+  if (errRateChart) errRateChart.dispose()
+  errRateChart = echarts.init(errorRateChartRef.value)
+
+  const timestamps = m.timestamps as string[] | undefined
+  const totals = (m.ts_total as number[]|undefined)||[]
+  const fails = (m.ts_fail as number[]|undefined)||[]
+
+  const errRates: number[] = []
+  for (let i = 0; i < totals.length; i++) {
+    errRates.push(totals[i] > 0 ? (fails[i] / totals[i]) * 100 : 0)
+  }
+
+  if (timestamps?.length && errRates.length) {
+    const timeLabels = timestamps.map(ts => formatTimeShort(ts))
+    const maxErrRate = Math.max(...errRates, 0.01)
+    const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100)
+    errRateChart.setOption({
+      backgroundColor: tc.bg,
+      tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        const idx = p[0]?.dataIndex ?? 0
+        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+      }},
+      grid: { left: 50, right: 16, top: 20, bottom: 44 },
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(248,81,73,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+      xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+      yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+      markLine: {
+        silent: true,
+        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.colors[3], fontSize: 9 }, lineStyle: { color: tc.colors[3], type: 'dashed', width: 1 } }],
+        symbol: 'none',
+      },
+      series: [{
+        name: 'Error Rate',
+        type: 'line',
+        smooth: chartTypes.value.errorRate === 'smooth',
+        step: chartTypes.value.errorRate === 'step' ? 'middle' as const : false,
+        data: errRates,
+        lineStyle: { width: 2, color: tc.colors[3] },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(248,81,73,0.18)' },
+          { offset: 1, color: 'rgba(248,81,73,0.01)' }
+        ])},
+        symbol: 'none',
+      }]
+    })
   }
 }
 
@@ -583,55 +655,7 @@ function renderAll() {
   })
 
   // Error rate trend chart
-  if (errorRateChartRef.value) {
-    if (errRateChart) errRateChart.dispose()
-    errRateChart = echarts.init(errorRateChartRef.value)
-
-    const timestamps = m.timestamps as string[] | undefined
-    const totals = (m.ts_total as number[]|undefined)||[]
-    const fails = (m.ts_fail as number[]|undefined)||[]
-
-    const errRates: number[] = []
-    for (let i = 0; i < totals.length; i++) {
-      errRates.push(totals[i] > 0 ? (fails[i] / totals[i]) * 100 : 0)
-    }
-
-    if (timestamps?.length && errRates.length) {
-      const timeLabels = timestamps.map(ts => formatTimeShort(ts))
-      const maxErrRate = Math.max(...errRates, 0.01)
-      const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100)
-      errRateChart.setOption({
-        backgroundColor: tc.bg,
-        tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
-          const p = Array.isArray(params) ? params[0] : params
-          const idx = p[0]?.dataIndex ?? 0
-          return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
-        }},
-        grid: { left: 50, right: 16, top: 20, bottom: 44 },
-        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(248,81,73,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
-        xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
-        yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
-        markLine: {
-          silent: true,
-          data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.colors[3], fontSize: 9 }, lineStyle: { color: tc.colors[3], type: 'dashed', width: 1 } }],
-          symbol: 'none',
-        },
-        series: [{
-          name: 'Error Rate',
-          type: 'line',
-          smooth: errorRateChartType.value === 'smooth',
-          step: errorRateChartType.value === 'step' ? 'middle' as const : undefined,
-          data: errRates,
-          lineStyle: { width: 2, color: tc.colors[3] },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(248,81,73,0.18)' },
-            { offset: 1, color: 'rgba(248,81,73,0.01)' }
-          ])},
-          symbol: 'none',
-        }]
-      })
-    }
-  }
+  renderErrorRateChart(tc, m)
 
   // Latency percentile bar chart (with P90)
   if (latChart) latChart.dispose()
@@ -760,30 +784,8 @@ function renderAll() {
   renderErrorBreakdownChart(tc)
 }
 
-function switchErrorRateChartType(type: 'smooth' | 'step') {
-  errorRateChartType.value = type
-  renderAll()
-}
-
-function switchQpsChartType(type: 'smooth' | 'step') {
-  qpsChartType.value = type
-  const m = metrics.value
-  if (m) renderQPSTrend(themeColors(), m)
-}
-
-function switchLatTrendChartType(type: 'smooth' | 'step') {
-  latTrendChartType.value = type
-  const m = metrics.value
-  if (m) renderLatencyTrend(themeColors(), m)
-}
-
-function switchNodeChartType(type: 'smooth' | 'step') {
-  nodeChartType.value = type
-  renderNodeCharts(themeColors())
-}
-
 function renderQPSTrend(tc: any, m: any) {
-  const isSmooth = qpsChartType.value === 'smooth'
+  const isSmooth = chartTypes.value.qpsTrend === 'smooth'
   if (!qpsChartRef.value) return
   if (qpsChart) qpsChart.dispose()
   qpsChart = echarts.init(qpsChartRef.value)
@@ -838,7 +840,7 @@ function renderQPSTrend(tc: any, m: any) {
 }
 
 function renderLatencyTrend(tc: any, m: any) {
-  const isSmooth = latTrendChartType.value === 'smooth'
+  const isSmooth = chartTypes.value.latTrend === 'smooth'
   if (!latencyTrendChartRef.value) return
   if (latTrendChart) latTrendChart.dispose()
   latTrendChart = echarts.init(latencyTrendChartRef.value)
@@ -892,8 +894,8 @@ function renderLatencyTrend(tc: any, m: any) {
 }
 
 function renderNodeCharts(tc: any) {
-  const isSmooth = nodeChartType.value === 'smooth'
   nodeTimeSeries.value.forEach((node, idx) => {
+    const isSmooth = chartTypes.value[`node-${idx}`] === 'smooth'
     const el = nodeChartRefs.get(idx)
     if (!el) return
     const chart = echarts.init(el)
@@ -1129,8 +1131,29 @@ function getStatusTooltip(status: string): string {
   return map[status] || status
 }
 
-function exportHTML() {
-  console.log('Export HTML clicked')
+async function exportHTML() {
+  const reportId = route.params.id as string
+  if (!reportId) return
+  try {
+    const token = localStorage.getItem('salvo_token')
+    const resp = await axios.get(`/api/v1/reports/${reportId}/export`, {
+      responseType: 'blob',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    const blob = resp.data as Blob
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const contentDisposition = resp.headers['content-disposition'] || ''
+    const match = contentDisposition.match(/filename=(.+)/)
+    link.download = match ? decodeURIComponent(match[1].replace(/"/g, '')) : `report-${reportId}.html`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Export HTML failed:', err)
+  }
 }
 
 // ===== Resize handling =====
