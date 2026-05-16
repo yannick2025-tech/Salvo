@@ -104,17 +104,17 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             --bg-secondary: #f9fafb;
             --bg-card: #ffffff;
             --bg-tertiary: #f3f4f6;
-            --bg-hover: rgba(88,166,255,0.04);
+            --bg-hover: rgba(8,145,178,0.04);
             --text-primary: #111827;
             --text-secondary: #374151;
             --text-tertiary: #6b7280;
             --border-primary: #e5e7eb;
             --border-secondary: #e5e7eb;
-            --accent-primary: #58a6ff;
-            --accent-success: #3fb950;
-            --accent-danger: #cf222e;
-            --accent-warning: #d29922;
-            --accent-info: #0969da;
+            --accent-primary: #0891b2;
+            --accent-success: #16a34a;
+            --accent-danger: #dc2626;
+            --accent-warning: #ca8a04;
+            --accent-info: #2563eb;
             --radius-sm: 6px;
             --radius-md: 8px;
         }
@@ -264,7 +264,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             border-radius: var(--radius-sm);
             font-size: 12px;
             font-weight: 600;
-            background: rgba(88,166,255,0.1);
+            background: rgba(8,145,178,0.1);
             color: var(--accent-primary);
         }
         .actual-val {
@@ -279,10 +279,10 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-weight: 600;
             letter-spacing: 0.04em;
         }
-        .status-badge.success { background: rgba(63,185,80,0.15); color: #238636; }
-        .status-badge.partial { background: rgba(210,153,34,0.15); color: #9a6700; }
-        .status-badge.failed { background: rgba(248,81,73,0.15); color: #cf222e; }
-        .status-badge.running { background: rgba(88,166,255,0.15); color: #0550ae; }
+        .status-badge.success { background: rgba(22,163,74,0.15); color: #16a34a; }
+        .status-badge.partial { background: rgba(217,119,6,0.15); color: #d97706; }
+        .status-badge.failed { background: rgba(220,38,38,0.15); color: #dc2626; }
+        .status-badge.running { background: rgba(8,145,178,0.15); color: #0891b2; }
         .status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
         .status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
@@ -472,7 +472,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <div class="metrics-row">
         <div class="metric-card">
             <div class="metric-label">成功率</div>
-            <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#3fb950{{else if gt .Metrics.SuccessRate 70.0}}#d29922{{else}}#cf222e{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
+            <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#16a34a{{else if gt .Metrics.SuccessRate 70.0}}#d97706{{else}}#dc2626{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
             <div class="metric-sub">{{formatNumber .Metrics.SuccessCount}} / {{formatNumber .Metrics.TotalRequests}} 次请求</div>
         </div>
 
@@ -722,7 +722,7 @@ const tc = {
     bg: '#ffffff',
     textColor: '#111827',
     lineColor: '#e5e7eb',
-    colors: ['#0969da', '#3fb950', '#d29922', '#cf222e']
+    colors: ['#0891b2', '#0891b2', '#d97706', '#8b5cf6']
 };
 
 let errorRateType = 'smooth';
@@ -862,10 +862,10 @@ function renderOverviewChart() {
             },
             data: [
                 { value: success, name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-                    { offset: 0, color: '#2da44e' }, { offset: 1, color: '#1a7f37' }
+                    { offset: 0, color: '#16a34a' }, { offset: 1, color: '#15803d' }
                 ])}},
                 { value: failed, name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-                    { offset: 0, color: '#cf222e' }, { offset: 1, color: '#a40e26' }
+                    { offset: 0, color: '#dc2626' }, { offset: 1, color: '#b91c1c' }
                 ])}}
             ]
         }]
@@ -908,7 +908,7 @@ function renderErrorRateChart() {
             }
         },
         grid: { left: 50, right: 16, top: 20, bottom: 44 },
-        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(248,81,73,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(225,29,72,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) } },
         yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         markLine: {
@@ -924,7 +924,7 @@ function renderErrorRateChart() {
             data: errRates,
             lineStyle: { width: 2, color: tc.colors[3] },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(248,81,73,0.18)' }, { offset: 1, color: 'rgba(248,81,73,0.01)' }
+                { offset: 0, color: 'rgba(225,29,72,0.18)' }, { offset: 1, color: 'rgba(225,29,72,0.01)' }
             ])},
             symbol: 'none'
         }]
@@ -974,19 +974,19 @@ function renderLatencyChart() {
             barWidth: '40%',
             data: [
                 { value: parseFloat(m.avg_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#0969da' }, { offset: 1, color: '#0550ae' }
+                    { offset: 0, color: '#0891b2' }, { offset: 1, color: '#0e7490' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p50_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#1a7f37' }, { offset: 1, color: '#116329' }
+                    { offset: 0, color: '#0891b2' }, { offset: 1, color: '#0e7490' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p90_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#9a6700' }, { offset: 1, color: '#7a5200' }
+                    { offset: 0, color: '#d97706' }, { offset: 1, color: '#b45309' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p95_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#cf222e' }, { offset: 1, color: '#a40e26' }
+                    { offset: 0, color: '#d97706' }, { offset: 1, color: '#b45309' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p99_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#8250df' }, { offset: 1, color: '#6e40c9' }
+                    { offset: 0, color: '#8b5cf6' }, { offset: 1, color: '#7c3aed' }
                 ]), borderRadius: [6, 6, 2, 2] }}
             ],
             label: {
@@ -1028,7 +1028,7 @@ function renderQPSTrend() {
             }
         },
         grid: { left: 50, right: 20, top: 20, bottom: 50 },
-        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(14,165,233, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         series: [{
@@ -1040,7 +1040,7 @@ function renderQPSTrend() {
             lineStyle: { width: 2, color: tc.colors[0] },
             itemStyle: { color: tc.colors[0] },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(14,165,233, 0.15)' }, { offset: 1, color: 'rgba(14,165,233, 0.01)' }
+                { offset: 0, color: 'rgba(8,145,178, 0.15)' }, { offset: 1, color: 'rgba(8,145,178, 0.01)' }
             ])},
             symbol: 'none'
         }]
@@ -1078,17 +1078,17 @@ function renderLatencyTrend() {
             }
         },
         grid: { top: 30, right: 20, bottom: 50, left: 50 },
-        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(14,165,233, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: [
             { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
             { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } } }
         ],
         series: [
-            { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#3fb950' }, itemStyle: { color: '#3fb950' }, symbol: 'none' },
-            { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d29922' }, itemStyle: { color: '#d29922' }, symbol: 'none' },
-            { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#cf222e' }, itemStyle: { color: '#cf222e' }, symbol: 'none' },
-            { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#8250df' }, itemStyle: { color: '#8250df' }, symbol: 'none' }
+            { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#0891b2' }, itemStyle: { color: '#0891b2' }, symbol: 'none' },
+            { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
+            { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
+            { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
         ]
     });
 }
@@ -1129,7 +1129,7 @@ function renderNodeCharts() {
                 }
             },
             grid: { top: 28, right: 48, bottom: 36, left: 48 },
-            dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(14,165,233, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+            dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
             xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
             yAxis: [
                 { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
@@ -1137,12 +1137,12 @@ function renderNodeCharts() {
             ],
             series: [
                 { name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: qpsData, yAxisIndex: 0, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(14,165,233, 0.12)' }, { offset: 1, color: 'rgba(14,165,233, 0.01)' }
+                    { offset: 0, color: 'rgba(8,145,178, 0.12)' }, { offset: 1, color: 'rgba(8,145,178, 0.01)' }
                 ])}, symbol: 'none' },
-                { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p50 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#3fb950' }, itemStyle: { color: '#3fb950' }, symbol: 'none' },
-                { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p90 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#d29922' }, itemStyle: { color: '#d29922' }, symbol: 'none' },
-                { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p95 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#cf222e' }, itemStyle: { color: '#cf222e' }, symbol: 'none' },
-                { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#8250df' }, itemStyle: { color: '#8250df' }, symbol: 'none' }
+                { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p50 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#0891b2' }, itemStyle: { color: '#0891b2' }, symbol: 'none' },
+                { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p90 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
+                { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p95 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
+                { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
             ]
         });
     });

@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" class="brand-icon" stroke-width="2">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
         <h1>Salvo</h1>
@@ -111,6 +111,18 @@ async function handleLogin() {
   margin-bottom: 32px;
 }
 
+.brand-icon {
+  stroke: #58a6ff;
+}
+
+[data-theme='light'] .brand-icon {
+  stroke: #0969da;
+}
+
+[data-theme='light'] .btn-login {
+  background: #0969da;
+}
+
 .login-header h1 {
   font-size: 28px;
   font-weight: 700;
@@ -155,7 +167,11 @@ async function handleLogin() {
 }
 
 .form-group input:focus {
-  border-color: var(--accent-primary);
+  border-color: #58a6ff;
+}
+
+[data-theme='light'] .form-group input:focus {
+  border-color: #0969da;
 }
 
 .form-group input::placeholder {
@@ -174,7 +190,7 @@ async function handleLogin() {
   height: 42px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--accent-primary);
+  background: #58a6ff;
   color: #fff;
   font-size: 15px;
   font-weight: 600;

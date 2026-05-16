@@ -98,10 +98,10 @@ function latencyLevel(span: SpanDTO): string {
 
 function latencyColor(span: SpanDTO): string {
   switch (latencyLevel(span)) {
-    case 'ok': return '#2ea04f'      // 绿色 <200ms
-    case 'warn': return '#17a2b8'    // 青色 200~600ms
-    case 'alert': return '#d29922'    // 暗黄色 600~1500ms
-    case 'critical': return '#f85149' // 红色 ≥1500ms
+    case 'ok': return '#4ade80'
+    case 'warn': return '#3b82f6'
+    case 'alert': return '#eab308'
+    case 'critical': return '#ef4444'
     default: return 'var(--accent-primary)'
   }
 }
@@ -237,9 +237,9 @@ function formatDurationMs(ns: number): string {
 .mono { font-family: monospace; font-size: 12px; cursor: default; }
 
 .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; min-width: auto; max-width: fit-content; }
-.st-ok { background: rgba(63,185,80,0.12); color: #238636; border: 1px solid rgba(63,185,80,0.2); }
-.st-error { background: rgba(248,81,73,0.12); color: #da3633; border: 1px solid rgba(248,81,73,0.2); }
-.st-skip { background: rgba(210,153,34,0.12); color: #9a6700; border: 1px solid rgba(210,153,34,0.2); }
+.st-ok { background: rgba(163,230,53,0.12); color: #65a30d; border: 1px solid rgba(163,230,53,0.2); }
+.st-error { background: rgba(225,29,72,0.12); color: #be123c; border: 1px solid rgba(225,29,72,0.2); }
+.st-skip { background: rgba(251,146,60,0.12); color: #ea580c; border: 1px solid rgba(251,146,60,0.2); }
 
 .empty { text-align: center; color: var(--text-tertiary); padding: 48px 0; }
 
@@ -249,14 +249,14 @@ function formatDurationMs(ns: number): string {
 .legend { display: flex; gap: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-secondary); }
 .legend-item { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.dot.lat-ok { background: #2ea04f; }
-.dot.lat-warn { background: #17a2b8; }
-.dot.lat-alert { background: #d29922; }
-.dot.lat-critical { background: #f85149; }
-.lat-ok { color: #2ea04f; }
-.lat-warn { color: #17a2b8; }
-.lat-alert { color: #d29922; font-weight: 700; }
-.lat-critical { color: #f85149; font-weight: 700; }
+.dot.lat-ok { background: #4ade80; }
+.dot.lat-warn { background: #3b82f6; }
+.dot.lat-alert { background: #eab308; }
+.dot.lat-critical { background: #ef4444; }
+.lat-ok { color: #4ade80; }
+.lat-warn { color: #3b82f6; }
+.lat-alert { color: #eab308; font-weight: 700; }
+.lat-critical { color: #ef4444; font-weight: 700; }
 
 .span-list { display: flex; flex-direction: column; gap: 10px; }
 .span-item { padding: 12px 14px; background: var(--bg-tertiary); border-radius: var(--radius-sm); border-left: 3px solid transparent; }

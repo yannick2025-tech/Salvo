@@ -174,6 +174,7 @@ let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
+let themeObserver: MutationObserver | null = null
 const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
@@ -540,11 +541,11 @@ function getChartTheme() {
       lineColor: '#30363d',
       bgColor: 'transparent',
       colors: {
-        primary: '#58a6ff',
-        success: '#3fb950',
-        warning: '#d29922',
-        danger: '#f85149',
-        info: '#89d0ff',
+        primary: '#00E5FF',
+        success: '#4ade80',
+        warning: '#eab308',
+        danger: '#ef4444',
+        info: '#3b82f6',
       }
     }
   }
@@ -553,11 +554,11 @@ function getChartTheme() {
     lineColor: '#e2e8f0',
     bgColor: 'transparent',
     colors: {
-      primary: '#0ea5e9',
-      success: '#22c55e',
-      warning: '#a855f7',
-      danger: '#ef4444',
-      info: '#06b6d4',
+      primary: '#0891b2',
+      success: '#16a34a',
+      warning: '#ca8a04',
+      danger: '#dc2626',
+      info: '#2563eb',
     }
   }
 }
@@ -627,6 +628,7 @@ function renderQpsChart() {
   if (!qpsChart) {
     qpsChart = echarts.init(qpsChartRef.value)
   }
+  qpsChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.qpsTrend === 'smooth'
   const ts = getFilteredTimeSeries()
@@ -642,10 +644,10 @@ function renderQpsChart() {
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` }, { offset: 1, color: 'rgba(88,166,255,0)' }]) } }],
+    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` }, { offset: 1, color: 'rgba(0,229,255,0)' }]) } }],
     tooltip: getTooltipConfig(),
   }, true)
   qpsChart.off('datazoom')
@@ -659,6 +661,7 @@ function renderLatencyChart() {
   if (!latencyChart) {
     latencyChart = echarts.init(latencyChartRef.value)
   }
+  latencyChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.latTrend === 'smooth'
   const ts = getFilteredTimeSeries()
@@ -674,7 +677,7 @@ function renderLatencyChart() {
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
@@ -696,6 +699,7 @@ function renderErrorChart() {
   if (!errorChart) {
     errorChart = echarts.init(errorChartRef.value)
   }
+  errorChart.clear()
   const theme = getChartTheme()
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
@@ -713,7 +717,7 @@ function renderErrorChart() {
   errorChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 16, right: 16, bottom: 44, left: 50 },
-    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(ts.timestamps.length / 8) }, splitLine: { show: false } },
     yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
     series: [{
@@ -724,7 +728,7 @@ function renderErrorChart() {
       step: isSmooth ? false : 'middle',
       symbol: 'none',
       lineStyle: { width: 2, color: theme.colors.danger },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#ef4444' ? '239, 68, 68' : '248, 81, 73'}, 0.01)` }]) }
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.01)` }]) }
     }],
     tooltip: getTooltipConfig(),
   }, true)
@@ -742,6 +746,7 @@ function renderNodeDetailChart(nodeId: string) {
     chart = echarts.init(el)
     nodeCharts.set(nodeId, chart)
   }
+  chart.clear()
   const node = overview.value?.node_metrics?.find(n => n.node_id === nodeId)
   if (!node) return
   const theme = getChartTheme()
@@ -773,7 +778,7 @@ function renderNodeDetailChart(nodeId: string) {
       { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, areaStyle: undefined },
     ]
     if (tsQPS.length > 0) {
-      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined })
+      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined, animationDelay: () => 0 })
     }
 
     const hasQPS = series.length > 4
@@ -781,7 +786,7 @@ function renderNodeDetailChart(nodeId: string) {
       backgroundColor: 'transparent',
       legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
       grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
-      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: node.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor((node.timestamps!.length || 1) / 6) - 1 } },
       yAxis: hasQPS ? [
         { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -815,7 +820,7 @@ function renderNodeDetailChart(nodeId: string) {
           borderRadius: [3, 3, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: theme.colors.primary },
-            { offset: 1, color: `rgba(${theme.colors.primary === '#0ea5e9' ? '14, 165, 233' : '88, 166, 255'}, 0.3)` },
+            { offset: 1, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` },
           ]),
         },
       }],
@@ -879,6 +884,21 @@ onMounted(() => {
     renderErrorChart()
   }, 100)
   window.addEventListener('resize', handleResize)
+
+  themeObserver = new MutationObserver(() => {
+    qpsChart?.dispose(); qpsChart = null
+    latencyChart?.dispose(); latencyChart = null
+    errorChart?.dispose(); errorChart = null
+    nodeCharts.forEach((c, k) => { c.dispose() })
+    nodeCharts.clear()
+    requestAnimationFrame(() => {
+      renderQpsChart()
+      renderLatencyChart()
+      renderErrorChart()
+      if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
+    })
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
   
   watch(allScenes, (scenes) => {
     if (scenes.length > 0 && !selectedSceneId.value) {
@@ -899,6 +919,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  themeObserver?.disconnect()
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
   qpsChart?.dispose()
@@ -954,7 +975,7 @@ onUnmounted(() => {
 .scene-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.1);
 }
 
 .scene-tabs {
@@ -991,13 +1012,13 @@ onUnmounted(() => {
 }
 
 .scene-tab.running {
-  border-color: #3fb950;
-  background: rgba(63,185,80,0.08);
+  border-color: #a3e635;
+  background: rgba(163,230,53,0.08);
 }
 
 .scene-tab.running.active {
-  background: #3fb950;
-  border-color: #3fb950;
+  background: #a3e635;
+  border-color: #a3e635;
 }
 
 .scene-status-dot {
@@ -1009,8 +1030,8 @@ onUnmounted(() => {
 }
 
 .scene-status-dot.running {
-  background: #3fb950;
-  box-shadow: 0 0 4px rgba(63,185,80,0.5);
+  background: #a3e635;
+  box-shadow: 0 0 4px rgba(163,230,53,0.5);
   animation: pulse 2s infinite;
 }
 
@@ -1019,7 +1040,7 @@ onUnmounted(() => {
 }
 
 .scene-status-dot.failed {
-  background: #f85149;
+  background: #e11d48;
 }
 
 @keyframes pulse {
@@ -1028,8 +1049,8 @@ onUnmounted(() => {
 }
 
 .running-badge {
-  background: rgba(63,185,80,0.15);
-  color: #3fb950;
+  background: rgba(163,230,53,0.15);
+  color: #a3e635;
   padding: 1px 6px;
   border-radius: 8px;
   font-size: 10px;
@@ -1070,7 +1091,7 @@ onUnmounted(() => {
 }
 
 .live-indicator {
-  color: #3fb950;
+  color: #a3e635;
   font-weight: 700;
   font-size: 11px;
   animation: blink 1.5s infinite;
@@ -1302,7 +1323,7 @@ onUnmounted(() => {
   border-radius: 10px;
 }
 
-.run-status.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+.run-status.running { background: rgba(0,229,255,0.15); color: var(--accent-primary); }
 .run-status.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .run-status.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
 
@@ -1360,7 +1381,7 @@ onUnmounted(() => {
   letter-spacing: 1px;
   font-weight: 600;
 }
-.node-type.http { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+.node-type.http { background: rgba(0,229,255,0.15); color: var(--accent-primary); }
 .node-type.setup, .node-type.teardown { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .node-type.delay { background: rgba(210,153,34,0.15); color: var(--accent-warning); }
 .node-type.condition { background: rgba(163,113,247,0.15); color: #a371f7; }
@@ -1533,12 +1554,12 @@ onUnmounted(() => {
 }
 .node-card:hover { 
   border-color: var(--accent-primary); 
-  box-shadow: 0 8px 24px rgba(88, 166, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0,229,255, 0.12);
   transform: translateY(-2px);
 }
 .node-card.expanded {
   border-color: var(--accent-primary);
-  box-shadow: 0 12px 40px rgba(88, 166, 255, 0.15);
+  box-shadow: 0 12px 40px rgba(0,229,255, 0.15);
   grid-column: 1 / -1;
 }
 
@@ -1603,7 +1624,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #0ea5e9, transparent);
+  background: linear-gradient(90deg, transparent, #0891b2, transparent);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -1622,19 +1643,19 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .node-type.http { 
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.18) 0%, rgba(14, 165, 233, 0.08) 100%); 
-  color: #0ea5e9;
+  background: linear-gradient(135deg, rgba(217, 70, 239, 0.18) 0%, rgba(8, 145, 178, 0.08) 100%); 
+  color: #0891b2;
 }
 
 [data-theme='light'] .node-type.setup, 
 [data-theme='light'] .node-type.teardown { 
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(22, 163, 74, 0.08) 100%); 
-  color: #22c55e;
+  background: linear-gradient(135deg, rgba(101, 163, 13, 0.18) 0%, rgba(77, 124, 15, 0.08) 100%); 
+  color: #65a30d;
 }
 
 [data-theme='light'] .node-type.delay { 
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(202, 138, 4, 0.08) 100%); 
-  color: #f59e0b;
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.18) 0%, rgba(194, 65, 12, 0.08) 100%); 
+  color: #ea580c;
 }
 
 [data-theme='light'] .node-type.condition { 
@@ -1643,7 +1664,7 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .qps-value {
-  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  background: linear-gradient(135deg, #0891b2 0%, #d946ef 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1655,18 +1676,18 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .bar-fill.p50 { 
-  background: linear-gradient(90deg, #06b6d4 0%, #0ea5e9 100%); 
-  box-shadow: 0 1px 4px rgba(6, 182, 212, 0.4);
+  background: linear-gradient(90deg, #d946ef 0%, #0891b2 100%); 
+  box-shadow: 0 1px 4px rgba(217, 70, 239, 0.4);
 }
 
 [data-theme='light'] .bar-fill.p95 { 
-  background: linear-gradient(90deg, #a855f7 0%, #8b5cf6 100%); 
-  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.4);
+  background: linear-gradient(90deg, #ea580c 0%, #c2410c 100%); 
+  box-shadow: 0 1px 4px rgba(234, 88, 12, 0.4);
 }
 
 [data-theme='light'] .bar-fill.p99 { 
-  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); 
-  box-shadow: 0 1px 4px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(90deg, #be123c 0%, #e11d48 100%); 
+  box-shadow: 0 1px 4px rgba(225, 29, 72, 0.4);
 }
 
 [data-theme='light'] .node-qps {
@@ -1678,13 +1699,13 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .node-card:hover {
-  border-color: #0ea5e9;
-  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
+  border-color: #0891b2;
+  box-shadow: 0 8px 24px rgba(8, 145, 178, 0.15);
 }
 
 [data-theme='light'] .node-card.expanded {
-  border-color: #0ea5e9;
-  box-shadow: 0 12px 40px rgba(14, 165, 233, 0.18);
+  border-color: #0891b2;
+  box-shadow: 0 12px 40px rgba(8, 145, 178, 0.18);
 }
 
 [data-theme='light'] .detail-item {
@@ -1774,5 +1795,10 @@ onUnmounted(() => {
   background: var(--accent-primary);
   color: #fff;
   border-color: var(--accent-primary);
+}
+[data-theme='dark'] .type-btn.active {
+  background: rgba(0,229,255,0.15);
+  color: #00E5FF;
+  border-color: rgba(0,229,255,0.3);
 }
 </style>

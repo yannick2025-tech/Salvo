@@ -276,6 +276,7 @@ let latChart: echarts.ECharts | null = null
 let ovChart: echarts.ECharts | null = null
 let errRateChart: echarts.ECharts | null = null
 let errBreakdownChart: echarts.ECharts | null = null
+let themeObserver: MutationObserver | null = null
 
 interface NodeTimeSeries {
   node_id: string
@@ -492,18 +493,26 @@ function themeColors() {
     bg: 'transparent',
     gridLineDash: dark ? [4, 3] : [4, 3],
     colors: [
-      dark ? '#58a6ff' : '#0969da',
-      dark ? '#3fb950' : '#1a7f37',
-      dark ? '#d29922' : '#9a6700',
-      dark ? '#f85149' : '#cf222e',
-      dark ? '#bc8cff' : '#8250df',
+      dark ? '#00E5FF' : '#0891b2',
+      dark ? '#4ade80' : '#16a34a',
+      dark ? '#FFB74D' : '#d97706',
+      dark ? '#B388FF' : '#8b5cf6',
+      dark ? '#ef4444' : '#dc2626',
+      dark ? '#eab308' : '#ca8a04',
+      dark ? '#3b82f6' : '#2563eb',
+      dark ? '#94a3b8' : '#64748b',
     ],
     latencyColors: [
-      dark ? '#89d0ff' : '#0969da',
-      dark ? '#3fb950' : '#1a7f37',
-      dark ? '#d29922' : '#9a6700',
-      dark ? '#f85149' : '#cf222e',
+      dark ? '#00E5FF' : '#0891b2',
+      dark ? '#4ade80' : '#16a34a',
+      dark ? '#FFB74D' : '#d97706',
+      dark ? '#B388FF' : '#8b5cf6',
+      dark ? '#ef4444' : '#dc2626',
+      dark ? '#eab308' : '#ca8a04',
+      dark ? '#3b82f6' : '#2563eb',
+      dark ? '#94a3b8' : '#64748b',
     ],
+    dangerColor: dark ? '#ef4444' : '#dc2626',
   }
 }
 
@@ -533,12 +542,12 @@ function renderErrorRateChart(tc: any, m: any) {
         return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
       }},
       grid: { left: 50, right: 16, top: 20, bottom: 44 },
-      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(248,81,73,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark() ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
       yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
       markLine: {
         silent: true,
-        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.colors[3], fontSize: 9 }, lineStyle: { color: tc.colors[3], type: 'dashed', width: 1 } }],
+        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
         symbol: 'none',
       },
       series: [{
@@ -547,10 +556,10 @@ function renderErrorRateChart(tc: any, m: any) {
         smooth: chartTypes.value.errorRate === 'smooth',
         step: chartTypes.value.errorRate === 'step' ? 'middle' as const : false,
         data: errRates,
-        lineStyle: { width: 2, color: tc.colors[3] },
+        lineStyle: { width: 2, color: tc.dangerColor },
         areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(248,81,73,0.18)' },
-          { offset: 1, color: 'rgba(248,81,73,0.01)' }
+          { offset: 0, color: isDark() ? 'rgba(239,68,68,0.18)' : 'rgba(220,38,38,0.18)' },
+          { offset: 1, color: isDark() ? 'rgba(239,68,68,0.01)' : 'rgba(220,38,38,0.01)' }
         ])},
         symbol: 'none',
       }]
@@ -643,12 +652,12 @@ function renderAll() {
       },
       data: [
         { value: Number(m.success_reqs || 0), name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-          { offset: 0, color: isDark() ? '#3fb950' : '#2da44e' },
-          { offset: 1, color: isDark() ? '#238636' : '#1a7f37' }
+          { offset: 0, color: isDark() ? '#4ade80' : '#16a34a' },
+          { offset: 1, color: isDark() ? '#22c55e' : '#15803d' }
         ])}},
         { value: Number(m.failed_reqs || 0), name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-          { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
-          { offset: 1, color: isDark() ? '#da3633' : '#a40e26' }
+          { offset: 0, color: isDark() ? '#ef4444' : '#dc2626' },
+          { offset: 1, color: isDark() ? '#dc2626' : '#b91c1c' }
         ])}},
       ],
     }],
@@ -663,7 +672,7 @@ function renderAll() {
   latChart.setOption({
     backgroundColor: tc.bg,
     tooltip: {
-      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(88,166,255,0.05)' : 'rgba(14,165,233,0.04)' } },
+      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(0,229,255,0.05)' : 'rgba(8,145,178,0.04)' } },
       confine: true,
       position: function (point: number[], params: any, dom: HTMLElement, rect: DOMRect, size: { contentSize: [number, number]; viewSize: [number, number] }) {
         const x = point[0]
@@ -711,56 +720,11 @@ function renderAll() {
       type: 'bar',
       barWidth: '40%',
       data: [
-        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark() ? '#58a6ff' : '#0969da' },
-            { offset: 1, color: isDark() ? '#388bfd' : '#0550ae' }
-          ]),
-          borderRadius: [6, 6, 2, 2],
-          shadowColor: isDark() ? 'rgba(88,166,255,0.3)' : 'rgba(9,105,218,0.2)',
-          shadowBlur: 8,
-          shadowOffsetY: 2,
-        }},
-        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark() ? '#3fb950' : '#1a7f37' },
-            { offset: 1, color: isDark() ? '#238636' : '#116329' }
-          ]),
-          borderRadius: [6, 6, 2, 2],
-          shadowColor: isDark() ? 'rgba(63,185,80,0.25)' : 'rgba(26,127,55,0.15)',
-          shadowBlur: 8,
-          shadowOffsetY: 2,
-        }},
-        { value: parseFloat(m.p90_latency_s || '0') * 1000, itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark() ? '#d29922' : '#9a6700' },
-            { offset: 1, color: isDark() ? '#bb8009' : '#7a5200' }
-          ]),
-          borderRadius: [6, 6, 2, 2],
-          shadowColor: isDark() ? 'rgba(210,153,34,0.25)' : 'rgba(154,103,0,0.15)',
-          shadowBlur: 8,
-          shadowOffsetY: 2,
-        }},
-        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
-            { offset: 1, color: isDark() ? '#da3633' : '#a40e26' }
-          ]),
-          borderRadius: [6, 6, 2, 2],
-          shadowColor: isDark() ? 'rgba(248,81,73,0.28)' : 'rgba(207,34,46,0.18)',
-          shadowBlur: 8,
-          shadowOffsetY: 2,
-        }},
-        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark() ? '#bc8cff' : '#8250df' },
-            { offset: 1, color: isDark() ? '#a371f7' : '#6e40c9' }
-          ]),
-          borderRadius: [6, 6, 2, 2],
-          shadowColor: isDark() ? 'rgba(188,140,255,0.3)' : 'rgba(130,80,223,0.2)',
-          shadowBlur: 8,
-          shadowOffsetY: 2,
-        }},
+        { value: parseFloat(m.avg_latency_s || '0') * 1000, itemStyle: { color: tc.colors[0], borderRadius: [6, 6, 2, 2] }},
+        { value: parseFloat(m.p50_latency_s || '0') * 1000, itemStyle: { color: tc.colors[1], borderRadius: [6, 6, 2, 2] }},
+        { value: parseFloat(m.p90_latency_s || '0') * 1000, itemStyle: { color: tc.colors[2], borderRadius: [6, 6, 2, 2] }},
+        { value: parseFloat(m.p95_latency_s || '0') * 1000, itemStyle: { color: tc.colors[3], borderRadius: [6, 6, 2, 2] }},
+        { value: parseFloat(m.p99_latency_s || '0') * 1000, itemStyle: { color: tc.colors[4 % tc.colors.length], borderRadius: [6, 6, 2, 2] }},
       ],
       label: {
         show: true, position: 'top',
@@ -819,7 +783,7 @@ function renderQPSTrend(tc: any, m: any) {
       }
     },
     grid: { left: 50, right: 20, top: 20, bottom: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(1) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
     series: [{
@@ -831,8 +795,8 @@ function renderQPSTrend(tc: any, m: any) {
       lineStyle: { width: 2, color: tc.colors[0] },
       itemStyle: { color: tc.colors[0] },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)` },
-        { offset: 1, color: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.01)` }
+        { offset: 0, color: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)` },
+        { offset: 1, color: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.01)` }
       ])},
       symbol: 'none',
     }]
@@ -881,7 +845,7 @@ function renderLatencyTrend(tc: any, m: any) {
     },
     legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
@@ -898,6 +862,8 @@ function renderNodeCharts(tc: any) {
     const isSmooth = chartTypes.value[`node-${idx}`] === 'smooth'
     const el = nodeChartRefs.get(idx)
     if (!el) return
+    const oldChart = nodeCharts.get(idx)
+    if (oldChart) { oldChart.dispose(); nodeCharts.delete(idx) }
     const chart = echarts.init(el)
     nodeCharts.set(idx, chart)
 
@@ -932,14 +898,14 @@ function renderNodeCharts(tc: any) {
       },
       legend: { data: ['QPS','P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
       grid: { left: 50, right: 50, top: 30, bottom: 50 },
-      dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '88,166,255' : '14,165,233'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+      dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
       xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
       yAxis: [
         { type: 'value', name: 'req/s', position: 'left', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         { type: 'value', name: 'ms', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
       ],
       series: [
-        { name:'QPS', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_qps||[], yAxisIndex:0, lineStyle:{width:2,color:tc.colors[0]}, itemStyle:{color:tc.colors[0]}, symbol:'none', areaStyle:{ color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:`rgba(${isDark()?'88,166,255':'14,165,233'},0.12)`},{offset:1,color:`rgba(${isDark()?'88,166,255':'14,165,233'},0.01)`}])} },
+        { name:'QPS', type:'bar', data:node.ts_qps||[], yAxisIndex:0, itemStyle:{ color:`rgba(${isDark()?'0,229,255':'8,145,178'}, 0.25)`, borderRadius:[2,2,0,0] }, animationDelay: () => 0 },
         { name:'P50', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p50||[], yAxisIndex:1, lineStyle:{width:2,color:lc[0]}, itemStyle:{color:lc[0]}, symbol:'none' },
         { name:'P90', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p90||[], yAxisIndex:1, lineStyle:{width:2,color:lc[1]}, itemStyle:{color:lc[1]}, symbol:'none' },
         { name:'P95', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p95||[], yAxisIndex:1, lineStyle:{width:2,color:lc[2]}, itemStyle:{color:lc[2]}, symbol:'none' },
@@ -969,7 +935,7 @@ function renderErrorBreakdownChart(tc: any) {
   errBreakdownChart.setOption({
     backgroundColor: tc.bg,
     tooltip: {
-      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(248,81,73,0.06)' : 'rgba(248,81,73,0.04)' } },
+      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(225,29,72,0.06)' : 'rgba(225,29,72,0.04)' } },
       confine: true,
       backgroundColor: isDark() ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
       borderColor: isDark() ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
@@ -1007,13 +973,7 @@ function renderErrorBreakdownChart(tc: any) {
         value: v,
         itemStyle: {
           borderRadius: [0, 6, 6, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: i === 0 ? (isDark() ? '#ff6b6b' : '#e53e3e') : (isDark() ? '#f85149' : '#cf222e') },
-            { offset: 1, color: i === 0 ? (isDark() ? 'rgba(255,107,107,0.25)' : 'rgba(229,62,62,0.12)') : (isDark() ? 'rgba(248,81,73,0.2)' : 'rgba(248,81,73,0.08)') }
-          ]),
-          shadowColor: isDark() ? 'rgba(248,81,73,0.25)' : 'rgba(207,34,46,0.15)',
-          shadowBlur: i === 0 ? 8 : 0,
-          shadowOffsetX: 0,
+          color: tc.colors[i % tc.colors.length],
         }
       })),
       barMaxWidth: 22,
@@ -1028,7 +988,7 @@ function renderErrorBreakdownChart(tc: any) {
       emphasis: {
         itemStyle: {
           shadowBlur: 16,
-          shadowColor: isDark() ? 'rgba(248,81,73,0.4)' : 'rgba(207,34,46,0.3)',
+          shadowColor: isDark() ? 'rgba(225,29,72,0.4)' : 'rgba(190,18,60,0.3)',
         }
       }
     }],
@@ -1166,8 +1126,23 @@ window.addEventListener('resize', () => {
   }, 150)
 })
 
-onMounted(() => fetchReport())
+onMounted(() => {
+  fetchReport()
+  themeObserver = new MutationObserver(() => {
+    qpsChart?.dispose(); qpsChart = null
+    latTrendChart?.dispose(); latTrendChart = null
+    latChart?.dispose(); latChart = null
+    ovChart?.dispose(); ovChart = null
+    errRateChart?.dispose(); errRateChart = null
+    errBreakdownChart?.dispose(); errBreakdownChart = null
+    nodeCharts.forEach((c) => { c.dispose() })
+    nodeCharts.clear()
+    requestAnimationFrame(() => renderAll())
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+})
 onUnmounted(() => {
+  themeObserver?.disconnect()
   qpsChart?.dispose(); latTrendChart?.dispose(); latChart?.dispose(); ovChart?.dispose(); errRateChart?.dispose()
   nodeCharts.forEach(c => c.dispose())
 })
@@ -1210,7 +1185,7 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.15s;
 }
-.btn-export:hover:not(:disabled) { background: rgba(88,166,255,0.08); }
+.btn-export:hover:not(:disabled) { background: rgba(0,229,255,0.08); }
 .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ===== Metrics Row ===== */
@@ -1263,7 +1238,7 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
-  background: rgba(88,166,255,0.1);
+  background: rgba(0,229,255,0.1);
   color: var(--accent-primary);
 }
 .actual-val { color: var(--accent-success); font-weight: 500; }
@@ -1275,10 +1250,10 @@ onUnmounted(() => {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
-.status-badge.success { background: rgba(63,185,80,0.15); color: #238636; }
-.status-badge.partial { background: rgba(210,153,34,0.15); color: #9a6700; }
-.status-badge.failed { background: rgba(248,81,73,0.15); color: #cf222e; }
-.status-badge.running { background: rgba(88,166,255,0.15); color: #0550ae; }
+.status-badge.success { background: rgba(163,230,53,0.15); color: #65a30d; }
+.status-badge.partial { background: rgba(251,146,60,0.15); color: #ea580c; }
+.status-badge.failed { background: rgba(225,29,72,0.15); color: #be123c; }
+.status-badge.running { background: rgba(0,229,255,0.15); color: #0891b2; }
 .status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
 .status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
@@ -1391,6 +1366,11 @@ onUnmounted(() => {
   background: var(--accent-primary);
   color: #fff;
   border-color: var(--accent-primary);
+}
+[data-theme='dark'] .type-btn.active {
+  background: rgba(0,229,255,0.15);
+  color: #00E5FF;
+  border-color: rgba(0,229,255,0.3);
 }
 .type-btn:hover:not(.active) {
   background: var(--bg-hover);
