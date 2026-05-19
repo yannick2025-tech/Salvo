@@ -122,6 +122,15 @@ func (r *SceneRepo) Update(ctx context.Context, scene *model.Scene) error {
 	return err
 }
 
+func (r *SceneRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE scenes SET status=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		status, now, id)
+	return err
+}
+
 func (r *SceneRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE scenes SET deleted_at=? WHERE id=?`, now, id)

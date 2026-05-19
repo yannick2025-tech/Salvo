@@ -302,18 +302,10 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	lc := lifecycle.New()
 	lc.Register(lifecycle.HookSceneSetup, func(ctx context.Context) error {
-		return r.scenes.Update(ctx, &model.Scene{
-			Model:  scene.Model,
-			Name:   scene.Name,
-			Status: model.SceneStatusRunning,
-		})
+		return r.scenes.UpdateStatus(ctx, r.cfg.SceneID, model.SceneStatusRunning)
 	})
 	lc.Register(lifecycle.HookSceneTeardown, func(ctx context.Context) error {
-		return r.scenes.Update(ctx, &model.Scene{
-			Model:  scene.Model,
-			Name:   scene.Name,
-			Status: model.SceneStatusCompleted,
-		})
+		return r.scenes.UpdateStatus(ctx, r.cfg.SceneID, model.SceneStatusCompleted)
 	})
 
 	if err := lc.Run(r.ctx, lifecycle.HookSceneSetup); err != nil {
@@ -548,7 +540,10 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		logger.F("node_samples_count", len(collectorData.NodeSamples)),
 	)
 
-	dbRecords, dbErr := r.tsStore.QueryByRunID(r.ctx, r.runID)
+	reportCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	dbRecords, dbErr := r.tsStore.QueryByRunID(reportCtx, r.runID)
 	if dbErr != nil {
 		r.log.Warn("failed to query full time series from db, falling back to in-memory", logger.F("error", dbErr))
 	} else {
@@ -612,7 +607,7 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	}
 
 	nodeNameMap := make(map[string]string)
-	if nodeList, err := r.nodes.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000}); err == nil {
+	if nodeList, err := r.nodes.List(reportCtx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000}); err == nil {
 		for _, n := range nodeList {
 			nodeNameMap[n.ID.String()] = n.Name
 		}

@@ -39,6 +39,7 @@ type SceneRepo interface {
 	GetByID(ctx context.Context, id snowflake.ID) (*model.Scene, error)
 	List(ctx context.Context, filter Filter) ([]*model.Scene, error)
 	Update(ctx context.Context, scene *model.Scene) error
+	UpdateStatus(ctx context.Context, id snowflake.ID, status string) error
 	Delete(ctx context.Context, id snowflake.ID) error
 }
 
