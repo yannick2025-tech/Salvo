@@ -19,7 +19,7 @@
           <label>确认新密码</label>
           <input v-model="pwdForm.confirm_password" type="password" placeholder="确认新密码" />
         </div>
-        <button class="btn-primary" @click="handleChangePassword">修改密码</button>
+        <button class="btn-login-primary" @click="handleChangePassword">修改密码</button>
         <div v-if="pwdMsg" :class="['msg', pwdMsgType]">{{ pwdMsg }}</div>
       </div>
 

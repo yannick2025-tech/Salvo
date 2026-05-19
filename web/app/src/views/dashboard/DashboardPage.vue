@@ -350,7 +350,9 @@ async function fetchSceneList() {
 
       if (!selectedSceneId.value && sceneList.value.length > 0) {
         const firstRunning = sceneList.value.find(s => s.status === 'running')
-        selectedSceneId.value = (firstRunning || sceneList.value[0]).scene_id
+        if (firstRunning) {
+          selectedSceneId.value = firstRunning.scene_id
+        }
       }
 
       syncRunningStatus()
@@ -903,8 +905,10 @@ onMounted(() => {
   watch(allScenes, (scenes) => {
     if (scenes.length > 0 && !selectedSceneId.value) {
       const firstRunning = scenes.find(s => s.status === 'running')
-      selectedSceneId.value = (firstRunning || scenes[0]).scene_id
-      console.log('🔄 Auto-selected scene:', selectedSceneId.value)
+      if (firstRunning) {
+        selectedSceneId.value = firstRunning.scene_id
+        console.log('🔄 Auto-selected running scene:', selectedSceneId.value)
+      }
     }
   }, { immediate: true })
   

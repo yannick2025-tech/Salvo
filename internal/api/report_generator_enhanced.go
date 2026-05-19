@@ -722,7 +722,8 @@ const tc = {
     bg: '#ffffff',
     textColor: '#111827',
     lineColor: '#e5e7eb',
-    colors: ['#0891b2', '#0891b2', '#d97706', '#8b5cf6']
+    colors: ['#0891b2', '#0891b2', '#d97706', '#dc2626'],
+    dangerColor: '#dc2626'
 };
 
 let errorRateType = 'smooth';
@@ -908,12 +909,12 @@ function renderErrorRateChart() {
             }
         },
         grid: { left: 50, right: 16, top: 20, bottom: 44 },
-        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(225,29,72,0.10)', handleStyle: { color: tc.colors[3] }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) } },
         yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         markLine: {
             silent: true,
-            data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(2) + '%', color: tc.colors[3], fontSize: 9 }, lineStyle: { color: tc.colors[3], type: 'dashed', width: 1 } }],
+            data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(2) + '%', color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
             symbol: 'none'
         },
         series: [{
@@ -922,9 +923,9 @@ function renderErrorRateChart() {
             smooth: chartTypes.errorRate === 'smooth',
             step: chartTypes.errorRate === 'step' ? 'middle' : false,
             data: errRates,
-            lineStyle: { width: 2, color: tc.colors[3] },
+            lineStyle: { width: 2, color: tc.dangerColor },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(225,29,72,0.18)' }, { offset: 1, color: 'rgba(225,29,72,0.01)' }
+                { offset: 0, color: 'rgba(220,38,38,0.18)' }, { offset: 1, color: 'rgba(220,38,38,0.01)' }
             ])},
             symbol: 'none'
         }]

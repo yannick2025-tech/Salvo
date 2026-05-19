@@ -4,7 +4,7 @@
       <h2>场景管理</h2>
       <div class="header-actions">
         <button class="btn-secondary" @click="showImport = true">导入 YAML</button>
-        <button class="btn-primary" @click="showCreate = true">+ 新建场景</button>
+        <button class="btn-login-primary" @click="showCreate = true">+ 新建场景</button>
       </div>
     </div>
 
@@ -58,7 +58,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreate = false">取消</button>
-          <button class="btn-primary" @click="handleCreate">创建</button>
+          <button class="btn-login-primary" @click="handleCreate">创建</button>
         </div>
       </div>
     </div>
@@ -97,7 +97,7 @@
         <div class="modal-actions">
           <button class="btn-secondary" @click="loadExample">加载示例</button>
           <button class="btn-secondary" @click="showImport = false">取消</button>
-          <button class="btn-primary" @click="handleImport" :disabled="importing">
+          <button class="btn-login-primary" @click="handleImport" :disabled="importing">
             {{ importing ? '导入中...' : '导入' }}
           </button>
         </div>

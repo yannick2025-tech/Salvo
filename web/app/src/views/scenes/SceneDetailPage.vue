@@ -5,7 +5,7 @@
       <h2 v-if="scene">{{ scene.name }}</h2>
       <div class="header-actions">
         <button class="btn-outline" @click="showCopyModal = true">复制场景</button>
-        <button class="btn-primary" @click="showRunConfig = true">▶ 启动测试</button>
+        <button class="btn-login-primary" @click="showRunConfig = true">▶ 启动测试</button>
       </div>
     </div>
 
@@ -201,7 +201,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
-          <button class="btn-primary" :disabled="nodes.length === 0" @click="handleStart">
+          <button class="btn-login-primary" :disabled="nodes.length === 0" @click="handleStart">
             {{ nodes.length === 0 ? '无 DAG 节点' : '启动' }}
           </button>
         </div>
@@ -217,7 +217,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCopyModal = false">取消</button>
-          <button class="btn-primary" @click="handleCopyScene">确认复制</button>
+          <button class="btn-login-primary" @click="handleCopyScene">确认复制</button>
         </div>
       </div>
     </div>
@@ -351,7 +351,7 @@ const runConfig = reactive({
   workers: 10,
   run_mode: 'count',
   count: 100,
-  duration: 30,
+  duration: 60,
 })
 
 const nodeForm = reactive({
@@ -1095,7 +1095,8 @@ onMounted(() => {
 .btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
-.btn-outline { padding: 8px 16px; border: 1px solid var(--accent-primary); border-radius: var(--radius-md); background: transparent; color: var(--accent-primary); font-size: 13px; cursor: pointer; }
+.btn-outline { padding: 8px 16px; border: 1px solid #58a6ff; border-radius: var(--radius-md); background: transparent; color: #58a6ff; font-size: 13px; cursor: pointer; }
+[data-theme='light'] .btn-outline { border-color: #0969da; color: #0969da; }
 .btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
 .btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
 .btn-close { border: none; background: transparent; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; }

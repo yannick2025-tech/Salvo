@@ -35,7 +35,7 @@
           <label>总请求数</label>
           <input v-model.number="form.count" type="number" min="1" />
         </div>
-        <button class="btn-primary" @click="handleStart" :disabled="!form.scene_id || starting || selectedSceneHasNoDAG">
+        <button class="btn-login-primary" @click="handleStart" :disabled="!form.scene_id || starting || selectedSceneHasNoDAG">
           {{ starting ? '启动中...' : '启动' }}
         </button>
         <div v-if="form.scene_id && selectedSceneHasNoDAG" class="no-dag-warning">

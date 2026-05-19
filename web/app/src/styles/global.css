@@ -113,3 +113,29 @@ a {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+/* Login button style - blue theme for primary actions */
+.btn-login-primary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: #58a6ff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+[data-theme='light'] .btn-login-primary {
+  background: #0969da;
+}
+
+.btn-login-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-login-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

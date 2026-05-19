@@ -2,7 +2,7 @@
   <div class="users-page">
     <div class="page-header">
       <h2>用户管理</h2>
-      <button class="btn-primary" @click="showCreate = true">+ 新建用户</button>
+      <button class="btn-login-primary" @click="showCreate = true">+ 新建用户</button>
     </div>
 
     <div class="table-wrapper">
@@ -69,7 +69,7 @@
         <div v-if="formError" class="form-error">{{ formError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeModal">取消</button>
-          <button class="btn-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
+          <button class="btn-login-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
         </div>
       </div>
     </div>
@@ -88,7 +88,7 @@
         <div v-if="formError" class="form-error">{{ formError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showResetPwd = false">取消</button>
-          <button class="btn-primary" @click="handleResetPassword">确认重置</button>
+          <button class="btn-danger-outline" @click="handleResetPassword">确认重置</button>
         </div>
       </div>
     </div>
@@ -272,9 +272,11 @@ onMounted(() => {
 .page-header h2 { font-size: 18px; font-weight: 600; }
 .btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
 .btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
-.btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
+.btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.15s ease; }
 .btn-sm.danger { color: var(--accent-danger); border-color: var(--accent-danger); }
-.btn-sm.warn { color: #f0ad4e; border-color: #f0ad4e; }
+.btn-sm.danger:hover { background: var(--accent-danger); color: #fff; }
+.btn-sm.warn { color: var(--accent-danger); border-color: var(--accent-danger); }
+.btn-sm.warn:hover { background: var(--accent-danger); color: #fff; }
 .form-error { font-size: 12px; color: var(--accent-danger, #e74c3c); background: rgba(248,81,73,0.1); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 8px; }
 
 .table-wrapper { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: auto; }
@@ -331,4 +333,14 @@ onMounted(() => {
   transition: opacity 0.15s ease;
 }
 .btn-danger-confirm:hover { opacity: 0.88; }
+.btn-danger-outline {
+  padding: 8px 20px; border: 1px solid var(--accent-danger); border-radius: var(--radius-md);
+  background: transparent; color: var(--accent-danger); font-size: 13px; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-danger-outline:hover {
+  background: var(--accent-danger);
+  color: #fff;
+  border-color: var(--accent-danger);
+}
 </style>
