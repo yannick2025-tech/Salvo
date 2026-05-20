@@ -1,0 +1,37 @@
+server:
+  host: "0.0.0.0"
+  port: 8766
+  web_dir: "web/dist"
+
+database:
+  driver: "sqlite3"
+  dsn: "salvo.db"
+  max_open: 10
+  max_idle: 5
+  log_level: "warn"
+
+log:
+  level: "info"
+  format: "json"
+  output: "logs/salvo.log"
+  max_size: 100
+  max_backups: 5
+  max_age: 30
+  time_format: "2006-01-02T15:04:05.000Z07:00"
+
+pool:
+  worker_count: 20
+  run_mode: "count"
+  count: 10000
+
+auth:
+  jwt_secret: "salvo-jwt-secret-change-in-production"
+
+mock:
+  enabled: true
+  port: 9090
+
+variables:
+  base_url: "http://localhost:9090/mock/api"
+  product_id: "12345"
+  order_id: "67890"

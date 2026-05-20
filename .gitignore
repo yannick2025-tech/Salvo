@@ -14,3 +14,10 @@ dist/
 .env
 *.log
 .DS_Store
+bin/
+*.db
+*.db-shm
+*.db-wal
+logs/
+salvo
+*.vue.js

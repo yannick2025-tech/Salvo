@@ -1,4 +1,4 @@
-# salvo 设计规格说明书
+# Salvo 设计规格说明书
 
 > 基于 DAG 工作流引擎的 HTTP 性能测试工具
 
@@ -533,41 +533,139 @@ func (id *SnowflakeID) UnmarshalJSON(data []byte) error {
 ### 9.1 四级追踪
 
 ```
-场景追踪 (trace_id)
-  └── 链路追踪 (span_id, parent_id = 场景 trace_id)
-        └── 接口追踪 (span_id, parent_id = 链路 span_id)
-              └── 函数追踪 (span_id, parent_id = 接口 span_id)
+场景追踪 (trace_id = run_id)
+  └── 链路追踪 (chain_id) - 每次 DAG 执行的唯一标识
+        └── 接口追踪 (node_id) - 每个节点的唯一标识
+              └── 函数追踪 (function_name) - 生成器函数调用
+```
+
+**四级追踪层级说明：**
+
+| 层级 | 标识 | 说明 |
+|------|------|------|
+| **场景层** | `trace_id` = `run_id` | 一次压测运行，包含所有并发、所有链路 |
+| **链路层** | `chain_id` | 每次 DAG 执行的唯一标识，可追踪完整链路（A→B→C→D→E） |
+| **接口层** | `node_id` + `parent_node_id` | 每个节点的唯一标识，记录父子节点关系 |
+| **函数层** | `function_name` | 生成器函数调用，记录输入输出 |
+
+**追踪数据结构：**
+
+```go
+type Span struct {
+    ID           string    // span 唯一标识
+    TraceID      string    // 场景追踪标识（= run_id）
+    ChainID      string    // 链路追踪标识
+    NodeID       string    // 节点标识
+    ParentNodeID string    // 父节点标识（用于构建调用链）
+    Status       SpanStatus // OK | Error | Timeout | Skipped
+    Error        string    // 错误信息
+    Input        string    // 输入参数
+    Output       string    // 输出结果
+    StartedAt    time.Time
+    FinishedAt   time.Time
+    Duration     time.Duration
+}
 ```
 
 ### 9.2 追踪接口
 
 ```go
-type Span struct {
-    TraceID   string
-    SpanID    string
-    ParentID  string
-    Name      string
-    StartTime time.Time
-    Duration  time.Duration
-    Tags      map[string]string
-    Status    SpanStatus  // OK | Error | Timeout
+type SpanBuilder interface {
+    SetInput(s string) *SpanBuilder
+    SetChainID(chainID string) *SpanBuilder
+    SetParentNodeID(parentNodeID string) *SpanBuilder
+    Finish(output string, err error)
+    Skip(reason string)
 }
 
 type Tracer interface {
-    StartSpan(ctx context.Context, name string) (context.Context, *Span)
+    StartSpan(ctx context.Context, nodeID string) SpanBuilder
     FinishSpan(span *Span)
-    SpanFromContext(ctx context.Context) *Span
     InjectTraceID(logger *zap.Logger, ctx context.Context) *zap.Logger
+}
+
+type TraceContext interface {
+    StartSpan(nodeID string) SpanContext
+    FinishTrace()
+    FinishTraceWithError(err string)
 }
 ```
 
 ### 9.3 追踪标识传播
 
-- 场景运行 → 追踪标识注入 context
-- 链路迭代 → 新 span，父级 = 场景追踪
-- 接口调用 → 新 span，父级 = 链路追踪
-- 插件/生成器调用 → 新 span，父级 = 接口追踪
-- 日志自动包含 context 中的追踪标识
+- **场景运行** → `trace_id` 注入 context，贯穿整个运行周期
+- **链路迭代** → 每次 DAG 执行生成唯一 `chain_id`，通过 context 传播
+- **接口调用** → `node_id` 标识当前节点，`parent_node_id` 记录上游节点
+- **函数调用** → 生成器函数执行时记录函数名和输出
+- **日志自动包含** context 中的 `trace_id`、`chain_id`、`node_id`
+
+### 9.4 典型日志输出
+
+**场景启动：**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "scene_id": "309890420588941312",
+  "run_id": "309890552487227392",
+  "workers": 3,
+  "run_mode": "count",
+  "count": 100
+}
+```
+
+**节点执行：**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "chain_id": "309890552495607808",
+  "node_id": "309890420593135618",
+  "node_type": "http",
+  "method": "GET",
+  "url": "http://localhost:9090/mock/api/products?page=1",
+  "status": 200,
+  "latency_ms": 75
+}
+```
+
+**生成器函数调用：**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "chain_id": "309890552495607808",
+  "node_id": "309890420593135618",
+  "function": "email",
+  "output": "test_123@example.com"
+}
+```
+
+### 9.5 节点类型支持
+
+| 节点类型 | 说明 | 执行行为 |
+|---------|------|----------|
+| `http` | HTTP 请求节点 | 执行 HTTP 请求 |
+| `setup` | 场景初始化节点 | 执行 HTTP 请求（生命周期钩子） |
+| `teardown` | 场景清理节点 | 执行 HTTP 请求（生命周期钩子） |
+| `delay` | 延迟节点 | 等待指定时间 |
+| `condition` | 条件判断节点 | 评估条件表达式 |
+| `if-else` | 分支节点 | 根据条件执行不同路径 |
+| `loop` | 循环节点 | 重复执行指定次数 |
+| `group` | 分组节点 | 逻辑分组 |
+
+### 9.6 运行模式判断
+
+运行模式通过 `run_mode` 参数决定：
+
+| 参数值 | 模式 | 说明 |
+|--------|------|------|
+| `count` | 次数模式 | 执行指定次数后停止 |
+| `duration` | 时长模式 | 运行指定时长后停止 |
+
+**日志输出规则：**
+- 次数模式：仅输出 `count` 字段，不输出 `duration`
+- 时长模式：仅输出 `duration` 字段，不输出 `count`
 
 ---
 
@@ -821,7 +919,58 @@ dag, pool, variable, lifecycle, timer, plugin, generator, protocol, api, store, 
 
 ---
 
-## 15. 代码规范
+## 15. 模拟 HTTP 服务器
+
+内置模拟 HTTP 服务器，用于本地端到端测试，位于 `test/mockserver/`。
+
+### 15.1 接口列表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/login | 返回令牌，模拟认证 |
+| POST | /api/users | 创建用户，返回用户 JSON |
+| GET | /api/users/:id | 按 ID 获取用户 |
+| GET | /api/users | 分页列出用户 |
+| PUT | /api/users/:id | 更新用户 |
+| DELETE | /api/users/:id | 删除用户 |
+| POST | /api/orders | 创建订单 |
+| GET | /api/orders | 列出订单 |
+| POST | /api/upload | 上传文件，返回文件信息 |
+| GET | /api/delay/:ms | 延迟响应（可配置延迟时间） |
+| GET | /api/status/:code | 返回指定 HTTP 状态码 |
+| POST | /api/echo | 回显请求体 |
+| GET | /api/headers | 回显请求头 |
+| POST | /api/encrypt | 接收加密请求体，返回加密响应 |
+| GET | /api/chunked | 分块传输编码响应 |
+| GET | /api/redirect/:count | 链式重定向 |
+| POST | /api/error | 随机服务端错误（500/502/503） |
+
+### 15.2 功能特性
+
+- 可配置响应延迟（模拟慢速接口）
+- 可配置错误率（模拟不稳定服务）
+- 请求日志（检查 Salvo 发出的请求内容）
+- 启用 CORS（方便网页界面测试）
+- 通过 `go test` 或独立二进制启动
+
+### 15.3 使用方式
+
+```go
+func TestE2ELoginFlow(t *testing.T) {
+    srv := mockserver.New(t, mockserver.Config{
+        Port:     18080,
+        Latency:  50 * time.Millisecond,
+        ErrorRate: 0.0,
+    })
+    defer srv.Close()
+    
+    // 测试目标: srv.URL() + "/api/login"
+}
+```
+
+---
+
+## 16. 代码规范
 
 - 所有代码注释使用英文
 - 文档同时提供中文和英文（独立文件）
@@ -831,7 +980,7 @@ dag, pool, variable, lifecycle, timer, plugin, generator, protocol, api, store, 
 
 ---
 
-## 16. 使用的技能
+## 17. 使用的技能
 
 | 技能 | 用途 |
 |------|------|

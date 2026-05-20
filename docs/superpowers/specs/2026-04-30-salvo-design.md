@@ -1,4 +1,4 @@
-# salvo Design Specification
+# Salvo Design Specification
 
 > HTTP Performance Testing Tool with DAG Workflow Engine
 
@@ -533,41 +533,139 @@ Based on Zap structured logger with automatic trace_id injection.
 ### 9.1 Four-Level Trace
 
 ```
-Scene Trace (trace_id)
-  └── Chain Trace (span_id, parent_id = scene trace_id)
-        └── API Trace (span_id, parent_id = chain span_id)
-              └── Function Trace (span_id, parent_id = api span_id)
+Scene Trace (trace_id = run_id)
+  └── Chain Trace (chain_id) - unique identifier for each DAG execution
+        └── API Trace (node_id) - unique identifier for each node
+              └── Function Trace (function_name) - generator function calls
+```
+
+**Four-Level Trace Hierarchy:**
+
+| Level | Identifier | Description |
+|-------|------------|-------------|
+| **Scene** | `trace_id` = `run_id` | One load test run, includes all concurrency and chains |
+| **Chain** | `chain_id` | Unique identifier for each DAG execution, tracks complete chain (A→B→C→D→E) |
+| **API** | `node_id` + `parent_node_id` | Unique identifier for each node, records parent-child relationship |
+| **Function** | `function_name` | Generator function calls, records input/output |
+
+**Trace Data Structure:**
+
+```go
+type Span struct {
+    ID           string    // span unique identifier
+    TraceID      string    // scene trace identifier (= run_id)
+    ChainID      string    // chain trace identifier
+    NodeID       string    // node identifier
+    ParentNodeID string    // parent node identifier (for building call chain)
+    Status       SpanStatus // OK | Error | Timeout | Skipped
+    Error        string    // error message
+    Input        string    // input parameters
+    Output       string    // output result
+    StartedAt    time.Time
+    FinishedAt   time.Time
+    Duration     time.Duration
+}
 ```
 
 ### 9.2 Trace Interface
 
 ```go
-type Span struct {
-    TraceID   string
-    SpanID    string
-    ParentID  string
-    Name      string
-    StartTime time.Time
-    Duration  time.Duration
-    Tags      map[string]string
-    Status    SpanStatus  // OK | Error | Timeout
+type SpanBuilder interface {
+    SetInput(s string) *SpanBuilder
+    SetChainID(chainID string) *SpanBuilder
+    SetParentNodeID(parentNodeID string) *SpanBuilder
+    Finish(output string, err error)
+    Skip(reason string)
 }
 
 type Tracer interface {
-    StartSpan(ctx context.Context, name string) (context.Context, *Span)
+    StartSpan(ctx context.Context, nodeID string) SpanBuilder
     FinishSpan(span *Span)
-    SpanFromContext(ctx context.Context) *Span
     InjectTraceID(logger *zap.Logger, ctx context.Context) *zap.Logger
+}
+
+type TraceContext interface {
+    StartSpan(nodeID string) SpanContext
+    FinishTrace()
+    FinishTraceWithError(err string)
 }
 ```
 
-### 9.3 TraceID Propagation
+### 9.3 Trace Identifier Propagation
 
-- Scene run → trace_id injected into context
-- Chain iteration → new span with parent = scene trace
-- API call → new span with parent = chain span
-- Plugin/Generator call → new span with parent = API span
-- Logger automatically includes trace_id from context
+- **Scene Run** → `trace_id` injected into context, persists throughout the run
+- **Chain Iteration** → Unique `chain_id` generated for each DAG execution, propagated via context
+- **API Call** → `node_id` identifies current node, `parent_node_id` records upstream node
+- **Function Call** → Generator function execution records function name and output
+- **Logger Auto-Includes** `trace_id`, `chain_id`, `node_id` from context
+
+### 9.4 Typical Log Output
+
+**Scene Start:**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "scene_id": "309890420588941312",
+  "run_id": "309890552487227392",
+  "workers": 3,
+  "run_mode": "count",
+  "count": 100
+}
+```
+
+**Node Execution:**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "chain_id": "309890552495607808",
+  "node_id": "309890420593135618",
+  "node_type": "http",
+  "method": "GET",
+  "url": "http://localhost:9090/mock/api/products?page=1",
+  "status": 200,
+  "latency_ms": 75
+}
+```
+
+**Generator Function Call:**
+```json
+{
+  "level": "info",
+  "trace_id": "309890552487227392",
+  "chain_id": "309890552495607808",
+  "node_id": "309890420593135618",
+  "function": "email",
+  "output": "test_123@example.com"
+}
+```
+
+### 9.5 Node Type Support
+
+| Node Type | Description | Execution Behavior |
+|-----------|-------------|-------------------|
+| `http` | HTTP request node | Execute HTTP request |
+| `setup` | Scene setup node | Execute HTTP request (lifecycle hook) |
+| `teardown` | Scene teardown node | Execute HTTP request (lifecycle hook) |
+| `delay` | Delay node | Wait for specified duration |
+| `condition` | Condition node | Evaluate condition expression |
+| `if-else` | Branch node | Execute different paths based on condition |
+| `loop` | Loop node | Repeat execution specified times |
+| `group` | Group node | Logical grouping |
+
+### 9.6 Run Mode Determination
+
+Run mode is determined by the `run_mode` parameter:
+
+| Parameter | Mode | Description |
+|-----------|------|-------------|
+| `count` | Count Mode | Stop after executing specified number of iterations |
+| `duration` | Duration Mode | Stop after running for specified duration |
+
+**Log Output Rules:**
+- Count Mode: Only output `count` field, no `duration`
+- Duration Mode: Only output `duration` field, no `count`
 
 ---
 
@@ -821,7 +919,58 @@ Each key module must pass all tests before committing:
 
 ---
 
-## 15. Code Standards
+## 15. Mock HTTP Server
+
+A built-in mock HTTP server for local end-to-end testing, located in `test/mockserver/`.
+
+### 15.1 Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/login | Return token, simulate auth |
+| POST | /api/users | Create user, return user JSON |
+| GET | /api/users/:id | Get user by ID |
+| GET | /api/users | List users with pagination |
+| PUT | /api/users/:id | Update user |
+| DELETE | /api/users/:id | Delete user |
+| POST | /api/orders | Create order |
+| GET | /api/orders | List orders |
+| POST | /api/upload | Upload file, return file info |
+| GET | /api/delay/:ms | Delayed response (configurable latency) |
+| GET | /api/status/:code | Return specified HTTP status code |
+| POST | /api/echo | Echo back request body |
+| GET | /api/headers | Echo back request headers |
+| POST | /api/encrypt | Accept encrypted body, return encrypted response |
+| GET | /api/chunked | Chunked transfer encoding response |
+| GET | /api/redirect/:count | Chain redirects |
+| POST | /api/error | Random server errors (500/502/503) |
+
+### 15.2 Features
+
+- Configurable response latency (simulate slow APIs)
+- Configurable error rate (simulate unstable services)
+- Request logging (inspect what Salvo sends)
+- CORS enabled (for Web UI testing)
+- Startup via `go test` or standalone binary
+
+### 15.3 Usage
+
+```go
+func TestE2ELoginFlow(t *testing.T) {
+    srv := mockserver.New(t, mockserver.Config{
+        Port:     18080,
+        Latency:  50 * time.Millisecond,
+        ErrorRate: 0.0,
+    })
+    defer srv.Close()
+    
+    // test against srv.URL() + "/api/login"
+}
+```
+
+---
+
+## 16. Code Standards
 
 - All code comments in English
 - Documentation in both Chinese and English (separate files)
@@ -831,7 +980,7 @@ Each key module must pass all tests before committing:
 
 ---
 
-## 16. Skills to Use
+## 17. Skills to Use
 
 | Skill | Purpose |
 |-------|---------|
