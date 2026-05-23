@@ -339,6 +339,24 @@ const sysMetricsHistory = ref<RuntimeMetricsDTO[]>([])
 const MAX_SYS_HISTORY = 300
 const sysMetricsTimeSeries = ref<any[]>([])
 const sysChartsVisible = ref(false)
+let sysChartsRendered = false
+let prewarmRetryTimer: ReturnType<typeof setTimeout> | null = null
+function prewarmSysCharts() {
+  if (sysChartsRendered) return
+  if (sysMetricsHistory.value.length === 0 && sysMetricsTimeSeries.value.length === 0) return
+  renderSysGoroutineChart()
+  if (!sysGoroutineChart) {
+    if (prewarmRetryTimer) clearTimeout(prewarmRetryTimer)
+    prewarmRetryTimer = setTimeout(() => prewarmSysCharts(), 100)
+    return
+  }
+  if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
+  sysChartsRendered = true
+  renderSysHeapChart()
+  renderSysCpuChart()
+  renderSysTaskWaitChart()
+  renderSysQueueChart()
+}
 const sysMonitorSectionRef = ref<HTMLElement | null>(null)
 const expandedSysChartId = ref<string | null>(null)
 
@@ -1335,39 +1353,9 @@ async function fetchOverview() {
             sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
           }
         }
-        if (sysChartsVisible.value) {
-          setTimeout(() => {
-            renderSysGoroutineChart()
-            requestAnimationFrame(() => {
-              renderSysHeapChart()
-              requestAnimationFrame(() => {
-                renderSysCpuChart()
-                requestAnimationFrame(() => {
-                  renderSysTaskWaitChart()
-                  requestAnimationFrame(() => renderSysQueueChart())
-                })
-              })
-            })
-          }, 0)
-        }
       } else if (resp.data?.system_metrics_time_series?.length > 0) {
         sysMetricsTimeSeries.value = resp.data.system_metrics_time_series
         sysMetricsHistory.value = []
-        if (sysChartsVisible.value) {
-          setTimeout(() => {
-            renderSysGoroutineChart()
-            requestAnimationFrame(() => {
-              renderSysHeapChart()
-              requestAnimationFrame(() => {
-                renderSysCpuChart()
-                requestAnimationFrame(() => {
-                  renderSysTaskWaitChart()
-                  requestAnimationFrame(() => renderSysQueueChart())
-                })
-              })
-            })
-          }, 0)
-        }
       }
 
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
@@ -1377,6 +1365,7 @@ async function fetchOverview() {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
+      prewarmSysCharts()
       if (expandedNodeId.value) {
         renderNodeDetailChart(expandedNodeId.value)
       }
@@ -1402,8 +1391,8 @@ function handleResize() {
   }
 }
 
-onMounted(() => {
-  fetchSceneList()
+onMounted(async () => {
+  await fetchSceneList()
   fetchOverview()
   loadHistoryData()
 
@@ -1411,6 +1400,7 @@ onMounted(() => {
     renderQpsChart()
     renderLatencyChart()
     renderErrorChart()
+    prewarmSysCharts()
   }, 100)
   window.addEventListener('resize', handleResize)
 
@@ -1430,17 +1420,13 @@ onMounted(() => {
     sysQueueExpandedChart?.dispose(); sysQueueExpandedChart = null
     nodeCharts.forEach((c) => { c.dispose() })
     nodeCharts.clear()
+    if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
+    sysChartsRendered = false
     requestAnimationFrame(() => {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
-      if (sysChartsVisible.value || sysMetricsHistory.value.length >= 2 || sysMetricsTimeSeries.value.length >= 2) {
-        renderSysGoroutineChart()
-        renderSysHeapChart()
-        renderSysCpuChart()
-        renderSysTaskWaitChart()
-        renderSysQueueChart()
-      }
+      prewarmSysCharts()
       if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
       if (expandedSysChartId.value) renderSysExpandedChart(expandedSysChartId.value)
     })
@@ -1468,23 +1454,11 @@ onMounted(() => {
         sysObserver?.disconnect()
       }
     }
-  }, { rootMargin: '200px 0px' })
+  }, { rootMargin: '800px 0px' })
 
   watch(sysChartsVisible, (visible) => {
     if (!visible) return
-    if (sysMetricsHistory.value.length >= 2 || sysMetricsTimeSeries.value.length >= 2) {
-      renderSysGoroutineChart()
-      requestAnimationFrame(() => {
-        renderSysHeapChart()
-        requestAnimationFrame(() => {
-          renderSysCpuChart()
-          requestAnimationFrame(() => {
-            renderSysTaskWaitChart()
-            requestAnimationFrame(() => renderSysQueueChart())
-          })
-        })
-      })
-    }
+    prewarmSysCharts()
   }, { once: true })
 
   nextTick(() => {
@@ -1508,6 +1482,7 @@ onUnmounted(() => {
   sysObserver?.disconnect()
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
+  if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
   qpsChart?.dispose()
   latencyChart?.dispose()
   errorChart?.dispose()
