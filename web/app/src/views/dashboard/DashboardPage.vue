@@ -1434,6 +1434,13 @@ onMounted(() => {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
+      if (sysChartsVisible.value || sysMetricsHistory.value.length >= 2 || sysMetricsTimeSeries.value.length >= 2) {
+        renderSysGoroutineChart()
+        renderSysHeapChart()
+        renderSysCpuChart()
+        renderSysTaskWaitChart()
+        renderSysQueueChart()
+      }
       if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
       if (expandedSysChartId.value) renderSysExpandedChart(expandedSysChartId.value)
     })
