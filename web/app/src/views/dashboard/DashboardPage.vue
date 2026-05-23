@@ -342,7 +342,6 @@ const sysChartsVisible = ref(false)
 let sysChartsRendered = false
 let prewarmRetryTimer: ReturnType<typeof setTimeout> | null = null
 function prewarmSysCharts() {
-  if (sysChartsRendered) return
   if (sysMetricsHistory.value.length === 0 && sysMetricsTimeSeries.value.length === 0) return
   renderSysGoroutineChart()
   if (!sysGoroutineChart) {
@@ -356,6 +355,17 @@ function prewarmSysCharts() {
   renderSysCpuChart()
   renderSysTaskWaitChart()
   renderSysQueueChart()
+}
+
+function refreshSysCharts() {
+  if (!sysChartsRendered) return
+  if (sysMetricsTimeSeries.value.length > 0 || sysMetricsHistory.value.length >= 2) {
+    renderSysGoroutineChart()
+    renderSysHeapChart()
+    renderSysCpuChart()
+    renderSysTaskWaitChart()
+    renderSysQueueChart()
+  }
 }
 const sysMonitorSectionRef = ref<HTMLElement | null>(null)
 const expandedSysChartId = ref<string | null>(null)
@@ -1366,6 +1376,7 @@ async function fetchOverview() {
       renderLatencyChart()
       renderErrorChart()
       prewarmSysCharts()
+      refreshSysCharts()
       if (expandedNodeId.value) {
         renderNodeDetailChart(expandedNodeId.value)
       }

@@ -248,8 +248,17 @@
       <section v-if="metrics?.system_metrics" class="nodes-section">
         <h3>系统性能分析</h3>
 
+        <!-- Legacy Report Info Banner -->
+        <div v-if="!metrics.system_metrics.time_series?.length && !metrics.system_metrics.summary" class="info-banner">
+          <span class="banner-icon">ℹ️</span>
+          <div class="banner-text">
+            <strong>无系统性能数据</strong>
+            <p>此报告生成时未启用系统指标采集，或测试运行时间过短未能收集到有效数据。建议在后续测试中开启系统监控以获取完整的性能分析。</p>
+          </div>
+        </div>
+
         <!-- Summary Cards -->
-        <div class="sys-summary-row">
+        <div v-if="metrics.system_metrics.summary || metrics.system_metrics.time_series?.length" class="sys-summary-row">
           <div class="sys-summary-card" title="Goroutine 峰值：测试运行期间 Go 运行时中活跃协程的最大数量。包含 Worker、HTTP 连接池、内部管理协程等。100 Worker 通常对应 1000-1500 Goroutine 属于正常范围">
             <div class="sys-summary-label">Goroutine 峰值</div>
             <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.goroutine_max || 0).toLocaleString() }}</div>
@@ -310,6 +319,89 @@
               <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
               <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
             </div>
+          </div>
+        </div>
+
+        <!-- System Metrics Data Table -->
+        <div v-if="metrics.system_metrics.time_series?.length > 0" class="sys-table-section">
+          <div class="table-header-row">
+            <h4>系统指标详细数据</h4>
+            <div class="table-info">共 {{ metrics.system_metrics.time_series.length }} 条记录</div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="sortable" @click="toggleSort('timestamp')">
+                    时间戳
+                    <span class="sort-icon">{{ getSortIcon('timestamp') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('goroutine_count')">
+                    Goroutines
+                    <span class="sort-icon">{{ getSortIcon('goroutine_count') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('heap_alloc_mb')">
+                    Heap (MB)
+                    <span class="sort-icon">{{ getSortIcon('heap_alloc_mb') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('cpu_percent')">
+                    CPU (%)
+                    <span class="sort-icon">{{ getSortIcon('cpu_percent') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('gc_pause_last_ms')">
+                    GC 暂停 (ms)
+                    <span class="sort-icon">{{ getSortIcon('gc_pause_last_ms') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('active_workers')">
+                    Workers
+                    <span class="sort-icon">{{ getSortIcon('active_workers') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('pending_queue_len')">
+                    队列长度
+                    <span class="sort-icon">{{ getSortIcon('pending_queue_len') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('task_wait_p99_ms')">
+                    Wait P99 (ms)
+                    <span class="sort-icon">{{ getSortIcon('task_wait_p99_ms') }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in paginatedTableData" :key="idx"
+                    :class="{ 'danger-row': isDangerRow(row) }">
+                  <td>{{ formatTimestamp(row.timestamp) }}</td>
+                  <td :class="{ 'danger-cell': row.goroutine_count > 50000 }">
+                    {{ Number(row.goroutine_count || 0).toLocaleString() }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.heap_alloc_mb > 500 }">
+                    {{ (row.heap_alloc_mb || 0).toFixed(1) }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.cpu_percent > 90 }">
+                    {{ (row.cpu_percent || 0).toFixed(1) }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.gc_pause_last_ms > 10 }">
+                    {{ (row.gc_pause_last_ms || 0).toFixed(1) }}
+                  </td>
+                  <td>{{ row.active_workers || 0 }}</td>
+                  <td :class="{ 'danger-cell': row.pending_queue_len > 100 }">
+                    {{ row.pending_queue_len || 0 }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.task_wait_p99_ms > 100 }">
+                    {{ (row.task_wait_p99_ms || 0).toFixed(1) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="pagination-controls" v-if="totalPages > 1">
+            <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+            <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+            <span class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</span>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">末页</button>
           </div>
         </div>
       </section>
@@ -389,6 +481,71 @@ const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   sysCpu: 'smooth',
   sysTaskWait: 'smooth',
 })
+
+const tableSortKey = ref<string>('timestamp')
+const tableSortOrder = ref<'asc' | 'desc'>('asc')
+const currentPage = ref<number>(1)
+const pageSize = 20
+
+const sortedTableData = computed(() => {
+  const ts = metrics.value?.system_metrics?.time_series || []
+  if (!tableSortKey.value) return ts
+  const key = tableSortKey.value
+  const order = tableSortOrder.value === 'asc' ? 1 : -1
+  return [...ts].sort((a: any, b: any) => {
+    const valA = a[key] ?? 0
+    const valB = b[key] ?? 0
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      return order * valA.localeCompare(valB)
+    }
+    return order * ((valA as number) - (valB as number))
+  })
+})
+
+const totalPages = computed(() => Math.ceil(sortedTableData.value.length / pageSize))
+
+const paginatedTableData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return sortedTableData.value.slice(start, start + pageSize)
+})
+
+function toggleSort(key: string) {
+  if (tableSortKey.value === key) {
+    tableSortOrder.value = tableSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    tableSortKey.value = key
+    tableSortOrder.value = 'asc'
+  }
+  currentPage.value = 1
+}
+
+function getSortIcon(key: string): string {
+  if (tableSortKey.value !== key) return '⇅'
+  return tableSortOrder.value === 'asc' ? '↑' : '↓'
+}
+
+function formatTimestamp(ts: string): string {
+  if (!ts) return '-'
+  try {
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return ts
+    return d.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    })
+  } catch {
+    return ts
+  }
+}
+
+function isDangerRow(row: any): boolean {
+  return (row.goroutine_count > 50000) ||
+         (row.heap_alloc_mb > 500) ||
+         (row.cpu_percent > 90) ||
+         (row.gc_pause_last_ms > 10) ||
+         (row.pending_queue_len > 100) ||
+         (row.task_wait_p99_ms > 100)
+}
 
 function initNodeChartTypes() {
   nodeTimeSeries.value.forEach((_, idx) => {
@@ -1692,6 +1849,163 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+/* System Metrics Data Table */
+.sys-table-section {
+  margin-top: 16px;
+}
+
+.info-banner {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(147, 197, 253, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+}
+
+.banner-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-text strong {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.banner-text p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.table-header-row h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.table-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: var(--bg-card, white);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table thead {
+  background: var(--bg-secondary, #f9fafb);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color, #e5e7eb);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.data-table th.sortable:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.sort-icon {
+  margin-left: 4px;
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
+  color: var(--text-primary);
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-hover, #f9fafb);
+}
+
+.danger-row {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.danger-cell {
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.page-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-card, white);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #f3f4f6);
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 100px;
+  text-align: center;
 }
 
 </style>

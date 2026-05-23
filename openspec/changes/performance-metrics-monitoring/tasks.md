@@ -81,11 +81,11 @@
 - [x] 5.2 Create 6 summary metric cards: Peak Goroutines, Peak Memory, Avg CPU, Total GC Time, Avg Task Wait Time, QPS Achievement %
 - [x] 5.3 Reuse or adapt dashboard chart rendering functions for report page (full history, static data)
 - [x] 5.4 Render 5 trend charts (Goroutine, Heap, CPU, Task Wait Time, Pending Queue) with complete time-series data
-- [ ] 5.5 Implement data table component: columns (Timestamp, Goroutines, Heap, CPU, GC Pause, Workers, Queue, Wait P99)
-- [ ] 5.6 Add table sorting functionality (column header click, asc/desc toggle)
-- [ ] 5.7 Add table pagination (20 rows/page) with controls
-- [ ] 5.8 Highlight rows/cells exceeding danger thresholds (red tint background, bold text)
-- [ ] 5.9 Handle legacy reports without system data: show info banner explaining unavailability
+- [x] 5.5 Implement data table component: columns (Timestamp, Goroutines, Heap, CPU, GC Pause, Workers, Queue, Wait P99)
+- [x] 5.6 Add table sorting functionality (column header click, asc/desc toggle)
+- [x] 5.7 Add table pagination (20 rows/page) with controls
+- [x] 5.8 Highlight rows/cells exceeding danger thresholds (red tint background, bold text)
+- [x] 5.9 Handle legacy reports without system data: show info banner explaining unavailability
 - [x] 5.10 Ensure chart type independence: toggling system charts doesn't affect QPS/latency/error charts
 
 ## 6. Exported HTML Report: System Metrics Integration
@@ -101,11 +101,11 @@
 - [x] 6.5 Implement smooth/step toggle for exported report charts (module-level state variables)
 - [x] 6.6 Add threshold markLines to goroutine chart (warning/danger levels)
 - [x] 6.7 Add task wait time threshold markLines at 10ms (warning) and 100ms (danger)
-- [ ] 6.8 Generate formatted data table with proper number formatting per project rules
-- [ ] 6.9 Implement client-side table pagination and sorting (pure JavaScript, no framework)
-- [ ] 6.10 Add @media print styles: convert charts to images, grayscale backgrounds, page-break control
-- [ ] 6.11 Implement window.onbeforeprint hook to convert ECharts canvas to PNG for print/PDF
-- [ ] 6.12 Add dark mode support for system metrics section (CSS variables / theme toggle handler)
+- [x] 6.8 Generate formatted data table with proper number formatting per project rules
+- [x] 6.9 Implement client-side table pagination and sorting (pure JavaScript, no framework)
+- [x] 6.10 Add @media print styles: convert charts to images, grayscale backgrounds, page-break control
+- [x] 6.11 Implement window.onbeforeprint hook to convert ECharts canvas to PNG for print/PDF
+- [x] 6.12 Add dark mode support for system metrics section (CSS variables / theme toggle handler)
 
 ## 7. Configuration & Testing
 

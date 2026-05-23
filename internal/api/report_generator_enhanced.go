@@ -498,6 +498,172 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             grid-template-columns: 1fr 1fr;
             gap: 12px;
         }
+
+        .sys-table-section {
+            margin-top: 16px;
+        }
+
+        .table-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .table-header-row h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+        }
+
+        .table-info {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table thead {
+            background: #f9fafb;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #111827;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .data-table th.sortable {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .data-table th.sortable:hover {
+            background: #f3f4f6;
+        }
+
+        .sort-icon {
+            margin-left: 4px;
+            opacity: 0.5;
+            font-size: 11px;
+        }
+
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #111827;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .danger-row {
+            background: rgba(239, 68, 68, 0.05) !important;
+        }
+
+        .danger-cell {
+            color: #dc2626 !important;
+            font-weight: 600;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            background: white;
+            color: #111827;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #f3f4f6;
+            border-color: #3b82f6;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #0f172a;
+                --bg-secondary: #1e293b;
+                --bg-card: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border-color: #334155;
+                --border-light: #1e293b;
+                --bg-hover: #334155;
+            }
+
+            body { background: var(--bg-primary); color: var(--text-primary); }
+            .container { background: var(--bg-primary); }
+            .metric-card, .chart-card, .sys-summary-card { background: var(--bg-card); border-color: var(--border-color); }
+            .metric-label, .sys-summary-label, .chart-header h3, h2, h3, h4 { color: var(--text-primary); }
+            .metric-sub, .sys-summary-sub, .table-info { color: var(--text-secondary); }
+            .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
+            .data-table thead { background: var(--bg-secondary); }
+            .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
+            .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+            .data-table tbody tr:hover { background: var(--bg-hover); }
+            .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
+            .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
+            .page-info { color: var(--text-secondary); }
+            .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
+            .banner-text strong { color: var(--text-primary); }
+            .banner-text p { color: var(--text-secondary); }
+        }
+
+        @media print {
+            body { background: white; color: black; }
+            .container { max-width: 100%; padding: 0; }
+            .page-header, .metrics-row, .charts-row, .nodes-section, .sys-table-section { page-break-inside: avoid; }
+            .chart-card { page-break-inside: avoid; border: 1px solid #ddd; margin-bottom: 16px; }
+            .chart-body canvas { max-width: 100% !important; height: auto !important; }
+            .data-table { font-size: 11px; }
+            .pagination-controls, .chart-type-toggle, .btn-back, button { display: none !important; }
+            .danger-cell { color: black !important; font-weight: bold; background: #f0f0f0; }
+            .danger-row { background: #f5f5f5 !important; }
+            h2, h3, h4 { page-break-after: avoid; }
+        }
     </style>
 </head>
 <body>
@@ -742,6 +908,39 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             </div>
         </div>
         {{end}}
+
+        {{if gt (len .SystemMetrics.TimeSeries) 0}}
+        <div class="sys-table-section">
+            <div class="table-header-row">
+                <h4>系统指标详细数据</h4>
+                <div class="table-info">共 {{len .SystemMetrics.TimeSeries}} 条记录</div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="sysMetricsTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="toggleSort('timestamp')">时间戳 <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('goroutine_count')">Goroutines <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('heap_alloc_mb')">Heap (MB) <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('cpu_percent')">CPU (%) <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('gc_pause_last_ms')">GC 暂停 (ms) <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('active_workers')">Workers <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('pending_queue_len')">队列长度 <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" onclick="toggleSort('task_wait_p99_ms')">Wait P99 (ms) <span class="sort-icon">⇅</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sysMetricsTableBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination-controls" id="tablePagination" style="display: none;">
+                <button class="page-btn" onclick="goToPage(1)">首页</button>
+                <button class="page-btn" onclick="prevPage()">上一页</button>
+                <span class="page-info" id="pageInfo"></span>
+                <button class="page-btn" onclick="nextPage()">下一页</button>
+                <button class="page-btn" onclick="goToPage(totalPages)">末页</button>
+            </div>
+        </div>
+        {{end}}
     </section>
     {{end}}
 
@@ -967,6 +1166,143 @@ function renderSysTaskWaitChart() {
     }, true);
 }
 
+// System Metrics Table Functions
+let tableSortKey = 'timestamp';
+let tableSortOrder = 'asc';
+let currentPage = 1;
+const pageSize = 20;
+let tableData = [];
+
+function initSysMetricsTable() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length === 0) return;
+    tableData = sm.time_series.slice();
+    renderTablePage();
+    updatePagination();
+}
+
+function formatTimestamp(ts) {
+    if (!ts) return '-';
+    try {
+        var d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        return d.toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    } catch (e) {
+        return ts;
+    }
+}
+
+function isDangerRow(row) {
+    return (row.goroutine_count > 50000) ||
+           (row.heap_alloc_mb > 500) ||
+           (row.cpu_percent > 90) ||
+           (row.gc_pause_last_ms > 10) ||
+           (row.pending_queue_len > 100) ||
+           (row.task_wait_p99_ms > 100);
+}
+
+function getSortedData() {
+    if (!tableSortKey) return tableData;
+    var key = tableSortKey;
+    var order = tableSortOrder === 'asc' ? 1 : -1;
+    return tableData.slice().sort(function(a, b) {
+        var valA = a[key] !== undefined ? a[key] : 0;
+        var valB = b[key] !== undefined ? b[key] : 0;
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return order * valA.localeCompare(valB);
+        }
+        return order * (valA - valB);
+    });
+}
+
+function toggleSort(key) {
+    if (tableSortKey === key) {
+        tableSortOrder = tableSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        tableSortKey = key;
+        tableSortOrder = 'asc';
+    }
+    currentPage = 1;
+    renderTablePage();
+    updatePagination();
+    updateSortIcons();
+}
+
+function updateSortIcons() {
+    var headers = document.querySelectorAll('#sysMetricsTable th.sortable');
+    headers.forEach(function(th) {
+        var icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        var col = th.getAttribute('onclick').match(/toggleSort\('(.+?)'\)/)[1];
+        if (col === tableSortKey) {
+            icon.textContent = tableSortOrder === 'asc' ? '↑' : '↓';
+        } else {
+            icon.textContent = '⇅';
+        }
+    });
+}
+
+function getTotalPages() {
+    return Math.ceil(tableData.length / pageSize);
+}
+
+function renderTablePage() {
+    var tbody = document.getElementById('sysMetricsTableBody');
+    if (!tbody) return;
+    var sorted = getSortedData();
+    var start = (currentPage - 1) * pageSize;
+    var pageData = sorted.slice(start, start + pageSize);
+    var html = '';
+    pageData.forEach(function(row) {
+        var dangerClass = isDangerRow(row) ? 'danger-row' : '';
+        html += '<tr class="' + dangerClass + '">';
+        html += '<td>' + formatTimestamp(row.timestamp) + '</td>';
+        html += '<td class="' + (row.goroutine_count > 50000 ? 'danger-cell' : '') + '">' + Number(row.goroutine_count || 0).toLocaleString() + '</td>';
+        html += '<td class="' + (row.heap_alloc_mb > 500 ? 'danger-cell' : '') + '">' + (row.heap_alloc_mb || 0).toFixed(1) + '</td>';
+        html += '<td class="' + (row.cpu_percent > 90 ? 'danger-cell' : '') + '">' + (row.cpu_percent || 0).toFixed(1) + '</td>';
+        html += '<td class="' + (row.gc_pause_last_ms > 10 ? 'danger-cell' : '') + '">' + (row.gc_pause_last_ms || 0).toFixed(1) + '</td>';
+        html += '<td>' + (row.active_workers || 0) + '</td>';
+        html += '<td class="' + (row.pending_queue_len > 100 ? 'danger-cell' : '') + '">' + (row.pending_queue_len || 0) + '</td>';
+        html += '<td class="' + (row.task_wait_p99_ms > 100 ? 'danger-cell' : '') + '">' + (row.task_wait_p99_ms || 0).toFixed(1) + '</td>';
+        html += '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function updatePagination() {
+    var totalPages = getTotalPages();
+    var pagination = document.getElementById('tablePagination');
+    var pageInfo = document.getElementById('pageInfo');
+    if (!pagination || !pageInfo) return;
+
+    if (totalPages <= 1) {
+        pagination.style.display = 'none';
+    } else {
+        pagination.style.display = 'flex';
+        pageInfo.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 页';
+    }
+}
+
+function goToPage(page) {
+    var totalPages = getTotalPages();
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    currentPage = page;
+    renderTablePage();
+    updatePagination();
+}
+
+function prevPage() {
+    goToPage(currentPage - 1);
+}
+
+function nextPage() {
+    goToPage(currentPage + 1);
+}
+
 function updateNodeToggleButtons(chartId) {
     const idx = parseInt(chartId.slice(5));
     const el = document.getElementById('nodeChart' + idx);
@@ -995,6 +1331,7 @@ function initCharts() {
     renderSysHeapChart();
     renderSysCpuChart();
     renderSysTaskWaitChart();
+    initSysMetricsTable();
     {{end}}
 }
 
@@ -1432,6 +1769,69 @@ window.addEventListener('resize', function() {
             echarts.getInstanceByDom(document.getElementById('nodeChart' + idx))?.resize();
         });
     }
+});
+
+window.addEventListener('beforeprint', function() {
+    var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
+                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
+    if (reportData.node_metrics) {
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeChart' + idx); });
+    }
+    chartIds.forEach(function(id) {
+        var chart = echarts.getInstanceByDom(document.getElementById(id));
+        if (chart) {
+            var url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+            var img = document.createElement('img');
+            img.src = url;
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            var container = document.getElementById(id);
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(img);
+            }
+        }
+    });
+});
+
+function applyDarkMode(isDark) {
+    tc.bg = isDark ? '#0f172a' : '#ffffff';
+    tc.textColor = isDark ? '#f1f5f9' : '#111827';
+    tc.lineColor = isDark ? '#334155' : '#e5e7eb';
+
+    var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
+                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
+    if (reportData.node_metrics) {
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeChart' + idx); });
+    }
+
+    chartIds.forEach(function(id) {
+        var chart = echarts.getInstanceByDom(document.getElementById(id));
+        if (chart) {
+            chart.dispose();
+        }
+    });
+
+    renderOverviewChart();
+    renderErrorRateChart();
+    renderLatencyChart();
+    renderQPSTrend();
+    renderLatencyTrend();
+    renderNodeCharts();
+    {{if .SystemMetrics}}
+    renderSysGoroutineChart();
+    renderSysHeapChart();
+    renderSysCpuChart();
+    renderSysTaskWaitChart();
+    {{end}}
+}
+
+if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyDarkMode(true);
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+    applyDarkMode(e.matches);
 });
 </script>
 </body>
