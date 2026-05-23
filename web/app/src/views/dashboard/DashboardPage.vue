@@ -157,21 +157,103 @@
         </div>
       </div>
     </div>
+
+    <!-- System Monitoring Section -->
+    <div v-if="overview?.system_metrics" class="system-monitor-section">
+      <h3 class="section-title">系统监控</h3>
+      <div class="sys-gauge-row">
+        <div class="sys-gauge-card" :class="gaugeStatus('goroutine')" title="Goroutine 数量：当前 Go 运行时中活跃的协程总数。包含 Worker 协程、HTTP 连接池协程、内部管理协程等。100 个 Worker 通常对应 1000-1500 个 Goroutine 属于正常范围。警告阈值：>10000，危险阈值：>50000">
+          <div class="gauge-label">Goroutines</div>
+          <div class="gauge-value">{{ overview.system_metrics.goroutine_count }}</div>
+          <div class="gauge-unit">个</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('heap')" title="堆内存分配量（Heap Alloc）：Go 运行时当前已分配的堆内存大小，单位 MB。反映应用程序的内存使用情况。警告阈值：>512MB，危险阈值：>1GB">
+          <div class="gauge-label">Heap Alloc</div>
+          <div class="gauge-value">{{ overview.system_metrics.heap_alloc_mb.toFixed(1) }}</div>
+          <div class="gauge-unit">MB</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('cpu')" title="CPU 使用率：当前进程的瞬时 CPU 占用百分比。基于两次采样间的 CPU 时间差计算得出。多核环境下可能超过 100%。警告阈值：>70%，危险阈值：>90%">
+          <div class="gauge-label">CPU</div>
+          <div class="gauge-value">{{ overview.system_metrics.cpu_percent.toFixed(1) }}</div>
+          <div class="gauge-unit">%</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('wait')" title="任务等待时间 P99：99% 的任务从进入队列到被 Worker 取出的等待时间。反映负载压力下的调度延迟。正常应 &lt;10ms，&gt;100ms 说明 Worker 不够用。警告阈值：>10ms，危险阈值：>100ms">
+          <div class="gauge-label">Task Wait P99</div>
+          <div class="gauge-value">{{ overview.system_metrics.task_wait_p99_ms.toFixed(1) }}</div>
+          <div class="gauge-unit">ms</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('queue')" title="待处理队列长度：当前在队列中等待被执行的任务数量。持续增长说明生产速度大于消费速度。警告阈值：>100，危险阈值：>1000">
+          <div class="gauge-label">Pending Queue</div>
+          <div class="gauge-value">{{ overview.system_metrics.pending_queue_len }}</div>
+          <div class="gauge-unit">任务</div>
+        </div>
+        <div class="sys-gauge-card status-normal" title="活跃 Worker 数量：当前正在执行任务的 Worker 协程数。最大值等于配置的 Worker 总数。如果远小于总 Worker 数，说明存在空闲资源">
+          <div class="gauge-label">Active Workers</div>
+          <div class="gauge-value">{{ overview.system_metrics.active_workers }}</div>
+          <div class="gauge-unit">个</div>
+        </div>
+      </div>
+
+      <!-- System Trend Charts -->
+      <div v-if="sysMetricsHistory.length >= 2" class="sys-charts-row">
+        <div class="sys-chart-item">
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+          </div>
+          <div ref="sysGoroutineChartRef" class="sys-chart-canvas"></div>
+        </div>
+        <div class="sys-chart-item">
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+          </div>
+          <div ref="sysHeapChartRef" class="sys-chart-canvas"></div>
+        </div>
+        <div class="sys-chart-item">
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+          </div>
+          <div ref="sysCpuChartRef" class="sys-chart-canvas"></div>
+        </div>
+        <div class="sys-chart-item">
+          <div class="chart-type-toggle center">
+            <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+          </div>
+          <div ref="sysTaskWaitChartRef" class="sys-chart-canvas"></div>
+        </div>
+        <div class="sys-chart-item">
+          <div ref="sysQueueChartRef" class="sys-chart-canvas"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import type { DashboardOverviewDTO, RunHistoryDTO } from '@/types'
+import type { DashboardOverviewDTO, RunHistoryDTO, RuntimeMetricsDTO } from '@/types'
 
 const qpsChartRef = ref<HTMLElement>()
 const latencyChartRef = ref<HTMLElement>()
 const errorChartRef = ref<HTMLElement>()
+const sysGoroutineChartRef = ref<HTMLElement>()
+const sysHeapChartRef = ref<HTMLElement>()
+const sysCpuChartRef = ref<HTMLElement>()
+const sysTaskWaitChartRef = ref<HTMLElement>()
+const sysQueueChartRef = ref<HTMLElement>()
 
 let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
+let sysGoroutineChart: echarts.ECharts | null = null
+let sysHeapChart: echarts.ECharts | null = null
+let sysCpuChart: echarts.ECharts | null = null
+let sysTaskWaitChart: echarts.ECharts | null = null
+let sysQueueChart: echarts.ECharts | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 let themeObserver: MutationObserver | null = null
@@ -181,8 +263,17 @@ const nodeCharts = new Map<string, echarts.ECharts>()
 const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   errorRate: 'smooth',
   qpsTrend: 'smooth',
-  latTrend: 'smooth'
+  latTrend: 'smooth',
+  sysGoroutine: 'smooth',
+  sysHeap: 'smooth',
+  sysCpu: 'smooth',
+  sysTaskWait: 'smooth',
+  sysQueue: 'smooth',
 })
+
+// Accumulated system metrics time series for trend charts.
+const sysMetricsHistory = ref<RuntimeMetricsDTO[]>([])
+const MAX_SYS_HISTORY = 300
 
 function initNodeChartTypes() {
   overview.value?.node_metrics?.forEach(node => {
@@ -196,6 +287,11 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'qpsTrend') renderQpsChart()
   else if (chartId === 'latTrend') renderLatencyChart()
   else if (chartId.startsWith('node-')) renderNodeDetailChart(chartId.slice(5))
+  else if (chartId === 'sysGoroutine') renderSysGoroutineChart()
+  else if (chartId === 'sysHeap') renderSysHeapChart()
+  else if (chartId === 'sysCpu') renderSysCpuChart()
+  else if (chartId === 'sysTaskWait') renderSysTaskWaitChart()
+  else if (chartId === 'sysQueue') renderSysQueueChart()
 }
 
 const overview = ref<DashboardOverviewDTO | null>(null)
@@ -283,6 +379,7 @@ const durationDisplay = computed(() => {
 })
 
 function onSceneChange() {
+  sysMetricsHistory.value = []
   fetchOverview()
   userAdjustedZoom.value = false
 }
@@ -533,6 +630,150 @@ function nodeQPS(node: any): string {
   }
   if (node.total_reqs > 0 && node.avg_latency > 0) return formatNum(1 / node.avg_latency)
   return '0'
+}
+
+function gaugeStatus(metric: string): string {
+  const m = overview.value?.system_metrics
+  if (!m) return 'status-normal'
+  switch (metric) {
+    case 'goroutine':
+      if (m.goroutine_count > 50000) return 'status-danger'
+      if (m.goroutine_count > 10000) return 'status-warning'
+      return 'status-normal'
+    case 'heap':
+      if (m.heap_alloc_mb > 1024) return 'status-danger'
+      if (m.heap_alloc_mb > 512) return 'status-warning'
+      return 'status-normal'
+    case 'cpu':
+      if (m.cpu_percent > 90) return 'status-danger'
+      if (m.cpu_percent > 70) return 'status-warning'
+      return 'status-normal'
+    case 'wait':
+      if (m.task_wait_p99_ms > 100) return 'status-danger'
+      if (m.task_wait_p99_ms > 10) return 'status-warning'
+      return 'status-normal'
+    case 'queue':
+      if (m.pending_queue_len > 1000) return 'status-danger'
+      if (m.pending_queue_len > 100) return 'status-warning'
+      return 'status-normal'
+    default:
+      return 'status-normal'
+  }
+}
+
+function getSysTimeLabels(): string[] {
+  return sysMetricsHistory.value.map((_, i) => {
+    const t = new Date(Date.now() - (sysMetricsHistory.value.length - 1 - i) * refreshInterval.value * 1000)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+}
+
+function renderSysGoroutineChart() {
+  if (!sysGoroutineChartRef.value) return
+  if (!sysGoroutineChart) sysGoroutineChart = echarts.init(sysGoroutineChartRef.value)
+  sysGoroutineChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysGoroutine === 'smooth'
+  const data = sysMetricsHistory.value.map(m => m.goroutine_count)
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  sysGoroutineChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, itemStyle: { color: theme.colors.primary }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 10 } }] } }],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysHeapChart() {
+  if (!sysHeapChartRef.value) return
+  if (!sysHeapChart) sysHeapChart = echarts.init(sysHeapChartRef.value)
+  sysHeapChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysHeap === 'smooth'
+  const allocData = sysMetricsHistory.value.map(m => m.heap_alloc_mb)
+  const sysData = sysMetricsHistory.value.map(m => m.heap_sys_mb)
+  const labels = getSysTimeLabels()
+  if (!allocData.length) return
+  sysHeapChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}MB' } },
+    series: [
+      { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, itemStyle: { color: theme.colors.primary } },
+      { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2, type: 'dashed' }, itemStyle: { color: theme.colors.info } },
+    ],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysCpuChart() {
+  if (!sysCpuChartRef.value) return
+  if (!sysCpuChart) sysCpuChart = echarts.init(sysCpuChartRef.value)
+  sysCpuChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysCpu === 'smooth'
+  const data = sysMetricsHistory.value.map(m => m.cpu_percent)
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  sysCpuChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
+    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10 } }] } }],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysTaskWaitChart() {
+  if (!sysTaskWaitChartRef.value) return
+  if (!sysTaskWaitChart) sysTaskWaitChart = echarts.init(sysTaskWaitChartRef.value)
+  sysTaskWaitChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysTaskWait === 'smooth'
+  const p50 = sysMetricsHistory.value.map(m => m.task_wait_p50_ms)
+  const p95 = sysMetricsHistory.value.map(m => m.task_wait_p95_ms)
+  const p99 = sysMetricsHistory.value.map(m => m.task_wait_p99_ms)
+  const labels = getSysTimeLabels()
+  if (!p50.length) return
+  sysTaskWaitChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
+    series: [
+      { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info } },
+      { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning } },
+      { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 10 } }] } },
+    ],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysQueueChart() {
+  if (!sysQueueChartRef.value) return
+  if (!sysQueueChart) sysQueueChart = echarts.init(sysQueueChartRef.value)
+  sysQueueChart.clear()
+  const theme = getChartTheme()
+  const data = sysMetricsHistory.value.map(m => m.pending_queue_len)
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  sysQueueChart.setOption({
+    backgroundColor: theme.bgColor,
+    grid: { top: 16, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }],
+    tooltip: getTooltipConfig(),
+  }, true)
 }
 
 function getChartTheme() {
@@ -852,6 +1093,20 @@ async function fetchOverview() {
       overview.value = resp.data
       syncRunningStatus()
       initNodeChartTypes()
+
+      // Accumulate system metrics for trend charts.
+      if (resp.data?.system_metrics) {
+        sysMetricsHistory.value.push(resp.data.system_metrics)
+        if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
+          sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
+        }
+        renderSysGoroutineChart()
+        renderSysHeapChart()
+        renderSysCpuChart()
+        renderSysTaskWaitChart()
+        renderSysQueueChart()
+      }
+
       const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
       if (!hasRunning && !hasTimeSeries) {
@@ -873,6 +1128,11 @@ function handleResize() {
   qpsChart?.resize()
   latencyChart?.resize()
   errorChart?.resize()
+  sysGoroutineChart?.resize()
+  sysHeapChart?.resize()
+  sysCpuChart?.resize()
+  sysTaskWaitChart?.resize()
+  sysQueueChart?.resize()
 }
 
 onMounted(() => {
@@ -891,6 +1151,11 @@ onMounted(() => {
     qpsChart?.dispose(); qpsChart = null
     latencyChart?.dispose(); latencyChart = null
     errorChart?.dispose(); errorChart = null
+    sysGoroutineChart?.dispose(); sysGoroutineChart = null
+    sysHeapChart?.dispose(); sysHeapChart = null
+    sysCpuChart?.dispose(); sysCpuChart = null
+    sysTaskWaitChart?.dispose(); sysTaskWaitChart = null
+    sysQueueChart?.dispose(); sysQueueChart = null
     nodeCharts.forEach((c, k) => { c.dispose() })
     nodeCharts.clear()
     requestAnimationFrame(() => {
@@ -929,6 +1194,11 @@ onUnmounted(() => {
   qpsChart?.dispose()
   latencyChart?.dispose()
   errorChart?.dispose()
+  sysGoroutineChart?.dispose()
+  sysHeapChart?.dispose()
+  sysCpuChart?.dispose()
+  sysTaskWaitChart?.dispose()
+  sysQueueChart?.dispose()
 })
 </script>
 
@@ -1804,5 +2074,99 @@ onUnmounted(() => {
   background: rgba(0,229,255,0.15);
   color: #00E5FF;
   border-color: rgba(0,229,255,0.3);
+}
+
+/* System Monitoring Section */
+.system-monitor-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.sys-gauge-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sys-gauge-card {
+  flex: 1;
+  min-width: 120px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: center;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.sys-gauge-card.status-normal {
+  border-color: var(--accent-success, #16a34a);
+}
+
+.sys-gauge-card.status-warning {
+  border-color: var(--accent-warning, #ca8a04);
+  background: rgba(202, 138, 4, 0.05);
+}
+
+.sys-gauge-card.status-danger {
+  border-color: var(--accent-danger, #dc2626);
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.sys-gauge-card .gauge-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.sys-gauge-card .gauge-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: -apple-system, 'SF Mono', 'Monaco', 'Menlo', monospace;
+  transition: color 0.3s ease;
+}
+
+.sys-gauge-card.status-warning .gauge-value {
+  color: var(--accent-warning, #ca8a04);
+}
+
+.sys-gauge-card.status-danger .gauge-value {
+  color: var(--accent-danger, #dc2626);
+}
+
+.sys-gauge-card .gauge-unit {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.sys-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sys-chart-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.sys-chart-canvas {
+  width: 100%;
+  height: 220px;
 }
 </style>

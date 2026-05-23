@@ -169,3 +169,48 @@ func TestPoolCompletedCount(t *testing.T) {
 	_ = p.Wait()
 	assert.Equal(t, int64(10), p.Completed())
 }
+
+func TestPoolTaskWaitStats(t *testing.T) {
+	p, err := New(2, Config{RunMode: RunModeCount, Count: 10})
+	require.NoError(t, err)
+
+	// Submit tasks with a small sleep to create measurable wait times
+	for i := 0; i < 10; i++ {
+		p.Submit(func(ctx context.Context) error {
+			time.Sleep(5 * time.Millisecond)
+			return nil
+		})
+	}
+
+	_ = p.Wait()
+
+	stats := p.TaskWaitStats()
+	assert.Greater(t, stats.SampleCount, int64(0), "should have recorded wait time samples")
+	assert.Greater(t, stats.Avg, time.Duration(0), "average wait time should be positive")
+	assert.GreaterOrEqual(t, stats.Max, stats.Avg, "max should be >= avg")
+	assert.GreaterOrEqual(t, stats.P99, stats.P50, "P99 should be >= P50")
+}
+
+func TestPoolTaskWaitStatsEmpty(t *testing.T) {
+	p, err := New(2, Config{RunMode: RunModeCount, Count: 1})
+	require.NoError(t, err)
+
+	// No tasks submitted yet
+	stats := p.TaskWaitStats()
+	assert.Equal(t, int64(0), stats.SampleCount)
+}
+
+func BenchmarkPoolSubmit(b *testing.B) {
+	p, err := New(4, Config{RunMode: RunModeDuration, Duration: 30 * time.Second})
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer p.Shutdown()
+
+	task := func(ctx context.Context) error { return nil }
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p.Submit(task)
+	}
+}

@@ -82,7 +82,7 @@ func TestStatsLatencyPercentiles(t *testing.T) {
 		s.RecordLatency(time.Duration(i+1)*time.Millisecond, true)
 	}
 
-	avg, p50, p95, p99 := s.LatencyPercentiles()
+	avg, p50, _, p95, p99 := s.LatencyPercentiles()
 	assert.True(t, avg > 0, "avg should be positive")
 	assert.True(t, p50 > 0, "p50 should be positive")
 	assert.True(t, p95 > 0, "p95 should be positive")
@@ -93,7 +93,7 @@ func TestStatsLatencyPercentiles(t *testing.T) {
 
 func TestStatsEmptyPercentiles(t *testing.T) {
 	s := &Stats{}
-	avg, p50, p95, p99 := s.LatencyPercentiles()
+	avg, p50, _, p95, p99 := s.LatencyPercentiles()
 	assert.Equal(t, time.Duration(0), avg)
 	assert.Equal(t, time.Duration(0), p50)
 	assert.Equal(t, time.Duration(0), p95)

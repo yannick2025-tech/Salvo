@@ -1260,11 +1260,12 @@ func (h *Handler) StartScene(r *http.Request) dto.Response {
 	}
 
 	cfg := runner.Config{
-		SceneID:   req.SceneID,
-		Workers:   workers,
-		RunMode:   runMode,
-		Count:     req.Count,
-		Variables: mergedVars,
+		SceneID:             req.SceneID,
+		Workers:             workers,
+		RunMode:             runMode,
+		Count:               req.Count,
+		Variables:           mergedVars,
+		EnableSystemMetrics: true,
 	}
 
 	if req.Duration > 0 {
@@ -1608,6 +1609,49 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	if sceneID > 0 {
 		response.SceneID = sceneID
+	}
+
+	// Populate system metrics from the running runner (if any).
+	if sceneID > 0 {
+		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
+			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
+				last := snapshots[len(snapshots)-1]
+				response.SystemMetrics = &dto.RuntimeMetricsDTO{
+					GoroutineCount:  last.GoroutineCount,
+					HeapAllocMB:     last.HeapAllocMB,
+					HeapSysMB:       last.HeapSysMB,
+					CPUUsagePercent: last.CPUUsagePercent,
+					RSSMemoryMB:     last.RSSMemoryMB,
+					ActiveWorkers:   last.ActiveWorkers,
+					PendingQueueLen: last.PendingQueueLen,
+					TaskWaitP50Ms:   last.TaskWaitP50Ms,
+					TaskWaitP95Ms:   last.TaskWaitP95Ms,
+					TaskWaitP99Ms:   last.TaskWaitP99Ms,
+					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
+				}
+			}
+		}
+	} else if len(runningMap) > 0 {
+		// No specific scene: use the first running runner.
+		for _, rn := range runningMap {
+			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
+				last := snapshots[len(snapshots)-1]
+				response.SystemMetrics = &dto.RuntimeMetricsDTO{
+					GoroutineCount:  last.GoroutineCount,
+					HeapAllocMB:     last.HeapAllocMB,
+					HeapSysMB:       last.HeapSysMB,
+					CPUUsagePercent: last.CPUUsagePercent,
+					RSSMemoryMB:     last.RSSMemoryMB,
+					ActiveWorkers:   last.ActiveWorkers,
+					PendingQueueLen: last.PendingQueueLen,
+					TaskWaitP50Ms:   last.TaskWaitP50Ms,
+					TaskWaitP95Ms:   last.TaskWaitP95Ms,
+					TaskWaitP99Ms:   last.TaskWaitP99Ms,
+					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
+				}
+			}
+			break
+		}
 	}
 
 	return dto.OK(response)

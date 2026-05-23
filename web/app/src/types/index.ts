@@ -264,6 +264,21 @@ export interface DashboardOverviewDTO {
   recent_runs: RunRecordDTO[]
   node_metrics: NodeMetricDTO[]
   time_series?: TimeSeriesDTO
+  system_metrics?: RuntimeMetricsDTO
+}
+
+export interface RuntimeMetricsDTO {
+  goroutine_count: number
+  heap_alloc_mb: number
+  heap_sys_mb: number
+  cpu_percent: number
+  rss_mb: number
+  active_workers: number
+  pending_queue_len: number
+  task_wait_p50_ms: number
+  task_wait_p95_ms: number
+  task_wait_p99_ms: number
+  gc_pause_last_ms: number
 }
 
 export interface NodeMetricDTO {

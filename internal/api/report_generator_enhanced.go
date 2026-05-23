@@ -459,6 +459,45 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         @media (max-width: 520px) {
             .metrics-row { grid-template-columns: 1fr 1fr; gap: 8px; }
         }
+
+        /* System Performance Section */
+        .sys-summary-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .sys-summary-card {
+            flex: 1;
+            min-width: 140px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            text-align: center;
+        }
+        .sys-summary-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .sys-summary-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: -apple-system, 'SF Mono', 'Monaco', 'Menlo', monospace;
+        }
+        .sys-summary-sub {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+        .sys-charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
     </style>
 </head>
 <body>
@@ -708,6 +747,76 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 
     {{end}}
 
+    {{if .SystemMetrics}}
+    <!-- System Performance Analysis Section -->
+    <section class="nodes-section">
+        <h3>系统性能分析</h3>
+        <div class="sys-summary-row">
+            <div class="sys-summary-card">
+                <div class="sys-summary-label">Goroutine 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.GoroutineMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.GoroutineAvg}}</div>
+            </div>
+            <div class="sys-summary-card">
+                <div class="sys-summary-label">Heap 峰值</div>
+                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.HeapAllocMaxMB}} MB</div>
+                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.HeapAllocAvgMB}} MB</div>
+            </div>
+            <div class="sys-summary-card">
+                <div class="sys-summary-label">CPU 峰值</div>
+                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.CPUMax}}%</div>
+                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.CPUAvg}}%</div>
+            </div>
+            <div class="sys-summary-card">
+                <div class="sys-summary-label">GC 暂停</div>
+                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.GCPauseTotalMs}} ms</div>
+                <div class="sys-summary-sub">共 {{.SystemMetrics.Summary.GCCount}} 次</div>
+            </div>
+            <div class="sys-summary-card">
+                <div class="sys-summary-label">任务等待 P99 峰值</div>
+                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.TaskWaitP99MaxMs}} ms</div>
+                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.TaskWaitAvgMs}} ms</div>
+            </div>
+        </div>
+        {{if gt (len .SystemMetrics.TimeSeries) 1}}
+        <div class="sys-charts-row">
+            <div class="chart-card">
+                <div class="chart-header"><h3>Goroutine 趋势</h3></div>
+                <div class="chart-body" id="sysGoroutineChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysGoroutine', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>Heap 内存趋势</h3></div>
+                <div class="chart-body" id="sysHeapChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysHeap', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysHeap', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>CPU 使用率趋势</h3></div>
+                <div class="chart-body" id="sysCpuChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysCpu', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysCpu', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>任务等待时间趋势</h3></div>
+                <div class="chart-body" id="sysTaskWaitChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysTaskWait', 'step')">阶梯</button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </section>
+    {{end}}
+
     <footer style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
         <p>Generated by Salvo at {{now.Format "2006-01-02 15:04:05"}}</p>
     </footer>
@@ -731,7 +840,7 @@ let qpsType = 'smooth';
 let latTrendType = 'smooth';
 let nodeType = 'smooth';
 
-const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth' };
+const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth', sysGoroutine: 'smooth', sysHeap: 'smooth', sysCpu: 'smooth', sysTaskWait: 'smooth' };
 
 function initNodeChartTypes() {
     if (reportData.node_metrics) {
@@ -747,6 +856,115 @@ function switchChartType(chartId, type) {
     else if (chartId === 'qpsTrend') { updateToggleButtons('qpsChart'); renderQPSTrend(); }
     else if (chartId === 'latTrend') { updateToggleButtons('latencyTrendChart'); renderLatencyTrend(); }
     else if (chartId.startsWith('node-')) { updateNodeToggleButtons(chartId); renderNodeCharts(); }
+    else if (chartId === 'sysGoroutine') { updateSysToggleButtons('sysGoroutineChart'); renderSysGoroutineChart(); }
+    else if (chartId === 'sysHeap') { updateSysToggleButtons('sysHeapChart'); renderSysHeapChart(); }
+    else if (chartId === 'sysCpu') { updateSysToggleButtons('sysCpuChart'); renderSysCpuChart(); }
+    else if (chartId === 'sysTaskWait') { updateSysToggleButtons('sysTaskWaitChart'); renderSysTaskWaitChart(); }
+}
+
+function updateSysToggleButtons(chartId) {
+    var el = document.getElementById(chartId);
+    if (!el) return;
+    var card = el.closest('.chart-card');
+    if (!card) return;
+    var btns = card.querySelectorAll('.type-btn');
+    btns.forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === chartTypes[chartId]);
+    });
+}
+
+function renderSysGoroutineChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysGoroutineChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysGoroutine === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var data = ts.map(function(s) { return s.goroutine_count; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        series: [{ name: 'Goroutines', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: '#ca8a04' }, label: { formatter: '10K', color: '#ca8a04', fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
+        tooltip: { trigger: 'axis', confine: true },
+        legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysHeapChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysHeapChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysHeap === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var allocData = ts.map(function(s) { return s.heap_alloc_mb; });
+    var sysData = ts.map(function(s) { return s.heap_sys_mb; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}MB' } },
+        series: [
+            { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
+            { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#2563eb', width: 2, type: 'dashed' }, itemStyle: { color: '#2563eb' } },
+        ],
+        tooltip: { trigger: 'axis', confine: true },
+        legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysCpuChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysCpuChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysCpu === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var data = ts.map(function(s) { return s.cpu_percent; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
+        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: '#ca8a04' }, label: { formatter: '70%', color: '#ca8a04', fontSize: 10 } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10 } }] } }],
+        tooltip: { trigger: 'axis', confine: true },
+        legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysTaskWaitChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysTaskWaitChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysTaskWait === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var p50 = ts.map(function(s) { return s.task_wait_p50_ms; });
+    var p95 = ts.map(function(s) { return s.task_wait_p95_ms; });
+    var p99 = ts.map(function(s) { return s.task_wait_p99_ms; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+        series: [
+            { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#2563eb', width: 2 }, itemStyle: { color: '#2563eb' } },
+            { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' } },
+            { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
+        ],
+        tooltip: { trigger: 'axis', confine: true },
+        legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
 }
 
 function updateNodeToggleButtons(chartId) {
@@ -771,6 +989,12 @@ function initCharts() {
     renderNodeCharts();
     {{if gt (len .ErrorBreakdown) 0}}
     renderErrorBreakdownChart();
+    {{end}}
+    {{if .SystemMetrics}}
+    renderSysGoroutineChart();
+    renderSysHeapChart();
+    renderSysCpuChart();
+    renderSysTaskWaitChart();
     {{end}}
 }
 
@@ -1214,11 +1438,45 @@ window.addEventListener('resize', function() {
 </html>`))
 
 type EnhancedReportContext struct {
-	Metrics        *EnhancedMetrics         `json:"metrics"`
-	NodeMetrics    []EnhancedNodeMetric     `json:"node_metrics"`
-	ErrorBreakdown []map[string]interface{} `json:"error_breakdown"`
-	Metadata       *EnhancedMetadata        `json:"metadata"`
-	JSONData       template.JS              `json:"-"`
+	Metrics        *EnhancedMetrics            `json:"metrics"`
+	NodeMetrics    []EnhancedNodeMetric        `json:"node_metrics"`
+	ErrorBreakdown []map[string]interface{}    `json:"error_breakdown"`
+	Metadata       *EnhancedMetadata           `json:"metadata"`
+	SystemMetrics  *EnhancedSystemMetrics      `json:"system_metrics,omitempty"`
+	JSONData       template.JS                 `json:"-"`
+}
+
+// EnhancedSystemMetrics holds system performance data for the exported HTML report.
+type EnhancedSystemMetrics struct {
+	Summary    EnhancedSystemMetricsSummary   `json:"summary"`
+	TimeSeries []EnhancedSystemMetricsSample  `json:"time_series,omitempty"`
+}
+
+// EnhancedSystemMetricsSummary holds aggregated system metrics for the exported HTML report.
+type EnhancedSystemMetricsSummary struct {
+	SampleCount      int     `json:"sample_count"`
+	GoroutineMax     int64   `json:"goroutine_max"`
+	GoroutineAvg     float64 `json:"goroutine_avg"`
+	HeapAllocMaxMB   float64 `json:"heap_alloc_max_mb"`
+	HeapAllocAvgMB   float64 `json:"heap_alloc_avg_mb"`
+	CPUMax           float64 `json:"cpu_max"`
+	CPUAvg           float64 `json:"cpu_avg"`
+	GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
+	GCCount          uint32  `json:"gc_count"`
+	TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+	TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+}
+
+// EnhancedSystemMetricsSample holds a single system metrics sample for the exported HTML report.
+type EnhancedSystemMetricsSample struct {
+	Timestamp       string  `json:"timestamp"`
+	GoroutineCount  int64   `json:"goroutine_count"`
+	HeapAllocMB     float64 `json:"heap_alloc_mb"`
+	HeapSysMB       float64 `json:"heap_sys_mb"`
+	CPUUsagePercent float64 `json:"cpu_percent"`
+	TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
+	TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
+	TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
 }
 
 type EnhancedMetrics struct {
@@ -1430,6 +1688,39 @@ func buildEnhancedContext(detail *runner.ReportDetail) *EnhancedReportContext {
 	}
 	if mode, ok := runModeMap[ctx.Metadata.RunMode]; ok {
 		ctx.Metadata.RunMode = mode
+	}
+
+	// Populate system metrics if available.
+	if detail.SystemMetrics != nil {
+		sm := detail.SystemMetrics
+		enhancedSM := &EnhancedSystemMetrics{
+			Summary: EnhancedSystemMetricsSummary{
+				SampleCount:      sm.Summary.SampleCount,
+				GoroutineMax:     sm.Summary.GoroutineMax,
+				GoroutineAvg:     sm.Summary.GoroutineAvg,
+				HeapAllocMaxMB:   sm.Summary.HeapAllocMaxMB,
+				HeapAllocAvgMB:   sm.Summary.HeapAllocAvgMB,
+				CPUMax:           sm.Summary.CPUMax,
+				CPUAvg:           sm.Summary.CPUAvg,
+				GCPauseTotalMs:   sm.Summary.GCPauseTotalMs,
+				GCCount:          sm.Summary.GCCount,
+				TaskWaitAvgMs:    sm.Summary.TaskWaitAvgMs,
+				TaskWaitP99MaxMs: sm.Summary.TaskWaitP99MaxMs,
+			},
+		}
+		for _, s := range sm.TimeSeries {
+			enhancedSM.TimeSeries = append(enhancedSM.TimeSeries, EnhancedSystemMetricsSample{
+				Timestamp:       s.Timestamp.Format("2006-01-02 15:04:05"),
+				GoroutineCount:  s.GoroutineCount,
+				HeapAllocMB:     s.HeapAllocMB,
+				HeapSysMB:       s.HeapSysMB,
+				CPUUsagePercent: s.CPUUsagePercent,
+				TaskWaitP50Ms:   s.TaskWaitP50Ms,
+				TaskWaitP95Ms:   s.TaskWaitP95Ms,
+				TaskWaitP99Ms:   s.TaskWaitP99Ms,
+			})
+		}
+		ctx.SystemMetrics = enhancedSM
 	}
 
 	return ctx

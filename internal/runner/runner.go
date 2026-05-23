@@ -39,13 +39,14 @@ const (
 )
 
 type Config struct {
-	SceneID   snowflake.ID
-	Workers   int
-	RunMode   RunMode
-	Count     int64
-	Duration  time.Duration
-	Timeout   time.Duration
-	Variables map[string]string
+	SceneID             snowflake.ID
+	Workers             int
+	RunMode             RunMode
+	Count               int64
+	Duration            time.Duration
+	Timeout             time.Duration
+	Variables           map[string]string
+	EnableSystemMetrics bool // Enable runtime/system metrics collection (default: true)
 }
 
 func (c Config) Validate() error {
@@ -188,10 +189,11 @@ type Runner struct {
 	startedAt  time.Time
 	finishedAt time.Time
 
-	nodeStats map[string]*NodeStats
-	collector *TimeSeriesCollector
-	tsStore   TimeSeriesStore
-	stopWg    sync.WaitGroup
+	nodeStats        map[string]*NodeStats
+	collector        *TimeSeriesCollector
+	tsStore          TimeSeriesStore
+	runtimeCollector *RuntimeMetricsCollector
+	stopWg           sync.WaitGroup
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
@@ -224,7 +226,8 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 			MemoryWindowSec: 300,
 			MaxNodes:        100,
 		}, n.Generate(), tsStore, nil),
-		tsStore: tsStore,
+		tsStore:          tsStore,
+		runtimeCollector: NewRuntimeMetricsCollector(2*time.Second, cfg.EnableSystemMetrics),
 	}
 	r.status.Store(StatusPending)
 	return r, nil
@@ -255,7 +258,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		runLog.Error("failed to start timeseries collector", logger.F("error", err))
 	}
 
+	r.runtimeCollector.Start()
+
 	defer func() {
+		r.runtimeCollector.Stop()
 		if stopErr := r.collector.Stop(); stopErr != nil {
 			runLog.Error("failed to stop timeseries collector", logger.F("error", stopErr))
 		}
@@ -503,6 +509,37 @@ func (r *Runner) Workers() int {
 	return r.cfg.Workers
 }
 
+// RuntimeMetricsSnapshots returns the collected runtime metrics snapshots.
+// Returns nil if system metrics collection is disabled.
+func (r *Runner) RuntimeMetricsSnapshots() []RuntimeMetricsSnapshot {
+	if r.runtimeCollector == nil {
+		return nil
+	}
+	return r.runtimeCollector.Snapshots()
+}
+
+// RuntimeMetricsSummary returns the aggregated runtime metrics summary.
+// Returns an empty summary if system metrics collection is disabled.
+func (r *Runner) RuntimeMetricsSummary() SystemMetricsSummary {
+	if r.runtimeCollector == nil {
+		return SystemMetricsSummary{}
+	}
+	return r.runtimeCollector.ComputeSummary()
+}
+
+// poolStateAdapter adapts a pool.Pool to the RunnerStateProvider
+// interface without importing the pool package directly in the
+// runtime_metrics.go interface definition.
+type poolStateAdapter struct {
+	p interface {
+		ActiveWorkers() int
+		PendingQueueLen() int
+	}
+}
+
+func (a *poolStateAdapter) ActiveWorkers() int   { return a.p.ActiveWorkers() }
+func (a *poolStateAdapter) PendingQueueLen() int { return a.p.PendingQueueLen() }
+
 func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	successRate := float64(0)
 	if runRecord.TotalReqs > 0 {
@@ -652,6 +689,18 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		})
 	}
 
+	// Populate system metrics if available.
+	if r.runtimeCollector != nil && r.cfg.EnableSystemMetrics {
+		snapshots := r.runtimeCollector.Snapshots()
+		summary := r.runtimeCollector.ComputeSummary()
+		if len(snapshots) > 0 {
+			detail.SystemMetrics = &SystemMetricsData{
+				TimeSeries: snapshots,
+				Summary:    summary,
+			}
+		}
+	}
+
 	detailJSON, err := json.Marshal(detail)
 	if err != nil {
 		r.log.Error("failed to marshal report detail", logger.F("error", err))
@@ -719,6 +768,23 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		return fmt.Errorf("runner: create pool: %w", err)
 	}
 	execLog.Info("worker pool created", logger.F("workers", r.cfg.Workers), logger.F("run_mode", r.cfg.RunMode))
+
+	// Connect Pool's wait time stats to the runtime metrics collector.
+	r.runtimeCollector.SetWaitTimeStatsProvider(WaitTimeStatsFunc(func() PoolWaitTimeStats {
+		ws := p.TaskWaitStats()
+		return PoolWaitTimeStats{
+			Avg:         ws.Avg,
+			P50:         ws.P50,
+			P95:         ws.P95,
+			P99:         ws.P99,
+			Max:         ws.Max,
+			SampleCount: ws.SampleCount,
+		}
+	}))
+
+	// Connect Pool's runner state (active workers, queue length) to the
+	// runtime metrics collector.
+	r.runtimeCollector.SetRunnerStateProvider(&poolStateAdapter{p: p})
 
 	genRegistry := generator.NewRegistry()
 	httpProto := httpprotocol.NewProtocol()

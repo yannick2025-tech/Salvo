@@ -63,12 +63,13 @@ func (c Config) Validate() error {
 // Pool is a fixed-size goroutine pool that executes submitted tasks
 // respecting a configurable termination condition.
 type Pool struct {
-	workers  int
-	cfg      Config
-	tasks    chan Task
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
+	workers     int
+	cfg         Config
+	tasks       chan Task
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	waitTracker *WaitTimeTracker
 
 	submitted atomic.Int64
 	completed atomic.Int64
@@ -97,11 +98,12 @@ func NewWithContext(parent context.Context, workers int, cfg Config) (*Pool, err
 	ctx, cancel := context.WithCancel(parent)
 
 	p := &Pool{
-		workers: workers,
-		cfg:     cfg,
-		tasks:   make(chan Task, workers*2),
-		ctx:     ctx,
-		cancel:  cancel,
+		workers:     workers,
+		cfg:         cfg,
+		tasks:       make(chan Task, workers*2),
+		ctx:         ctx,
+		cancel:      cancel,
+		waitTracker: NewWaitTimeTracker(10000),
 	}
 
 	p.start()
@@ -157,8 +159,15 @@ func (p *Pool) Submit(task Task) {
 	}
 	p.submitted.Add(1)
 
+	enqueuedAt := time.Now()
+
 	select {
-	case p.tasks <- task:
+	case p.tasks <- func(ctx context.Context) error {
+		if p.ctx.Err() == nil {
+			p.waitTracker.Record(time.Since(enqueuedAt))
+		}
+		return task(ctx)
+	}:
 	case <-p.ctx.Done():
 	}
 }
@@ -214,4 +223,29 @@ func (p *Pool) Submitted() int64 {
 // Completed returns the total number of tasks that finished execution.
 func (p *Pool) Completed() int64 {
 	return p.completed.Load()
+}
+
+// TaskWaitStats returns aggregated wait-time statistics for tasks in
+// the pool. The statistics reflect the time between task submission
+// (Submit) and actual execution start.
+func (p *Pool) TaskWaitStats() WaitTimeStats {
+	return p.waitTracker.Stats()
+}
+
+// ActiveWorkers returns the number of currently executing workers,
+// computed as submitted minus completed tasks (capped at worker count).
+func (p *Pool) ActiveWorkers() int {
+	active := int(p.submitted.Load() - p.completed.Load())
+	if active < 0 {
+		active = 0
+	}
+	if active > p.workers {
+		active = p.workers
+	}
+	return active
+}
+
+// PendingQueueLen returns the number of tasks waiting in the queue.
+func (p *Pool) PendingQueueLen() int {
+	return len(p.tasks)
 }

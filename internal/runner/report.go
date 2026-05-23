@@ -9,11 +9,19 @@ import (
 
 // ReportDetail represents a complete test report with all metrics and time-series data.
 type ReportDetail struct {
-	Metadata       ReportMetadata     `json:"metadata"`
-	GlobalSummary  GlobalSummary      `json:"global_summary"`
-	GlobalTimeSeries []Sample         `json:"global_time_series,omitempty"`
-	NodeMetrics    []NodeMetricDetail `json:"node_metrics"`
-	ErrorSummary   []ErrorItem        `json:"error_summary,omitempty"`
+	Metadata         ReportMetadata           `json:"metadata"`
+	GlobalSummary    GlobalSummary            `json:"global_summary"`
+	GlobalTimeSeries []Sample                 `json:"global_time_series,omitempty"`
+	NodeMetrics      []NodeMetricDetail       `json:"node_metrics"`
+	ErrorSummary     []ErrorItem              `json:"error_summary,omitempty"`
+	SystemMetrics    *SystemMetricsData       `json:"system_metrics,omitempty"`
+}
+
+// SystemMetricsData holds runtime and system performance metrics collected
+// during a test run. It is nil for legacy reports that predate this feature.
+type SystemMetricsData struct {
+	TimeSeries []RuntimeMetricsSnapshot `json:"time_series,omitempty"`
+	Summary    SystemMetricsSummary     `json:"summary"`
 }
 
 // ReportMetadata contains metadata about the test run.

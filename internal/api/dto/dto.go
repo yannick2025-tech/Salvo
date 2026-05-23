@@ -488,18 +488,35 @@ type DashboardOverviewRequest struct {
 }
 
 type DashboardOverviewDTO struct {
-	TotalReqs   int64           `json:"total_reqs"`
-	SuccessReqs int64           `json:"success_reqs"`
-	FailedReqs  int64           `json:"failed_reqs"`
-	P50Latency  float64         `json:"p50_latency"`
-	P95Latency  float64         `json:"p95_latency"`
-	P99Latency  float64         `json:"p99_latency"`
-	AvgLatency  float64         `json:"avg_latency"`
-	Running     int             `json:"running"`
-	SceneID     int64           `json:"scene_id,omitempty"`
-	RecentRuns  []RunRecordDTO  `json:"recent_runs"`
-	NodeMetrics []NodeMetricDTO `json:"node_metrics"`
-	TimeSeries  *TimeSeriesDTO  `json:"time_series,omitempty"`
+	TotalReqs      int64                `json:"total_reqs"`
+	SuccessReqs    int64                `json:"success_reqs"`
+	FailedReqs     int64                `json:"failed_reqs"`
+	P50Latency     float64              `json:"p50_latency"`
+	P95Latency     float64              `json:"p95_latency"`
+	P99Latency     float64              `json:"p99_latency"`
+	AvgLatency     float64              `json:"avg_latency"`
+	Running        int                  `json:"running"`
+	SceneID        int64                `json:"scene_id,omitempty"`
+	RecentRuns     []RunRecordDTO       `json:"recent_runs"`
+	NodeMetrics    []NodeMetricDTO      `json:"node_metrics"`
+	TimeSeries     *TimeSeriesDTO       `json:"time_series,omitempty"`
+	SystemMetrics  *RuntimeMetricsDTO   `json:"system_metrics,omitempty"`
+}
+
+// RuntimeMetricsDTO holds the latest runtime/system metrics snapshot
+// for the Dashboard real-time monitoring section.
+type RuntimeMetricsDTO struct {
+	GoroutineCount  int64   `json:"goroutine_count"`
+	HeapAllocMB     float64 `json:"heap_alloc_mb"`
+	HeapSysMB       float64 `json:"heap_sys_mb"`
+	CPUUsagePercent float64 `json:"cpu_percent"`
+	RSSMemoryMB     float64 `json:"rss_mb"`
+	ActiveWorkers   int     `json:"active_workers"`
+	PendingQueueLen int     `json:"pending_queue_len"`
+	TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
+	TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
+	TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
+	GCPauseLastMs   float64 `json:"gc_pause_last_ms"`
 }
 
 type NodeMetricDTO struct {
