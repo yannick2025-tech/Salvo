@@ -162,34 +162,39 @@
     <div v-if="overview?.system_metrics" class="system-monitor-section">
       <h3 class="section-title">系统监控</h3>
       <div class="sys-gauge-row">
-        <div class="sys-gauge-card" :class="gaugeStatus('goroutine')" title="Goroutine 数量：当前 Go 运行时中活跃的协程总数。包含 Worker 协程、HTTP 连接池协程、内部管理协程等。100 个 Worker 通常对应 1000-1500 个 Goroutine 属于正常范围。警告阈值：>10000，危险阈值：>50000">
+        <div class="sys-gauge-card" :class="gaugeStatus('goroutine')" :style="{ borderColor: gaugeColor('goroutine'), '--gauge-color': gaugeColor('goroutine') }" data-tooltip="Goroutine 数量：当前 Go 运行时活跃协程总数" :data-alert="gaugeAlert('goroutine')">
           <div class="gauge-label">Goroutines</div>
-          <div class="gauge-value">{{ overview.system_metrics.goroutine_count }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('goroutine') }">{{ overview.system_metrics.goroutine_count }}</div>
           <div class="gauge-unit">个</div>
+          <div v-if="gaugeAlert('goroutine')" class="gauge-alert">{{ gaugeAlert('goroutine') }}</div>
         </div>
-        <div class="sys-gauge-card" :class="gaugeStatus('heap')" title="堆内存分配量（Heap Alloc）：Go 运行时当前已分配的堆内存大小，单位 MB。反映应用程序的内存使用情况。警告阈值：>512MB，危险阈值：>1GB">
+        <div class="sys-gauge-card" :class="gaugeStatus('heap')" :style="{ borderColor: gaugeColor('heap'), '--gauge-color': gaugeColor('heap') }" data-tooltip="堆内存分配量 (Heap Alloc)：Go 运行时当前已分配的堆内存大小 (MB)" :data-alert="gaugeAlert('heap')">
           <div class="gauge-label">Heap Alloc</div>
-          <div class="gauge-value">{{ overview.system_metrics.heap_alloc_mb.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('heap') }">{{ overview.system_metrics.heap_alloc_mb.toFixed(1) }}</div>
           <div class="gauge-unit">MB</div>
+          <div v-if="gaugeAlert('heap')" class="gauge-alert">{{ gaugeAlert('heap') }}</div>
         </div>
-        <div class="sys-gauge-card" :class="gaugeStatus('cpu')" title="CPU 使用率：当前进程的瞬时 CPU 占用百分比。基于两次采样间的 CPU 时间差计算得出。多核环境下可能超过 100%。警告阈值：>70%，危险阈值：>90%">
+        <div class="sys-gauge-card" :class="gaugeStatus('cpu')" :style="{ borderColor: gaugeColor('cpu'), '--gauge-color': gaugeColor('cpu') }" data-tooltip="CPU 使用率：当前进程瞬时 CPU 占用百分比" :data-alert="gaugeAlert('cpu')">
           <div class="gauge-label">CPU</div>
-          <div class="gauge-value">{{ overview.system_metrics.cpu_percent.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('cpu') }">{{ overview.system_metrics.cpu_percent.toFixed(1) }}</div>
           <div class="gauge-unit">%</div>
+          <div v-if="gaugeAlert('cpu')" class="gauge-alert">{{ gaugeAlert('cpu') }}</div>
         </div>
-        <div class="sys-gauge-card" :class="gaugeStatus('wait')" title="任务等待时间 P99：99% 的任务从进入队列到被 Worker 取出的等待时间。反映负载压力下的调度延迟。正常应 &lt;10ms，&gt;100ms 说明 Worker 不够用。警告阈值：>10ms，危险阈值：>100ms">
+        <div class="sys-gauge-card" :class="gaugeStatus('wait')" :style="{ borderColor: gaugeColor('wait'), '--gauge-color': gaugeColor('wait') }" data-tooltip="任务等待时间 P99：99% 的任务从入队到被 Worker 取出的等待时间" :data-alert="gaugeAlert('wait')">
           <div class="gauge-label">Task Wait P99</div>
-          <div class="gauge-value">{{ overview.system_metrics.task_wait_p99_ms.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('wait') }">{{ overview.system_metrics.task_wait_p99_ms.toFixed(1) }}</div>
           <div class="gauge-unit">ms</div>
+          <div v-if="gaugeAlert('wait')" class="gauge-alert">{{ gaugeAlert('wait') }}</div>
         </div>
-        <div class="sys-gauge-card" :class="gaugeStatus('queue')" title="待处理队列长度：当前在队列中等待被执行的任务数量。持续增长说明生产速度大于消费速度。警告阈值：>100，危险阈值：>1000">
+        <div class="sys-gauge-card" :class="gaugeStatus('queue')" :style="{ borderColor: gaugeColor('queue'), '--gauge-color': gaugeColor('queue') }" data-tooltip="待处理队列长度：当前在队列中等待执行的任务数" :data-alert="gaugeAlert('queue')">
           <div class="gauge-label">Pending Queue</div>
-          <div class="gauge-value">{{ overview.system_metrics.pending_queue_len }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('queue') }">{{ overview.system_metrics.pending_queue_len }}</div>
           <div class="gauge-unit">任务</div>
+          <div v-if="gaugeAlert('queue')" class="gauge-alert">{{ gaugeAlert('queue') }}</div>
         </div>
-        <div class="sys-gauge-card status-normal" title="活跃 Worker 数量：当前正在执行任务的 Worker 协程数。最大值等于配置的 Worker 总数。如果远小于总 Worker 数，说明存在空闲资源">
+        <div class="sys-gauge-card status-normal" :style="{ borderColor: gaugeColor('workers'), '--gauge-color': gaugeColor('workers') }" data-tooltip="活跃 Worker 数：当前正在执行任务的 Worker 协程数">
           <div class="gauge-label">Active Workers</div>
-          <div class="gauge-value">{{ overview.system_metrics.active_workers }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('workers') }">{{ overview.system_metrics.active_workers }}</div>
           <div class="gauge-unit">个</div>
         </div>
       </div>
@@ -661,6 +666,55 @@ function gaugeStatus(metric: string): string {
   }
 }
 
+function gaugeAlert(metric: string): string {
+  const m = overview.value?.system_metrics
+  if (!m) return ''
+  switch (metric) {
+    case 'goroutine':
+      if (m.goroutine_count > 50000) return '🚨 超过 50K'
+      if (m.goroutine_count > 10000) return '⚠️ 超过 10K'
+      return ''
+    case 'heap':
+      if (m.heap_alloc_mb > 1024) return '🚨 超过 1GB'
+      if (m.heap_alloc_mb > 512) return '⚠️ 超过 512MB'
+      return ''
+    case 'cpu':
+      if (m.cpu_percent > 90) return '🚨 超过 90%'
+      if (m.cpu_percent > 70) return '⚠️ 超过 70%'
+      return ''
+    case 'wait':
+      if (m.task_wait_p99_ms > 100) return '🚨 超过 100ms'
+      if (m.task_wait_p99_ms > 10) return '⚠️ 超过 10ms'
+      return ''
+    case 'queue':
+      if (m.pending_queue_len > 1000) return '🚨 超过 1K'
+      if (m.pending_queue_len > 100) return '⚠️ 超过 100'
+      return ''
+    default:
+      return ''
+  }
+}
+
+const gaugeColors: Record<string, string> = {
+  goroutine: '#0891b2',
+  heap: '#8b5cf6',
+  cpu: '#d97706',
+  wait: '#dc2626',
+  queue: '#2563eb',
+  workers: '#16a34a',
+}
+
+function gaugeColor(metric: string): string {
+  return gaugeColors[metric] || '#94a3b8'
+}
+
+function gaugeValueColor(metric: string): string {
+  const status = gaugeStatus(metric)
+  if (status === 'status-danger') return 'var(--accent-danger, #dc2626)'
+  if (status === 'status-warning') return 'var(--accent-warning, #ca8a04)'
+  return gaugeColor(metric)
+}
+
 function getSysTimeLabels(): string[] {
   return sysMetricsHistory.value.map((_, i) => {
     const t = new Date(Date.now() - (sysMetricsHistory.value.length - 1 - i) * refreshInterval.value * 1000)
@@ -723,10 +777,10 @@ function renderSysCpuChart() {
   if (!data.length) return
   sysCpuChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    grid: { top: 30, right: 48, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10 } }] } }],
+    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } }],
     tooltip: getTooltipConfig(),
     legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 },
   }, true)
@@ -745,13 +799,13 @@ function renderSysTaskWaitChart() {
   if (!p50.length) return
   sysTaskWaitChart.setOption({
     backgroundColor: theme.bgColor,
-    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    grid: { top: 30, right: 48, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
       { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info } },
       { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning } },
-      { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 10 } }] } },
+      { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 10, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } },
     ],
     tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
@@ -817,7 +871,6 @@ function getTooltipConfig() {
 
   return {
     trigger: 'axis' as const,
-    confine: true,
     backgroundColor: bgColor,
     borderColor: borderColor,
     borderWidth: 1,
@@ -836,9 +889,17 @@ function getTooltipConfig() {
       let result = `<div style="font-size:11.5px;color:${titleColor};margin-bottom:10px;font-weight:600;letter-spacing:0.3px">${params[0].axisValue}</div>`
       for (const param of params) {
         const rawVal = Number(param.value)
-        const val = isNaN(rawVal) ? '-' : (param.seriesName === 'QPS' ? rawVal.toFixed(1) : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? rawVal.toFixed(2) : rawVal.toFixed(1)))
-        const unit = param.seriesName === 'QPS' ? '' : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? '%' : 'ms')
-        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${param.seriesName}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
+        const name = param.seriesName
+        let val: string
+        let unit: string
+        if (name === 'QPS') { val = rawVal.toFixed(1); unit = '' }
+        else if (name === '错误率' || name === 'error_rate') { val = rawVal.toFixed(2); unit = '%' }
+        else if (name === 'HeapAlloc' || name === 'HeapSys') { val = rawVal.toFixed(1); unit = ' MB' }
+        else if (name === 'CPU') { val = rawVal.toFixed(1); unit = '%' }
+        else if (name.startsWith('P5') || name.startsWith('P9')) { val = rawVal.toFixed(1); unit = 'ms' }
+        else if (name === 'Goroutines') { val = Math.round(rawVal).toLocaleString(); unit = '' }
+        else { val = rawVal.toFixed(1); unit = 'ms' }
+        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${name}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
       }
       return result
     }
@@ -2105,20 +2166,72 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   padding: 12px 16px;
   text-align: center;
-  transition: border-color 0.3s ease, background-color 0.3s ease;
+  transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  cursor: default;
 }
 
-.sys-gauge-card.status-normal {
-  border-color: var(--accent-success, #16a34a);
+.sys-gauge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sys-gauge-card[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  font-size: 11.5px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 10px;
+  white-space: normal;
+  max-width: 220px;
+  width: max-content;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0.2s;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sys-gauge-card[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.96);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s 0.2s;
+  z-index: 101;
+  pointer-events: none;
+}
+
+.sys-gauge-card[data-tooltip]:hover::after,
+.sys-gauge-card[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0s;
+  transform: translateX(-50%) scale(1);
 }
 
 .sys-gauge-card.status-warning {
-  border-color: var(--accent-warning, #ca8a04);
+  border-color: var(--accent-warning, #ca8a04) !important;
   background: rgba(202, 138, 4, 0.05);
 }
 
 .sys-gauge-card.status-danger {
-  border-color: var(--accent-danger, #dc2626);
+  border-color: var(--accent-danger, #dc2626) !important;
   background: rgba(220, 38, 38, 0.05);
 }
 
@@ -2151,6 +2264,31 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 
+.gauge-alert {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.status-warning .gauge-alert {
+  color: var(--accent-warning, #ca8a04);
+  background: rgba(202, 138, 4, 0.10);
+}
+
+.status-danger .gauge-alert {
+  color: var(--accent-danger, #dc2626);
+  background: rgba(220, 38, 38, 0.10);
+}
+
+.sys-gauge-row {
+  display: flex;
+  gap: 10px;
+  overflow: visible;
+}
+
 .sys-charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2163,10 +2301,12 @@ onUnmounted(() => {
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
   padding: 12px;
+  overflow: visible;
 }
 
 .sys-chart-canvas {
   width: 100%;
   height: 220px;
+  overflow: visible;
 }
 </style>

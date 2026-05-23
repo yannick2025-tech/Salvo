@@ -623,7 +623,7 @@ function renderSysGoroutineChart(tc: any) {
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: tc.colors[5] }, label: { formatter: '10K', color: tc.colors[5], fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toLocaleString()}</strong><br/>` }); return h } },
     legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -650,7 +650,7 @@ function renderSysHeapChart(tc: any) {
       { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
       { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2, type: 'dashed' }, itemStyle: { color: tc.colors[6] } },
     ],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)} MB</strong><br/>` }); return h } },
     legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -673,7 +673,7 @@ function renderSysCpuChart(tc: any) {
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
     series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: tc.colors[5] }, label: { formatter: '70%', color: tc.colors[5], fontSize: 10 } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10 } }] } }],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)}%</strong><br/>` }); return h } },
     legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -702,7 +702,7 @@ function renderSysTaskWaitChart(tc: any) {
       { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] } },
       { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
     ],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)} ms</strong><br/>` }); return h } },
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }

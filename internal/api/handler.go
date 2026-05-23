@@ -1612,6 +1612,7 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	}
 
 	// Populate system metrics from the running runner (if any).
+	// If the scene is not running, fall back to the latest completed report.
 	if sceneID > 0 {
 		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
 			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
@@ -1630,9 +1631,10 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
 				}
 			}
+		} else {
+			response.SystemMetrics = h.loadSystemMetricsFromDB(r.Context(), snowflake.ID(sceneID))
 		}
 	} else if len(runningMap) > 0 {
-		// No specific scene: use the first running runner.
 		for _, rn := range runningMap {
 			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
 				last := snapshots[len(snapshots)-1]
@@ -1655,6 +1657,57 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	}
 
 	return dto.OK(response)
+}
+
+func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake.ID) *dto.RuntimeMetricsDTO {
+	filter := repo.Filter{SceneID: sceneID, Limit: 1}
+	runRecords, err := h.runs.List(ctx, filter)
+	if err != nil || len(runRecords) == 0 {
+		return nil
+	}
+	latestRR := runRecords[0]
+	if latestRR.ID == 0 {
+		return nil
+	}
+	report, err := h.reports.GetByRunID(ctx, latestRR.ID)
+	if err != nil || report == nil || report.Detail == "" || report.Detail == "{}" {
+		return nil
+	}
+	var detail struct {
+		SystemMetrics *struct {
+			Summary struct {
+				GoroutineMax     float64 `json:"goroutine_max"`
+				GoroutineAvg     float64 `json:"goroutine_avg"`
+				HeapAllocMaxMB   float64 `json:"heap_alloc_max_mb"`
+				HeapAllocAvgMB   float64 `json:"heap_alloc_avg_mb"`
+				CPUMax           float64 `json:"cpu_max"`
+				CPUAvg           float64 `json:"cpu_avg"`
+				TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+				TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+				GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
+			} `json:"summary"`
+		} `json:"system_metrics,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(report.Detail), &detail); err != nil {
+		return nil
+	}
+	sm := detail.SystemMetrics
+	if sm == nil {
+		return nil
+	}
+	return &dto.RuntimeMetricsDTO{
+		GoroutineCount:  int64(sm.Summary.GoroutineMax),
+		HeapAllocMB:     sm.Summary.HeapAllocMaxMB,
+		HeapSysMB:       0,
+		CPUUsagePercent: sm.Summary.CPUMax,
+		RSSMemoryMB:     0,
+		ActiveWorkers:   0,
+		PendingQueueLen: 0,
+		TaskWaitP50Ms:   0,
+		TaskWaitP95Ms:   0,
+		TaskWaitP99Ms:   sm.Summary.TaskWaitP99MaxMs,
+		GCPauseLastMs:   sm.Summary.GCPauseTotalMs,
+	}
 }
 
 func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
