@@ -135,7 +135,7 @@
                 <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
               </div>
             </div>
-            <div v-if="expandedNodeId === node.node_id" class="node-detail" @click.stop>
+            <div v-show="expandedNodeId === node.node_id" class="node-detail" @click.stop>
               <div class="node-time-range">
                 <span class="time-range-label">时间区间:</span>
                 <span class="time-range-value">{{ getNodeTimeRange(node) }}</span>
@@ -159,7 +159,7 @@
     </div>
 
     <!-- System Monitoring Section -->
-    <div v-if="overview?.system_metrics" class="system-monitor-section">
+    <div v-if="overview?.system_metrics" ref="sysMonitorSectionRef" class="system-monitor-section">
       <h3 class="section-title">系统监控</h3>
       <div class="sys-gauge-row">
         <div class="sys-gauge-card" :class="gaugeStatus('goroutine')" :style="{ borderColor: gaugeColor('goroutine'), '--gauge-color': gaugeColor('goroutine') }" data-tooltip="Goroutine 数量：当前 Go 运行时活跃协程总数" :data-alert="gaugeAlert('goroutine')">
@@ -200,37 +200,84 @@
       </div>
 
       <!-- System Trend Charts -->
-      <div v-if="sysMetricsHistory.length >= 2" class="sys-charts-row">
-        <div class="sys-chart-item">
-          <div class="chart-type-toggle center">
-            <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
-            <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+      <div v-if="sysMetricsHistory.length >= 2 || sysMetricsTimeSeries.length >= 2" class="sys-charts-row">
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysGoroutine' }" @click="toggleSysChartExpand('sysGoroutine')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysGoroutine' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+            </div>
           </div>
-          <div ref="sysGoroutineChartRef" class="sys-chart-canvas"></div>
-        </div>
-        <div class="sys-chart-item">
-          <div class="chart-type-toggle center">
-            <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
-            <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+          <div v-show="expandedSysChartId !== 'sysGoroutine'" ref="sysGoroutineChartRef" class="sys-chart-canvas"></div>
+          <div v-show="expandedSysChartId === 'sysGoroutine'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysGoroutineExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+            </div>
           </div>
-          <div ref="sysHeapChartRef" class="sys-chart-canvas"></div>
         </div>
-        <div class="sys-chart-item">
-          <div class="chart-type-toggle center">
-            <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
-            <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysHeap' }" @click="toggleSysChartExpand('sysHeap')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysHeap' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+            </div>
           </div>
-          <div ref="sysCpuChartRef" class="sys-chart-canvas"></div>
-        </div>
-        <div class="sys-chart-item">
-          <div class="chart-type-toggle center">
-            <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
-            <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+          <div v-show="expandedSysChartId !== 'sysHeap'" ref="sysHeapChartRef" class="sys-chart-canvas"></div>
+          <div v-show="expandedSysChartId === 'sysHeap'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysHeapExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+            </div>
           </div>
-          <div ref="sysTaskWaitChartRef" class="sys-chart-canvas"></div>
         </div>
-        <div class="sys-chart-item">
-          <div ref="sysQueueChartRef" class="sys-chart-canvas"></div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysCpu' }" @click="toggleSysChartExpand('sysCpu')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysCpu' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysCpu'" ref="sysCpuChartRef" class="sys-chart-canvas"></div>
+          <div v-show="expandedSysChartId === 'sysCpu'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysCpuExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysTaskWait' }" @click="toggleSysChartExpand('sysTaskWait')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysTaskWait' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysTaskWait'" ref="sysTaskWaitChartRef" class="sys-chart-canvas"></div>
+          <div v-show="expandedSysChartId === 'sysTaskWait'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysTaskWaitExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysQueue' }" @click="toggleSysChartExpand('sysQueue')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysQueue' ? '▼' : '▶' }}</span>
+            <span class="sys-chart-title">Pending Queue</span>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysQueue'" ref="sysQueueChartRef" class="sys-chart-canvas"></div>
+          <div v-show="expandedSysChartId === 'sysQueue'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysQueueExpandedRef" class="sys-expanded-canvas"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -238,7 +285,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { DashboardOverviewDTO, RunHistoryDTO, RuntimeMetricsDTO } from '@/types'
 
@@ -250,6 +297,11 @@ const sysHeapChartRef = ref<HTMLElement>()
 const sysCpuChartRef = ref<HTMLElement>()
 const sysTaskWaitChartRef = ref<HTMLElement>()
 const sysQueueChartRef = ref<HTMLElement>()
+const sysGoroutineExpandedRef = ref<HTMLElement>()
+const sysHeapExpandedRef = ref<HTMLElement>()
+const sysCpuExpandedRef = ref<HTMLElement>()
+const sysTaskWaitExpandedRef = ref<HTMLElement>()
+const sysQueueExpandedRef = ref<HTMLElement>()
 
 let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
@@ -259,9 +311,15 @@ let sysHeapChart: echarts.ECharts | null = null
 let sysCpuChart: echarts.ECharts | null = null
 let sysTaskWaitChart: echarts.ECharts | null = null
 let sysQueueChart: echarts.ECharts | null = null
+let sysGoroutineExpandedChart: echarts.ECharts | null = null
+let sysHeapExpandedChart: echarts.ECharts | null = null
+let sysCpuExpandedChart: echarts.ECharts | null = null
+let sysTaskWaitExpandedChart: echarts.ECharts | null = null
+let sysQueueExpandedChart: echarts.ECharts | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 let themeObserver: MutationObserver | null = null
+let sysObserver: IntersectionObserver | null = null
 const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
@@ -279,6 +337,10 @@ const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
 // Accumulated system metrics time series for trend charts.
 const sysMetricsHistory = ref<RuntimeMetricsDTO[]>([])
 const MAX_SYS_HISTORY = 300
+const sysMetricsTimeSeries = ref<any[]>([])
+const sysChartsVisible = ref(false)
+const sysMonitorSectionRef = ref<HTMLElement | null>(null)
+const expandedSysChartId = ref<string | null>(null)
 
 function initNodeChartTypes() {
   overview.value?.node_metrics?.forEach(node => {
@@ -292,10 +354,10 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'qpsTrend') renderQpsChart()
   else if (chartId === 'latTrend') renderLatencyChart()
   else if (chartId.startsWith('node-')) renderNodeDetailChart(chartId.slice(5))
-  else if (chartId === 'sysGoroutine') renderSysGoroutineChart()
-  else if (chartId === 'sysHeap') renderSysHeapChart()
-  else if (chartId === 'sysCpu') renderSysCpuChart()
-  else if (chartId === 'sysTaskWait') renderSysTaskWaitChart()
+  else if (chartId === 'sysGoroutine') { renderSysGoroutineChart(); if (expandedSysChartId.value === 'sysGoroutine') renderSysExpandedChart('sysGoroutine') }
+  else if (chartId === 'sysHeap') { renderSysHeapChart(); if (expandedSysChartId.value === 'sysHeap') renderSysExpandedChart('sysHeap') }
+  else if (chartId === 'sysCpu') { renderSysCpuChart(); if (expandedSysChartId.value === 'sysCpu') renderSysExpandedChart('sysCpu') }
+  else if (chartId === 'sysTaskWait') { renderSysTaskWaitChart(); if (expandedSysChartId.value === 'sysTaskWait') renderSysExpandedChart('sysTaskWait') }
   else if (chartId === 'sysQueue') renderSysQueueChart()
 }
 
@@ -385,6 +447,7 @@ const durationDisplay = computed(() => {
 
 function onSceneChange() {
   sysMetricsHistory.value = []
+  sysMetricsTimeSeries.value = []
   fetchOverview()
   userAdjustedZoom.value = false
 }
@@ -454,6 +517,8 @@ async function fetchSceneList() {
         const firstRunning = sceneList.value.find(s => s.status === 'running')
         if (firstRunning) {
           selectedSceneId.value = firstRunning.scene_id
+        } else {
+          selectedSceneId.value = sceneList.value[0].scene_id
         }
       }
 
@@ -554,9 +619,18 @@ function getNodeTimeRange(_node: any): string {
 }
 
 function toggleNodeExpand(nodeId: string) {
-  expandedNodeId.value = expandedNodeId.value === nodeId ? '' : nodeId
+  const wasExpanded = expandedNodeId.value === nodeId
+  expandedNodeId.value = wasExpanded ? '' : nodeId
   if (expandedNodeId.value) {
     setTimeout(() => renderNodeDetailChart(nodeId), 50)
+  } else {
+    requestAnimationFrame(() => {
+      if (sysGoroutineChart) sysGoroutineChart.resize()
+      if (sysHeapChart) sysHeapChart.resize()
+      if (sysCpuChart) sysCpuChart.resize()
+      if (sysTaskWaitChart) sysTaskWaitChart.resize()
+      if (sysQueueChart) sysQueueChart.resize()
+    })
   }
 }
 
@@ -683,12 +757,12 @@ function gaugeAlert(metric: string): string {
       if (m.cpu_percent > 70) return '⚠️ 超过 70%'
       return ''
     case 'wait':
-      if (m.task_wait_p99_ms > 100) return '🚨 超过 100ms'
-      if (m.task_wait_p99_ms > 10) return '⚠️ 超过 10ms'
+      if (m.task_wait_p99_ms > 60000) return '🚨 超过 60000ms'
+      if (m.task_wait_p99_ms > 30000) return '⚠️ 超过 30000ms'
       return ''
     case 'queue':
       if (m.pending_queue_len > 1000) return '🚨 超过 1K'
-      if (m.pending_queue_len > 100) return '⚠️ 超过 100'
+      if (m.pending_queue_len > 500) return '⚠️ 超过 500'
       return ''
     default:
       return ''
@@ -716,10 +790,106 @@ function gaugeValueColor(metric: string): string {
 }
 
 function getSysTimeLabels(): string[] {
+  if (sysMetricsTimeSeries.value.length > 0) {
+    return sysMetricsTimeSeries.value.map((m: any, i: number) => {
+      const t = m.timestamp ? new Date(m.timestamp) : null
+      if (t && !isNaN(t.getTime())) {
+        return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      }
+      return `${i}s`
+    })
+  }
   return sysMetricsHistory.value.map((_, i) => {
     const t = new Date(Date.now() - (sysMetricsHistory.value.length - 1 - i) * refreshInterval.value * 1000)
     return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   })
+}
+
+function getSysData(key: string): any[] {
+  if (sysMetricsTimeSeries.value.length > 0) {
+    return sysMetricsTimeSeries.value.map((m: any) => m[key])
+  }
+  return sysMetricsHistory.value.map((m: any) => m[key])
+}
+
+function toggleSysChartExpand(chartId: string) {
+  const wasExpanded = expandedSysChartId.value === chartId
+  expandedSysChartId.value = wasExpanded ? null : chartId
+  if (expandedSysChartId.value) {
+    setTimeout(() => renderSysExpandedChart(chartId), 50)
+  } else {
+    requestAnimationFrame(() => {
+      sysGoroutineChart?.resize()
+      sysHeapChart?.resize()
+      sysCpuChart?.resize()
+      sysTaskWaitChart?.resize()
+      sysQueueChart?.resize()
+    })
+  }
+}
+
+function renderSysExpandedChart(chartId: string) {
+  const refMap: Record<string, HTMLElement | undefined> = {
+    sysGoroutine: sysGoroutineExpandedRef.value,
+    sysHeap: sysHeapExpandedRef.value,
+    sysCpu: sysCpuExpandedRef.value,
+    sysTaskWait: sysTaskWaitExpandedRef.value,
+    sysQueue: sysQueueExpandedRef.value,
+  }
+  const el = refMap[chartId]
+  if (!el) return
+  const chartMap: Record<string, echarts.ECharts | null> = {
+    sysGoroutine: sysGoroutineExpandedChart,
+    sysHeap: sysHeapExpandedChart,
+    sysCpu: sysCpuExpandedChart,
+    sysTaskWait: sysTaskWaitExpandedChart,
+    sysQueue: sysQueueExpandedChart,
+  }
+  let chart = chartMap[chartId]
+  if (chart) { chart.dispose(); chart = null }
+  chart = echarts.init(el)
+  if (chartId === 'sysGoroutine') sysGoroutineExpandedChart = chart
+  else if (chartId === 'sysHeap') sysHeapExpandedChart = chart
+  else if (chartId === 'sysCpu') sysCpuExpandedChart = chart
+  else if (chartId === 'sysTaskWait') sysTaskWaitExpandedChart = chart
+  else if (chartId === 'sysQueue') sysQueueExpandedChart = chart
+
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value[chartId] === 'smooth'
+  const labels = getSysTimeLabels()
+
+  const baseGrid = { top: 50, right: 40, bottom: 50, left: 55 }
+  const baseXAxis = { type: 'category' as const, data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 11 } }
+  const baseYAxis = { type: 'value' as const, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 11 } }
+
+  if (chartId === 'sysGoroutine') {
+    const data = getSysData('goroutine_count')
+    if (!data.length) return
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 11 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 11 } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(14,165,233,0.15)`, handleStyle: { color: '#0ea5e9' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysHeap') {
+    const allocData = getSysData('heap_alloc_mb')
+    const sysData = getSysData('heap_sys_mb')
+    if (!allocData.length) return
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(14,165,233,0.15)`, handleStyle: { color: '#0ea5e9' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysCpu') {
+    const data = getSysData('cpu_percent')
+    if (!data.length) return
+    const areaGrad = new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }])
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,6' : '234,179,8'}, 0.15)`, handleStyle: { color: theme.colors.warning }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysTaskWait') {
+    const p50 = getSysData('task_wait_p50_ms')
+    const p95 = getSysData('task_wait_p95_ms')
+    const p99 = getSysData('task_wait_p99_ms')
+    if (!p50.length) return
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(220,38,38,0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysQueue') {
+    const data = getSysData('pending_queue_len')
+    if (!data.length) return
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0 }, series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }], tooltip: getTooltipConfig(), legend: { data: ['Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(37,99,235,0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  }
 }
 
 function renderSysGoroutineChart() {
@@ -728,7 +898,7 @@ function renderSysGoroutineChart() {
   sysGoroutineChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysGoroutine === 'smooth'
-  const data = sysMetricsHistory.value.map(m => m.goroutine_count)
+  const data = getSysData('goroutine_count')
   const labels = getSysTimeLabels()
   if (!data.length) return
   sysGoroutineChart.setOption({
@@ -748,8 +918,8 @@ function renderSysHeapChart() {
   sysHeapChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysHeap === 'smooth'
-  const allocData = sysMetricsHistory.value.map(m => m.heap_alloc_mb)
-  const sysData = sysMetricsHistory.value.map(m => m.heap_sys_mb)
+  const allocData = getSysData('heap_alloc_mb')
+  const sysData = getSysData('heap_sys_mb')
   const labels = getSysTimeLabels()
   if (!allocData.length) return
   sysHeapChart.setOption({
@@ -772,7 +942,7 @@ function renderSysCpuChart() {
   sysCpuChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysCpu === 'smooth'
-  const data = sysMetricsHistory.value.map(m => m.cpu_percent)
+  const data = getSysData('cpu_percent')
   const labels = getSysTimeLabels()
   if (!data.length) return
   sysCpuChart.setOption({
@@ -792,9 +962,9 @@ function renderSysTaskWaitChart() {
   sysTaskWaitChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysTaskWait === 'smooth'
-  const p50 = sysMetricsHistory.value.map(m => m.task_wait_p50_ms)
-  const p95 = sysMetricsHistory.value.map(m => m.task_wait_p95_ms)
-  const p99 = sysMetricsHistory.value.map(m => m.task_wait_p99_ms)
+  const p50 = getSysData('task_wait_p50_ms')
+  const p95 = getSysData('task_wait_p95_ms')
+  const p99 = getSysData('task_wait_p99_ms')
   const labels = getSysTimeLabels()
   if (!p50.length) return
   sysTaskWaitChart.setOption({
@@ -817,7 +987,7 @@ function renderSysQueueChart() {
   if (!sysQueueChart) sysQueueChart = echarts.init(sysQueueChartRef.value)
   sysQueueChart.clear()
   const theme = getChartTheme()
-  const data = sysMetricsHistory.value.map(m => m.pending_queue_len)
+  const data = getSysData('pending_queue_len')
   const labels = getSysTimeLabels()
   if (!data.length) return
   sysQueueChart.setOption({
@@ -1155,20 +1325,51 @@ async function fetchOverview() {
       syncRunningStatus()
       initNodeChartTypes()
 
-      // Accumulate system metrics for trend charts.
-      if (resp.data?.system_metrics) {
-        sysMetricsHistory.value.push(resp.data.system_metrics)
-        if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
-          sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
+      const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
+
+      if (hasRunning) {
+        sysMetricsTimeSeries.value = []
+        if (resp.data?.system_metrics) {
+          sysMetricsHistory.value.push(resp.data.system_metrics)
+          if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
+            sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
+          }
         }
-        renderSysGoroutineChart()
-        renderSysHeapChart()
-        renderSysCpuChart()
-        renderSysTaskWaitChart()
-        renderSysQueueChart()
+        if (sysChartsVisible.value) {
+          setTimeout(() => {
+            renderSysGoroutineChart()
+            requestAnimationFrame(() => {
+              renderSysHeapChart()
+              requestAnimationFrame(() => {
+                renderSysCpuChart()
+                requestAnimationFrame(() => {
+                  renderSysTaskWaitChart()
+                  requestAnimationFrame(() => renderSysQueueChart())
+                })
+              })
+            })
+          }, 0)
+        }
+      } else if (resp.data?.system_metrics_time_series?.length > 0) {
+        sysMetricsTimeSeries.value = resp.data.system_metrics_time_series
+        sysMetricsHistory.value = []
+        if (sysChartsVisible.value) {
+          setTimeout(() => {
+            renderSysGoroutineChart()
+            requestAnimationFrame(() => {
+              renderSysHeapChart()
+              requestAnimationFrame(() => {
+                renderSysCpuChart()
+                requestAnimationFrame(() => {
+                  renderSysTaskWaitChart()
+                  requestAnimationFrame(() => renderSysQueueChart())
+                })
+              })
+            })
+          }, 0)
+        }
       }
 
-      const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
       if (!hasRunning && !hasTimeSeries) {
         loadHistoryData()
@@ -1194,6 +1395,11 @@ function handleResize() {
   sysCpuChart?.resize()
   sysTaskWaitChart?.resize()
   sysQueueChart?.resize()
+  if (expandedSysChartId.value) {
+    const id = expandedSysChartId.value
+    const map: Record<string, echarts.ECharts | null> = { sysGoroutine: sysGoroutineExpandedChart, sysHeap: sysHeapExpandedChart, sysCpu: sysCpuExpandedChart, sysTaskWait: sysTaskWaitExpandedChart, sysQueue: sysQueueExpandedChart }
+    map[id]?.resize()
+  }
 }
 
 onMounted(() => {
@@ -1217,13 +1423,19 @@ onMounted(() => {
     sysCpuChart?.dispose(); sysCpuChart = null
     sysTaskWaitChart?.dispose(); sysTaskWaitChart = null
     sysQueueChart?.dispose(); sysQueueChart = null
-    nodeCharts.forEach((c, k) => { c.dispose() })
+    sysGoroutineExpandedChart?.dispose(); sysGoroutineExpandedChart = null
+    sysHeapExpandedChart?.dispose(); sysHeapExpandedChart = null
+    sysCpuExpandedChart?.dispose(); sysCpuExpandedChart = null
+    sysTaskWaitExpandedChart?.dispose(); sysTaskWaitExpandedChart = null
+    sysQueueExpandedChart?.dispose(); sysQueueExpandedChart = null
+    nodeCharts.forEach((c) => { c.dispose() })
     nodeCharts.clear()
     requestAnimationFrame(() => {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
       if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
+      if (expandedSysChartId.value) renderSysExpandedChart(expandedSysChartId.value)
     })
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
@@ -1234,11 +1446,47 @@ onMounted(() => {
       if (firstRunning) {
         selectedSceneId.value = firstRunning.scene_id
         console.log('🔄 Auto-selected running scene:', selectedSceneId.value)
+      } else {
+        selectedSceneId.value = scenes[0].scene_id
       }
     }
   }, { immediate: true })
   
   restartPolling()
+
+  sysObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        sysChartsVisible.value = true
+        sysObserver?.disconnect()
+      }
+    }
+  }, { rootMargin: '200px 0px' })
+
+  watch(sysChartsVisible, (visible) => {
+    if (!visible) return
+    if (sysMetricsHistory.value.length >= 2 || sysMetricsTimeSeries.value.length >= 2) {
+      renderSysGoroutineChart()
+      requestAnimationFrame(() => {
+        renderSysHeapChart()
+        requestAnimationFrame(() => {
+          renderSysCpuChart()
+          requestAnimationFrame(() => {
+            renderSysTaskWaitChart()
+            requestAnimationFrame(() => renderSysQueueChart())
+          })
+        })
+      })
+    }
+  }, { once: true })
+
+  nextTick(() => {
+    if (sysMonitorSectionRef.value) {
+      sysObserver?.observe(sysMonitorSectionRef.value)
+    } else {
+      sysChartsVisible.value = true
+    }
+  })
 
   timeRefreshTimer = setInterval(() => {
     if (overview.value?.recent_runs?.some(r => r.status === 'running')) {
@@ -1250,6 +1498,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   themeObserver?.disconnect()
+  sysObserver?.disconnect()
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
   qpsChart?.dispose()
@@ -1260,6 +1509,11 @@ onUnmounted(() => {
   sysCpuChart?.dispose()
   sysTaskWaitChart?.dispose()
   sysQueueChart?.dispose()
+  sysGoroutineExpandedChart?.dispose()
+  sysHeapExpandedChart?.dispose()
+  sysCpuExpandedChart?.dispose()
+  sysTaskWaitExpandedChart?.dispose()
+  sysQueueExpandedChart?.dispose()
 })
 </script>
 
@@ -2308,5 +2562,40 @@ onUnmounted(() => {
   width: 100%;
   height: 220px;
   overflow: visible;
+}
+
+.sys-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sys-chart-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.expand-icon {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.sys-chart-item.expanded {
+  grid-column: 1 / -1;
+}
+
+.sys-chart-expanded {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.sys-expanded-canvas {
+  height: 320px;
 }
 </style>

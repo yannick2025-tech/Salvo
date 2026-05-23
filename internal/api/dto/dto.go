@@ -497,15 +497,17 @@ type DashboardOverviewDTO struct {
 	AvgLatency     float64              `json:"avg_latency"`
 	Running        int                  `json:"running"`
 	SceneID        int64                `json:"scene_id,omitempty"`
-	RecentRuns     []RunRecordDTO       `json:"recent_runs"`
-	NodeMetrics    []NodeMetricDTO      `json:"node_metrics"`
-	TimeSeries     *TimeSeriesDTO       `json:"time_series,omitempty"`
-	SystemMetrics  *RuntimeMetricsDTO   `json:"system_metrics,omitempty"`
+	RecentRuns              []RunRecordDTO       `json:"recent_runs"`
+	NodeMetrics             []NodeMetricDTO      `json:"node_metrics"`
+	TimeSeries              *TimeSeriesDTO       `json:"time_series,omitempty"`
+	SystemMetrics           *RuntimeMetricsDTO   `json:"system_metrics,omitempty"`
+	SystemMetricsTimeSeries []RuntimeMetricsDTO  `json:"system_metrics_time_series,omitempty"`
 }
 
 // RuntimeMetricsDTO holds the latest runtime/system metrics snapshot
 // for the Dashboard real-time monitoring section.
 type RuntimeMetricsDTO struct {
+	Timestamp       string  `json:"timestamp,omitempty"`
 	GoroutineCount  int64   `json:"goroutine_count"`
 	HeapAllocMB     float64 `json:"heap_alloc_mb"`
 	HeapSysMB       float64 `json:"heap_sys_mb"`
