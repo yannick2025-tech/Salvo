@@ -1,6 +1,7 @@
 package api
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 )
+
+//go:embed echarts.min.js
+var echartsMinJS string
 
 var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs(template.FuncMap{
 	"formatTime": func(t time.Time) string {
@@ -97,7 +101,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>测试报告 - Salvo</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script>{{.EChartsJS}}</script>
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -1838,18 +1842,19 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
 </html>`))
 
 type EnhancedReportContext struct {
-	Metrics        *EnhancedMetrics            `json:"metrics"`
-	NodeMetrics    []EnhancedNodeMetric        `json:"node_metrics"`
-	ErrorBreakdown []map[string]interface{}    `json:"error_breakdown"`
-	Metadata       *EnhancedMetadata           `json:"metadata"`
-	SystemMetrics  *EnhancedSystemMetrics      `json:"system_metrics,omitempty"`
-	JSONData       template.JS                 `json:"-"`
+	Metrics        *EnhancedMetrics         `json:"metrics"`
+	NodeMetrics    []EnhancedNodeMetric     `json:"node_metrics"`
+	ErrorBreakdown []map[string]interface{} `json:"error_breakdown"`
+	Metadata       *EnhancedMetadata        `json:"metadata"`
+	SystemMetrics  *EnhancedSystemMetrics   `json:"system_metrics,omitempty"`
+	JSONData       template.JS              `json:"-"`
+	EChartsJS      template.JS              `json:"-"`
 }
 
 // EnhancedSystemMetrics holds system performance data for the exported HTML report.
 type EnhancedSystemMetrics struct {
-	Summary    EnhancedSystemMetricsSummary   `json:"summary"`
-	TimeSeries []EnhancedSystemMetricsSample  `json:"time_series,omitempty"`
+	Summary    EnhancedSystemMetricsSummary  `json:"summary"`
+	TimeSeries []EnhancedSystemMetricsSample `json:"time_series,omitempty"`
 }
 
 // EnhancedSystemMetricsSummary holds aggregated system metrics for the exported HTML report.
@@ -1966,6 +1971,7 @@ func GenerateEnhancedHTML(detailJSON string) (string, error) {
 		return "", fmt.Errorf("failed to marshal context: %w", err)
 	}
 	ctx.JSONData = template.JS(jsonBytes)
+	ctx.EChartsJS = template.JS(echartsMinJS)
 
 	var buf strings.Builder
 	if err := enhancedReportTemplate.Execute(&buf, ctx); err != nil {

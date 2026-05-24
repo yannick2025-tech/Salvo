@@ -11,6 +11,8 @@
 vendor/
 node_modules/
 dist/
+# Embedded ECharts for exported HTML reports (copied from node_modules)
+internal/api/echarts.min.js
 .env
 *.log
 .DS_Store
