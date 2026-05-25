@@ -25,7 +25,7 @@
         <div class="metric-card">
           <div class="metric-label tooltip-wrapper" data-tooltip="测试期间发送的 HTTP 请求总数">总请求数</div>
           <div class="metric-value" style="color: var(--accent-primary)">{{ Number(metrics.total_reqs || 0).toLocaleString() }}</div>
-          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(1) + 's' : '-' }} 持续时间</div>
+          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(3) + 's' : '-' }} 持续时间</div>
         </div>
 
         <div class="metric-card">
@@ -119,7 +119,7 @@
             <tr><td class="info-label">运行模式</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
             <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">计划持续时间</td><td>{{ getPlannedDuration() }}s</td></tr>
             <tr v-if="metrics.run_mode === 'count'"><td class="info-label">计划请求数</td><td>{{ getPlannedCount() }} 次</td></tr>
-            <tr><td class="info-label">实际{{ metrics.run_mode === 'duration' ? '持续时间' : '请求数' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(2) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' 次' }}</td></tr>
+            <tr><td class="info-label">实际{{ metrics.run_mode === 'duration' ? '持续时间' : '请求数' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(3) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' 次' }}</td></tr>
             <tr><td class="info-label">并发数</td><td>{{ metrics.worker_count || '-' }}</td></tr>
             <tr><td class="info-label">状态</td><td>
               <span :class="['status-badge', report.status]" class="tooltip-wrapper" :data-tooltip="getStatusTooltip(report.status)">{{ getStatusLabel(report.status) }}</span>
@@ -214,8 +214,8 @@
                 <td>{{ fmtLatencyMs(node.summary?.p50_latency_ms) }}</td>
                 <td>{{ fmtLatencyMs(node.summary?.p90_latency_ms) }}</td>
                 <td>{{ fmtLatencyMs(node.summary?.p95_latency_ms) }}</td>
-                <td>{{ (node.summary?.avg_qps || 0).toFixed(1) }}</td>
-                <td>{{ (node.summary?.peak_qps || 0).toFixed(1) }}</td>
+                <td>{{ (node.summary?.avg_qps || 0).toFixed(3) }}</td>
+                <td>{{ (node.summary?.peak_qps || 0).toFixed(3) }}</td>
               </tr>
             </tbody>
           </table>
@@ -229,7 +229,7 @@
           <div class="chart-header">
             <h3>{{ node.name || node.node_id }}</h3>
             <div class="node-badges" v-if="node.summary">
-              <span class="node-badge">QPS {{ (node.summary.avg_qps || 0).toFixed(1) }}</span>
+              <span class="node-badge">QPS {{ (node.summary.avg_qps || 0).toFixed(3) }}</span>
               <span class="node-badge">P50 {{ fmtLatencyMs(node.summary.p50_latency_ms) }}</span>
               <span class="node-badge">P90 {{ fmtLatencyMs(node.summary.p90_latency_ms) }}</span>
               <span class="node-badge">P95 {{ fmtLatencyMs(node.summary.p95_latency_ms) }}</span>
@@ -266,23 +266,23 @@
           </div>
           <div class="sys-summary-card" title="Heap 峰值：测试运行期间堆内存分配的最大值（MB）。反映应用程序的内存使用峰值">
             <div class="sys-summary-label">Heap 峰值</div>
-            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.heap_alloc_max_mb || 0).toFixed(1) }} MB</div>
-            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.heap_alloc_avg_mb || 0).toFixed(1) }} MB</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.heap_alloc_max_mb || 0).toFixed(3) }} MB</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.heap_alloc_avg_mb || 0).toFixed(3) }} MB</div>
           </div>
           <div class="sys-summary-card" title="CPU 峰值：测试运行期间进程 CPU 占用的最大百分比。基于两次采样间 CPU 时间差计算。多核环境可能超过 100%">
             <div class="sys-summary-label">CPU 峰值</div>
-            <div class="sys-summary-value" :style="{ color: (metrics.system_metrics.summary?.cpu_max || 0) > 90 ? 'var(--accent-danger)' : (metrics.system_metrics.summary?.cpu_max || 0) > 70 ? 'var(--accent-warning)' : 'var(--text-primary)' }">{{ (metrics.system_metrics.summary?.cpu_max || 0).toFixed(1) }}%</div>
-            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.cpu_avg || 0).toFixed(1) }}%</div>
+            <div class="sys-summary-value" :style="{ color: (metrics.system_metrics.summary?.cpu_max || 0) > 90 ? 'var(--accent-danger)' : (metrics.system_metrics.summary?.cpu_max || 0) > 70 ? 'var(--accent-warning)' : 'var(--text-primary)' }">{{ (metrics.system_metrics.summary?.cpu_max || 0).toFixed(3) }}%</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.cpu_avg || 0).toFixed(3) }}%</div>
           </div>
           <div class="sys-summary-card" title="GC 暂停：测试运行期间垃圾回收暂停的总时间和次数。频繁或长时间的 GC 暂停会影响测试精度">
             <div class="sys-summary-label">GC 暂停</div>
-            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.gc_pause_total_ms || 0).toFixed(1) }} ms</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.gc_pause_total_ms || 0).toFixed(3) }} ms</div>
             <div class="sys-summary-sub">共 {{ metrics.system_metrics.summary?.gc_count || 0 }} 次</div>
           </div>
           <div class="sys-summary-card" title="任务等待 P99 峰值：99% 的任务从进入队列到被 Worker 取出的最大等待时间（ms）。&gt;100ms 说明 Worker 不够用，应增加 Worker 数量">
             <div class="sys-summary-label">任务等待 P99 峰值</div>
-            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.task_wait_p99_max_ms || 0).toFixed(1) }} ms</div>
-            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.task_wait_avg_ms || 0).toFixed(1) }} ms</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.task_wait_p99_max_ms || 0).toFixed(3) }} ms</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.task_wait_avg_ms || 0).toFixed(3) }} ms</div>
           </div>
         </div>
 
@@ -375,20 +375,20 @@
                     {{ Number(row.goroutine_count || 0).toLocaleString() }}
                   </td>
                   <td :class="{ 'danger-cell': row.heap_alloc_mb > 500 }">
-                    {{ (row.heap_alloc_mb || 0).toFixed(1) }}
+                    {{ (row.heap_alloc_mb || 0).toFixed(3) }}
                   </td>
                   <td :class="{ 'danger-cell': row.cpu_percent > 90 }">
-                    {{ (row.cpu_percent || 0).toFixed(1) }}
+                    {{ (row.cpu_percent || 0).toFixed(3) }}
                   </td>
                   <td :class="{ 'danger-cell': row.gc_pause_last_ms > 10 }">
-                    {{ (row.gc_pause_last_ms || 0).toFixed(1) }}
+                    {{ (row.gc_pause_last_ms || 0).toFixed(3) }}
                   </td>
                   <td>{{ row.active_workers || 0 }}</td>
                   <td :class="{ 'danger-cell': row.pending_queue_len > 100 }">
                     {{ row.pending_queue_len || 0 }}
                   </td>
                   <td :class="{ 'danger-cell': row.task_wait_p99_ms > 100 }">
-                    {{ (row.task_wait_p99_ms || 0).toFixed(1) }}
+                    {{ (row.task_wait_p99_ms || 0).toFixed(3) }}
                   </td>
                 </tr>
               </tbody>
@@ -632,7 +632,7 @@ const calcQPS = computed(() => {
   const dur = Number(m.duration_s || 0)
   const total = Number(m.total_reqs || 0)
   if (dur <= 0 || total <= 0) return '-'
-  return (total / dur).toFixed(1)
+  return (total / dur).toFixed(3)
 })
 
 const fmtPeakQPS = computed(() => {
@@ -640,7 +640,7 @@ const fmtPeakQPS = computed(() => {
   if (!m) return '-'
   const peak = Number(m.peak_qps || 0)
   if (peak <= 0) return '-'
-  return peak.toFixed(1)
+  return peak.toFixed(3)
 })
 
 const fmtThroughput = computed(() => {
@@ -648,7 +648,7 @@ const fmtThroughput = computed(() => {
   if (!m) return '-'
   const tp = Number(m.throughput || 0)
   if (tp <= 0) return '-'
-  return tp.toFixed(1) + '/s'
+  return tp.toFixed(3) + '/s'
 })
 
 const fmtTTFB = computed(() => {
@@ -675,7 +675,7 @@ const fmtErrorRate = computed(() => {
   const total = Number(m.total_reqs || 0)
   const fail = Number(m.failed_reqs || 0)
   if (total <= 0) return '0%'
-  return ((fail / total) * 100).toFixed(2) + '%'
+  return ((fail / total) * 100).toFixed(3) + '%'
 })
 
 const successRateColor = computed(() => {
@@ -780,7 +780,7 @@ function renderSysGoroutineChart(tc: any) {
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: tc.colors[5] }, label: { formatter: '10K', color: tc.colors[5], fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toLocaleString()}</strong><br/>` }); return h } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)}</strong><br/>` }); return h } },
     legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -807,7 +807,7 @@ function renderSysHeapChart(tc: any) {
       { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
       { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2, type: 'dashed' }, itemStyle: { color: tc.colors[6] } },
     ],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)} MB</strong><br/>` }); return h } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)} MB</strong><br/>` }); return h } },
     legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -830,7 +830,7 @@ function renderSysCpuChart(tc: any) {
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
     series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: tc.colors[5] }, label: { formatter: '70%', color: tc.colors[5], fontSize: 10 } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10 } }] } }],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)}%</strong><br/>` }); return h } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)}%</strong><br/>` }); return h } },
     legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -859,7 +859,7 @@ function renderSysTaskWaitChart(tc: any) {
       { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] } },
       { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
     ],
-    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(1)} ms</strong><br/>` }); return h } },
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)} ms</strong><br/>` }); return h } },
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
   }, true)
 }
@@ -887,15 +887,15 @@ function renderErrorRateChart(tc: any, m: any) {
       tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const idx = p[0]?.dataIndex ?? 0
-        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(3)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
       }},
       grid: { left: 50, right: 16, top: 20, bottom: 44 },
       dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark() ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
-      yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+      yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(3) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
       markLine: {
         silent: true,
-        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(3)}%`, color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
         symbol: 'none',
       },
       series: [{
@@ -938,7 +938,7 @@ function renderAll() {
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
       formatter: (p: any) => {
         const total = Number(m.total_reqs || 1)
-        const pct = ((p.value / total) * 100).toFixed(1)
+        const pct = ((p.value / total) * 100).toFixed(3)
         return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> requests <span style="color:${isDark()?'#8b949e':'#656d76'}">(${pct}%)</span></div>`
       }
     },
@@ -974,7 +974,7 @@ function renderAll() {
       formatter: (name: string) => {
         const val = name === 'Success' ? Number(m.success_reqs || 0) : Number(m.failed_reqs || 0)
         const total = Number(m.total_reqs || 1)
-        const pct = (val / total * 100).toFixed(1)
+        const pct = (val / total * 100).toFixed(3)
         return `{name|${name}}   {val|${pct}%}`
       },
       textStyle: { rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
@@ -1040,7 +1040,7 @@ function renderAll() {
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const labels: Record<string, string> = { Avg: '平均延迟', P50: '中位数 (50%)', P90: 'P90 延迟', P95: 'P95 延迟', P99: 'P99 尾部延迟' }
-        return `<div style="font-weight:600;margin-bottom:4px">${labels[p.name] || p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toFixed(1)}</strong> ms</div>`
+        return `<div style="font-weight:600;margin-bottom:4px">${labels[p.name] || p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toFixed(3)}</strong> ms</div>`
       }
     },
     grid: { left: 44, right: 20, top: 24, bottom: 32 },
@@ -1076,7 +1076,7 @@ function renderAll() {
       ],
       label: {
         show: true, position: 'top',
-        formatter: (p: any) => Number(p.value).toFixed(1),
+        formatter: (p: any) => Number(p.value).toFixed(3),
         color: isDark() ? '#8b949e' : '#656d76',
         fontSize: 11,
         fontWeight: 600,
@@ -1131,13 +1131,13 @@ function renderQPSTrend(tc: any, m: any) {
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const idx = p[0]?.dataIndex ?? 0
-        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p[0]?.value || 0).toFixed(1)}</strong>`
+        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p[0]?.value || 0).toFixed(3)}</strong>`
       }
     },
     grid: { left: 50, right: 20, top: 20, bottom: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(1) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+    yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(3) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
     series: [{
       name: 'QPS',
       type: 'line',
@@ -1191,7 +1191,7 @@ function renderLatencyTrend(tc: any, m: any) {
         if (!Array.isArray(params)) return ''
         const i = params[0]?.dataIndex ?? 0
         let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
-        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(1)}</strong>ms<br/>` })
+        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(3)}</strong>ms<br/>` })
         return h
       }
     },
@@ -1244,7 +1244,7 @@ function renderNodeCharts(tc: any) {
           if (!Array.isArray(params)) return ''
           const i = params[0]?.dataIndex ?? 0
           let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
-          params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(1) : Number(item.value).toFixed(1)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
+          params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(3) : Number(item.value).toFixed(3)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
           return h
         }
       },
@@ -1298,7 +1298,7 @@ function renderErrorBreakdownChart(tc: any) {
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
-        return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> <span style="color:${isDark()?'#8b949e':'#656d76'}">(${(Number(p.value)/totalCount*100).toFixed(1)}%)</span></div>`
+        return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> <span style="color:${isDark()?'#8b949e':'#656d76'}">(${(Number(p.value)/totalCount*100).toFixed(3)}%)</span></div>`
       }
     },
     grid: { left: 105, right: 36, top: 16, bottom: 12 },
@@ -1352,7 +1352,7 @@ function formatSuccessRate(v: any): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return '-'
-  return n.toFixed(2) + '%'
+  return n.toFixed(3) + '%'
 }
 
 function fmtLatency3(v: any): string {
@@ -1375,7 +1375,7 @@ function fmtPercent(v: any): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return '-'
-  return n.toFixed(2) + '%'
+  return n.toFixed(3) + '%'
 }
 
 function formatTime(t: any): string {

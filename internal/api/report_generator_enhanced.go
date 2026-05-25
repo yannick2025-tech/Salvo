@@ -154,6 +154,19 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-weight: 600;
             flex: 1;
         }
+        #themeToggle {
+            padding: 6px 12px;
+            font-size: 18px;
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-sm);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #themeToggle:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
 
         /* Metrics Row */
         .metrics-row {
@@ -626,33 +639,42 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             text-align: center;
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-primary: #0f172a;
-                --bg-secondary: #1e293b;
-                --bg-card: #1e293b;
-                --text-primary: #f1f5f9;
-                --text-secondary: #94a3b8;
-                --border-color: #334155;
-                --border-light: #1e293b;
-                --bg-hover: #334155;
-            }
+        .dark-theme {
+            --bg-primary: #0f172a;
+            --bg-secondary: #161b22;
+            --bg-card: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --border-light: #21262d;
+            --border-primary: #30363d;
+            --bg-hover: #21262d;
+            --accent-primary: #00E5FF;
+        }
 
-            body { background: var(--bg-primary); color: var(--text-primary); }
-            .container { background: var(--bg-primary); }
-            .metric-card, .chart-card, .sys-summary-card { background: var(--bg-card); border-color: var(--border-color); }
-            .metric-label, .sys-summary-label, .chart-header h3, h2, h3, h4 { color: var(--text-primary); }
-            .metric-sub, .sys-summary-sub, .table-info { color: var(--text-secondary); }
-            .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
-            .data-table thead { background: var(--bg-secondary); }
-            .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
-            .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
-            .data-table tbody tr:hover { background: var(--bg-hover); }
-            .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
-            .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
-            .page-info { color: var(--text-secondary); }
-            .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
-            .banner-text strong { color: var(--text-primary); }
+        .dark-theme body { background: var(--bg-primary); color: var(--text-primary); }
+        .dark-theme .container { background: var(--bg-primary); }
+        .dark-theme .metric-card, .dark-theme .chart-card, .dark-theme .sys-summary-card { background: var(--bg-card); border-color: var(--border-color); }
+        .dark-theme .metric-label, .dark-theme .sys-summary-label, .dark-theme .chart-header h3, .dark-theme h2, .dark-theme h3, .dark-theme h4 { color: var(--text-primary); }
+        .dark-theme .metric-sub, .dark-theme .sys-summary-sub, .dark-theme .table-info { color: var(--text-secondary); }
+        .dark-theme .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
+        .dark-theme .data-table thead { background: var(--bg-secondary); }
+        .dark-theme .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
+        .dark-theme .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        .dark-theme .data-table tbody tr:hover { background: var(--bg-hover); }
+        .dark-theme .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
+        .dark-theme .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
+        .dark-theme .type-btn { background: transparent; color: var(--text-secondary); border-color: var(--border-color); }
+        .dark-theme .type-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+        .dark-theme .type-btn:hover:not(.active) { background: var(--bg-hover); border-color: var(--accent-primary); }
+        .dark-theme .node-badge { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .dark-theme .info-card { background: var(--bg-card); border-color: var(--border-color); }
+        .dark-theme .info-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        .dark-theme .status-badge { border: 1px solid var(--border-color); }
+        .dark-theme .page-info { color: var(--text-secondary); }
+        .dark-theme .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
+        .dark-theme .banner-text strong { color: var(--text-primary); }
             .banner-text p { color: var(--text-secondary); }
         }
 
@@ -674,6 +696,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 <div class="container">
     <div class="page-header">
         <h2>测试报告</h2>
+        <button id="themeToggle" onclick="toggleTheme()" title="切换主题">🌓</button>
     </div>
 
     {{if .Metrics}}
@@ -912,39 +935,6 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             </div>
         </div>
         {{end}}
-
-        {{if gt (len .SystemMetrics.TimeSeries) 0}}
-        <div class="sys-table-section">
-            <div class="table-header-row">
-                <h4>系统指标详细数据</h4>
-                <div class="table-info">共 {{len .SystemMetrics.TimeSeries}} 条记录</div>
-            </div>
-            <div class="table-wrapper">
-                <table class="data-table" id="sysMetricsTable">
-                    <thead>
-                        <tr>
-                            <th class="sortable" onclick="toggleSort('timestamp')">时间戳 <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('goroutine_count')">Goroutines <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('heap_alloc_mb')">Heap (MB) <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('cpu_percent')">CPU (%) <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('gc_pause_last_ms')">GC 暂停 (ms) <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('active_workers')">Workers <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('pending_queue_len')">队列长度 <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" onclick="toggleSort('task_wait_p99_ms')">Wait P99 (ms) <span class="sort-icon">⇅</span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="sysMetricsTableBody"></tbody>
-                </table>
-            </div>
-            <div class="pagination-controls" id="tablePagination" style="display: none;">
-                <button class="page-btn" onclick="goToPage(1)">首页</button>
-                <button class="page-btn" onclick="prevPage()">上一页</button>
-                <span class="page-info" id="pageInfo"></span>
-                <button class="page-btn" onclick="nextPage()">下一页</button>
-                <button class="page-btn" onclick="goToPage(totalPages)">末页</button>
-            </div>
-        </div>
-        {{end}}
     </section>
     {{end}}
 
@@ -1020,6 +1010,39 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     </section>
     {{end}}
 
+    {{if gt (len .SystemMetrics.TimeSeries) 0}}
+    <div class="sys-table-section">
+        <div class="table-header-row">
+            <h4>系统指标详细数据</h4>
+            <div class="table-info">共 {{len .SystemMetrics.TimeSeries}} 条记录</div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table" id="sysMetricsTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="toggleSort('timestamp')">时间戳 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('goroutine_count')">Goroutines <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('heap_alloc_mb')">Heap (MB) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('cpu_percent')">CPU (%) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('gc_pause_last_ms')">GC 暂停 (ms) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('active_workers')">Workers <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('pending_queue_len')">队列长度 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('task_wait_p99_ms')">Wait P99 (ms) <span class="sort-icon">⇅</span></th>
+                    </tr>
+                </thead>
+                <tbody id="sysMetricsTableBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination-controls" id="tablePagination" style="display: none;">
+            <button class="page-btn" onclick="goToPage(1)">首页</button>
+            <button class="page-btn" onclick="prevPage()">上一页</button>
+            <span class="page-info" id="pageInfo"></span>
+            <button class="page-btn" onclick="nextPage()">下一页</button>
+            <button class="page-btn" onclick="goToPage(totalPages)">末页</button>
+        </div>
+    </div>
+    {{end}}
+
     <footer style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
         <p>Generated by Salvo at {{now.Format "2006-01-02 15:04:05"}}</p>
     </footer>
@@ -1031,11 +1054,12 @@ const reportData = {{.JSONData}};
 
 // Theme colors
 const tc = {
-    bg: '#ffffff',
-    textColor: '#111827',
-    lineColor: '#e5e7eb',
-    colors: ['#0891b2', '#0891b2', '#d97706', '#dc2626'],
-    dangerColor: '#dc2626'
+    bg: '#0f172a',
+    textColor: '#c9d1d9',
+    lineColor: '#30363d',
+    colors: ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF', '#ef4444', '#eab308', '#3b82f6', '#94a3b8'],
+    latencyColors: ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF'],
+    dangerColor: '#ef4444'
 };
 
 let errorRateType = 'smooth';
@@ -1092,7 +1116,14 @@ function renderSysGoroutineChart() {
         xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         series: [{ name: 'Goroutines', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: '#ca8a04' }, label: { formatter: '10K', color: '#ca8a04', fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
-        tooltip: { trigger: 'axis', confine: true },
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' ' + params[0].seriesName + ': <strong>' + Number(params[0].value).toFixed(3) + '</strong>';
+            }
+        },
         legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
     }, true);
 }
@@ -1117,7 +1148,15 @@ function renderSysHeapChart() {
             { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
             { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#2563eb', width: 2, type: 'dashed' }, itemStyle: { color: '#2563eb' } },
         ],
-        tooltip: { trigger: 'axis', confine: true },
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' HeapAlloc: <strong>' + Number(params[0].value).toFixed(3) + ' MB</strong><br/>' +
+                       params[1].marker + ' HeapSys: <strong>' + Number(params[1].value).toFixed(3) + ' MB</strong>';
+            }
+        },
         legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
     }, true);
 }
@@ -1134,11 +1173,18 @@ function renderSysCpuChart() {
     var data = ts.map(function(s) { return s.cpu_percent; });
     chart.setOption({
         backgroundColor: tc.bg,
-        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        grid: { top: 30, right: 60, bottom: 50, left: 50 },
         xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
-        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: '#ca8a04' }, label: { formatter: '70%', color: '#ca8a04', fontSize: 10 } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10 } }] } }],
-        tooltip: { trigger: 'axis', confine: true },
+        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: '#ca8a04' }, label: { formatter: '70%', color: '#ca8a04', fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10, position: 'end' } }] } }],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' CPU: <strong>' + Number(params[0].value).toFixed(3) + '%</strong>';
+            }
+        },
         legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
     }, true);
 }
@@ -1165,7 +1211,16 @@ function renderSysTaskWaitChart() {
             { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' } },
             { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
         ],
-        tooltip: { trigger: 'axis', confine: true },
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' P50: <strong>' + Number(params[0].value).toFixed(3) + ' ms</strong><br/>' +
+                       params[1].marker + ' P95: <strong>' + Number(params[1].value).toFixed(3) + ' ms</strong><br/>' +
+                       params[2].marker + ' P99: <strong>' + Number(params[2].value).toFixed(3) + ' ms</strong>';
+            }
+        },
         legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
     }, true);
 }
@@ -1342,26 +1397,28 @@ function initCharts() {
 function renderOverviewChart() {
     const m = reportData.metrics || {};
     const chart = echarts.init(document.getElementById('overviewChart'));
-    
+
     const total = Number(m.total_reqs || 0);
     const success = Number(m.success_reqs || 0);
     const failed = Number(m.failed_reqs || 0);
-    
+
+    const isDark = document.body.classList.contains('dark-theme');
+
     chart.setOption({
         backgroundColor: tc.bg,
         color: [tc.colors[1], tc.colors[3]],
         tooltip: {
             trigger: 'item',
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.97)',
-            borderColor: 'rgba(208,215,222,0.5)',
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
             borderWidth: 1,
             borderRadius: 10,
             padding: [12, 16],
-            textStyle: { fontSize: 12, color: '#24292f' },
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
             extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
             formatter: function(p) {
-                const pct = ((p.value / Math.max(total, 1)) * 100).toFixed(1);
+                const pct = ((p.value / Math.max(total, 1)) * 100).toFixed(3);
                 return '<div style="font-weight:600;margin-bottom:4px">' + p.name + '</div>' +
                        '<div style="font-size:13px"><strong>' + p.value.toLocaleString() + '</strong> requests (' + pct + '%)</div>';
             }
@@ -1386,7 +1443,7 @@ function renderOverviewChart() {
                 style: {
                     text: '总请求',
                     fontSize: 11,
-                    fill: '#8c959f',
+                    fill: tc.textColor,
                     textAlign: 'center'
                 }
             }
@@ -1397,13 +1454,13 @@ function renderOverviewChart() {
             icon: 'roundRect',
             formatter: function(name) {
                 const val = name === 'Success' ? success : failed;
-                const pct = (val / Math.max(total, 1) * 100).toFixed(1);
+                const pct = (val / Math.max(total, 1) * 100).toFixed(3);
                 return '{name|' + name + '}   {val|' + pct + '%}';
             },
             textStyle: {
                 rich: {
-                    name: { color: '#24292f', fontWeight: 500, fontSize: 13 },
-                    val: { color: '#8c959f', fontSize: 12, fontWeight: 400 }
+                    name: { color: tc.textColor, fontWeight: 500, fontSize: 13 },
+                    val: { color: tc.lineColor, fontSize: 12, fontWeight: 400 }
                 }
             }
         },
@@ -1443,43 +1500,45 @@ function renderErrorRateChart() {
     const timestamps = m.timestamps || [];
     const totals = m.ts_total || [];
     const fails = m.ts_fail || [];
-    
+
     const errRates = [];
     for (let i = 0; i < totals.length; i++) {
         errRates.push(totals[i] > 0 ? (fails[i] / totals[i]) * 100 : 0);
     }
-    
+
     if (!timestamps.length || !errRates.length) return;
-    
+
     const timeLabels = timestamps.map(ts => ts.substring(11, 19));
     const maxErrRate = Math.max(...errRates, 0.01);
     const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100);
-    
+
     const chart = echarts.init(document.getElementById('errorRateChart'));
+    const isDark = document.body.classList.contains('dark-theme');
+
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'axis',
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.96)',
-            borderColor: 'rgba(148,163,184,0.2)',
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
             borderWidth: 1,
             borderRadius: 8,
             padding: [10, 14],
-            textStyle: { fontSize: 11, color: '#475569' },
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
             formatter: function(params) {
                 const idx = params[0].dataIndex;
-                return timeLabels[idx] + '<br/>Error Rate: <strong>' + params[0].value.toFixed(2) + '%</strong><br/>' +
+                return timeLabels[idx] + '<br/>Error Rate: <strong>' + params[0].value.toFixed(3) + '%</strong><br/>' +
                        'Failed: ' + (fails[idx] || 0) + ' / Total: ' + (totals[idx] || 0);
             }
         },
         grid: { left: 50, right: 16, top: 20, bottom: 44 },
-        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) } },
-        yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+        yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         markLine: {
             silent: true,
-            data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(2) + '%', color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+            data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(3) + '%', color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
             symbol: 'none'
         },
         series: [{
@@ -1490,7 +1549,7 @@ function renderErrorRateChart() {
             data: errRates,
             lineStyle: { width: 2, color: tc.dangerColor },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(220,38,38,0.18)' }, { offset: 1, color: 'rgba(220,38,38,0.01)' }
+                { offset: 0, color: isDark ? 'rgba(239,68,68,0.18)' : 'rgba(220,38,38,0.18)' }, { offset: 1, color: isDark ? 'rgba(239,68,68,0.01)' : 'rgba(220,38,38,0.01)' }
             ])},
             symbol: 'none'
         }]
@@ -1500,24 +1559,26 @@ function renderErrorRateChart() {
 function renderLatencyChart() {
     const m = reportData.metrics || {};
     const chart = echarts.init(document.getElementById('latencyChart'));
-    
+
+    const isDark = document.body.classList.contains('dark-theme');
+
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.97)',
-            borderColor: 'rgba(208,215,222,0.5)',
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
             borderWidth: 1,
             borderRadius: 10,
             padding: [12, 16],
-            textStyle: { fontSize: 12, color: '#24292f' },
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
             extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
             formatter: function(params) {
                 const labels = { Avg: '平均延迟', P50: '中位数 (50%)', P90: 'P90 延迟', P95: 'P95 延迟', P99: 'P99 尾部延迟' };
                 return '<div style="font-weight:600;margin-bottom:4px">' + (labels[params[0].name] || params[0].name) + '</div>' +
-                       '<div style="font-size:13px"><strong>' + params[0].value.toFixed(1) + '</strong> ms</div>';
+                       '<div style="font-size:13px"><strong>' + params[0].value.toFixed(3) + '</strong> ms</div>';
             }
         },
         grid: { left: 44, right: 20, top: 24, bottom: 32 },
@@ -1526,39 +1587,39 @@ function renderLatencyChart() {
             data: ['Avg', 'P50', 'P90', 'P95', 'P99'],
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: '#656d76', fontSize: 12, fontWeight: 600, margin: 12 }
+            axisLabel: { color: tc.textColor, fontSize: 12, fontWeight: 600, margin: 12 }
         },
         yAxis: {
             type: 'value',
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: '#8c959f', fontSize: 10, formatter: function(v) { return v.toFixed(0) } },
-            splitLine: { lineStyle: { color: 'rgba(208,215,222,0.6)', type: 'dashed' } }
+            axisLabel: { color: tc.lineColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } },
+            splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }
         },
         series: [{
             type: 'bar',
             barWidth: '40%',
             data: [
                 { value: parseFloat(m.avg_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#0891b2' }, { offset: 1, color: '#0e7490' }
+                    { offset: 0, color: tc.colors[0] }, { offset: 1, color: isDark ? '#0891b2' : '#0e7490' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p50_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#0891b2' }, { offset: 1, color: '#0e7490' }
+                    { offset: 0, color: tc.colors[0] }, { offset: 1, color: isDark ? '#0891b2' : '#0e7490' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p90_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#d97706' }, { offset: 1, color: '#b45309' }
+                    { offset: 0, color: tc.colors[2] }, { offset: 1, color: isDark ? '#d97706' : '#b45309' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p95_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#d97706' }, { offset: 1, color: '#b45309' }
+                    { offset: 0, color: tc.colors[2] }, { offset: 1, color: isDark ? '#d97706' : '#b45309' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p99_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#8b5cf6' }, { offset: 1, color: '#7c3aed' }
+                    { offset: 0, color: tc.colors[3] }, { offset: 1, color: isDark ? '#8b5cf6' : '#7c3aed' }
                 ]), borderRadius: [6, 6, 2, 2] }}
             ],
             label: {
                 show: true, position: 'top',
-                formatter: function(p) { return p.value.toFixed(1); },
-                color: '#656d76', fontSize: 11, fontWeight: 600, offset: [0, -4]
+                formatter: function(p) { return p.value.toFixed(3); },
+                color: tc.textColor, fontSize: 11, fontWeight: 600, offset: [0, -4]
             }
         }]
     });
@@ -1590,13 +1651,13 @@ function renderQPSTrend() {
             formatter: function(params) {
                 const idx = params[0].dataIndex;
                 return '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[idx] + '</div>' +
-                       'QPS: <strong>' + params[0].value.toFixed(1) + '</strong>';
+                       'QPS: <strong>' + params[0].value.toFixed(3) + '</strong>';
             }
         },
         grid: { left: 50, right: 20, top: 20, bottom: 50 },
         dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-        yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+        yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         series: [{
             name: 'QPS',
             type: 'line',
@@ -1638,7 +1699,7 @@ function renderLatencyTrend() {
             formatter: function(params) {
                 let h = '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
                 params.forEach(function(item) {
-                    h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(1) + '</strong>ms<br/>';
+                    h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong>ms<br/>';
                 });
                 return h;
             }
@@ -1689,7 +1750,7 @@ function renderNodeCharts() {
                 formatter: function(params) {
                     let h = '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
                     params.forEach(function(item) {
-                        h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(1) + '</strong><br/>';
+                        h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong><br/>';
                     });
                     return h;
                 }
@@ -1698,8 +1759,8 @@ function renderNodeCharts() {
             dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
             xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
             yAxis: [
-                { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
-                { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } } }
+                { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+                { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } } }
             ],
             series: [
                 { name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: qpsData, yAxisIndex: 0, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -1717,36 +1778,41 @@ function renderNodeCharts() {
 function renderErrorBreakdownChart() {
     const errors = reportData.error_breakdown || [];
     if (!errors.length) return;
-    
+
     const chart = echarts.init(document.getElementById('errorBreakdownChart'));
     const data = errors.map(function(e) {
         return { value: e.count, name: e.code || e.status || e.error_type || 'Unknown' };
     });
-    
+
+    const isDark = document.body.classList.contains('dark-theme');
+
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'item',
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.97)',
-            borderColor: 'rgba(208,215,222,0.5)',
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
             borderWidth: 1,
             borderRadius: 10,
             padding: [12, 16],
-            textStyle: { fontSize: 12, color: '#24292f' },
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
             extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
             formatter: function(p) {
                 return '<div style="font-weight:600;margin-bottom:4px">' + p.name + '</div>' +
-                       '<div style="font-size:13px"><strong>' + p.value.toLocaleString() + '</strong> occurrences (' + p.percent.toFixed(1) + '%)</div>';
+                       '<div style="font-size:13px"><strong>' + p.value.toLocaleString() + '</strong> occurrences (' + p.percent.toFixed(3) + '%)</div>';
             }
         },
-        legend: { orient: 'vertical', right: 20, top: 'center' },
+        legend: {
+            orient: 'vertical', right: 20, top: 'center',
+            textStyle: { color: tc.textColor }
+        },
         series: [{
             type: 'pie',
             radius: ['45%', '70%'],
             center: ['40%', '50%'],
             data: data,
-            label: { show: true, formatter: '{b}: {c}' },
+            label: { show: true, formatter: '{b}: {c}', color: tc.textColor },
             emphasis: { itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0,0,0,0.15)' } }
         }]
     });
@@ -1800,8 +1866,15 @@ window.addEventListener('beforeprint', function() {
 
 function applyDarkMode(isDark) {
     tc.bg = isDark ? '#0f172a' : '#ffffff';
-    tc.textColor = isDark ? '#f1f5f9' : '#111827';
-    tc.lineColor = isDark ? '#334155' : '#e5e7eb';
+    tc.textColor = isDark ? '#c9d1d9' : '#656d76';
+    tc.lineColor = isDark ? '#30363d' : '#dde2e8';
+    tc.colors = isDark
+        ? ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF', '#ef4444', '#eab308', '#3b82f6', '#94a3b8']
+        : ['#0891b2', '#16a34a', '#d97706', '#8b5cf6', '#dc2626', '#ca8a04', '#2563eb', '#64748b'];
+    tc.latencyColors = isDark
+        ? ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF']
+        : ['#0891b2', '#16a34a', '#d97706', '#8b5cf6'];
+    tc.dangerColor = isDark ? '#ef4444' : '#dc2626';
 
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
                      'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
@@ -1830,13 +1903,24 @@ function applyDarkMode(isDark) {
     {{end}}
 }
 
-if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    applyDarkMode(true);
+let isDarkMode = false;
+
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    applyTheme();
+    var btn = document.getElementById('themeToggle');
+    btn.textContent = isDarkMode ? '☀️' : '🌓';
+    document.body.classList.toggle('dark-theme', isDarkMode);
 }
 
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-    applyDarkMode(e.matches);
-});
+function applyTheme() {
+    applyDarkMode(isDarkMode);
+    document.body.classList.toggle('dark-theme', isDarkMode);
+    var btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = isDarkMode ? '☀️' : '🌓';
+}
+
+applyTheme();
 </script>
 </body>
 </html>`))

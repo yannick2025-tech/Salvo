@@ -281,11 +281,11 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
 		if r.URL.Path != "/mock/health" {
-			delayMs := rand.Intn(1971) + 30
+			delayMs := rand.Intn(197) + 30
 			time.Sleep(time.Duration(delayMs) * time.Millisecond)
 		}
 
-		if r.URL.Path != "/mock/health" && rand.Float64() < 0.30 {
+		if r.URL.Path != "/mock/health" && rand.Float64() < 0.07 {
 			code := errorCodes[rand.Intn(len(errorCodes))]
 			writeJSON(rw, code, map[string]any{"code": code, "message": http.StatusText(code), "_injected": true})
 			reqLog.Printf("%s %s | %d | %.2fms [INJECTED]", r.Method, r.URL.Path, code, float64(time.Since(start).Microseconds())/1000)
