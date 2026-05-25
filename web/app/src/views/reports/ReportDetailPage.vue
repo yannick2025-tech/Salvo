@@ -886,8 +886,8 @@ function renderErrorRateChart(tc: any, m: any) {
       backgroundColor: tc.bg,
       tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
-        const idx = p[0]?.dataIndex ?? 0
-        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(3)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+        const idx = p?.dataIndex ?? 0
+        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p?.value || 0).toFixed(3)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
       }},
       grid: { left: 50, right: 16, top: 20, bottom: 44 },
       dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark() ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
@@ -1130,8 +1130,8 @@ function renderQPSTrend(tc: any, m: any) {
       extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
-        const idx = p[0]?.dataIndex ?? 0
-        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p[0]?.value || 0).toFixed(3)}</strong>`
+        const idx = p?.dataIndex ?? 0
+        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p?.value || 0).toFixed(3)}</strong>`
       }
     },
     grid: { left: 50, right: 20, top: 20, bottom: 50 },
