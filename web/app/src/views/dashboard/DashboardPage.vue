@@ -590,11 +590,11 @@ function formatDuration(seconds: number): string {
   const pad = (n: number) => String(n).padStart(2, '0')
 
   if (hours > 0) {
-    return `${hours}小时${pad(minutes)}分${pad(secs)}秒`
+    return `${pad(hours)}小时${pad(minutes)}分${pad(secs)}秒`
   } else if (minutes > 0) {
-    return `${minutes}分${pad(secs)}秒`
+    return `${pad(minutes)}分${pad(secs)}秒`
   } else {
-    return `${secs}秒`
+    return `${pad(secs)}秒`
   }
 }
 

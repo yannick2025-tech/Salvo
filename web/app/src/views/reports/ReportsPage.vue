@@ -86,11 +86,11 @@ function calculateDuration(startedAt?: string, finishedAt?: string): string {
   const pad = (n: number) => String(n).padStart(2, '0')
 
   if (hours > 0) {
-    return `${hours}小时${pad(minutes)}分${pad(seconds)}秒`
+    return `${pad(hours)}小时${pad(minutes)}分${pad(seconds)}秒`
   } else if (minutes > 0) {
-    return `${minutes}分${pad(seconds)}秒`
+    return `${pad(minutes)}分${pad(seconds)}秒`
   } else {
-    return `${seconds}秒`
+    return `${pad(seconds)}秒`
   }
 }
 
