@@ -61,8 +61,14 @@
         </div>
         <div class="chart-body" ref="latencyChartRef"></div>
         <div class="chart-type-toggle center">
-          <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
-          <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
+          <div class="type-btn-group">
+            <button :class="['type-btn', { active: latencyDataSource === 'full' }]" @click="latencyDataSource = 'full'; renderLatencyChart()">端到端</button>
+            <button :class="['type-btn', { active: latencyDataSource === 'httpOnly' }]" @click="latencyDataSource = 'httpOnly'; renderLatencyChart()">纯HTTP</button>
+          </div>
+          <div class="type-btn-group">
+            <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
+          </div>
         </div>
       </div>
     </div>
@@ -210,6 +216,7 @@
             </div>
           </div>
           <div v-show="expandedSysChartId !== 'sysGoroutine'" ref="sysGoroutineChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">当前 Go 运行时中活跃的协程数量，反映并发任务规模</div>
           <div v-show="expandedSysChartId === 'sysGoroutine'" class="sys-chart-expanded" @click.stop>
             <div ref="sysGoroutineExpandedRef" class="sys-expanded-canvas"></div>
             <div class="chart-type-toggle center">
@@ -227,6 +234,7 @@
             </div>
           </div>
           <div v-show="expandedSysChartId !== 'sysHeap'" ref="sysHeapChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">堆内存分配量（Heap Alloc），反映运行时内存使用情况</div>
           <div v-show="expandedSysChartId === 'sysHeap'" class="sys-chart-expanded" @click.stop>
             <div ref="sysHeapExpandedRef" class="sys-expanded-canvas"></div>
             <div class="chart-type-toggle center">
@@ -244,6 +252,7 @@
             </div>
           </div>
           <div v-show="expandedSysChartId !== 'sysCpu'" ref="sysCpuChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">进程 CPU 使用率，反映计算资源消耗</div>
           <div v-show="expandedSysChartId === 'sysCpu'" class="sys-chart-expanded" @click.stop>
             <div ref="sysCpuExpandedRef" class="sys-expanded-canvas"></div>
             <div class="chart-type-toggle center">
@@ -261,6 +270,7 @@
             </div>
           </div>
           <div v-show="expandedSysChartId !== 'sysTaskWait'" ref="sysTaskWaitChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">任务排队等待时间：任务提交到 Worker 接手执行的等待耗时（非网络延迟），反映 Worker 池繁忙程度</div>
           <div v-show="expandedSysChartId === 'sysTaskWait'" class="sys-chart-expanded" @click.stop>
             <div ref="sysTaskWaitExpandedRef" class="sys-expanded-canvas"></div>
             <div class="chart-type-toggle center">
@@ -275,6 +285,7 @@
             <span class="sys-chart-title">Pending Queue</span>
           </div>
           <div v-show="expandedSysChartId !== 'sysQueue'" ref="sysQueueChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">待处理队列中积压的任务数，0 表示所有任务被即时消费</div>
           <div v-show="expandedSysChartId === 'sysQueue'" class="sys-chart-expanded" @click.stop>
             <div ref="sysQueueExpandedRef" class="sys-expanded-canvas"></div>
           </div>
@@ -333,6 +344,8 @@ const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   sysTaskWait: 'smooth',
   sysQueue: 'smooth',
 })
+
+const latencyDataSource = ref<'full' | 'httpOnly'>('full')
 
 // Accumulated system metrics time series for trend charts.
 const sysMetricsHistory = ref<RuntimeMetricsDTO[]>([])
@@ -1105,6 +1118,13 @@ function getTooltipConfig() {
 }
 
 function getFilteredTimeSeries() {
+  if (latencyDataSource.value === 'httpOnly') {
+    const httpTs = overview.value?.http_only_time_series
+    if (httpTs && httpTs.timestamps?.length) {
+      return httpTs
+    }
+  }
+
   const ts = overview.value?.time_series
   if (ts && ts.timestamps?.length) {
     return ts
@@ -2363,6 +2383,10 @@ onUnmounted(() => {
   justify-content: center;
   margin-top: 8px;
 }
+.type-btn-group {
+  display: flex;
+  gap: 4px;
+}
 .type-btn {
   padding: 3px 12px;
   border: 1px solid var(--border-primary);
@@ -2555,6 +2579,14 @@ onUnmounted(() => {
   width: 100%;
   height: 220px;
   overflow: visible;
+}
+
+.sys-chart-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin-top: 4px;
+  padding: 0 2px;
 }
 
 .sys-chart-header {

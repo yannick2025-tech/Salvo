@@ -168,14 +168,15 @@ func percentile(sorted []time.Duration, p int) time.Duration {
 }
 
 type Runner struct {
-	cfg    Config
-	status atomic.Value
-	stats  *Stats
-	cancel context.CancelFunc
-	ctx    context.Context
-	mu     sync.Mutex
-	done   chan struct{}
-	log    logger.Logger
+	cfg           Config
+	status        atomic.Value
+	stats         *Stats
+	httpOnlyStats *Stats
+	cancel        context.CancelFunc
+	ctx           context.Context
+	mu            sync.Mutex
+	done          chan struct{}
+	log           logger.Logger
 
 	scenes  repo.SceneRepo
 	nodes   repo.NodeRepo
@@ -207,19 +208,20 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 	}
 
 	r := &Runner{
-		cfg:       cfg,
-		stats:     &Stats{},
-		scenes:    scenes,
-		nodes:     nodes,
-		edges:     edges,
-		runs:      runs,
-		reports:   reports,
-		tracer:    tracer,
-		nodeGen:   n,
-		runID:     n.Generate(),
-		done:      make(chan struct{}),
-		log:       log,
-		nodeStats: make(map[string]*NodeStats),
+		cfg:           cfg,
+		stats:         &Stats{},
+		httpOnlyStats: &Stats{},
+		scenes:        scenes,
+		nodes:         nodes,
+		edges:         edges,
+		runs:          runs,
+		reports:       reports,
+		tracer:        tracer,
+		nodeGen:       n,
+		runID:         n.Generate(),
+		done:          make(chan struct{}),
+		log:           log,
+		nodeStats:     make(map[string]*NodeStats),
 		collector: NewTimeSeriesCollector(TimeSeriesConfig{
 			SampleInterval:  1 * time.Second,
 			FlushInterval:   10 * time.Second,
@@ -501,6 +503,18 @@ func (r *Runner) Stats() *Stats {
 	return r.stats
 }
 
+func (r *Runner) HttpOnlyStats() *Stats {
+	return r.httpOnlyStats
+}
+
+func (r *Runner) HttpOnlyGlobalTimeSeries() []Sample {
+	if r.collector == nil {
+		return nil
+	}
+	data := r.collector.GetCollectedData()
+	return data.HttpOnlyGlobalSamples
+}
+
 func (r *Runner) RunID() snowflake.ID {
 	return r.runID
 }
@@ -638,8 +652,9 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 			Throughput:    calculateThroughput(runRecord),
 			PeakQPS:       collectorData.GlobalPeakQPS,
 		},
-		GlobalTimeSeries: globalTimeSeries,
-		NodeMetrics:      []NodeMetricDetail{},
+		GlobalTimeSeries:           globalTimeSeries,
+		HttpOnlyGlobalTimeSeries:   collectorData.HttpOnlyGlobalSamples,
+		NodeMetrics:                []NodeMetricDetail{},
 		ErrorSummary:     collectorData.ErrorItems,
 	}
 
@@ -898,16 +913,17 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 }
 
 type sceneNode struct {
-	id        string
-	nodeType  string
-	config    string
-	timeout   time.Duration
-	loopCount int
-	mode      dag.ExecMode
-	stats     *Stats
-	nodeStats *NodeStats
-	log       logger.Logger
-	traceID   string
+	id            string
+	nodeType      string
+	config        string
+	timeout       time.Duration
+	loopCount     int
+	mode          dag.ExecMode
+	stats         *Stats
+	httpOnlyStats *Stats
+	nodeStats     *NodeStats
+	log           logger.Logger
+	traceID       string
 }
 
 func (n *sceneNode) ID() string             { return n.id }
@@ -1015,12 +1031,18 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
 		return &dag.Output{Error: err}, nil
 	}
 
 	if n.stats != nil {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
 			n.stats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+			if n.httpOnlyStats != nil {
+				n.httpOnlyStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+			}
 			nodeLog.Info("HTTP request completed",
 				logger.F("method", method),
 				logger.F("url", url),
@@ -1067,9 +1089,6 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 
 	select {
 	case <-time.After(dur):
-		if n.stats != nil {
-			n.stats.RecordLatency(dur, true)
-		}
 		if n.nodeStats != nil {
 			n.nodeStats.RecordLatency(dur, true)
 		}
@@ -1178,15 +1197,16 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 
 func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, error) {
 	sn := &sceneNode{
-		id:        n.ID.String(),
-		nodeType:  n.Type,
-		config:    n.Config,
-		loopCount: n.LoopCount,
-		mode:      dag.ExecSync,
-		stats:     r.stats,
-		nodeStats: nodeStat,
-		log:       r.log,
-		traceID:   r.runID.String(),
+		id:            n.ID.String(),
+		nodeType:      n.Type,
+		config:        n.Config,
+		loopCount:     n.LoopCount,
+		mode:          dag.ExecSync,
+		stats:         r.stats,
+		httpOnlyStats: r.httpOnlyStats,
+		nodeStats:     nodeStat,
+		log:           r.log,
+		traceID:       r.runID.String(),
 	}
 
 	if n.LoopCount <= 0 {
@@ -1346,6 +1366,36 @@ func (r *Runner) GlobalSnapshot() *Sample {
 		P95LatencyMs:  p95.Seconds() * 1000,
 		P99LatencyMs:  p99.Seconds() * 1000,
 		MinLatencyMs:  time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
+		MaxLatencyMs:  p99.Seconds() * 1000,
+	}
+}
+
+func (r *Runner) HttpOnlySnapshot() *Sample {
+	totalReqs := r.httpOnlyStats.TotalReqs.Load()
+	successReqs := r.httpOnlyStats.SuccessReqs.Load()
+	failedReqs := r.httpOnlyStats.FailedReqs.Load()
+
+	avg, p50, p90, p95, p99 := r.httpOnlyStats.LatencyPercentiles()
+
+	duration := time.Since(r.startedAt).Seconds()
+	qps := float64(0)
+	if duration > 0 {
+		qps = float64(totalReqs) / duration
+	}
+
+	return &Sample{
+		Timestamp:     time.Now().UTC(),
+		WindowSeconds: 1,
+		QPS:           qps,
+		TotalRequests: totalReqs,
+		SuccessCount:  successReqs,
+		FailCount:     failedReqs,
+		AvgLatencyMs:  avg.Seconds() * 1000,
+		P50LatencyMs:  p50.Seconds() * 1000,
+		P90LatencyMs:  p90.Seconds() * 1000,
+		P95LatencyMs:  p95.Seconds() * 1000,
+		P99LatencyMs:  p99.Seconds() * 1000,
+		MinLatencyMs:  time.Duration(r.httpOnlyStats.MinLatency.Load()).Seconds() * 1000,
 		MaxLatencyMs:  p99.Seconds() * 1000,
 	}
 }

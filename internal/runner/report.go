@@ -9,12 +9,13 @@ import (
 
 // ReportDetail represents a complete test report with all metrics and time-series data.
 type ReportDetail struct {
-	Metadata         ReportMetadata           `json:"metadata"`
-	GlobalSummary    GlobalSummary            `json:"global_summary"`
-	GlobalTimeSeries []Sample                 `json:"global_time_series,omitempty"`
-	NodeMetrics      []NodeMetricDetail       `json:"node_metrics"`
-	ErrorSummary     []ErrorItem              `json:"error_summary,omitempty"`
-	SystemMetrics    *SystemMetricsData       `json:"system_metrics,omitempty"`
+	Metadata                 ReportMetadata     `json:"metadata"`
+	GlobalSummary            GlobalSummary      `json:"global_summary"`
+	GlobalTimeSeries         []Sample           `json:"global_time_series,omitempty"`
+	HttpOnlyGlobalTimeSeries []Sample           `json:"http_only_global_time_series,omitempty"`
+	NodeMetrics              []NodeMetricDetail `json:"node_metrics"`
+	ErrorSummary             []ErrorItem        `json:"error_summary,omitempty"`
+	SystemMetrics            *SystemMetricsData `json:"system_metrics,omitempty"`
 }
 
 // SystemMetricsData holds runtime and system performance metrics collected
@@ -26,20 +27,20 @@ type SystemMetricsData struct {
 
 // ReportMetadata contains metadata about the test run.
 type ReportMetadata struct {
-	RunID       snowflake.ID `json:"run_id"`
-	SceneID     snowflake.ID `json:"scene_id"`
-	SceneName   string       `json:"scene_name,omitempty"`
-	Status      string       `json:"status"`
-	StartedAt   time.Time    `json:"started_at"`
-	FinishedAt  time.Time    `json:"finished_at"`
-	DurationSec float64      `json:"duration_sec"`
-	WorkerCount int          `json:"worker_count"`
-	RunMode     string       `json:"run_mode"`
-	Count          int64        `json:"count"`
+	RunID           snowflake.ID `json:"run_id"`
+	SceneID         snowflake.ID `json:"scene_id"`
+	SceneName       string       `json:"scene_name,omitempty"`
+	Status          string       `json:"status"`
+	StartedAt       time.Time    `json:"started_at"`
+	FinishedAt      time.Time    `json:"finished_at"`
+	DurationSec     float64      `json:"duration_sec"`
+	WorkerCount     int          `json:"worker_count"`
+	RunMode         string       `json:"run_mode"`
+	Count           int64        `json:"count"`
 	PlannedDuration float64      `json:"planned_duration,omitempty"`
-	PlannedCount   int64         `json:"planned_count,omitempty"`
-	GeneratedAt time.Time    `json:"generated_at"`
-	Version     string       `json:"version"`
+	PlannedCount    int64        `json:"planned_count,omitempty"`
+	GeneratedAt     time.Time    `json:"generated_at"`
+	Version         string       `json:"version"`
 }
 
 // GlobalSummary contains aggregated global statistics.

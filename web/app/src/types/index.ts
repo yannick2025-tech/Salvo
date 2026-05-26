@@ -264,6 +264,7 @@ export interface DashboardOverviewDTO {
   recent_runs: RunRecordDTO[]
   node_metrics: NodeMetricDTO[]
   time_series?: TimeSeriesDTO
+  http_only_time_series?: TimeSeriesDTO
   system_metrics?: RuntimeMetricsDTO
 }
 

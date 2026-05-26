@@ -500,6 +500,7 @@ type DashboardOverviewDTO struct {
 	RecentRuns              []RunRecordDTO       `json:"recent_runs"`
 	NodeMetrics             []NodeMetricDTO      `json:"node_metrics"`
 	TimeSeries              *TimeSeriesDTO       `json:"time_series,omitempty"`
+	HttpOnlyTimeSeries       *TimeSeriesDTO       `json:"http_only_time_series,omitempty"`
 	SystemMetrics           *RuntimeMetricsDTO   `json:"system_metrics,omitempty"`
 	SystemMetricsTimeSeries []RuntimeMetricsDTO  `json:"system_metrics_time_series,omitempty"`
 }

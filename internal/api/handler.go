@@ -1594,24 +1594,30 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	}
 
 	response := dto.DashboardOverviewDTO{
-		TotalReqs:   totalReqs,
-		SuccessReqs: successReqs,
-		FailedReqs:  failedReqs,
-		P50Latency:  p50,
-		P95Latency:  p95,
-		P99Latency:  p99,
-		AvgLatency:  avg,
-		Running:     running,
-		RecentRuns:  recentRuns,
-		NodeMetrics: nodeMetrics,
-		TimeSeries:  ts,
+		TotalReqs:         totalReqs,
+		SuccessReqs:       successReqs,
+		FailedReqs:        failedReqs,
+		P50Latency:        p50,
+		P95Latency:        p95,
+		P99Latency:        p99,
+		AvgLatency:        avg,
+		Running:           running,
+		RecentRuns:        recentRuns,
+		NodeMetrics:       nodeMetrics,
+		TimeSeries:        ts,
 	}
 
 	if sceneID > 0 {
 		response.SceneID = sceneID
 	}
 
-	// Populate system metrics from the running runner (if any).
+	if sceneID > 0 {
+		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
+			if httpOnlySamples := rn.HttpOnlyGlobalTimeSeries(); len(httpOnlySamples) > 0 {
+				response.HttpOnlyTimeSeries = h.samplesToTimeSeriesDTO(httpOnlySamples)
+			}
+		}
+	}
 	// If the scene is not running, fall back to the latest completed report.
 	if sceneID > 0 {
 		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
@@ -2501,5 +2507,39 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		WindowStart: windowStart.Local().Format("2006-01-02T15:04:05"),
 		WindowEnd:   windowEnd.Local().Format("2006-01-02T15:04:05"),
 		HasRunning:  hasRunning,
+	}
+}
+
+func (h *Handler) samplesToTimeSeriesDTO(samples []runner.Sample) *dto.TimeSeriesDTO {
+	if len(samples) == 0 {
+		return nil
+	}
+
+	timestamps := make([]string, len(samples))
+	qps := make([]float64, len(samples))
+	p50 := make([]float64, len(samples))
+	p95 := make([]float64, len(samples))
+	p99 := make([]float64, len(samples))
+	errRate := make([]float64, len(samples))
+
+	for i, s := range samples {
+		timestamps[i] = s.Timestamp.Local().Format("15:04:05")
+		qps[i] = s.QPS
+		p50[i] = s.P50LatencyMs
+		p95[i] = s.P95LatencyMs
+		p99[i] = s.P99LatencyMs
+		if s.TotalRequests > 0 {
+			errRate[i] = float64(s.FailCount) / float64(s.TotalRequests) * 100
+		}
+	}
+
+	return &dto.TimeSeriesDTO{
+		Timestamps: timestamps,
+		QPS:        qps,
+		P50:        p50,
+		P95:        p95,
+		P99:        p99,
+		ErrorRate:  errRate,
+		HasRunning: true,
 	}
 }
