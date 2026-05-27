@@ -178,17 +178,22 @@ type Runner struct {
 	done          chan struct{}
 	log           logger.Logger
 
-	scenes  repo.SceneRepo
-	nodes   repo.NodeRepo
-	edges   repo.EdgeRepo
-	runs    repo.RunRecordRepo
-	reports repo.ReportRepo
-	tracer  *tracelib.Tracer
-	runID   snowflake.ID
-	nodeGen *snowflake.Node
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	runs        repo.RunRecordRepo
+	reports     repo.ReportRepo
+	dataSources repo.DataSourceRepo
+	tracer      *tracelib.Tracer
+	runID       snowflake.ID
+	nodeGen     *snowflake.Node
 
 	startedAt  time.Time
 	finishedAt time.Time
+
+	// rowIterators maps data source name to its RowIterator.
+	// Each task execution advances the iterator to get the next row.
+	rowIterators map[string]*RowIterator
 
 	nodeStats        map[string]*NodeStats
 	collector        *TimeSeriesCollector
@@ -197,7 +202,7 @@ type Runner struct {
 	stopWg           sync.WaitGroup
 }
 
-func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
+func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -211,11 +216,12 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		cfg:           cfg,
 		stats:         &Stats{},
 		httpOnlyStats: &Stats{},
-		scenes:        scenes,
-		nodes:         nodes,
-		edges:         edges,
-		runs:          runs,
-		reports:       reports,
+		scenes:      scenes,
+		nodes:       nodes,
+		edges:       edges,
+		runs:        runs,
+		reports:     reports,
+		dataSources: dataSources,
 		tracer:        tracer,
 		nodeGen:       n,
 		runID:         n.Generate(),
@@ -306,6 +312,29 @@ func (r *Runner) Run(ctx context.Context) error {
 		r.status.Store(StatusFailed)
 		runLog.Error("failed to build scope", logger.F("error", err))
 		return fmt.Errorf("runner: build scope: %w", err)
+	}
+
+	// Load data sources and create row iterators
+	if r.dataSources != nil {
+		dSources, dsErr := r.dataSources.ListBySceneID(r.ctx, r.cfg.SceneID)
+		if dsErr != nil {
+			runLog.Warn("failed to load data sources", logger.F("error", dsErr))
+		} else if len(dSources) > 0 {
+			r.rowIterators = make(map[string]*RowIterator, len(dSources))
+			for _, ds := range dSources {
+				var rows []map[string]string
+				if err := json.Unmarshal([]byte(ds.Rows), &rows); err != nil {
+					runLog.Warn("failed to parse data source rows",
+						logger.F("name", ds.Name), logger.F("error", err))
+					continue
+				}
+				r.rowIterators[ds.Name] = NewRowIterator(rows)
+				runLog.Info("loaded data source",
+					logger.F("name", ds.Name),
+					logger.F("rows", len(rows)),
+				)
+			}
+		}
 	}
 
 	lc := lifecycle.New()
@@ -826,6 +855,16 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		exec := dag.NewExecutor(dagObj, execOpts...)
 
 		resolvedVars := variable.ResolveAll(scope)
+
+		// Inject data source row variables: ${ds_name.column} pattern
+		for dsName, it := range r.rowIterators {
+			row := it.Next()
+			for col, val := range row {
+				key := dsName + "." + col
+				resolvedVars[key] = val
+			}
+		}
+
 		execLog.Info("resolved scene variables",
 			logger.F("chain_id", chainID.String()),
 			logger.F("variable_count", len(resolvedVars)),
@@ -909,6 +948,39 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		}
 	}
 
+	// Resolve Group node children: look up child node IDs from config
+	// and store references to the actual DAG nodes.
+	for _, n := range nodeList {
+		if n.Type != model.NodeTypeGroup {
+			continue
+		}
+		var cfg struct {
+			NodeIDs []string `json:"node_ids"`
+		}
+		if err := json.Unmarshal([]byte(n.Config), &cfg); err != nil {
+			return nil, fmt.Errorf("parse group node %s config: %w", n.ID, err)
+		}
+		groupNode, ok := dagObj.Node(n.ID.String())
+		if !ok {
+			continue
+		}
+		sn, ok := groupNode.(*sceneNode)
+		if !ok {
+			continue
+		}
+		for _, childID := range cfg.NodeIDs {
+			child, found := dagObj.Node(childID)
+			if !found {
+				return nil, fmt.Errorf("group node %s references non-existent child %s", n.ID, childID)
+			}
+			// Validate: Group cannot contain another Group
+			if childSN, ok := child.(*sceneNode); ok && childSN.nodeType == model.NodeTypeGroup {
+				return nil, fmt.Errorf("group node %s cannot contain another group node %s", n.ID, childID)
+			}
+			sn.childNodes = append(sn.childNodes, child)
+		}
+	}
+
 	return dagObj, nil
 }
 
@@ -924,6 +996,9 @@ type sceneNode struct {
 	nodeStats     *NodeStats
 	log           logger.Logger
 	traceID       string
+	// childNodes holds references to child nodes for Group execution.
+	// Populated after DAG construction via resolveGroupChildren.
+	childNodes []dag.Node
 }
 
 func (n *sceneNode) ID() string             { return n.id }
@@ -951,6 +1026,10 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		return n.executeCondition(input, nodeLog)
 	case model.NodeTypeIfElse:
 		return n.executeIfElse(input, nodeLog)
+	case model.NodeTypeGroup:
+		return n.executeGroup(ctx, input, nodeLog)
+	case model.NodeTypeTimer:
+		return n.executeTimer(ctx, input, nodeLog)
 	default:
 		nodeLog.Warn("unknown node type, skipping")
 		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
@@ -1153,6 +1232,136 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
 }
 
+func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		NodeIDs   []string `json:"node_ids"`
+		LoopCount int      `json:"loop_count"`
+		Async     bool     `json:"async"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse group config", logger.F("error", err))
+		return nil, fmt.Errorf("parse group config: %w", err)
+	}
+
+	loopCount := cfg.LoopCount
+	if loopCount <= 0 {
+		loopCount = 1
+	}
+
+	if len(n.childNodes) == 0 {
+		nodeLog.Warn("group node has no children, skipping")
+		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": "group", "iterations": 0}}, nil
+	}
+
+	nodeLog.Info("executing group",
+		logger.F("child_count", len(n.childNodes)),
+		logger.F("loop_count", loopCount),
+		logger.F("async", cfg.Async),
+	)
+
+	var lastOutput *dag.Output
+	for i := 0; i < loopCount; i++ {
+		for _, child := range n.childNodes {
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("group execution cancelled: %w", ctx.Err())
+			default:
+			}
+
+			childLoopCount := child.LoopCount()
+			if childLoopCount <= 0 {
+				childLoopCount = 1
+			}
+
+			for j := 0; j < childLoopCount; j++ {
+				output, err := child.Execute(ctx, input)
+				if err != nil {
+					nodeLog.Error("group child execution failed",
+						logger.F("child_id", child.ID()),
+						logger.F("loop", i),
+						logger.F("error", err),
+					)
+					return nil, fmt.Errorf("group child %s loop %d: %w", child.ID(), i, err)
+				}
+				lastOutput = output
+			}
+		}
+	}
+
+	if n.stats != nil {
+		n.stats.RecordLatency(0, true)
+	}
+
+	return &dag.Output{Response: map[string]any{
+		"node_id":    n.id,
+		"type":       "group",
+		"iterations": loopCount,
+		"last_child": lastOutput,
+	}}, nil
+}
+
+func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		Mode    string  `json:"mode"`    // "delay" or "interval"
+		Seconds float64 `json:"seconds"` // duration in seconds
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse timer config", logger.F("error", err))
+		return nil, fmt.Errorf("parse timer config: %w", err)
+	}
+
+	if cfg.Seconds <= 0 {
+		return nil, fmt.Errorf("timer seconds must be > 0, got %f", cfg.Seconds)
+	}
+
+	duration := time.Duration(cfg.Seconds * float64(time.Second))
+
+	switch cfg.Mode {
+	case "delay":
+		nodeLog.Info("timer delay started", logger.F("seconds", cfg.Seconds))
+		select {
+		case <-time.After(duration):
+			nodeLog.Info("timer delay completed")
+		case <-ctx.Done():
+			nodeLog.Info("timer delay cancelled")
+			return nil, fmt.Errorf("timer cancelled: %w", ctx.Err())
+		}
+	case "interval":
+		nodeLog.Info("timer interval started", logger.F("seconds", cfg.Seconds))
+		ticker := time.NewTicker(duration)
+		defer ticker.Stop()
+
+		tickCount := 0
+		for {
+			select {
+			case <-ticker.C:
+				tickCount++
+				nodeLog.Info("timer tick", logger.F("tick", tickCount))
+			case <-ctx.Done():
+				nodeLog.Info("timer interval stopped", logger.F("ticks", tickCount))
+				return &dag.Output{Response: map[string]any{
+					"node_id": n.id,
+					"type":    "timer",
+					"mode":    "interval",
+					"ticks":   tickCount,
+				}}, nil
+			}
+		}
+	default:
+		return nil, fmt.Errorf("invalid timer mode %q, must be \"delay\" or \"interval\"", cfg.Mode)
+	}
+
+	if n.stats != nil {
+		n.stats.RecordLatency(0, true)
+	}
+
+	return &dag.Output{Response: map[string]any{
+		"node_id": n.id,
+		"type":    "timer",
+		"mode":    cfg.Mode,
+	}}, nil
+}
+
 func evaluateExpression(expr string, input *dag.Input) bool {
 	if expr == "" {
 		return true
@@ -1213,6 +1422,11 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		sn.loopCount = 1
 	}
 
+	// Timer nodes are always async — they should never block the DAG main chain.
+	if n.Type == model.NodeTypeTimer {
+		sn.mode = dag.ExecAsync
+	}
+
 	return sn, nil
 }
 
@@ -1233,12 +1447,38 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 		globalScope.Set(k, v)
 	}
 
+	// Resolve nested variable references in all variable values.
+	// This ensures that variables like base_url = "http://${host}:${port}"
+	// are fully expanded before the scope is used.
+	if err := resolveNestedVariables(globalScope); err != nil {
+		return nil, fmt.Errorf("resolve nested variables: %w", err)
+	}
+
 	sceneScope := variable.NewScope(
 		variable.WithLevel(variable.ScopeScene),
 		variable.WithParent(globalScope),
 	)
 
 	return sceneScope, nil
+}
+
+// resolveNestedVariables iterates over all variables in a scope and resolves
+// any ${var} references in their values using the scope itself.
+func resolveNestedVariables(scope *variable.Scope) error {
+	keys := scope.Keys()
+	for _, k := range keys {
+		val, _ := scope.Get(k)
+		strVal := fmt.Sprintf("%v", val)
+		if !strings.Contains(strVal, "${") {
+			continue
+		}
+		resolved, err := variable.ResolveString(scope, strVal)
+		if err != nil {
+			return fmt.Errorf("variable %q: %w", k, err)
+		}
+		scope.Set(k, resolved)
+	}
+	return nil
 }
 
 func resolveWithVariables(str string, vars map[string]any) string {

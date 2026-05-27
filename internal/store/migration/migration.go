@@ -28,6 +28,7 @@ func Migrate(db *sql.DB) error {
 		{"role_permissions", createRolePermissionsTable},
 		{"users", createUsersTable},
 		{"time_series_samples", createTimeSeriesSamplesTable},
+		{"data_sources", createDataSourcesTable},
 	}
 
 	for _, m := range migrations {
@@ -194,7 +195,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 3
+const currentVersion = 4
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -333,4 +334,23 @@ CREATE TABLE IF NOT EXISTS time_series_samples (
 CREATE INDEX IF NOT EXISTS idx_ts_run_node ON time_series_samples (run_id, node_id);
 CREATE INDEX IF NOT EXISTS idx_ts_run_time ON time_series_samples (run_id, sample_time);
 CREATE INDEX IF NOT EXISTS idx_ts_sample_time ON time_series_samples (sample_time);
+`
+
+const createDataSourcesTable = `
+CREATE TABLE IF NOT EXISTS data_sources (
+	id              INTEGER PRIMARY KEY,
+	scene_id        INTEGER NOT NULL,
+	name            TEXT    NOT NULL,
+	file_name       TEXT    NOT NULL,
+	columns         TEXT    NOT NULL DEFAULT '[]',
+	rows            TEXT    NOT NULL DEFAULT '[]',
+	row_count       INTEGER NOT NULL DEFAULT 0,
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL,
+	FOREIGN KEY (scene_id) REFERENCES scenes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_data_sources_scene_id ON data_sources(scene_id);
+CREATE INDEX IF NOT EXISTS idx_data_sources_name ON data_sources(name);
+CREATE INDEX IF NOT EXISTS idx_data_sources_deleted_at ON data_sources(deleted_at);
 `

@@ -205,6 +205,10 @@ func (m *mockStatsProvider) GlobalSnapshot() *Sample {
 	return &snap
 }
 
+func (m *mockStatsProvider) HttpOnlySnapshot() *Sample {
+	return m.GlobalSnapshot()
+}
+
 func (m *mockStatsProvider) NodeSnapshots() map[string]*Sample {
 	m.mu.Lock()
 	defer m.mu.Unlock()

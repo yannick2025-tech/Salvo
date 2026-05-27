@@ -76,6 +76,7 @@ import '@vue-flow/minimap/dist/style.css'
 const props = defineProps<{
   nodes: NodeDTO[]
   edges: EdgeDTO[]
+  dataSources?: { name: string; columns: string[]; rows: Record<string, string>[] }[]
 }>()
 
 const emit = defineEmits<{
@@ -101,12 +102,12 @@ const defaultEdgeOptions = computed(() => ({
 }))
 
 function getNodeTypeLabel(type: string) {
-  const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN' }
+  const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN', group: 'GROUP', timer: 'TIMER' }
   return map[type] || type.toUpperCase()
 }
 
 function getNodeIcon(type: string) {
-  const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■' }
+  const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■', group: '⊞', timer: '⏲' }
   return map[type] || '?'
 }
 
@@ -163,6 +164,11 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
 
   vfNodes.value = newNodes.map(n => {
     const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
+    let loopCount = 1
+    try {
+      const cfg = JSON.parse(n.config || '{}')
+      loopCount = cfg.loop_count || 1
+    } catch { /* ignore */ }
     return {
       id: n.id,
       type: 'scene-node',
@@ -172,6 +178,7 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
         nodeType: n.type,
         icon: getNodeIcon(n.type),
         typeLabel: getNodeTypeLabel(n.type),
+        loopCount,
         originalNode: n,
       },
     } as Node
@@ -275,12 +282,37 @@ function generateYaml(): string {
     idToName.set(n.id, n.name)
   }
 
+  // Data sources section
+  if (props.dataSources && props.dataSources.length > 0) {
+    lines.push('data_sources:')
+    for (const ds of props.dataSources) {
+      lines.push(`  - name: ${toYamlValue(ds.name, '')}`)
+      if (ds.columns && ds.columns.length > 0) {
+        lines.push(`    columns:`)
+        for (const col of ds.columns) {
+          lines.push(`      - ${col}`)
+        }
+      }
+      if (ds.rows && ds.rows.length > 0) {
+        lines.push(`    rows:`)
+        for (const row of ds.rows) {
+          lines.push(`      - { ${Object.entries(row).map(([k, v]) => `${k}: ${toYamlValue(v, '')}`).join(', ')} }`)
+        }
+      }
+      lines.push('')
+    }
+  }
+
   lines.push('nodes:')
   for (const n of props.nodes) {
     lines.push(`  - name: ${toYamlValue(n.name, '')}`)
     lines.push(`    type: ${n.type}`)
     try {
       const parsed = JSON.parse(n.config || '{}')
+      // For group nodes, convert node_ids from IDs to names for readability
+      if (n.type === 'group' && parsed.node_ids) {
+        parsed.node_ids = (parsed.node_ids as string[]).map((id: string) => idToName.get(id) || id)
+      }
       if (Object.keys(parsed).length > 0) {
         lines.push(`    config:`)
         for (const [k, v] of Object.entries(parsed)) {

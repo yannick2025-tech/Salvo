@@ -57,6 +57,7 @@ func New(cfg Config) *Server {
 		roles:      sqlite.NewRoleRepo(cfg.DB),
 		perms:      sqlite.NewPermissionRepo(cfg.DB),
 		rp:         sqlite.NewRolePermissionRepo(cfg.DB),
+		dataSources: sqlite.NewDataSourceRepo(cfg.DB),
 		jwt:        cfg.JWT,
 		rbac:       cfg.RBAC,
 		globalVars: cfg.Variables,
@@ -80,7 +81,7 @@ func New(cfg Config) *Server {
 	}
 
 	h.tsStore = runner.NewSQLiteTimeSeriesStore(cfg.DB.DB)
-	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.tracer, h.tsStore, cfg.Logger)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.dataSources, h.tracer, h.tsStore, cfg.Logger)
 
 	s := &Server{
 		db:      cfg.DB,
@@ -198,6 +199,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/scenes/variables/list", s.handleAuth(s.handler.ListVariables))
 	mux.HandleFunc("POST /api/v1/scenes/variables/set", s.handleAuth(s.handler.SetVariable))
+	mux.HandleFunc("POST /api/v1/scenes/variables/batch-set", s.handleAuth(s.handler.BatchSetVariables))
+
+	mux.HandleFunc("POST /api/v1/scenes/datasources/upload", s.handleAuth(s.handler.UploadDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/list", s.handleAuth(s.handler.ListDataSources))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/preview", s.handleAuth(s.handler.PreviewDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/delete", s.handleAuth(s.handler.DeleteDataSource))
 
 	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
 	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
@@ -407,23 +414,24 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 }
 
 type Handler struct {
-	log        logger.Logger
-	scenes     repo.SceneRepo
-	nodes      repo.NodeRepo
-	edges      repo.EdgeRepo
-	variables  repo.VariableRepo
-	plugins    repo.PluginConfigRepo
-	reports    repo.ReportRepo
-	runs       repo.RunRecordRepo
-	users      repo.UserRepo
-	roles      repo.RoleRepo
-	perms      repo.PermissionRepo
-	rp         repo.RolePermissionRepo
-	tracer     *tracelib.Tracer
-	traceStore *tracestore.Store
-	tsStore    runner.TimeSeriesStore
-	runnerMgr  *runner.Manager
-	jwt        *auth.JWTManager
-	rbac       *auth.RBACChecker
-	globalVars map[string]string
+	log         logger.Logger
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	variables   repo.VariableRepo
+	plugins     repo.PluginConfigRepo
+	reports     repo.ReportRepo
+	runs        repo.RunRecordRepo
+	users       repo.UserRepo
+	roles       repo.RoleRepo
+	perms       repo.PermissionRepo
+	rp          repo.RolePermissionRepo
+	dataSources repo.DataSourceRepo
+	tracer      *tracelib.Tracer
+	traceStore  *tracestore.Store
+	tsStore     runner.TimeSeriesStore
+	runnerMgr   *runner.Manager
+	jwt         *auth.JWTManager
+	rbac        *auth.RBACChecker
+	globalVars  map[string]string
 }

@@ -1,9 +1,9 @@
 <template>
   <div :class="['scene-node', data.nodeType, { selected: selected }]">
-    <Handle type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
-    <Handle type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
-    <Handle type="target" id="t-left" :position="Position.Left" class="handle-target handle-left" />
-    <Handle type="target" id="t-right" :position="Position.Right" class="handle-target handle-right" />
+    <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
+    <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
+    <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-left" :position="Position.Left" class="handle-target handle-left" />
+    <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-right" :position="Position.Right" class="handle-target handle-right" />
 
     <div class="node-body">
       <div :class="['node-icon-wrap', data.nodeType]">
@@ -11,7 +11,10 @@
       </div>
       <div class="node-content">
         <span class="node-label">{{ data.label }}</span>
-        <span :class="['type-badge', data.nodeType]">{{ data.typeLabel }}</span>
+        <div class="node-meta-row">
+          <span :class="['type-badge', data.nodeType]">{{ data.typeLabel }}</span>
+          <span v-if="data.loopCount > 1" class="loop-badge">x{{ data.loopCount }}</span>
+        </div>
       </div>
       <div class="node-actions">
         <button class="action-btn edit" @click.stop="$emit('edit', data.originalNode)" title="编辑">✎</button>
@@ -36,6 +39,7 @@ defineProps<{
     nodeType: string
     icon: string
     typeLabel: string
+    loopCount?: number
     originalNode: any
   }
   selected?: boolean
@@ -75,6 +79,8 @@ defineEmits<{
 .scene-node.condition { border-left: 3.5px solid #9b59b6; }
 .scene-node.if-else { border-left: 3.5px solid #e67e22; }
 .scene-node.teardown { border-left: 3.5px solid #e74c3c; }
+.scene-node.group { border-left: 3.5px solid #1abc9c; border-style: dashed; min-width: 300px; }
+.scene-node.timer { border-left: 3.5px solid #e84393; }
 
 .node-body {
   display: flex;
@@ -100,6 +106,8 @@ defineEmits<{
 .node-icon-wrap.condition { background: rgba(155,89,182,0.13); color: #9b59b6; }
 .node-icon-wrap.if-else { background: rgba(230,126,34,0.13); color: #e67e22; }
 .node-icon-wrap.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
+.node-icon-wrap.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
+.node-icon-wrap.timer { background: rgba(232,67,147,0.12); color: #e84393; }
 
 .node-icon { font-size: 15px; line-height: 1; }
 
@@ -121,6 +129,12 @@ defineEmits<{
   letter-spacing: -0.01em;
 }
 
+.node-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .type-badge {
   font-size: 9.5px;
   font-weight: 700;
@@ -135,6 +149,18 @@ defineEmits<{
 .type-badge.condition { background: rgba(155,89,182,0.13); color: #9b59b6; }
 .type-badge.if-else { background: rgba(230,126,34,0.13); color: #e67e22; }
 .type-badge.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
+.type-badge.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
+.type-badge.timer { background: rgba(232,67,147,0.12); color: #e84393; }
+
+.loop-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1.5px 6px;
+  border-radius: 6px;
+  background: rgba(255,152,0,0.15);
+  color: #f57c00;
+  letter-spacing: 0.04em;
+}
 
 .node-actions {
   display: flex;

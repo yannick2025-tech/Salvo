@@ -15,27 +15,29 @@ type Manager struct {
 	mu      sync.Mutex
 	runners map[snowflake.ID]*Runner
 
-	scenes   repo.SceneRepo
-	nodes    repo.NodeRepo
-	edges    repo.EdgeRepo
-	runs     repo.RunRecordRepo
-	reports  repo.ReportRepo
-	tracer   *tracelib.Tracer
-	tsStore  TimeSeriesStore
-	log      logger.Logger
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	runs        repo.RunRecordRepo
+	reports     repo.ReportRepo
+	dataSources repo.DataSourceRepo
+	tracer      *tracelib.Tracer
+	tsStore     TimeSeriesStore
+	log         logger.Logger
 }
 
-func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) *Manager {
+func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) *Manager {
 	return &Manager{
-		runners: make(map[snowflake.ID]*Runner),
-		scenes:   scenes,
-		nodes:    nodes,
-		edges:    edges,
-		runs:     runs,
-		reports:  reports,
-		tracer:   tracer,
-		tsStore:  tsStore,
-		log:      log,
+		runners:     make(map[snowflake.ID]*Runner),
+		scenes:      scenes,
+		nodes:       nodes,
+		edges:       edges,
+		runs:        runs,
+		reports:     reports,
+		dataSources: dataSources,
+		tracer:      tracer,
+		tsStore:     tsStore,
+		log:         log,
 	}
 }
 
@@ -47,7 +49,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 		return nil, fmt.Errorf("scene %d is already running", cfg.SceneID)
 	}
 
-	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.reports, m.tracer, m.tsStore, m.log)
+	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.reports, m.dataSources, m.tracer, m.tsStore, m.log)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,50 @@
       </div>
     </div>
 
+    <div class="variable-panel">
+      <div class="section-header" @click="showVarPanel = !showVarPanel" style="cursor: pointer;">
+        <h3>场景变量 {{ showVarPanel ? '▾' : '▸' }}</h3>
+        <button class="btn-sm" @click.stop="addVariableRow">+ 添加</button>
+      </div>
+      <div v-if="showVarPanel" class="var-list">
+        <div v-if="varEntries.length === 0" class="var-empty">暂无变量，点击「添加」创建</div>
+        <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
+          <input
+            v-model="entry.key"
+            placeholder="变量名"
+            class="var-input var-key"
+            @blur="saveVariables"
+          />
+          <span class="var-eq">=</span>
+          <input
+            v-model="entry.value"
+            placeholder="值（支持 ${other_var} 引用）"
+            class="var-input var-value"
+            @blur="saveVariables"
+          />
+          <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="datasource-panel">
+      <div class="section-header" @click="showDsPanel = !showDsPanel" style="cursor: pointer;">
+        <h3>数据源 (CSV) {{ showDsPanel ? '▾' : '▸' }}</h3>
+        <label class="btn-sm ds-upload-btn">
+          上传 CSV
+          <input type="file" accept=".csv" style="display:none" @change="onDsFileChange" />
+        </label>
+      </div>
+      <div v-if="showDsPanel" class="ds-list">
+        <div v-if="dataSources.length === 0" class="var-empty">暂无数据源</div>
+        <div v-for="ds in dataSources" :key="ds.id" class="ds-row" @click="handleDsPreview(ds)" title="点击预览数据">
+              <span class="ds-name">{{ ds.file_name }}</span>
+              <span class="ds-meta">{{ ds.columns.length }} 列 · {{ ds.row_count }} 行</span>
+              <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除">✕</button>
+        </div>
+      </div>
+    </div>
+
     <div class="workspace-split">
       <div class="dag-section">
         <div class="section-header">
@@ -27,6 +71,8 @@
             <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
             <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
             <button class="btn-sm" @click="addNode('if-else')">+ IF-ELSE</button>
+            <button class="btn-sm" @click="addNode('group')">+ 分组</button>
+            <button class="btn-sm" @click="addNode('timer')">+ 定时器</button>
             <button class="btn-sm" @click="addNode('teardown')">+ 清理</button>
           </div>
         </div>
@@ -167,6 +213,48 @@
         </div>
       </div>
 
+      <div v-else-if="selectedNode.type === 'group'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>子节点</label>
+          <div class="child-node-selector">
+            <div v-for="n in availableGroupChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="groupConfig.node_ids" @change="saveNodeConfig" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <label class="hint-label">子节点将按顺序执行，不可嵌套 Group 节点</label>
+        </div>
+        <div class="form-row inline">
+          <label>循环次数</label>
+          <input v-model.number="groupConfig.loop_count" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+      </div>
+
+      <div v-else-if="selectedNode.type === 'timer'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>模式</label>
+          <select v-model="timerConfig.mode" @change="saveNodeConfig">
+            <option value="delay">延迟执行（单次）</option>
+            <option value="interval">间隔执行（循环）</option>
+          </select>
+        </div>
+        <div class="form-row inline">
+          <label>{{ timerConfig.mode === 'delay' ? '延迟时间(秒)' : '间隔时间(秒)' }}</label>
+          <input v-model.number="timerConfig.seconds" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">定时器节点始终异步执行</label>
+        </div>
+      </div>
+
       <div class="panel-footer">
         <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode">保存配置</button>
       </div>
@@ -237,6 +325,8 @@
             <option value="delay">延迟</option>
             <option value="condition">条件判断</option>
             <option value="if-else">IF-ELSE 分支</option>
+            <option value="group">分组</option>
+            <option value="timer">定时器</option>
             <option value="teardown">Teardown (清理)</option>
           </select>
         </div>
@@ -293,6 +383,11 @@
             <input v-model="nodeForm.conditionExpr" placeholder='${order_id} != ""' />
           </div>
         </template>
+        <div class="form-group">
+          <label>循环次数</label>
+          <input v-model.number="nodeForm.loop_count" type="number" min="1" />
+          <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+        </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeNodeEditor">取消</button>
           <button class="btn-primary" @click="handleSaveNode">{{ editingNode ? '保存' : '添加' }}</button>
@@ -301,6 +396,32 @@
     </div>
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
+
+    <div v-if="showDsPreview" class="modal-overlay" @click.self="showDsPreview = false">
+      <div class="modal-panel ds-preview-modal">
+        <div class="modal-header">
+          <h3>{{ dsPreview?.file_name }}</h3>
+          <span class="ds-preview-meta">{{ dsPreview?.columns.length }} 列 · {{ dsPreview?.rows.length }} 行（预览前5行）</span>
+          <button class="btn-icon modal-close" @click="showDsPreview = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="ds-preview-table-wrap">
+            <table class="ds-preview-table">
+              <thead>
+                <tr>
+                  <th v-for="col in dsPreview?.columns" :key="col">{{ col }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in dsPreview?.rows" :key="ri">
+                  <td v-for="col in dsPreview?.columns" :key="col">{{ row[col] }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
       <div class="confirm-dialog">
@@ -321,9 +442,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene } from '@/api/scene'
+import { getScene, createScene, startScene, batchSetVariables } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
+import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
+import { previewDataSource } from '@/api/datasource'
+import type { DataSourceDTO, DataSourcePreviewDTO } from '@/api/datasource'
 import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
 import DagFlow from './DagFlow.vue'
 
@@ -340,6 +464,110 @@ const showCopyModal = ref(false)
 const showNodeEditor = ref(false)
 const editingNode = ref<NodeDTO | null>(null)
 const copyName = ref('')
+
+const showVarPanel = ref(false)
+const varEntries = ref<{ key: string; value: string }[]>([])
+
+// Data source state
+const dataSources = ref<DataSourceDTO[]>([])
+const showDsPanel = ref(false)
+const dsUploading = ref(false)
+
+// Group node config
+const groupConfig = reactive({ node_ids: [] as string[], loop_count: 1, async: false })
+// Timer node config
+const timerConfig = reactive({ mode: 'delay', seconds: 1 })
+
+function parseVariables(sceneVars: string): { key: string; value: string }[] {
+  try {
+    const obj = JSON.parse(sceneVars)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v) }))
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function addVariableRow() {
+  varEntries.value.push({ key: '', value: '' })
+  showVarPanel.value = true
+}
+
+function removeVariableRow(idx: number) {
+  varEntries.value.splice(idx, 1)
+  saveVariables()
+}
+
+async function saveVariables() {
+  const sceneId = route.params.id as string
+  if (!sceneId) return
+  const vars: Record<string, string> = {}
+  for (const e of varEntries.value) {
+    if (e.key.trim()) {
+      vars[e.key.trim()] = e.value
+    }
+  }
+  try {
+    await batchSetVariables(sceneId, vars)
+  } catch { /* ignore */ }
+}
+
+// Data source methods
+async function fetchDataSources() {
+  const id = route.params.id as string
+  if (!id) return
+  try {
+    const resp = await listDataSources(id)
+    if (resp.code === 0) dataSources.value = resp.data.items || []
+  } catch { /* ignore */ }
+}
+
+async function handleDsUpload(file: File) {
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('文件大小不能超过 10MB', 'error')
+    return
+  }
+  dsUploading.value = true
+  try {
+    const text = await file.text()
+    const sceneId = route.params.id as string
+    await uploadDataSource(sceneId, file.name, text)
+    showToast('上传成功', 'success')
+    fetchDataSources()
+  } catch {
+    showToast('上传失败', 'error')
+  } finally {
+    dsUploading.value = false
+  }
+}
+
+async function handleDsDelete(dsId: string) {
+  try {
+    await deleteDataSource(dsId)
+    showToast('已删除', 'success')
+    fetchDataSources()
+  } catch { showToast('删除失败', 'error') }
+}
+
+function onDsFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files && input.files[0]) handleDsUpload(input.files[0])
+  input.value = ''
+}
+
+// Data source preview
+const showDsPreview = ref(false)
+const dsPreview = ref<DataSourcePreviewDTO | null>(null)
+
+async function handleDsPreview(ds: DataSourceDTO) {
+  try {
+    const resp = await previewDataSource(ds.id)
+    if (resp.code === 0) {
+      dsPreview.value = resp.data
+      showDsPreview.value = true
+    }
+  } catch { showToast('预览失败', 'error') }
+}
 
 const toastMsg = ref('')
 const toastType = ref('info')
@@ -365,6 +593,7 @@ const nodeForm = reactive({
   conditionExpr: '',
   extract: '',
   parentId: '',
+  loop_count: 1,
 })
 
 const editingConfig = reactive({ name: '' })
@@ -395,6 +624,11 @@ const filteredGenerators = computed<GeneratorInfo[]>(() => {
 const availableIfElseTargets = computed(() => {
   if (!selectedNode.value) return []
   return nodes.value.filter(n => n.id !== selectedNode.value?.id)
+})
+
+const availableGroupChildren = computed(() => {
+  if (!selectedNode.value) return []
+  return nodes.value.filter(n => n.id !== selectedNode.value?.id && n.type !== 'group')
 })
 
 async function saveIfElseBranches() {
@@ -650,7 +884,12 @@ async function fetchScene() {
   if (!id) return
   try {
     const resp = await getScene(id)
-    if (resp.code === 0) scene.value = resp.data
+    if (resp.code === 0) {
+      scene.value = resp.data
+      if (resp.data.variables) {
+        varEntries.value = parseVariables(resp.data.variables)
+      }
+    }
   } catch { /* ignore */ }
 }
 
@@ -710,6 +949,15 @@ function editNode(node: NodeDTO) {
     nodeForm.delayMs = cfg.ms || 1000
     nodeForm.conditionExpr = cfg.expr || ''
     nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
+    nodeForm.loop_count = cfg.loop_count || 1
+    if (node.type === 'group') {
+      groupConfig.node_ids = cfg.node_ids || []
+      groupConfig.loop_count = cfg.loop_count || 1
+    }
+    if (node.type === 'timer') {
+      timerConfig.mode = cfg.mode || 'delay'
+      timerConfig.seconds = cfg.seconds || 1
+    }
   } catch {
     nodeForm.httpMethod = 'GET'
     nodeForm.url = ''
@@ -718,6 +966,7 @@ function editNode(node: NodeDTO) {
     nodeForm.delayMs = 1000
     nodeForm.conditionExpr = ''
     nodeForm.extract = ''
+    nodeForm.loop_count = 1
   }
   showNodeEditor.value = true
 }
@@ -769,6 +1018,19 @@ async function handleSaveNode() {
     config = JSON.stringify({ expr: nodeForm.conditionExpr })
   } else if (nodeForm.type === 'if-else') {
     config = JSON.stringify({ expr: nodeForm.conditionExpr })
+  } else if (nodeForm.type === 'group') {
+    config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: nodeForm.loop_count, async: false })
+  } else if (nodeForm.type === 'timer') {
+    config = JSON.stringify({ mode: timerConfig.mode, seconds: timerConfig.seconds })
+  }
+
+  // Add loop_count for all types except group/timer
+  if (config !== '{}' && nodeForm.type !== 'group' && nodeForm.type !== 'timer' && nodeForm.loop_count > 1) {
+    try {
+      const cfg = JSON.parse(config)
+      cfg.loop_count = nodeForm.loop_count
+      config = JSON.stringify(cfg)
+    } catch { /* ignore */ }
   }
 
   if (editingNode.value) {
@@ -878,6 +1140,12 @@ function selectNode(node: NodeDTO | null) {
     delayConfig.ms = cfg.ms || 1000
     conditionConfig.expr = cfg.expr || ''
     ifElseConfig.expr = cfg.expr || ''
+
+    groupConfig.node_ids = cfg.node_ids || []
+    groupConfig.loop_count = cfg.loop_count || 1
+    groupConfig.async = cfg.async || false
+    timerConfig.mode = cfg.mode || 'delay'
+    timerConfig.seconds = cfg.seconds || 1
     
     if (node.type === 'if-else') {
       const nodeEdges = edges.value.filter(e => e.from_node === node.id)
@@ -959,6 +1227,10 @@ async function saveNodeConfig() {
     config = JSON.stringify({ expr: conditionConfig.expr })
   } else if (nodeType === 'if-else') {
     config = JSON.stringify({ expr: ifElseConfig.expr })
+  } else if (nodeType === 'group') {
+    config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: groupConfig.loop_count, async: groupConfig.async })
+  } else if (nodeType === 'timer') {
+    config = JSON.stringify(timerConfig)
   }
 
   try {
@@ -1081,13 +1353,14 @@ onMounted(() => {
   fetchNodes()
   fetchEdges()
   fetchGenerators()
+  fetchDataSources()
 })
 </script>
 
 <style scoped>
-.scene-detail { display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 100px); max-height: calc(100vh - 100px); overflow: hidden; }
+.scene-detail { display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 64px); max-height: calc(100vh - 64px); overflow: hidden; }
 
-.page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding-bottom: 4px; }
 .page-header h2 { font-size: 18px; font-weight: 600; flex: 1; }
 .header-actions { display: flex; gap: 8px; }
 
@@ -1101,8 +1374,50 @@ onMounted(() => {
 .btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
 .btn-close { border: none; background: transparent; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; }
 
-.scene-info { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 16px; flex-shrink: 0; }
-.info-grid { display: flex; gap: 24px; flex-wrap: wrap; }
+.scene-info { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 10px 16px; flex-shrink: 0; }
+
+/* Variable Panel */
+.variable-panel { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 8px 16px; flex-shrink: 0; }
+.variable-panel .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; min-height: 28px; }
+.variable-panel .section-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); user-select: none; margin: 0; }
+.var-list { margin-top: 6px; }
+.var-empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+.var-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.var-input { padding: 4px 8px; border: 1px solid var(--border-secondary); border-radius: 4px; font-size: 13px; background: var(--bg-input); color: var(--text-primary); }
+.var-key { width: 140px; flex-shrink: 0; }
+.var-value { flex: 1; }
+.var-eq { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
+.btn-del-var { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+.btn-del-var:hover { color: var(--danger); }
+
+/* Data Source Panel */
+.datasource-panel { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 8px 16px; flex-shrink: 0; }
+.datasource-panel .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; min-height: 28px; }
+.datasource-panel .section-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); user-select: none; margin: 0; }
+.ds-list { margin-top: 6px; }
+.ds-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-tertiary); cursor: pointer; }
+.ds-row:hover { background: var(--bg-hover); border-radius: 4px; padding-left: 4px; padding-right: 4px; }
+.ds-row:last-child { border-bottom: none; }
+.ds-name { font-size: 13px; font-weight: 500; flex: 1; }
+.ds-meta { font-size: 12px; color: var(--text-muted); }
+.ds-upload-btn { cursor: pointer; }
+
+/* Data Source Preview Modal */
+.ds-preview-modal { max-width: 720px; width: 95%; }
+.ds-preview-meta { margin-left: auto; margin-right: 12px; font-size: 13px; color: var(--text-muted); }
+.ds-preview-table-wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
+.ds-preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ds-preview-table th { text-align: left; padding: 8px 10px; background: var(--bg-tertiary); border-bottom: 2px solid var(--border-primary); font-weight: 600; color: var(--text-secondary); position: sticky; top: 0; }
+.ds-preview-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-tertiary); color: var(--text-primary); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.ds-preview-table tbody tr:hover { background: var(--bg-hover); }
+
+/* Modal styles (shared) */
+
+/* Child Node Selector */
+.child-node-selector { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.child-node-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.child-node-check input[type="checkbox"] { width: auto; margin: 0; }
+.info-grid { display: flex; gap: 16px; flex-wrap: wrap; }
 .info-item { display: flex; align-items: center; gap: 8px; }
 .info-item .label { font-size: 12px; color: var(--text-tertiary); }
 .info-item .value { font-size: 13px; color: var(--text-primary); }
@@ -1113,12 +1428,12 @@ onMounted(() => {
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 
-.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: visible; flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-secondary); flex-shrink: 0; }
+.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.section-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border-secondary); flex-shrink: 0; }
 .section-header h3 { font-size: 14px; font-weight: 600; }
 .dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.dag-canvas { padding: 0; min-height: 480px; flex: 1; position: relative; padding-bottom: 8px; }
+.dag-canvas { padding: 0; min-height: 200px; flex: 1; position: relative; overflow: auto; }
 .dag-empty { text-align: center; padding: 40px 0; color: var(--text-tertiary); }
 .empty-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
 
@@ -1244,7 +1559,7 @@ onMounted(() => {
 .dag-edge:hover .edge-delete { opacity: 1; }
 .edge-delete:hover { color: var(--accent-danger); }
 
-.workspace-split { display: flex; gap: 16px; flex: 1; min-height: 0; overflow: hidden; }
+.workspace-split { display: flex; gap: 12px; flex: 1 1 0; min-height: 0; overflow: hidden; }
 
 .config-sidebar {
   width: 420px; max-width: 45%; min-width: 340px;

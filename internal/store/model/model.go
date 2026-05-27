@@ -64,7 +64,19 @@ const (
 	NodeTypeGroup     = "group"
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
+	NodeTypeTimer     = "timer"
 )
+
+// DataSource represents a CSV data source attached to a scene.
+type DataSource struct {
+	Model
+	SceneID   snowflake.ID `json:"scene_id,string"`
+	Name      string       `json:"name"`
+	FileName  string       `json:"file_name"`
+	Columns   string       `json:"columns"`   // JSON array of column names
+	Rows      string       `json:"rows"`      // JSON array of row objects
+	RowCount  int          `json:"row_count"`
+}
 
 // Edge represents a directed edge between two DAG nodes.
 type Edge struct {

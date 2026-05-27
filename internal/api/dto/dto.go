@@ -208,6 +208,52 @@ type SetVariableRequest struct {
 	Value   string       `json:"value"`
 }
 
+// BatchSetVariablesRequest is the request body for POST /api/v1/scenes/variables/batch-set.
+// It replaces all scene-level variables with the provided key-value map.
+type BatchSetVariablesRequest struct {
+	SceneID   snowflake.ID        `json:"scene_id"`
+	Variables map[string]string   `json:"variables"`
+}
+
+// BatchSetVariablesResponse is the response for the batch-set endpoint.
+type BatchSetVariablesResponse struct {
+	Variables map[string]string `json:"variables"`
+}
+
+// --- DataSource ---
+
+// UploadDataSourceRequest is the request body for POST /api/v1/scenes/datasources/upload.
+type UploadDataSourceRequest struct {
+	SceneID  snowflake.ID `json:"scene_id"`
+	FileName string       `json:"file_name"`
+	Content  string       `json:"content"` // raw CSV content
+}
+
+// DataSourceDTO is the data source detail returned in API responses.
+type DataSourceDTO struct {
+	ID        snowflake.ID `json:"id"`
+	SceneID   snowflake.ID `json:"scene_id"`
+	Name      string       `json:"name"`
+	FileName  string       `json:"file_name"`
+	Columns   []string     `json:"columns"`
+	RowCount  int          `json:"row_count"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// DataSourcePreviewDTO is the data source preview with sample rows.
+type DataSourcePreviewDTO struct {
+	ID        snowflake.ID       `json:"id"`
+	SceneID   snowflake.ID       `json:"scene_id"`
+	Name      string             `json:"name"`
+	FileName  string             `json:"file_name"`
+	Columns   []string           `json:"columns"`
+	RowCount  int                `json:"row_count"`
+	Rows      []map[string]string `json:"rows"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+
 // VariableDTO is the variable detail returned in API responses.
 type VariableDTO struct {
 	ID        snowflake.ID `json:"id"`

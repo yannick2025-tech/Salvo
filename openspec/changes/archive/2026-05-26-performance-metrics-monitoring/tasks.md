@@ -113,12 +113,12 @@
 - [x] 7.2 Document configuration option in code comments or README
 - [x] 7.3 Write backend benchmark test: measure single sample cycle execution time (< 1ms target)
 - [x] 7.4 Write backend memory test: verify collector memory footprint after 1-hour simulation (< 500KB)
-- [ ] 7.5 Manual testing - Dashboard: verify gauge colors change correctly at threshold boundaries
-- [ ] 7.6 Manual testing - Dashboard: toggle smooth/step on one system chart, verify others unaffected
-- [ ] 7.7 Manual testing - Dashboard: verify Task Wait Time chart shows P50/P95/P99 lines correctly
-- [ ] 7.8 Manual testing - Report Detail: open report with system data, verify all sections render correctly
-- [ ] 7.9 Manual testing - Exported HTML: open file in browser, verify charts interactive and theme toggle works
-- [ ] 7.10 Manual testing - Print/PDF: trigger browser print, verify system metrics section readable
-- [ ] 7.11 Manual testing - Cross-platform: verify Linux and macOS system metrics collection (if environments available)
-- [ ] 7.12 **Performance validation: run high-concurrency test, verify Task Wait Time overhead < 0.1% of total test duration**
+- [x] 7.5 Manual testing - Dashboard: verify gauge colors change correctly at threshold boundaries
+- [x] 7.6 Manual testing - Dashboard: toggle smooth/step on one system chart, verify others unaffected
+- [x] 7.7 Manual testing - Dashboard: verify Task Wait Time chart shows P50/P95/P99 lines correctly
+- [x] 7.8 Manual testing - Report Detail: open report with system data, verify all sections render correctly
+- [x] 7.9 Manual testing - Exported HTML: open file in browser, verify charts interactive and theme toggle works
+- [x] 7.10 Manual testing - Print/PDF: trigger browser print, verify system metrics section readable
+- [x] 7.11 Manual testing - Cross-platform: verify Linux and macOS system metrics collection (if environments available)
+- [x] 7.12 **Performance validation: run high-concurrency test, verify Task Wait Time overhead < 0.1% of total test duration**
 

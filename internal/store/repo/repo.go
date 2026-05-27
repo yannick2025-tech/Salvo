@@ -130,3 +130,12 @@ type RolePermissionRepo interface {
 	RevokeAll(ctx context.Context, roleID snowflake.ID) error
 	ListPermissions(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error)
 }
+
+// DataSourceRepo provides persistence operations for DataSource entities.
+type DataSourceRepo interface {
+	Create(ctx context.Context, ds *model.DataSource) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.DataSource, error)
+	GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) (*model.DataSource, error)
+	ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error)
+	Delete(ctx context.Context, id snowflake.ID) error
+}

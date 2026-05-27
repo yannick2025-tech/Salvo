@@ -1,0 +1,275 @@
+name: Mock API 电商全链路压测 V2（新版功能演示）
+description: |
+  基于 Mock Server 的完整电商链路压测场景，演示 Salvo 新版核心能力：
+  - 多变量嵌套引用 (Nested Variables) - 三级引用链 A→B→C
+  - CSV 数据源 (Data Source) - 用户登录凭据驱动测试
+  - 分组节点 (Group Node) - 订单处理子流程 ×3 循环
+  - 定时器节点 (Timer Node) - 延迟等待 + 间隔心跳检测
+  - Setup/Teardown 生命周期管理
+  - IF-ELSE 条件分支
+  - Generator 参数生成器
+
+variables:
+  - key: env
+    value: staging
+  - key: api_host
+    value: ${env}-api.example.com
+  - key: base_url
+    value: http://${api_host}/mock/api
+  - key: token
+    value: ""
+  - key: user_id
+    value: "0"
+  - key: product_id
+    value: "1"
+  - key: order_id
+    value: ""
+  - key: payment_status
+    value: ""
+  - key: timeout_ms
+    value: "5000"
+  - key: retry_count
+    value: "3"
+
+data_sources:
+  - name: user_credentials
+    columns:
+      - username
+      - password
+      - role
+    rows:
+      - username: "admin@example.com"
+        password: "admin123"
+        role: "admin"
+      - username: "user1@example.com"
+        password: "user1pass"
+        role: "user"
+      - username: "user2@example.com"
+        password: "user2pass"
+        role: "user"
+
+setup:
+  - name: 注册测试用户
+    type: setup
+    config:
+      method: POST
+      url: "${base_url}/users"
+      headers:
+        Content-Type: application/json
+      body: '{"name":"perf_user_${user_credentials.username}","email":"${user_credentials.username}","role":"${user_credentials.role}"}'
+      timeout: ${timeout_ms}
+      expect_status: 201
+      extract:
+        user_id: "$.data.id"
+
+  - name: 用户登录获取Token
+    type: setup
+    config:
+      method: POST
+      url: "${base_url}/auth/login"
+      headers:
+        Content-Type: application/json
+      body: '{"email":"${user_credentials.username}","password":"${user_credentials.password}"}'
+      timeout: ${timeout_ms}
+      expect_status: 200
+      extract:
+        token: "$.data.token"
+        user_id: "$.data.user.id"
+
+nodes:
+  - name: 浏览商品列表
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products?page=1"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+      extract:
+        product_id: "$.data[0].id"
+
+  - name: 查看商品详情
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products/${product_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+  - name: 用户思考等待
+    type: timer
+    config:
+      mode: delay
+      delay: 500
+
+  - name: 订单处理子步骤1：校验库存
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/inventory/${product_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+  - name: 订单处理子步骤2：创建订单
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/orders"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"user_id":${user_id},"product_id":${product_id},"total":99.99}'
+      timeout: ${timeout_ms}
+      expect_status: 201
+      extract:
+        order_id: "$.data.id"
+      generator:
+        body_fields:
+          total:
+            type: number
+            minimum: 10
+            maximum: 500
+            multipleOf: 0.01
+
+  - name: 订单处理子步骤3：更新状态
+    type: http
+    config:
+      method: PUT
+      url: "${base_url}/orders/${order_id}/status"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"status":"confirmed"}'
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+  - name: 订单处理流程(Group)
+    type: group
+    config:
+      node_ids:
+        - 订单处理子步骤1：校验库存
+        - 订单处理子步骤2：创建订单
+        - 订单处理子步骤3：更新状态
+      loop_count: 3
+
+  - name: 判断是否支付
+    type: if-else
+    config:
+      expr: "${order_id} != ''"
+
+  - name: 支付订单
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/payment"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"amount":99.99,"order_id":"${order_id}"}'
+      timeout: ${timeout_ms}
+      expect_status: 200
+      extract:
+        payment_status: "$.data.status"
+      generator:
+        body_fields:
+          amount:
+            type: number
+            minimum: 10
+            maximum: 500
+
+  - name: 跳过支付
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/orders/${order_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+  - name: 支付结果轮询
+    type: timer
+    config:
+      mode: interval
+      interval: 1000
+      duration: 5000
+
+  - name: 发送支付通知
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/notify"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"event":"payment_success","order_id":"${order_id}"}'
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+teardown:
+  - name: 查询最终订单状态
+    type: teardown
+    config:
+      method: GET
+      url: "${base_url}/orders/${order_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+  - name: 清理测试数据
+    type: teardown
+    config:
+      method: DELETE
+      url: "${base_url}/users/${user_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: ${timeout_ms}
+      expect_status: 200
+
+edges:
+  - from: 注册测试用户
+    to: 用户登录获取Token
+
+  - from: 用户登录获取Token
+    to: 浏览商品列表
+
+  - from: 浏览商品列表
+    to: 查看商品详情
+
+  - from: 查看商品详情
+    to: 用户思考等待
+
+  - from: 用户思考等待
+    to: 订单处理流程(Group)
+
+  - from: 订单处理流程(Group)
+    to: 判断是否支付
+
+  - from: 判断是否支付
+    to: 支付订单
+    condition: "__if_true__"
+
+  - from: 判断是否支付
+    to: 跳过支付
+    condition: "__if_false__"
+
+  - from: 支付订单
+    to: 支付结果轮询
+
+  - from: 支付结果轮询
+    to: 发送支付通知
+
+  - from: 发送支付通知
+    to: 查询最终订单状态
+
+  - from: 跳过支付
+    to: 查询最终订单状态
+
+  - from: 查询最终订单状态
+    to: 清理测试数据

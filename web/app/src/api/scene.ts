@@ -37,6 +37,10 @@ export function sceneStatus(sceneId: string) {
   return post<SceneStatusDTO>('/scenes/status', { scene_id: sceneId })
 }
 
+export function batchSetVariables(sceneId: string, variables: Record<string, string>) {
+  return post<{ variables: Record<string, string> }>('/scenes/variables/batch-set', { scene_id: sceneId, variables })
+}
+
 export function listRuns(params?: { scene_id?: string; status?: string; offset?: number; limit?: number }) {
   return post<ListResponse<RunRecordDTO>>('/runs/list', params)
 }

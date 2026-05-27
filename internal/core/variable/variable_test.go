@@ -1,6 +1,7 @@
 package variable
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -186,4 +187,60 @@ func TestResolveStringWithParent(t *testing.T) {
 	result, err := ResolveString(sc, "${base}-${suffix}")
 	require.NoError(t, err)
 	assert.Equal(t, "global-scene", result)
+}
+
+func TestResolveStringNestedReference(t *testing.T) {
+	g := NewScope(WithLevel(ScopeGlobal))
+	g.Set("host", "localhost")
+	g.Set("port", "8080")
+	g.Set("base_url", "http://${host}:${port}")
+	g.Set("api_url", "${base_url}/api/v1")
+
+	result, err := ResolveString(g, "${api_url}/users")
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080/api/v1/users", result)
+}
+
+func TestResolveStringNestedAtoBtoC(t *testing.T) {
+	g := NewScope(WithLevel(ScopeGlobal))
+	g.Set("a", "hello")
+	g.Set("b", "${a}-world")
+	g.Set("c", "${b}-end")
+
+	result, err := ResolveString(g, "${c}")
+	require.NoError(t, err)
+	assert.Equal(t, "hello-world-end", result)
+}
+
+func TestResolveStringCircularReference(t *testing.T) {
+	g := NewScope(WithLevel(ScopeGlobal))
+	g.Set("a", "${b}")
+	g.Set("b", "${a}")
+
+	_, err := ResolveString(g, "${a}")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "circular reference")
+}
+
+func TestResolveStringMaxDepthExceeded(t *testing.T) {
+	g := NewScope(WithLevel(ScopeGlobal))
+	// Create a chain longer than maxResolveDepth
+	for i := 0; i < 12; i++ {
+		g.Set(fmt.Sprintf("v%d", i), fmt.Sprintf("${v%d}", i+1))
+	}
+	g.Set("v12", "end")
+
+	_, err := ResolveString(g, "${v0}")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "max depth")
+}
+
+func TestResolveStringExpressionConcatenation(t *testing.T) {
+	g := NewScope(WithLevel(ScopeGlobal))
+	g.Set("base_url", "http://host")
+	g.Set("path", "orders")
+
+	result, err := ResolveString(g, "${base_url}/api/v1/${path}")
+	require.NoError(t, err)
+	assert.Equal(t, "http://host/api/v1/orders", result)
 }

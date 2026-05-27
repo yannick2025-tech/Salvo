@@ -156,10 +156,25 @@ func ResolveAll(scope *Scope) map[string]any {
 // varPattern matches ${variable_name} placeholders.
 var varPattern = regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
 
+// maxResolveDepth limits recursive variable resolution to prevent circular
+// references from causing infinite recursion.
+const maxResolveDepth = 10
+
 // ResolveString replaces all ${var} placeholders in the input string
-// with resolved variable values. Returns an error if any referenced
-// variable is not found.
+// with resolved variable values. If a resolved value itself contains
+// ${var} references, they are resolved recursively up to maxResolveDepth
+// levels. Returns an error if any referenced variable is not found or if
+// the maximum resolution depth is exceeded (circular reference).
 func ResolveString(scope *Scope, input string) (string, error) {
+	return resolveStringDepth(scope, input, 0)
+}
+
+// resolveStringDepth performs recursive variable resolution with depth tracking.
+func resolveStringDepth(scope *Scope, input string, depth int) (string, error) {
+	if depth > maxResolveDepth {
+		return "", fmt.Errorf("variable resolution exceeded max depth %d: possible circular reference", maxResolveDepth)
+	}
+
 	var err error
 	result := varPattern.ReplaceAllStringFunc(input, func(match string) string {
 		if err != nil {
@@ -173,5 +188,14 @@ func ResolveString(scope *Scope, input string) (string, error) {
 		}
 		return fmt.Sprintf("%v", val)
 	})
-	return result, err
+	if err != nil {
+		return "", err
+	}
+
+	// If the result still contains ${var} patterns, resolve recursively.
+	if varPattern.MatchString(result) {
+		return resolveStringDepth(scope, result, depth+1)
+	}
+
+	return result, nil
 }

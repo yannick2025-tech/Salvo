@@ -60,13 +60,20 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 }
 
 type yamlScene struct {
-	Name        string        `yaml:"name"`
-	Description string        `yaml:"description"`
-	Variables   []yamlVarItem `yaml:"variables,omitempty"`
-	Setup       []yamlNode    `yaml:"setup,omitempty"`
-	Nodes       []yamlNode    `yaml:"nodes"`
-	Teardown    []yamlNode    `yaml:"teardown,omitempty"`
-	Edges       []yamlEdge    `yaml:"edges,omitempty"`
+	Name        string          `yaml:"name"`
+	Description string          `yaml:"description"`
+	Variables   []yamlVarItem   `yaml:"variables,omitempty"`
+	DataSources []yamlDataSource `yaml:"data_sources,omitempty"`
+	Setup       []yamlNode      `yaml:"setup,omitempty"`
+	Nodes       []yamlNode      `yaml:"nodes"`
+	Teardown    []yamlNode      `yaml:"teardown,omitempty"`
+	Edges       []yamlEdge      `yaml:"edges,omitempty"`
+}
+
+type yamlDataSource struct {
+	Name    string   `yaml:"name"`
+	Columns []string `yaml:"columns"`
+	Rows    []map[string]string `yaml:"rows"`
 }
 
 type yamlNode struct {
@@ -132,6 +139,25 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
 	}
 
+	// Import data sources: create DataSource records and build name→ID map.
+	dsNameToID := make(map[string]snowflake.ID)
+	for _, yds := range ys.DataSources {
+		if yds.Name == "" {
+			return dto.ErrorResp(400, "data source name is required")
+		}
+		rowsJSON, _ := json.Marshal(yds.Rows)
+		ds := &model.DataSource{
+			SceneID: scene.ID,
+			Name:    yds.Name,
+			Columns: strings.Join(yds.Columns, ","),
+			Rows:    string(rowsJSON),
+		}
+		if err := h.dataSources.Create(r.Context(), ds); err != nil {
+			return dto.ErrorResp(500, fmt.Sprintf("create data source %q: %v", yds.Name, err))
+		}
+		dsNameToID[yds.Name] = ds.ID
+	}
+
 	nodeNameToID := make(map[string]snowflake.ID)
 
 	allNodes := make([]yamlNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
@@ -154,6 +180,41 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
 		}
 		nodeNameToID[yn.Name] = node.ID
+	}
+
+	// Resolve group node_ids from names to IDs.
+	// Group config stores node_ids as string IDs; in YAML they are node names.
+	for _, yn := range allNodes {
+		if yn.Type != model.NodeTypeGroup {
+			continue
+		}
+		nodeID, ok := nodeNameToID[yn.Name]
+		if !ok {
+			continue
+		}
+		nodeNames, _ := yn.Config["node_ids"].([]any)
+		resolvedIDs := make([]string, 0, len(nodeNames))
+		for _, nameVal := range nodeNames {
+			name, ok := nameVal.(string)
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: node_ids must be strings", yn.Name))
+			}
+			childID, ok := nodeNameToID[name]
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: child node %q not found", yn.Name, name))
+			}
+			resolvedIDs = append(resolvedIDs, childID.String())
+		}
+		yn.Config["node_ids"] = resolvedIDs
+		configBytes, _ := json.Marshal(yn.Config)
+		node, err := h.nodes.GetByID(r.Context(), nodeID)
+		if err != nil {
+			return dto.ErrorResp(500, fmt.Sprintf("get group node %q: %v", yn.Name, err))
+		}
+		node.Config = string(configBytes)
+		if err := h.nodes.Update(r.Context(), node); err != nil {
+			return dto.ErrorResp(500, fmt.Sprintf("update group node %q: %v", yn.Name, err))
+		}
 	}
 
 	if len(ys.Edges) > 0 {
@@ -648,6 +709,181 @@ func (h *Handler) SetVariable(r *http.Request) dto.Response {
 	}
 
 	return dto.OK(toVariableDTO(v))
+}
+
+// BatchSetVariables replaces all scene-level variables with the provided map.
+// It serializes the variables map to JSON and updates the scene's Variables field.
+func (h *Handler) BatchSetVariables(r *http.Request) dto.Response {
+	req, err := decode[dto.BatchSetVariablesRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	scene, err := h.scenes.GetByID(r.Context(), req.SceneID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	}
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+	}
+
+	varsJSON, err := json.Marshal(req.Variables)
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("marshal variables: %v", err))
+	}
+	scene.Variables = string(varsJSON)
+
+	if err := h.scenes.Update(r.Context(), scene); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("update scene variables: %v", err))
+	}
+
+	return dto.OK(dto.BatchSetVariablesResponse{Variables: req.Variables})
+}
+
+// --- DataSource Handlers ---
+
+func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.UploadDataSourceRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+	if req.FileName == "" {
+		return dto.ErrorResp(400, "file_name is required")
+	}
+	if req.Content == "" {
+		return dto.ErrorResp(400, "content is required")
+	}
+
+	// Verify scene exists
+	if _, err := h.scenes.GetByID(r.Context(), req.SceneID); err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	} else if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+	}
+
+	// Parse CSV
+	columns, rows, err := runner.ParseCSV(req.FileName, strings.NewReader(req.Content))
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("parse csv: %v", err))
+	}
+
+	// Check for existing data source with same name (upsert)
+	dsModel := runner.ToDataSourceModel(req.SceneID, req.FileName, columns, rows)
+
+	existing, _ := h.dataSources.GetBySceneIDAndName(r.Context(), req.SceneID, dsModel.Name)
+	if existing != nil {
+		// Delete old and create new
+		_ = h.dataSources.Delete(r.Context(), existing.ID)
+	}
+
+	if err := h.dataSources.Create(r.Context(), dsModel); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("create data source: %v", err))
+	}
+
+	return dto.OK(dto.DataSourceDTO{
+		ID:        dsModel.ID,
+		SceneID:   dsModel.SceneID,
+		Name:      dsModel.Name,
+		FileName:  dsModel.FileName,
+		Columns:   columns,
+		RowCount:  dsModel.RowCount,
+		CreatedAt: dsModel.CreatedAt,
+		UpdatedAt: dsModel.UpdatedAt,
+	})
+}
+
+func (h *Handler) ListDataSources(r *http.Request) dto.Response {
+	req, err := decode[dto.SceneIDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	sources, err := h.dataSources.ListBySceneID(r.Context(), req.SceneID)
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("list data sources: %v", err))
+	}
+
+	var items []dto.DataSourceDTO
+	for _, ds := range sources {
+		var columns []string
+		_ = json.Unmarshal([]byte(ds.Columns), &columns)
+		items = append(items, dto.DataSourceDTO{
+			ID:        ds.ID,
+			SceneID:   ds.SceneID,
+			Name:      ds.Name,
+			FileName:  ds.FileName,
+			Columns:   columns,
+			RowCount:  ds.RowCount,
+			CreatedAt: ds.CreatedAt,
+			UpdatedAt: ds.UpdatedAt,
+		})
+	}
+	return dto.OK(items)
+}
+
+func (h *Handler) PreviewDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	ds, err := h.dataSources.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "data source not found")
+	}
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get data source: %v", err))
+	}
+
+	var columns []string
+	_ = json.Unmarshal([]byte(ds.Columns), &columns)
+	var rows []map[string]string
+	_ = json.Unmarshal([]byte(ds.Rows), &rows)
+
+	// Limit preview to first 10 rows
+	previewRows := rows
+	if len(rows) > 10 {
+		previewRows = rows[:10]
+	}
+
+	return dto.OK(dto.DataSourcePreviewDTO{
+		ID:        ds.ID,
+		SceneID:   ds.SceneID,
+		Name:      ds.Name,
+		FileName:  ds.FileName,
+		Columns:   columns,
+		RowCount:  ds.RowCount,
+		Rows:      previewRows,
+		CreatedAt: ds.CreatedAt,
+		UpdatedAt: ds.UpdatedAt,
+	})
+}
+
+func (h *Handler) DeleteDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	if err := h.dataSources.Delete(r.Context(), req.ID); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("delete data source: %v", err))
+	}
+	return dto.OK(nil)
 }
 
 // --- Plugin Handlers ---
