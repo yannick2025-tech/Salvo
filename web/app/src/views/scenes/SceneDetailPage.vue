@@ -218,15 +218,27 @@
           <label>节点名称</label>
           <input v-model="editingConfig.name" @change="saveNodeConfig" />
         </div>
-        <div class="form-row">
-          <label>子节点</label>
-          <div class="child-node-selector">
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
             <div v-for="n in availableGroupChildren" :key="n.id" class="child-node-check">
-              <input type="checkbox" :value="n.id" v-model="groupConfig.node_ids" @change="saveNodeConfig" />
+              <input type="checkbox" :value="n.id" v-model="groupConfig.node_ids" @change="onGroupChildrenChange" />
               <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
             </div>
           </div>
-          <label class="hint-label">子节点将按顺序执行，不可嵌套 Group 节点</label>
+          <div v-if="groupOrderedChildren.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in groupConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < groupConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === groupConfig.node_ids.length - 1" @click="moveChildDown(idx)" title="下移">↓</button>
+                <button class="order-btn remove-btn" @click="removeChild(childId)" title="移除">✕</button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选子节点后可调整执行顺序，顺序决定内部 DAG 连线方向</label>
         </div>
         <div class="form-row inline">
           <label>循环次数</label>
@@ -630,6 +642,39 @@ const availableGroupChildren = computed(() => {
   if (!selectedNode.value) return []
   return nodes.value.filter(n => n.id !== selectedNode.value?.id && n.type !== 'group')
 })
+
+const groupOrderedChildren = computed(() => {
+  const nodeMap = new Map(nodes.value.map(n => [n.id, n]))
+  return groupConfig.node_ids.map(id => nodeMap.get(id)).filter(Boolean)
+})
+
+function getNodeName(nodeId: string): string {
+  const node = nodes.value.find(n => n.id === nodeId)
+  return node ? `${node.name} (${nodeTypeLabel(node.type)})` : nodeId
+}
+
+function onGroupChildrenChange() { saveNodeConfig() }
+
+function moveChildUp(idx: number) {
+  if (idx <= 0) return
+  const arr = [...groupConfig.node_ids]
+  ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
+  groupConfig.node_ids = arr
+  saveNodeConfig()
+}
+
+function moveChildDown(idx: number) {
+  if (idx >= groupConfig.node_ids.length - 1) return
+  const arr = [...groupConfig.node_ids]
+  ;[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
+  groupConfig.node_ids = arr
+  saveNodeConfig()
+}
+
+function removeChild(childId: string) {
+  groupConfig.node_ids = groupConfig.node_ids.filter(id => id !== childId)
+  saveNodeConfig()
+}
 
 async function saveIfElseBranches() {
   if (!selectedNode.value) return
@@ -1414,9 +1459,25 @@ onMounted(() => {
 /* Modal styles (shared) */
 
 /* Child Node Selector */
+.group-child-config { display: flex; flex-direction: column; gap: 6px; }
+.group-available-nodes { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 120px; overflow-y: auto; padding: 2px 0; }
 .child-node-selector { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .child-node-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .child-node-check input[type="checkbox"] { width: auto; margin: 0; }
+
+/* Group Ordered Children List */
+.group-ordered-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; border: 1px solid var(--border-secondary); border-radius: 8px; padding: 6px 8px; background: var(--bg-secondary); }
+.ordered-child-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; background: var(--bg-card); transition: background 0.15s; }
+.ordered-child-row:hover { background: var(--bg-hover); }
+.order-index { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent-primary); border-radius: 50%; flex-shrink: 0; }
+.order-arrow { color: var(--accent-primary); font-size: 14px; font-weight: bold; flex-shrink: 0; margin-left: -2px; }
+.order-name { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.ordered-child-row:hover .order-actions { opacity: 1; }
+.order-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-secondary); border-radius: 4px; background: var(--bg-card); cursor: pointer; font-size: 12px; color: var(--text-secondary); transition: all 0.15s; padding: 0; line-height: 1; }
+.order-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(88,166,255,0.06); }
+.order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.order-btn.remove-btn:hover { border-color: #e74c3c; color: #e74c3c; background: rgba(231,76,60,0.06); }
 .info-grid { display: flex; gap: 16px; flex-wrap: wrap; }
 .info-item { display: flex; align-items: center; gap: 8px; }
 .info-item .label { font-size: 12px; color: var(--text-tertiary); }

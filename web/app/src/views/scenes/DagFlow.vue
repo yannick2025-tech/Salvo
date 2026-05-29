@@ -165,22 +165,35 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
   vfNodes.value = newNodes.map(n => {
     const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
     let loopCount = 1
+    let childNodes: NodeDTO[] = []
     try {
       const cfg = JSON.parse(n.config || '{}')
       loopCount = cfg.loop_count || 1
+      if (n.type === 'group' && cfg.node_ids && Array.isArray(cfg.node_ids)) {
+        const childIdSet = new Set(cfg.node_ids as string[])
+        const childMap = new Map(newNodes.filter(cn => childIdSet.has(cn.id)).map(cn => [cn.id, cn]))
+        childNodes = (cfg.node_ids as string[]).map(id => childMap.get(id)).filter(Boolean) as NodeDTO[]
+      }
     } catch { /* ignore */ }
+
+    const baseData: Record<string, unknown> = {
+      label: n.name,
+      nodeType: n.type,
+      icon: getNodeIcon(n.type),
+      typeLabel: getNodeTypeLabel(n.type),
+      loopCount,
+      originalNode: n,
+    }
+
+    if (n.type === 'group') {
+      baseData.childNodes = childNodes
+    }
+
     return {
       id: n.id,
       type: 'scene-node',
       position: pos,
-      data: {
-        label: n.name,
-        nodeType: n.type,
-        icon: getNodeIcon(n.type),
-        typeLabel: getNodeTypeLabel(n.type),
-        loopCount,
-        originalNode: n,
-      },
+      data: baseData,
     } as Node
   })
 
@@ -248,7 +261,7 @@ function toYamlValue(val: any, indent: string): string {
   }
   if (Array.isArray(val)) {
     if (val.length === 0) return '[]'
-    const items = val.map((item, i) => {
+    const items = val.map((item) => {
       const v = toYamlValue(item, indent + '  ')
       return `${indent}  - ${v}`
     })
