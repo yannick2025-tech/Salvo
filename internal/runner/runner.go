@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -216,12 +217,12 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		cfg:           cfg,
 		stats:         &Stats{},
 		httpOnlyStats: &Stats{},
-		scenes:      scenes,
-		nodes:       nodes,
-		edges:       edges,
-		runs:        runs,
-		reports:     reports,
-		dataSources: dataSources,
+		scenes:        scenes,
+		nodes:         nodes,
+		edges:         edges,
+		runs:          runs,
+		reports:       reports,
+		dataSources:   dataSources,
 		tracer:        tracer,
 		nodeGen:       n,
 		runID:         n.Generate(),
@@ -346,6 +347,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	})
 
 	if err := lc.Run(r.ctx, lifecycle.HookSceneSetup); err != nil {
+		runLog.Error("scene setup lifecycle hook failed", logger.F("error", err))
 		r.status.Store(StatusFailed)
 		return fmt.Errorf("runner: scene setup: %w", err)
 	}
@@ -361,6 +363,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		StartedAt:   &r.startedAt,
 	}
 	if err := r.runs.Create(r.ctx, runRecord); err != nil {
+		runLog.Error("failed to create run record", logger.F("error", err))
 		r.status.Store(StatusFailed)
 		return fmt.Errorf("runner: create run record: %w", err)
 	}
@@ -398,6 +401,11 @@ func (r *Runner) Run(ctx context.Context) error {
 		} else if totalReqs > 0 {
 			rate := float64(successReqs) / float64(totalReqs)
 			if rate < 0.95 {
+				runLog.Warn("success rate below 95%% threshold",
+					logger.F("rate", fmt.Sprintf("%.1f%%", rate*100)),
+					logger.F("total", totalReqs),
+					logger.F("success", successReqs),
+					logger.F("failed", totalReqs-successReqs))
 				runRecord.Status = model.RunStatusFailed
 				if err != nil {
 					runRecord.ErrorMsg = err.Error()
@@ -681,10 +689,10 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 			Throughput:    calculateThroughput(runRecord),
 			PeakQPS:       collectorData.GlobalPeakQPS,
 		},
-		GlobalTimeSeries:           globalTimeSeries,
-		HttpOnlyGlobalTimeSeries:   collectorData.HttpOnlyGlobalSamples,
-		NodeMetrics:                []NodeMetricDetail{},
-		ErrorSummary:     collectorData.ErrorItems,
+		GlobalTimeSeries:         globalTimeSeries,
+		HttpOnlyGlobalTimeSeries: collectorData.HttpOnlyGlobalSamples,
+		NodeMetrics:              []NodeMetricDetail{},
+		ErrorSummary:             collectorData.ErrorItems,
 	}
 
 	nodeNameMap := make(map[string]string)
@@ -863,6 +871,10 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 				key := dsName + "." + col
 				resolvedVars[key] = val
 			}
+			execLog.Debug("data source row injected",
+				logger.F("chain_id", chainID.String()),
+				logger.F("data_source", dsName),
+				logger.F("row", fmt.Sprintf("%v", row)))
 		}
 
 		execLog.Info("resolved scene variables",
@@ -877,6 +889,10 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 		_, err := exec.ExecuteWithTrace(taskCtx, resolvedVars)
 		if err != nil {
+			r.log.Error("DAG execution failed",
+				logger.F("error", err),
+				logger.F("chain_id", chainID.String()),
+			)
 			r.stats.RecordLatency(0, false)
 			return err
 		}
@@ -909,9 +925,14 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	dagObj := dag.New()
+	buildLog := r.log.With(
+		logger.F("trace_id", r.runID.String()),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+	)
 
 	nodeList, err := r.nodes.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000})
 	if err != nil {
+		buildLog.Error("failed to list nodes for DAG", logger.F("error", err))
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 
@@ -924,15 +945,24 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 
 		dagNode, buildErr := r.buildDAGNode(n, r.nodeStats[nodeIDStr])
 		if buildErr != nil {
+			buildLog.Error("failed to build DAG node",
+				logger.F("node_id", nodeIDStr),
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
+				logger.F("error", buildErr))
 			return nil, buildErr
 		}
 		if addErr := dagObj.AddNode(dagNode); addErr != nil {
+			buildLog.Error("failed to add node to DAG",
+				logger.F("node_id", nodeIDStr),
+				logger.F("error", addErr))
 			return nil, fmt.Errorf("add node %s: %w", nodeIDStr, addErr)
 		}
 	}
 
 	edgeList, err := r.edges.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000})
 	if err != nil {
+		buildLog.Error("failed to list edges for DAG", logger.F("error", err))
 		return nil, fmt.Errorf("list edges: %w", err)
 	}
 
@@ -944,6 +974,11 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 			edgeType = dag.EdgeCondition
 		}
 		if addErr := dagObj.AddEdge(fromStr, toStr, edgeType, e.Condition); addErr != nil {
+			buildLog.Error("failed to add edge to DAG",
+				logger.F("from", fromStr),
+				logger.F("to", toStr),
+				logger.F("condition", e.Condition),
+				logger.F("error", addErr))
 			return nil, fmt.Errorf("add edge %s->%s: %w", fromStr, toStr, addErr)
 		}
 	}
@@ -958,6 +993,10 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 			NodeIDs []string `json:"node_ids"`
 		}
 		if err := json.Unmarshal([]byte(n.Config), &cfg); err != nil {
+			buildLog.Error("failed to parse group node config",
+				logger.F("node_id", n.ID.String()),
+				logger.F("node_name", n.Name),
+				logger.F("error", err))
 			return nil, fmt.Errorf("parse group node %s config: %w", n.ID, err)
 		}
 		groupNode, ok := dagObj.Node(n.ID.String())
@@ -971,10 +1010,17 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		for _, childID := range cfg.NodeIDs {
 			child, found := dagObj.Node(childID)
 			if !found {
+				buildLog.Error("group node references non-existent child",
+					logger.F("group_node_id", n.ID.String()),
+					logger.F("group_name", n.Name),
+					logger.F("child_id", childID))
 				return nil, fmt.Errorf("group node %s references non-existent child %s", n.ID, childID)
 			}
 			// Validate: Group cannot contain another Group
 			if childSN, ok := child.(*sceneNode); ok && childSN.nodeType == model.NodeTypeGroup {
+				buildLog.Error("group node cannot contain another group",
+					logger.F("group_node_id", n.ID.String()),
+					logger.F("nested_group_id", childID))
 				return nil, fmt.Errorf("group node %s cannot contain another group node %s", n.ID, childID)
 			}
 			sn.childNodes = append(sn.childNodes, child)
@@ -1042,9 +1088,13 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		URL     string            `json:"url"`
 		Headers map[string]string `json:"headers"`
 		Body    string            `json:"body"`
-		Timeout float64           `json:"timeout"`
+		Timeout any               `json:"timeout"` // float64 or string (variable ref like ${timeout_ms})
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse http config",
+			logger.F("error", err),
+			logger.F("config_preview", truncateString(n.config, 200)),
+		)
 		return nil, fmt.Errorf("parse http config: %w", err)
 	}
 
@@ -1076,8 +1126,45 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	timeout := n.timeout
-	if cfg.Timeout > 0 {
-		timeout = time.Duration(cfg.Timeout * float64(time.Second))
+	// Resolve timeout: support both numeric value and variable reference string
+	if cfg.Timeout != nil {
+		switch v := cfg.Timeout.(type) {
+		case float64:
+			if v > 0 {
+				timeout = time.Duration(v * float64(time.Second))
+			}
+		case string:
+			// Resolve variable reference, e.g. ${timeout_ms} → "5000"
+			resolved := v
+			if input != nil && input.Variables != nil {
+				resolved = resolveWithVariables(resolved, input.Variables)
+			}
+			if sec, err := strconv.ParseFloat(resolved, 64); err == nil && sec > 0 {
+				timeout = time.Duration(sec * float64(time.Second))
+			} else if ms, err := strconv.ParseFloat(resolved, 64); err == nil && ms > 0 {
+				// If value looks like milliseconds (e.g. "5000"), treat as seconds
+				timeout = time.Duration(ms * float64(time.Millisecond))
+			} else {
+				nodeLog.Warn("failed to parse timeout value",
+					logger.F("raw", v),
+					logger.F("resolved", resolved),
+					logger.F("err", err),
+				)
+			}
+		case int:
+			if v > 0 {
+				timeout = time.Duration(float64(v) * float64(time.Second))
+			}
+		case int64:
+			if v > 0 {
+				timeout = time.Duration(float64(v) * float64(time.Second))
+			}
+		default:
+			nodeLog.Warn("unsupported timeout type",
+				logger.F("type", fmt.Sprintf("%T", cfg.Timeout)),
+				logger.F("value", cfg.Timeout),
+			)
+		}
 	}
 
 	req := &httpprotocol.HTTPRequest{
@@ -1129,6 +1216,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 				logger.F("latency_ms", httpResp.Latency.Milliseconds()),
 				logger.F("success", httpResp.IsSuccess()),
 			)
+			if !httpResp.IsSuccess() && len(httpResp.Body) > 0 {
+				nodeLog.Debug("HTTP response body (non-2xx)",
+					logger.F("status", httpResp.StatusCode),
+					logger.F("body_preview", truncateString(string(httpResp.Body), 500)))
+			}
 		}
 	}
 
@@ -1261,9 +1353,18 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 
 	var lastOutput *dag.Output
 	for i := 0; i < loopCount; i++ {
+		if loopCount > 1 {
+			nodeLog.Debug("group iteration started",
+				logger.F("iteration", i+1),
+				logger.F("total", loopCount))
+		}
 		for _, child := range n.childNodes {
 			select {
 			case <-ctx.Done():
+				nodeLog.Error("group execution cancelled by context",
+					logger.F("error", ctx.Err()),
+					logger.F("loop", i),
+					logger.F("child_id", child.ID()))
 				return nil, fmt.Errorf("group execution cancelled: %w", ctx.Err())
 			default:
 			}
@@ -1311,6 +1412,9 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 	}
 
 	if cfg.Seconds <= 0 {
+		nodeLog.Warn("timer seconds must be > 0, got invalid value",
+			logger.F("seconds", cfg.Seconds),
+			logger.F("mode", cfg.Mode))
 		return nil, fmt.Errorf("timer seconds must be > 0, got %f", cfg.Seconds)
 	}
 
@@ -1348,6 +1452,9 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 			}
 		}
 	default:
+		nodeLog.Warn("invalid timer mode",
+			logger.F("mode", cfg.Mode),
+			logger.F("valid_modes", []string{"delay", "interval"}))
 		return nil, fmt.Errorf("invalid timer mode %q, must be \"delay\" or \"interval\"", cfg.Mode)
 	}
 
@@ -1431,16 +1538,27 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 }
 
 func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
+	scopeLog := r.log.With(
+		logger.F("trace_id", r.runID.String()),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+	)
+
 	globalScope := variable.NewScope(variable.WithLevel(variable.ScopeGlobal))
 
 	if scene.Variables != "" {
 		var vars map[string]string
 		if err := json.Unmarshal([]byte(scene.Variables), &vars); err != nil {
+			scopeLog.Error("failed to parse scene variables JSON",
+				logger.F("error", err),
+				logger.F("variables_preview", truncateString(scene.Variables, 200)))
 			return nil, fmt.Errorf("parse scene variables: %w", err)
 		}
 		for k, v := range vars {
 			globalScope.Set(k, v)
 		}
+		scopeLog.Debug("scene variables loaded",
+			logger.F("variable_count", len(vars)),
+			logger.F("variables", fmt.Sprintf("%v", vars)))
 	}
 
 	for k, v := range r.cfg.Variables {
@@ -1448,9 +1566,8 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 	}
 
 	// Resolve nested variable references in all variable values.
-	// This ensures that variables like base_url = "http://${host}:${port}"
-	// are fully expanded before the scope is used.
 	if err := resolveNestedVariables(globalScope); err != nil {
+		scopeLog.Error("failed to resolve nested variable references", logger.F("error", err))
 		return nil, fmt.Errorf("resolve nested variables: %w", err)
 	}
 
@@ -1692,4 +1809,13 @@ func (r *Runner) NodeSnapshots() map[string]*Sample {
 	)
 
 	return result
+}
+
+// truncateString returns a truncated version of s, limited to maxLen characters.
+// If s exceeds maxLen, it appends "..." to indicate truncation.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

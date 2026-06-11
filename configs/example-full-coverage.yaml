@@ -47,6 +47,31 @@ data_sources:
         password: "bob123"
         role: "user"
         credit_limit: "1000"
+      - username: "charlie@example.com"
+        password: "charlie123"
+        role: "user"
+        credit_limit: "3000"
+
+  # 商品数据源 — 演示 CSV 多列参数化（上传 products.csv 后自动关联）
+  - name: products
+    columns:
+      - product_id
+      - product_name
+      - category
+      - unit_price
+    rows:
+      - product_id: "1"
+        product_name: "Widget A"
+        category: "electronics"
+        unit_price: "29.99"
+      - product_id: "2"
+        product_name: "Widget B"
+        category: "electronics"
+        unit_price: "49.99"
+      - product_id: "3"
+        product_name: "Gadget C"
+        category: "gadgets"
+        unit_price: "99.99"
 
 setup:
   - name: S1-注册用户
@@ -190,7 +215,47 @@ nodes:
       timeout: 5.0
     loop_count: 3
 
-  - name: D11-健康检查
+  # ---- CSV 多列参数化演示：使用 products 数据源 ----
+  - name: D11-商品搜索(CSV参数化)
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products/search?q=${products.product_name}&category=${products.category}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+    loop_count: 3
+
+  - name: G2-商品推荐(Async Group)
+    type: group
+    config:
+      node_ids:
+        - D12-异步商品详情查询
+        - D13-异步价格计算
+      loop_count: 2
+      async: true
+
+  - name: D12-异步商品详情查询
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products/${products.product_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: D13-异步价格计算
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/products/${products.product_id}/price"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"unit_price":${products.unit_price},"quantity":2}'
+      timeout: 5.0
+
+  - name: D14-健康检查
     type: http
     config:
       method: GET
@@ -255,13 +320,23 @@ edges:
   - from: D9-发送支付通知
     to: D10-查询用户列表
 
-  - from: D8-查询订单跳过支付
-    to: D10-查询用户列表
+  - from: D9-发送支付通知
+    to: D11-商品搜索(CSV参数化)
+
+  # CSV 参数化链路
+  - from: D11-商品搜索(CSV参数化)
+    to: G2-商品推荐(Async Group)
 
   - from: D10-查询用户列表
-    to: D11-健康检查
+    to: D14-健康检查
 
-  - from: D11-健康检查
+  - from: G2-商品推荐(Async Group)
+    to: D14-健康检查
+
+  - from: D8-查询订单跳过支付
+    to: D14-健康检查
+
+  - from: D14-健康检查
     to: T2-查询最终订单
 
   - from: T2-查询最终订单

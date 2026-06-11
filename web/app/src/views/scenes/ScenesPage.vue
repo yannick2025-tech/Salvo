@@ -337,9 +337,10 @@ const exampleYAMLV2 = `name: Mock API 电商全链路压测 V2（新版功能演
 description: |
   基于 Mock Server 的完整电商链路压测场景，演示 Salvo 新版核心能力：
   - 多变量嵌套引用 (Nested Variables) - 三级引用链 A→B→C
-  - CSV 数据源 (Data Source) - 用户登录凭据驱动测试
-  - 分组节点 (Group Node) - 订单处理子流程 ×3 循环
+  - CSV 数据源 (Data Source) - 用户凭据 + 商品数据双数据源参数化
+  - 分组节点 (Group Node) - 订单处理子流程 ×3 循环 + 异步推荐 Group
   - 定时器节点 (Timer Node) - 延迟等待 + 间隔心跳检测
+  - 节点级 LoopCount - HTTP 节点独立循环执行
   - Setup/Teardown 生命周期管理
   - IF-ELSE 条件分支
   - Generator 参数生成器
@@ -372,16 +373,45 @@ data_sources:
       - username
       - password
       - role
+      - credit_limit
     rows:
       - username: "admin@example.com"
         password: "admin123"
         role: "admin"
-      - username: "user1@example.com"
-        password: "user1pass"
+        credit_limit: "5000"
+      - username: "alice@example.com"
+        password: "alice123"
         role: "user"
-      - username: "user2@example.com"
-        password: "user2pass"
+        credit_limit: "2000"
+      - username: "bob@example.com"
+        password: "bob123"
         role: "user"
+        credit_limit: "1000"
+      - username: "charlie@example.com"
+        password: "charlie123"
+        role: "user"
+        credit_limit: "3000"
+
+  # 商品数据源 — 演示 CSV 多列参数化（上传 products.csv 后自动关联）
+  - name: products
+    columns:
+      - product_id
+      - product_name
+      - category
+      - unit_price
+    rows:
+      - product_id: "1"
+        product_name: "Widget A"
+        category: "electronics"
+        unit_price: "29.99"
+      - product_id: "2"
+        product_name: "Widget B"
+        category: "electronics"
+        unit_price: "49.99"
+      - product_id: "3"
+        product_name: "Gadget C"
+        category: "gadgets"
+        unit_price: "99.99"
 
 setup:
   - name: 注册测试用户
@@ -546,6 +576,50 @@ nodes:
       timeout: \${timeout_ms}
       expect_status: 200
 
+  # ---- CSV 多列参数化演示：使用 products 数据源 ----
+  - name: 商品搜索(CSV参数化)
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/search?q=\${products.product_name}&category=\${products.category}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+    # 节点级 LoopCount：每个迭代使用 CSV 下一行
+    loop_count: 3
+
+  - name: 商品推荐(Async Group)
+    type: group
+    config:
+      node_ids:
+        - 异步商品详情查询
+        - 异步价格计算
+      loop_count: 2
+      async: true
+
+  - name: 异步商品详情查询
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/\${products.product_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 异步价格计算
+    type: http
+    config:
+      method: POST
+      url: "\${base_url}/products/\${products.product_id}/price"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"unit_price":\${products.unit_price},"quantity":2}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+
 teardown:
   - name: 查询最终订单状态
     type: teardown
@@ -601,6 +675,13 @@ edges:
     to: 发送支付通知
 
   - from: 发送支付通知
+    to: 商品搜索(CSV参数化)
+
+  # CSV 参数化链路：商品搜索 → 异步推荐
+  - from: 商品搜索(CSV参数化)
+    to: 商品推荐(Async Group)
+
+  - from: 商品推荐(Async Group)
     to: 查询最终订单状态
 
   - from: 跳过支付
