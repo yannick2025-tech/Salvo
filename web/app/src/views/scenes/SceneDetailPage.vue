@@ -60,7 +60,7 @@
         <div class="node-config-panel">
           <div class="panel-header">
             <h4>{{ selectedNode.name }} - 配置</h4>
-            <button class="btn-close" @click="selectedNode = null">✕</button>
+            <button class="btn-close" @click="selectedNode = null"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
 
       <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
@@ -192,7 +192,7 @@
               <div class="order-actions">
                 <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(idx)" title="上移">↑</button>
                 <button class="order-btn" :disabled="idx === groupConfig.node_ids.length - 1" @click="moveChildDown(idx)" title="下移">↓</button>
-                <button class="order-btn remove-btn" @click="removeChild(childId)" title="移除">✕</button>
+                <button class="order-btn remove-btn" @click="removeChild(childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
             </div>
           </div>
@@ -237,7 +237,7 @@
       <div class="drawer-panel">
         <div class="drawer-header">
           <h3>场景设置</h3>
-          <button class="btn-icon btn-close" @click="showSettings = false">✕</button>
+          <button class="btn-icon btn-close" @click="showSettings = false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
 
         <!-- 场景信息 -->
@@ -267,7 +267,7 @@
             <input v-model="entry.key" placeholder="变量名" class="var-input var-key" @blur="saveVariables" />
             <span class="var-eq">=</span>
             <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input var-value" @blur="saveVariables" />
-            <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">✕</button>
+            <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           <button class="btn-sm drawer-add-btn" @click="addVariableRow">+ 添加变量</button>
           </div>
@@ -288,7 +288,7 @@
           <div v-for="ds in dataSources" :key="ds.id" class="ds-row" @click="handleDsPreview(ds)" title="点击编辑数据">
             <span class="ds-name">{{ ds.file_name }}</span>
             <span class="ds-meta">{{ ds.columns?.length ?? 0 }} 列 · {{ ds.row_count ?? 0 }} 行</span>
-            <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除">✕</button>
+            <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           </div>
         </div>
@@ -436,7 +436,7 @@
         <!-- 精简标题栏 -->
         <div class="csv-editor-header">
           <h3>{{ dsPreview?.file_name }}</h3>
-          <button class="btn-icon modal-close" @click="showDsPreview = false">✕</button>
+          <button class="btn-icon modal-close" @click="showDsPreview = false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
 
         <!-- 表格区域（含底部浮动工具栏） -->
@@ -452,7 +452,7 @@
                     :value="col"
                     @change="dsRenameColumn(ci, ($event.target as HTMLInputElement).value)"
                   />
-                  <button class="btn-icon col-del-btn" @click="dsDeleteColumn(ci)" title="删除列">✕</button>
+                  <button class="btn-icon col-del-btn" @click="dsDeleteColumn(ci)" title="删除列"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </th>
                 <th class="col-action"></th>
               </tr>
@@ -468,7 +468,7 @@
                   />
                 </td>
                 <td class="col-action">
-                  <button class="btn-icon row-del-btn" @click="dsDeleteRow((dsPage - 1) * dsPageSize + ri)" title="删除行">✕</button>
+                  <button class="btn-icon row-del-btn" @click="dsDeleteRow((dsPage - 1) * dsPageSize + ri)" title="删除行"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </td>
               </tr>
             </tbody>
