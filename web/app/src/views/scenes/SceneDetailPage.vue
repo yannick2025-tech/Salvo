@@ -1,67 +1,24 @@
 <template>
-  <div class="scene-detail">
-    <div class="page-header">
-      <button class="btn-back" @click="$router.push('/scenes')">← 返回</button>
-      <h2 v-if="scene">{{ scene.name }}</h2>
-      <div class="header-actions">
-        <button class="btn-outline" @click="showCopyModal = true">复制场景</button>
-        <button class="btn-login-primary" @click="showRunConfig = true">▶ 启动测试</button>
+  <div class="scene-detail" :class="{ 'settings-open': showSettings }">
+    <!-- ===== 紧凑工具栏 ===== -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn-back" @click="$router.push('/scenes')">← 返回</button>
+        <h2 v-if="scene">{{ scene.name }}</h2>
+        <span v-if="scene" :class="['status-badge', scene.status]">{{ scene.status }}</span>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-sm toolbar-btn" @click="showSettings = !showSettings" :class="{ active: showSettings }" title="场景设置（变量 / 数据源）">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          设置
+        </button>
+        <button class="btn-outline btn-sm" @click="showCopyModal = true">复制</button>
+        <button class="btn-login-primary btn-sm" @click="showRunConfig = true">▶ 启动测试</button>
       </div>
     </div>
 
-    <div v-if="scene" class="scene-info">
-      <div class="info-grid">
-        <div class="info-item"><span class="label">状态</span><span :class="['status-badge', scene.status]">{{ scene.status }}</span></div>
-        <div class="info-item"><span class="label">描述</span><span class="value">{{ scene.description || '-' }}</span></div>
-        <div class="info-item"><span class="label">创建时间</span><span class="value">{{ formatTime(scene.created_at) }}</span></div>
-      </div>
-    </div>
-
-    <div class="variable-panel">
-      <div class="section-header" @click="showVarPanel = !showVarPanel" style="cursor: pointer;">
-        <h3>场景变量 {{ showVarPanel ? '▾' : '▸' }}</h3>
-        <button class="btn-sm" @click.stop="addVariableRow">+ 添加</button>
-      </div>
-      <div v-if="showVarPanel" class="var-list">
-        <div v-if="varEntries.length === 0" class="var-empty">暂无变量，点击「添加」创建</div>
-        <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
-          <input
-            v-model="entry.key"
-            placeholder="变量名"
-            class="var-input var-key"
-            @blur="saveVariables"
-          />
-          <span class="var-eq">=</span>
-          <input
-            v-model="entry.value"
-            placeholder="值（支持 ${other_var} 引用）"
-            class="var-input var-value"
-            @blur="saveVariables"
-          />
-          <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">✕</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="datasource-panel">
-      <div class="section-header" @click="showDsPanel = !showDsPanel" style="cursor: pointer;">
-        <h3>数据源 (CSV) {{ showDsPanel ? '▾' : '▸' }}</h3>
-        <label class="btn-sm ds-upload-btn">
-          上传 CSV
-          <input type="file" accept=".csv" style="display:none" @change="onDsFileChange" />
-        </label>
-      </div>
-      <div v-if="showDsPanel" class="ds-list">
-        <div v-if="dataSources.length === 0" class="var-empty">暂无数据源</div>
-        <div v-for="ds in dataSources" :key="ds.id" class="ds-row" @click="handleDsPreview(ds)" title="点击预览数据">
-              <span class="ds-name">{{ ds.file_name }}</span>
-              <span class="ds-meta">{{ ds.columns.length }} 列 · {{ ds.row_count }} 行</span>
-              <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除">✕</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="workspace-split">
+    <!-- ===== 主工作区：DAG 画布 ===== -->
+    <div class="main-workspace">
       <div class="dag-section">
         <div class="section-header">
           <h3>DAG 请求流</h3>
@@ -95,15 +52,16 @@
             @node-select="selectNode"
             @node-position-update="saveNodePosition"
           />
-      </div>
-    </div>
-
-    <div v-if="selectedNode" class="config-sidebar">
-      <div class="node-config-panel">
-        <div class="panel-header">
-          <h4>{{ selectedNode.name }} - 配置</h4>
-          <button class="btn-close" @click="selectedNode = null">✕</button>
         </div>
+      </div>
+
+      <!-- 节点配置侧边栏 -->
+      <div v-if="selectedNode" class="config-sidebar">
+        <div class="node-config-panel">
+          <div class="panel-header">
+            <h4>{{ selectedNode.name }} - 配置</h4>
+            <button class="btn-close" @click="selectedNode = null">✕</button>
+          </div>
 
       <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
         <div class="form-row">
@@ -274,6 +232,69 @@
     </div>
     </div>
 
+    <!-- ===== 设置抽屉（变量 + 数据源） ===== -->
+    <div v-if="showSettings" class="drawer-overlay" @click.self="showSettings = false">
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <h3>场景设置</h3>
+          <button class="btn-icon btn-close" @click="showSettings = false">✕</button>
+        </div>
+
+        <!-- 场景信息 -->
+        <div v-if="scene" class="drawer-card">
+          <h4 class="drawer-section-title" @click="toggleCard('basic')">
+            <span>基本信息</span>
+            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.basic }">▸</span>
+          </h4>
+          <div v-show="!collapsedCards.basic" class="card-body">
+          <div class="info-grid">
+            <div class="info-item"><span class="label">状态</span><span :class="['status-badge', scene.status]">{{ scene.status }}</span></div>
+            <div class="info-item"><span class="label">描述</span><span class="value">{{ scene.description || '-' }}</span></div>
+            <div class="info-item"><span class="label">创建时间</span><span class="value">{{ formatTime(scene.created_at) }}</span></div>
+          </div>
+          </div>
+        </div>
+
+        <!-- 场景变量 -->
+        <div class="drawer-card">
+          <h4 class="drawer-section-title" @click="toggleCard('variables')">
+            <span>场景变量</span>
+            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.variables }">▸</span>
+          </h4>
+          <div v-show="!collapsedCards.variables" class="card-body">
+          <div v-if="varEntries.length === 0" class="var-empty">暂无变量</div>
+          <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
+            <input v-model="entry.key" placeholder="变量名" class="var-input var-key" @blur="saveVariables" />
+            <span class="var-eq">=</span>
+            <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input var-value" @blur="saveVariables" />
+            <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">✕</button>
+          </div>
+          <button class="btn-sm drawer-add-btn" @click="addVariableRow">+ 添加变量</button>
+          </div>
+        </div>
+
+        <!-- 数据源 (CSV) -->
+        <div class="drawer-card">
+          <h4 class="drawer-section-title" @click="toggleCard('datasource')">
+            <span>数据源 (CSV)</span>
+            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.datasource }">▸</span>
+          </h4>
+          <div v-show="!collapsedCards.datasource" class="card-body">
+          <label class="btn-sm ds-upload-btn">
+            上传 CSV
+            <input type="file" accept=".csv" style="display:none" @change="onDsFileChange" />
+          </label>
+          <div v-if="dataSources.length === 0" class="var-empty" style="margin-top: 8px;">暂无数据源</div>
+          <div v-for="ds in dataSources" :key="ds.id" class="ds-row" @click="handleDsPreview(ds)" title="点击编辑数据">
+            <span class="ds-name">{{ ds.file_name }}</span>
+            <span class="ds-meta">{{ ds.columns?.length ?? 0 }} 列 · {{ ds.row_count ?? 0 }} 行</span>
+            <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除">✕</button>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showRunConfig" class="modal-overlay" @click.self="showRunConfig = false">
       <div class="modal">
         <h3>启动测试</h3>
@@ -409,27 +430,69 @@
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
 
-    <div v-if="showDsPreview" class="modal-overlay" @click.self="showDsPreview = false">
-      <div class="modal-panel ds-preview-modal">
-        <div class="modal-header">
+    <!-- ===== 全屏 CSV 数据编辑器 ===== -->
+    <div v-if="showDsPreview" class="csv-editor-overlay" @click.self="showDsPreview = false">
+      <div class="csv-editor">
+        <!-- 精简标题栏 -->
+        <div class="csv-editor-header">
           <h3>{{ dsPreview?.file_name }}</h3>
-          <span class="ds-preview-meta">{{ dsPreview?.columns.length }} 列 · {{ dsPreview?.rows.length }} 行（预览前5行）</span>
           <button class="btn-icon modal-close" @click="showDsPreview = false">✕</button>
         </div>
-        <div class="modal-body">
-          <div class="ds-preview-table-wrap">
-            <table class="ds-preview-table">
-              <thead>
-                <tr>
-                  <th v-for="col in dsPreview?.columns" :key="col">{{ col }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, ri) in dsPreview?.rows" :key="ri">
-                  <td v-for="col in dsPreview?.columns" :key="col">{{ row[col] }}</td>
-                </tr>
-              </tbody>
-            </table>
+
+        <!-- 表格区域（含底部浮动工具栏） -->
+        <div class="csv-editor-body">
+          <div class="csv-table-card">
+          <table class="csv-table">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th v-for="(col, ci) in dsEditColumns" :key="ci" class="col-editable">
+                  <input
+                    class="col-name-input"
+                    :value="col"
+                    @change="dsRenameColumn(ci, ($event.target as HTMLInputElement).value)"
+                  />
+                  <button class="btn-icon col-del-btn" @click="dsDeleteColumn(ci)" title="删除列">✕</button>
+                </th>
+                <th class="col-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, ri) in pagedRows" :key="ri + (dsPage - 1) * dsPageSize">
+                <td class="col-num">{{ (dsPage - 1) * dsPageSize + ri + 1 }}</td>
+                <td v-for="col in dsEditColumns" :key="col">
+                  <input
+                    class="cell-input"
+                    :value="row[col] || ''"
+                    @change="dsUpdateCell((dsPage - 1) * dsPageSize + ri, col, ($event.target as HTMLInputElement).value)"
+                  />
+                </td>
+                <td class="col-action">
+                  <button class="btn-icon row-del-btn" @click="dsDeleteRow((dsPage - 1) * dsPageSize + ri)" title="删除行">✕</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+
+          <!-- 底部浮动工具栏 -->
+          <div class="csv-footer-bar">
+            <span class="csv-meta">{{ dsEditColumns.length }} 列 · {{ dsEditRows.length }} 行</span>
+            <div class="csv-pagination" v-if="totalDsPages > 1">
+              <button class="btn-sm" :disabled="dsPage <= 1" @click="dsPage--">‹</button>
+              <span class="page-info">{{ dsPage }} / {{ totalDsPages }}</span>
+              <button class="btn-sm" :disabled="dsPage >= totalDsPages" @click="dsPage++">›</button>
+              <select class="page-size-select" v-model.number="dsPageSize">
+                <option :value="25">25/页</option>
+                <option :value="50">50/页</option>
+                <option :value="100">100/页</option>
+                <option :value="200">200/页</option>
+              </select>
+            </div>
+            <div style="flex:1"></div>
+            <button class="btn-sm" @click="dsAddRow">+ 行</button>
+            <button class="btn-sm" @click="dsAddColumn">+ 列</button>
+            <button class="btn-login-primary btn-sm" @click="dsSaveEdit" :disabled="dsSaving">{{ dsSaving ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -444,7 +507,22 @@
         <p class="confirm-msg">{{ confirmMessage }}</p>
         <div class="confirm-actions">
           <button class="btn-cancel" @click="showConfirm = false">取消</button>
-          <button class="btn-danger-confirm" @click="confirmDeleteNode">确认删除</button>
+          <button class="btn-danger-confirm" @click="confirmDeleteAction">确认删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CSV 添加列弹窗 ===== -->
+    <div v-if="showAddColumnModal" class="modal-overlay" @click.self="showAddColumnModal = false">
+      <div class="modal">
+        <h3>添加列</h3>
+        <div class="form-group">
+          <label>列名</label>
+          <input v-model="newColumnName" placeholder="仅支持英文字母、数字、下划线" @keyup.enter="dsConfirmAddColumn" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showAddColumnModal = false">取消</button>
+          <button class="btn-primary" @click="dsConfirmAddColumn">确认添加</button>
         </div>
       </div>
     </div>
@@ -482,8 +560,24 @@ const varEntries = ref<{ key: string; value: string }[]>([])
 
 // Data source state
 const dataSources = ref<DataSourceDTO[]>([])
-const showDsPanel = ref(false)
 const dsUploading = ref(false)
+const showSettings = ref(false)
+
+// 抽屉卡片收缩状态：'basic' | 'variables' | 'datasource'
+const collapsedCards = reactive<Record<string, boolean>>({
+  basic: false,
+  variables: false,
+  datasource: false,
+})
+function toggleCard(key: string) { collapsedCards[key] = !collapsedCards[key] }
+// CSV editor pagination
+const dsPage = ref(1)
+const dsPageSize = ref(50)
+const totalDsPages = computed(() => Math.max(1, Math.ceil(dsEditRows.value.length / dsPageSize.value)))
+const pagedRows = computed(() => {
+  const start = (dsPage.value - 1) * dsPageSize.value
+  return dsEditRows.value.slice(start, start + dsPageSize.value)
+})
 
 // Group node config
 const groupConfig = reactive({ node_ids: [] as string[], loop_count: 1, async: false })
@@ -506,8 +600,10 @@ function addVariableRow() {
 }
 
 function removeVariableRow(idx: number) {
-  varEntries.value.splice(idx, 1)
-  saveVariables()
+  confirmMessage.value = '确定要删除变量 "' + (varEntries.value[idx]?.key || '未命名') + '" 吗？'
+  showConfirm.value = true
+  pendingDeleteAction.value = 'var'
+  pendingDeleteParam.value = idx
 }
 
 async function saveVariables() {
@@ -530,8 +626,17 @@ async function fetchDataSources() {
   if (!id) return
   try {
     const resp = await listDataSources(id)
-    if (resp.code === 0) dataSources.value = resp.data.items || []
-  } catch { /* ignore */ }
+    if (resp.code === 0) {
+      const items = Array.isArray(resp.data) ? resp.data : (resp.data?.items || [])
+      dataSources.value = items
+        .map((ds: any) => ({
+          ...ds,
+          columns: ds.columns || [],
+          row_count: ds.row_count ?? 0,
+        }))
+        .filter((ds: any) => ds.file_name && (ds.columns?.length > 0 || ds.row_count > 0))
+    }
+  } catch (e) { /* ignore */ }
 }
 
 async function handleDsUpload(file: File) {
@@ -543,10 +648,14 @@ async function handleDsUpload(file: File) {
   try {
     const text = await file.text()
     const sceneId = route.params.id as string
-    await uploadDataSource(sceneId, file.name, text)
+    const resp = await uploadDataSource(sceneId, file.name, text)
+    if (resp.code !== 0) {
+      showToast(resp.message || '上传失败', 'error')
+      return
+    }
     showToast('上传成功', 'success')
     fetchDataSources()
-  } catch {
+  } catch (e) {
     showToast('上传失败', 'error')
   } finally {
     dsUploading.value = false
@@ -554,11 +663,10 @@ async function handleDsUpload(file: File) {
 }
 
 async function handleDsDelete(dsId: string) {
-  try {
-    await deleteDataSource(dsId)
-    showToast('已删除', 'success')
-    fetchDataSources()
-  } catch { showToast('删除失败', 'error') }
+  pendingDeleteAction.value = 'datasource'
+  pendingDeleteParam.value = dsId
+  confirmMessage.value = '确定要删除该数据源吗？此操作不可撤销。'
+  showConfirm.value = true
 }
 
 function onDsFileChange(e: Event) {
@@ -570,22 +678,129 @@ function onDsFileChange(e: Event) {
 // Data source preview
 const showDsPreview = ref(false)
 const dsPreview = ref<DataSourcePreviewDTO | null>(null)
+const dsEditColumns = ref<string[]>([])
+const dsEditRows = ref<Record<string, string>[]>([])
+const dsSaving = ref(false)
 
 async function handleDsPreview(ds: DataSourceDTO) {
   try {
     const resp = await previewDataSource(ds.id)
     if (resp.code === 0) {
       dsPreview.value = resp.data
+      dsEditColumns.value = [...(resp.data.columns || [])]
+      // 过滤掉所有字段均为空的无效行
+      const raw = (resp.data.rows || []) as Record<string, string>[]
+      dsEditRows.value = raw
+        .filter(r => r && typeof r === 'object' && Object.keys(r).length > 0 && Object.values(r).some(v => v != null && v !== ''))
+        .map(r => ({ ...r }))
+      dsPage.value = 1
       showDsPreview.value = true
     }
   } catch { showToast('预览失败', 'error') }
+}
+
+function dsUpdateCell(ri: number, col: string, value: string) {
+  if (dsEditRows.value[ri]) {
+    dsEditRows.value[ri][col] = value
+  }
+}
+
+function dsAddRow() {
+  const newRow: Record<string, string> = {}
+  for (const col of dsEditColumns.value) {
+    newRow[col] = ''
+  }
+  dsEditRows.value.push(newRow)
+}
+
+function dsDeleteRow(ri: number) {
+  pendingDeleteAction.value = 'csv-row'
+  pendingDeleteParam.value = ri
+  confirmMessage.value = '确定要删除第 ' + ((dsPage.value - 1) * dsPageSize.value + ri + 1) + ' 行吗？'
+  showConfirm.value = true
+}
+
+function dsAddColumn() {
+  newColumnName.value = ''
+  showAddColumnModal.value = true
+}
+
+function dsConfirmAddColumn() {
+  const name = newColumnName.value.trim()
+  if (!name || !/^[a-zA-Z0-9_]+$/.test(name)) {
+    showToast('列名只能包含英文字母、数字、下划线', 'error')
+    return
+  }
+  if (dsEditColumns.value.includes(name)) {
+    showToast('列名已存在', 'error')
+    return
+  }
+  dsEditColumns.value.push(name)
+  for (const row of dsEditRows.value) {
+    row[name] = ''
+  }
+  showAddColumnModal.value = false
+}
+
+function dsRenameColumn(ci: number, newName: string) {
+  const trimmed = newName.trim()
+  if (!trimmed || !/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+    showToast('列名只能包含英文字母、数字、下划线', 'error')
+    return
+  }
+  if (dsEditColumns.value.includes(trimmed) && dsEditColumns.value[ci] !== trimmed) {
+    showToast('列名已存在', 'error')
+    return
+  }
+  const oldName = dsEditColumns.value[ci]
+  dsEditColumns.value[ci] = trimmed
+  if (oldName !== trimmed) {
+    for (const row of dsEditRows.value) {
+      row[trimmed] = row[oldName] || ''
+      delete row[oldName]
+    }
+  }
+}
+
+function dsDeleteColumn(ci: number) {
+  pendingDeleteAction.value = 'csv-column'
+  pendingDeleteParam.value = ci
+  confirmMessage.value = '确定要删除列 "' + dsEditColumns.value[ci] + '" 吗？该列所有数据将被清除。'
+  showConfirm.value = true
+}
+
+async function dsSaveEdit() {
+  if (!dsPreview.value) return
+  dsSaving.value = true
+  try {
+    const csvLines: string[] = [dsEditColumns.value.join(',')]
+    for (const row of dsEditRows.value) {
+      csvLines.push(dsEditColumns.value.map(c => row[c] || '').join(','))
+    }
+    const csvContent = csvLines.join('\n')
+    const sceneId = route.params.id as string
+    await uploadDataSource(sceneId, dsPreview.value.file_name, csvContent)
+    showToast('保存成功', 'success')
+    fetchDataSources()
+    showDsPreview.value = false
+  } catch {
+    showToast('保存失败', 'error')
+  } finally {
+    dsSaving.value = false
+  }
 }
 
 const toastMsg = ref('')
 const toastType = ref('info')
 const showConfirm = ref(false)
 const confirmMessage = ref('')
-const pendingDeleteNodeId = ref('')
+// 通用确认删除状态（支持节点、数据源、CSV行/列、变量）
+const pendingDeleteAction = ref<'node' | 'datasource' | 'csv-row' | 'csv-column' | 'var'>('node')
+const pendingDeleteParam = ref<string | number>('')
+
+// CSV 添加列弹窗
+const showAddColumnModal = ref(false)
+const newColumnName = ref('')
 
 const runConfig = reactive({
   workers: 10,
@@ -1127,30 +1342,59 @@ async function handleSaveNode() {
 }
 
 async function handleDeleteNode(id: string) {
-  pendingDeleteNodeId.value = id
+  pendingDeleteAction.value = 'node'
+  pendingDeleteParam.value = id
   confirmMessage.value = '确定要删除该节点吗？'
   showConfirm.value = true
 }
 
-async function confirmDeleteNode() {
-  const id = pendingDeleteNodeId.value
+async function confirmDeleteAction() {
+  const action = pendingDeleteAction.value
+  const param = pendingDeleteParam.value
   showConfirm.value = false
-  pendingDeleteNodeId.value = ''
-  
-  const relatedEdges = edges.value.filter(e => e.from_node === id || e.to_node === id)
-  for (const edge of relatedEdges) {
-    await deleteEdge(edge.id)
+
+  if (action === 'node') {
+    const id = param as string
+    const relatedEdges = edges.value.filter(e => e.from_node === id || e.to_node === id)
+    for (const edge of relatedEdges) {
+      await deleteEdge(edge.id)
+    }
+    const resp = await apiDeleteNode(id)
+    if (resp.code === 0) {
+      showToast('节点已删除（关联连线已自动清理）')
+      if (selectedNode.value?.id === id) selectedNode.value = null
+      fetchNodes()
+      fetchEdges()
+    } else {
+      showToast(resp.message || '删除失败', 'error')
+    }
+  } else if (action === 'datasource') {
+    const dsId = param as string
+    try {
+      await deleteDataSource(dsId)
+      showToast('数据源已删除', 'success')
+      fetchDataSources()
+    } catch {
+      showToast('删除失败', 'error')
+    }
+  } else if (action === 'csv-row') {
+    const ri = param as number
+    dsEditRows.value.splice(ri, 1)
+  } else if (action === 'csv-column') {
+    const ci = param as number
+    const colName = dsEditColumns.value[ci]
+    dsEditColumns.value.splice(ci, 1)
+    for (const row of dsEditRows.value) {
+      delete row[colName]
+    }
+  } else if (action === 'var') {
+    const idx = param as number
+    varEntries.value.splice(idx, 1)
+    saveVariables()
   }
-  
-  const resp = await apiDeleteNode(id)
-  if (resp.code === 0) {
-    showToast('节点已删除（关联连线已自动清理）')
-    if (selectedNode.value?.id === id) selectedNode.value = null
-    fetchNodes()
-    fetchEdges()
-  } else {
-    showToast(resp.message || '删除失败', 'error')
-  }
+
+  pendingDeleteAction.value = 'node'
+  pendingDeleteParam.value = ''
 }
 
 async function deleteEdgeBetween(idx: number) {
@@ -1403,323 +1647,790 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.scene-detail { display: flex; flex-direction: column; gap: 8px; height: calc(100vh - 64px); max-height: calc(100vh - 64px); overflow: hidden; }
+/* ===================================================================
+   SceneDetailPage — 完整 UI 重设计
+   设计理念：年轻、扁平、清爽、信息层级清晰
+   基于 Salvo CSS 变量系统，兼容深色/浅色主题
+   =================================================================== */
 
-.page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding-bottom: 4px; }
-.page-header h2 { font-size: 18px; font-weight: 600; flex: 1; }
-.header-actions { display: flex; gap: 8px; }
-
-.btn-back { padding: 6px 12px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
-.btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
-.btn-outline { padding: 8px 16px; border: 1px solid #58a6ff; border-radius: var(--radius-md); background: transparent; color: #58a6ff; font-size: 13px; cursor: pointer; }
-[data-theme='light'] .btn-outline { border-color: #0969da; color: #0969da; }
-.btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
-.btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
-.btn-close { border: none; background: transparent; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; }
-
-.scene-info { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 10px 16px; flex-shrink: 0; }
-
-/* Variable Panel */
-.variable-panel { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 8px 16px; flex-shrink: 0; }
-.variable-panel .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; min-height: 28px; }
-.variable-panel .section-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); user-select: none; margin: 0; }
-.var-list { margin-top: 6px; }
-.var-empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
-.var-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.var-input { padding: 4px 8px; border: 1px solid var(--border-secondary); border-radius: 4px; font-size: 13px; background: var(--bg-input); color: var(--text-primary); }
-.var-key { width: 140px; flex-shrink: 0; }
-.var-value { flex: 1; }
-.var-eq { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
-.btn-del-var { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
-.btn-del-var:hover { color: var(--danger); }
-
-/* Data Source Panel */
-.datasource-panel { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 8px 16px; flex-shrink: 0; }
-.datasource-panel .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; min-height: 28px; }
-.datasource-panel .section-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); user-select: none; margin: 0; }
-.ds-list { margin-top: 6px; }
-.ds-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-tertiary); cursor: pointer; }
-.ds-row:hover { background: var(--bg-hover); border-radius: 4px; padding-left: 4px; padding-right: 4px; }
-.ds-row:last-child { border-bottom: none; }
-.ds-name { font-size: 13px; font-weight: 500; flex: 1; }
-.ds-meta { font-size: 12px; color: var(--text-muted); }
-.ds-upload-btn { cursor: pointer; }
-
-/* Data Source Preview Modal */
-.ds-preview-modal { max-width: 720px; width: 95%; }
-.ds-preview-meta { margin-left: auto; margin-right: 12px; font-size: 13px; color: var(--text-muted); }
-.ds-preview-table-wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
-.ds-preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ds-preview-table th { text-align: left; padding: 8px 10px; background: var(--bg-tertiary); border-bottom: 2px solid var(--border-primary); font-weight: 600; color: var(--text-secondary); position: sticky; top: 0; }
-.ds-preview-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-tertiary); color: var(--text-primary); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-.ds-preview-table tbody tr:hover { background: var(--bg-hover); }
-
-/* Modal styles (shared) */
-
-/* Child Node Selector */
-.group-child-config { display: flex; flex-direction: column; gap: 6px; }
-.group-available-nodes { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 120px; overflow-y: auto; padding: 2px 0; }
-.child-node-selector { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.child-node-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.child-node-check input[type="checkbox"] { width: auto; margin: 0; }
-
-/* Group Ordered Children List */
-.group-ordered-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; border: 1px solid var(--border-secondary); border-radius: 8px; padding: 6px 8px; background: var(--bg-secondary); }
-.ordered-child-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; background: var(--bg-card); transition: background 0.15s; }
-.ordered-child-row:hover { background: var(--bg-hover); }
-.order-index { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent-primary); border-radius: 50%; flex-shrink: 0; }
-.order-arrow { color: var(--accent-primary); font-size: 14px; font-weight: bold; flex-shrink: 0; margin-left: -2px; }
-.order-name { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.order-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
-.ordered-child-row:hover .order-actions { opacity: 1; }
-.order-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-secondary); border-radius: 4px; background: var(--bg-card); cursor: pointer; font-size: 12px; color: var(--text-secondary); transition: all 0.15s; padding: 0; line-height: 1; }
-.order-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(88,166,255,0.06); }
-.order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.order-btn.remove-btn:hover { border-color: #e74c3c; color: #e74c3c; background: rgba(231,76,60,0.06); }
-.info-grid { display: flex; gap: 16px; flex-wrap: wrap; }
-.info-item { display: flex; align-items: center; gap: 8px; }
-.info-item .label { font-size: 12px; color: var(--text-tertiary); }
-.info-item .value { font-size: 13px; color: var(--text-primary); }
-
-.status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
-.status-badge.draft { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
-.status-badge.ready { background: rgba(63,185,80,0.15); color: var(--accent-success); }
-.status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
-.status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
-
-.dag-section { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: hidden; flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.section-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border-secondary); flex-shrink: 0; }
-.section-header h3 { font-size: 14px; font-weight: 600; }
-.dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-.dag-canvas { padding: 0; min-height: 200px; flex: 1; position: relative; overflow: auto; }
-.dag-empty { text-align: center; padding: 40px 0; color: var(--text-tertiary); }
-.empty-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
-
-.dag-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
-
-.dag-branch-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  padding: 16px 0;
+/* ---- 布局结构 ---- */
+.scene-detail {
+  display: flex; flex-direction: column;
+  height: calc(100vh - var(--header-height, 52px)); overflow: hidden;
+  background: var(--bg-primary);
 }
 
-.dag-level {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  width: 100%;
-  position: relative;
-  margin-bottom: 8px;
+/* 设置打开时隐藏 DAG 悬浮工具栏 */
+.settings-open :deep(.dag-toolbar) { opacity: 0; pointer-events: none; }
+
+/* ---- 工具栏 ---- */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0; gap: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.toolbar-left {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+.toolbar-left h2 {
+  font-size: 16px; font-weight: 700; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text-primary); letter-spacing: -0.3px;
+}
+.toolbar-right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
 }
 
-.dag-level-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
+/* ---- 通用按钮系统 ---- */
 
-.branch-item .dag-nodes-in-level::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  width: 2px;
-  height: 16px;
-  background: var(--border-primary);
-}
-
-.branch-label { margin-bottom: 4px; }
-.label-badge {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
-  padding: 2px 10px; border-radius: 10px;
-}
-.true-label { background: rgba(46,204,113,0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
-.false-label { background: rgba(231,76,60,0.12); color: #e74c3c; border: 1px solid rgba(231,76,60,0.25); }
-
-.dag-nodes-in-level {
-  display: flex;
-  gap: 12px;
-}
-
-.branch-split-lines {
-  display: flex;
-  gap: 40px;
-  margin-top: 4px;
-  position: relative;
-}
-
-.split-line-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 80px;
-}
-
-.split-line {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
-
-.split-condition {
-  font-size: 9px; font-weight: 600; letter-spacing: 0.5px;
-  padding: 1px 6px; border-radius: 8px; margin-bottom: 2px;
-}
-.true-line .split-condition { background: rgba(46,204,113,0.15); color: #2ecc71; }
-.false-line .split-condition { background: rgba(231,76,60,0.12); color: #e74c3c; }
-
-.split-svg {
-  width: 40px; height: 50px; overflow: visible;
-}
-.true-line .split-svg path { stroke: #2ecc71; stroke-dasharray: none; opacity: 0.7; }
-.false-line .split-svg path { stroke: #e74c3c; stroke-dasharray: none; opacity: 0.7; }
-
-.dag-node {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
-  background: var(--bg-tertiary); cursor: pointer; min-width: 300px;
-  transition: all 0.15s ease;
-}
-.dag-node:hover { border-color: var(--accent-primary); }
-.dag-node.active { border-color: var(--accent-primary); box-shadow: 0 0 0 2px rgba(88,166,255,0.2); }
-.dag-node.setup { border-left: 3px solid #2ecc71; }
-.dag-node.http { border-left: 3px solid var(--accent-primary); }
-.dag-node.delay { border-left: 3px solid #f0ad4e; }
-.dag-node.condition { border-left: 3px solid #9b59b6; }
-.dag-node.if-else { border-left: 3px solid #e67e22; }
-.dag-node.teardown { border-left: 3px solid #e74c3c; }
-
-.node-icon { font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
-.node-icon.setup { background: rgba(46,204,113,0.15); color: #2ecc71; }
-.node-icon.http { background: rgba(88,166,255,0.1); color: var(--accent-primary); }
-.node-icon.delay { background: rgba(240,173,78,0.15); color: #f0ad4e; }
-.node-icon.condition { background: rgba(155,89,182,0.15); color: #9b59b6; }
-.node-icon.if-else { background: rgba(230,126,34,0.15); color: #e67e22; }
-.node-icon.teardown { background: rgba(231,76,60,0.15); color: #e74c3c; }
-
-.node-info { flex: 1; display: flex; align-items: center; gap: 8px; }
-.node-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-.node-type-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(139,148,158,0.15); color: var(--text-tertiary); letter-spacing: 0.5px; }
-.node-actions { display: flex; gap: 4px; }
-.node-btn { border: none; background: transparent; color: var(--text-tertiary); font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
-.node-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
-.node-btn.danger:hover { color: var(--accent-danger); }
-
-.dag-edge { display: flex; flex-direction: column; align-items: center; position: relative; padding: 4px 0; }
-.edge-line { width: 2px; height: 12px; background: var(--border-primary); }
-.edge-condition { font-size: 10px; padding: 2px 8px; border-radius: 8px; background: rgba(155,89,182,0.15); color: #9b59b6; margin: 2px 0; }
-.edge-arrow { color: var(--text-tertiary); font-size: 10px; line-height: 1; }
-.edge-delete { position: absolute; right: -20px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: var(--text-tertiary); font-size: 10px; cursor: pointer; opacity: 0; transition: opacity 0.15s; }
-.dag-edge:hover .edge-delete { opacity: 1; }
-.edge-delete:hover { color: var(--accent-danger); }
-
-.workspace-split { display: flex; gap: 12px; flex: 1 1 0; min-height: 0; overflow: hidden; }
-
-.config-sidebar {
-  width: 420px; max-width: 45%; min-width: 340px;
+/* 基础按钮 mixin — 通过 class 组合使用 */
+.btn-base {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
-.node-config-panel {
-  background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md);
-  padding: 16px; min-width: 0;
+/* 返回按钮 */
+.btn-back {
+  padding: 6px 12px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; cursor: pointer;
+  transition: all 0.2s ease;
 }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.panel-header h4 { font-size: 14px; font-weight: 600; }
+.btn-back:hover {
+  color: var(--text-primary); border-color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
 
-.config-form { display: flex; flex-direction: column; gap: 12px; }
-.form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-row.inline { flex-direction: row; align-items: center; gap: 8px; }
-.form-row.inline label { width: 100px; flex-shrink: 0; }
-.form-row label { font-size: 12px; color: var(--text-secondary); }
+/* 主按钮（青色） */
+.btn-primary {
+  padding: 7px 16px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-primary); color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88; box-shadow: 0 2px 8px rgba(0,229,255,0.25);
+}
+
+/* 次要按钮 */
+.btn-secondary {
+  padding: 7px 16px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* 描边按钮（青色边框） */
+.btn-outline {
+  padding: 5px 12px; border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--accent-primary); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-outline:hover { background: rgba(0,229,255,0.08); }
+
+/* 小型按钮 */
+.btn-sm {
+  padding: 5px 10px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-secondary); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+}
+.btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.04); }
+
+/* 工具栏按钮变体 */
+.toolbar-btn { display: inline-flex; align-items: center; gap: 5px; }
+.toolbar-btn.active {
+  border-color: var(--accent-primary); color: var(--accent-primary);
+  background: rgba(0,229,255,0.1);
+}
+
+/* 关闭按钮 */
+.btn-close {
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 18px; cursor: pointer; padding: 4px 8px; line-height: 1;
+  border-radius: var(--radius-sm); transition: all 0.2s ease;
+}
+.btn-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* 无样式图标按钮（用于操作列表中的小按钮） */
+.btn-icon {
+  border: none; background: transparent; cursor: pointer;
+  padding: 4px; border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+/* ---- 状态标签 ---- */
+.status-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 100px; white-space: nowrap;
+  letter-spacing: 0.2px; border: 1px solid transparent;
+}
+.status-badge.draft { background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border-primary); }
+.status-badge.ready { background: rgba(74,222,128,0.1); color: var(--accent-success); border-color: rgba(74,222,128,0.2); }
+.status-badge.running { background: rgba(0,229,255,0.08); color: var(--accent-primary); border-color: rgba(0,229,255,0.15); }
+.status-badge.completed { background: rgba(74,222,128,0.1); color: var(--accent-success); border-color: rgba(74,222,128,0.2); }
+
+/* ---- 主工作区 ---- */
+.main-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ---- DAG 区块 ---- */
+.dag-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); overflow: hidden;
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  margin: 12px;
+}
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0; background: var(--bg-secondary);
+}
+.section-header h3 {
+  font-size: 13px; font-weight: 700; margin: 0;
+  color: var(--text-primary); letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dag-canvas { padding: 0; min-height: 200px; flex: 1; position: relative; overflow: auto; }
+.dag-empty {
+  text-align: center; padding: 80px 20px; color: var(--text-tertiary);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty-icon { font-size: 48px; opacity: 0.15; }
+.dag-empty p { font-size: 14px; margin: 0; }
+
+/* ---- 节点配置侧边栏 ---- */
+.config-sidebar {
+  width: 400px; max-width: 45%; min-width: 340px;
+  flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-primary);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+}
+.node-config-panel { padding: 20px; min-width: 0; }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-primary);
+}
+.panel-header h4 {
+  font-size: 14px; font-weight: 700; margin: 0;
+  color: var(--text-primary);
+}
+
+/* ---- 配置表单 ---- */
+.config-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: flex; flex-direction: column; gap: 5px; }
+.form-row.inline { flex-direction: row; align-items: center; gap: 10px; }
+.form-row.inline label { width: 110px; flex-shrink: 0; font-size: 12px; }
+.form-row label {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
 .form-row input, .form-row select, .form-row textarea {
   width: 100%; box-sizing: border-box;
-  padding: 6px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
-  background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none;
+  padding: 8px 12px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: var(--bg-input);
+  color: var(--text-primary); font-size: 13px; outline: none;
   font-family: inherit; word-break: break-all;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent-primary); }
-.form-row textarea { resize: vertical; min-height: 60px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.form-row textarea {
+  resize: vertical; min-height: 64px;
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+  line-height: 1.5;
+}
+.panel-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-primary); }
+.btn-save-panel { width: 100%; padding: 10px; font-size: 13px; }
 
-.run-warning { background: rgba(240,173,78,0.1); border: 1px solid rgba(240,173,78,0.3); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: #f0ad4e; margin-bottom: 12px; }
+/* ---- 设置抽屉 ---- */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; justify-content: flex-end;
+  animation: drawerOverlayFadeIn 0.2s ease;
+}
+@keyframes drawerOverlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal { background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: 24px; width: 480px; max-height: 80vh; overflow-y: auto; }
-.modal h3 { font-size: 16px; margin-bottom: 16px; }
-.form-group { margin-bottom: 14px; }
-.form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+.drawer-panel {
+  width: 440px; max-width: 92vw; height: 100%;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-primary);
+  display: flex; flex-direction: column;
+  animation: drawerSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
+}
+@keyframes drawerSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.drawer-header {
+  display: flex; justify-content: space-between; align-items: center;
+  /* ← [可调参数] 左边距：5px，右边距：40px */
+  padding: 12px 40px 0 5px;
+  /* 去掉 border-bottom，改用 padding 控制间距 */
+  flex-shrink: 0; background: var(--bg-secondary);
+}
+.drawer-header h3 {
+  font-size: 16px; font-weight: 700; margin: 0;
+  color: var(--text-primary);
+}
+.drawer-body {
+  flex: 1; overflow-y: auto;
+  /* ← [可调参数] 左边距：5px，右边距：40px，标题与卡片间距：2px */
+  padding: 2px 40px 24px 5px;
+}
+/* ---- 抽屉卡片（参考 SettingsPage .card 立体效果） ---- */
+.drawer-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 18px 20px 20px;
+  /* [可调参数] 卡片之间间距：2px */
+  margin-bottom: 2px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease;
+}
+.drawer-card:hover {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.drawer-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin: 0 0 14px;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.drawer-section-title::before {
+  content: ''; width: 3px; height: 14px;
+  border-radius: 2px; background: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+/* 卡片收缩图标 */
+.card-collapse-icon {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.card-collapse-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* 卡片内容区 — 收缩时平滑过渡 */
+.card-body {
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+/* 场景信息 */
+.info-grid { display: flex; flex-direction: column; gap: 10px; }
+.info-item {
+  display: flex; align-items: center; gap: 12px; font-size: 13px;
+}
+.info-item .label {
+  font-size: 12px; color: var(--text-tertiary); min-width: 60px; flex-shrink: 0;
+}
+.info-item .value { color: var(--text-primary); word-break: break-all; }
+
+/* ---- 变量编辑 ---- */
+.var-empty {
+  font-size: 12px; color: var(--text-tertiary); padding: 14px;
+  text-align: center; background: var(--bg-tertiary);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+}
+.var-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.var-input {
+  height: 34px; padding: 0 12px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); font-size: 13px;
+  background: var(--bg-input); color: var(--text-primary);
+  outline: none; transition: all 0.2s ease; box-sizing: border-box;
+}
+.var-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(0,229,255,0.08); }
+.var-input::placeholder { color: var(--text-tertiary); font-size: 12px; }
+.var-key { width: 130px; flex-shrink: 0; }
+.var-value { flex: 1; min-width: 0; }
+.var-eq { color: var(--text-tertiary); font-size: 14px; flex-shrink: 0; user-select: none; }
+.btn-del-var {
+  background: none; border: 1px solid transparent; color: var(--text-tertiary); cursor: pointer;
+  font-size: 12px; padding: 3px 8px; border-radius: var(--radius-md);
+  transition: all 0.2s ease; line-height: 1.4; flex-shrink: 0;
+}
+.btn-del-var:hover {
+  color: #fff; background: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+
+.drawer-add-btn {
+  margin-top: 6px; border-style: dashed !important;
+  width: 100%; justify-content: center;
+  color: var(--accent-primary) !important; border-color: var(--accent-primary) !important;
+}
+.drawer-add-btn:hover {
+  background: rgba(0,229,255,0.06) !important;
+}
+
+/* ---- 数据源列表 ---- */
+.ds-upload-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; transition: all 0.2s ease;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+}
+.ds-upload-btn:hover { background: rgba(0,229,255,0.06) !important; }
+
+.ds-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  cursor: pointer; transition: all 0.2s ease; background: var(--bg-secondary);
+  margin-top: 8px;
+}
+.ds-row:hover { border-color: var(--accent-primary); background: var(--bg-hover); }
+.ds-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.ds-meta { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+
+/* ---- 全屏 CSV 编辑器 ---- */
+.csv-editor-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.csv-editor {
+  width: 94vw; height: 90vh; max-width: 1500px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  display: flex; flex-direction: column;
+  /* 多层阴影营造立体浮起效果（参考 SettingsPage .card） */
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.04),
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 24px 64px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.csv-editor-header {
+  padding: 10px 20px; border-bottom: 1px solid var(--border-secondary);
+  flex-shrink: 0; background: var(--bg-secondary);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.csv-editor-header h3 { font-size: 14px; font-weight: 700; margin: 0; color: var(--text-primary); }
+
+/* CSV 分页 */
+.csv-pagination { display: flex; align-items: center; gap: 6px; }
+.page-info {
+  font-size: 12px; color: var(--text-secondary);
+  min-width: 50px; text-align: center; font-weight: 600;
+}
+.page-size-select {
+  padding: 4px 8px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: var(--bg-input);
+  color: var(--text-primary); font-size: 12px; outline: none; cursor: pointer;
+}
+.page-size-select:focus { border-color: var(--accent-primary); }
+
+/* CSV 表格体 — 背景块内边距，表格与背景块有间距 */
+.csv-editor-body {
+  flex: 1; overflow: auto;
+  padding: 12px 16px;
+  display: flex; flex-direction: column;
+}
+
+/* CSV 底部浮动工具栏 */
+.csv-footer-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+.csv-meta { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
+
+/* CSV 表格内层卡片 — 数据表与背景块的视觉分层 */
+.csv-table-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 0;
+  overflow-x: auto;
+}
+
+.csv-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 13px; table-layout: fixed;
+}
+.csv-table th {
+  text-align: left; padding: 10px 12px; background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--accent-primary);
+  font-weight: 600; font-size: 12px; color: var(--text-primary);
+  position: sticky; top: 0; z-index: 2;
+  white-space: nowrap; vertical-align: middle;
+}
+.csv-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border-primary);
+  color: var(--text-primary); vertical-align: middle;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.csv-table tbody tr { transition: background 0.12s ease; }
+.csv-table tbody tr:hover { background: var(--bg-hover); }
+.csv-table tbody tr:nth-child(even) { background: rgba(128,128,128,0.02); }
+.csv-table tbody tr:nth-child(even):hover { background: var(--bg-hover); }
+
+.col-num {
+  width: 44px; text-align: center; color: var(--text-tertiary);
+  font-size: 11px; user-select: none;
+}
+.col-action { width: 36px; text-align: center; }
+.col-editable { position: relative; }
+
+/* 列名输入 */
+.col-name-input {
+  background: transparent; border: none; color: var(--text-primary);
+  font-weight: 600; font-size: 12px; width: calc(100% - 20px);
+  padding: 2px 4px; outline: none; border-radius: 2px;
+}
+.col-name-input:focus { background: rgba(0,229,255,0.06); }
+.col-del-btn {
+  font-size: 10px; padding: 2px 5px; opacity: 0.3;
+  cursor: pointer; transition: all 0.15s ease;
+  vertical-align: middle; border: 1px solid transparent; background: none; color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+}
+.col-del-btn:hover { opacity: 1; color: #fff; background: var(--accent-danger); border-color: var(--accent-danger); }
+
+/* 单元格输入 */
+.cell-input {
+  background: transparent; border: none; color: var(--text-primary);
+  font-size: 13px; width: 100%; padding: 4px 6px; outline: none;
+  border-radius: var(--radius-sm); transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.cell-input:focus {
+  background: rgba(0,229,255,0.06);
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.12);
+}
+.row-del-btn {
+  font-size: 11px; padding: 2px 6px; opacity: 0.3;
+  transition: all 0.15s ease; color: var(--text-tertiary);
+  border: 1px solid transparent; background: none; border-radius: var(--radius-sm); cursor: pointer;
+}
+.row-del-btn:hover { opacity: 1; color: #fff; background: var(--accent-danger); border-color: var(--accent-danger); }
+
+/* ---- DAG 流程图元素 ---- */
+.dag-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.dag-branch-container { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 20px 0; }
+.dag-level { display: flex; justify-content: center; gap: 28px; width: 100%; position: relative; margin-bottom: 12px; }
+.dag-level-item { display: flex; flex-direction: column; align-items: center; position: relative; }
+
+.branch-item .dag-nodes-in-level::before {
+  content: ''; position: absolute; top: -24px; left: 50%;
+  width: 2px; height: 20px; background: var(--border-primary);
+}
+.branch-label { margin-bottom: 6px; }
+.label-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+  padding: 3px 12px; border-radius: 100px; text-transform: uppercase;
+}
+.true-label { background: rgba(74,222,128,0.12); color: var(--accent-success); border: 1px solid rgba(74,222,128,0.2); }
+.false-label { background: rgba(239,68,68,0.1); color: var(--accent-danger); border: 1px solid rgba(239,68,68,0.2); }
+.dag-nodes-in-level { display: flex; gap: 14px; }
+
+/* 分支线 */
+.branch-split-lines { display: flex; gap: 48px; margin-top: 6px; position: relative; }
+.split-line-wrapper { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.split-line { display: flex; flex-direction: column; align-items: center; position: relative; }
+.split-condition {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+  padding: 2px 8px; border-radius: 100px; margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.true-line .split-condition { background: rgba(74,222,128,0.1); color: var(--accent-success); }
+.false-line .split-condition { background: rgba(239,68,68,0.08); color: var(--accent-danger); }
+.split-svg { width: 40px; height: 50px; overflow: visible; }
+.true-line .split-svg path { stroke: var(--accent-success); stroke-dasharray: none; opacity: 0.6; }
+.false-line .split-svg path { stroke: var(--accent-danger); stroke-dasharray: none; opacity: 0.6; }
+
+/* DAG 节点卡片 */
+.dag-node {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); background: var(--bg-card);
+  cursor: pointer; min-width: 300px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.dag-node:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 12px rgba(0,229,255,0.08);
+  transform: translateY(-1px);
+}
+.dag-node.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.12), 0 2px 12px rgba(0,229,255,0.06);
+}
+.dag-node.setup { border-left: 3px solid var(--accent-success); }
+.dag-node.http { border-left: 3px solid var(--accent-primary); }
+.dag-node.delay { border-left: 3px solid var(--accent-warning); }
+.dag-node.condition { border-left: 3px solid #a78bfa; }
+.dag-node.if-else { border-left: 3px solid #fb923c; }
+.dag-node.teardown { border-left: 3px solid var(--accent-danger); }
+.dag-node.group { border-left: 3px solid #f472b6; }
+.dag-node.timer { border-left: 3px solid #38bdf8; }
+
+/* 节点图标 */
+.node-icon {
+  font-size: 14px; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); flex-shrink: 0;
+}
+.node-icon.setup { background: rgba(74,222,128,0.1); color: var(--accent-success); }
+.node-icon.http { background: rgba(0,229,255,0.08); color: var(--accent-primary); }
+.node-icon.delay { background: rgba(234,179,8,0.1); color: var(--accent-warning); }
+.node-icon.condition { background: rgba(167,139,250,0.1); color: #a78bfa; }
+.node-icon.if-else { background: rgba(251,146,60,0.1); color: #fb923c; }
+.node-icon.teardown { background: rgba(239,68,68,0.08); color: var(--accent-danger); }
+.node-icon.group { background: rgba(244,114,182,0.1); color: #f472b6; }
+.node-icon.timer { background: rgba(56,189,248,0.1); color: #38bdf8; }
+
+.node-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.node-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.node-type-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: 100px; background: var(--bg-tertiary);
+  color: var(--text-tertiary); letter-spacing: 0.3px;
+}
+.node-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
+.dag-node:hover .node-actions { opacity: 1; }
+.node-btn {
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 12px; cursor: pointer; padding: 4px 8px;
+  border-radius: var(--radius-sm); transition: all 0.15s ease;
+}
+.node-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.node-btn.danger:hover { color: var(--accent-danger); background: rgba(239,68,68,0.08); }
+
+/* DAG 边（连线） */
+.dag-edge {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; padding: 6px 0;
+}
+.edge-line { width: 2px; height: 14px; background: var(--border-primary); border-radius: 1px; }
+.edge-condition {
+  font-size: 10px; font-weight: 600; padding: 2px 10px;
+  border-radius: 100px; background: rgba(167,139,250,0.1);
+  color: #a78bfa; margin: 4px 0; letter-spacing: 0.3px;
+}
+.edge-arrow { color: var(--text-tertiary); font-size: 10px; line-height: 1; }
+.edge-delete {
+  position: absolute; right: -24px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 10px; cursor: pointer; opacity: 0;
+  transition: opacity 0.15s ease; padding: 4px; border-radius: var(--radius-sm);
+}
+.dag-edge:hover .edge-delete { opacity: 1; }
+.edge-delete:hover { color: var(--accent-danger); background: rgba(239,68,68,0.08); }
+
+/* ---- 运行警告 / 弹窗 / Toast / 确认框 ---- */
+.run-warning {
+  background: rgba(234,179,8,0.08);
+  border: 1px solid rgba(234,179,8,0.2);
+  border-radius: var(--radius-md); padding: 12px 16px;
+  font-size: 13px; color: var(--accent-warning); margin-bottom: 12px;
+}
+
+/* 模态框 */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; animation: fadeIn 0.2s ease;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); padding: 28px;
+  width: 480px; max-width: 90vw; max-height: 80vh;
+  overflow-y: auto; box-shadow: var(--shadow-lg);
+  animation: modalScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal h3 { font-size: 17px; font-weight: 700; margin: 0 0 20px; color: var(--text-primary); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
 .form-group input, .form-group select, .form-group textarea {
-  width: 100%; padding: 0 10px; height: 36px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
-  background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; font-family: inherit;
+  width: 100%; padding: 0 12px; height: 38px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-input); color: var(--text-primary);
+  font-size: 13px; outline: none; font-family: inherit;
+  box-sizing: border-box; transition: all 0.2s ease;
 }
-.form-group textarea { height: auto; min-height: 60px; padding: 8px 10px; resize: vertical; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
-.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent-primary); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.form-group textarea {
+  height: auto; min-height: 64px; padding: 10px 12px;
+  resize: vertical; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.field-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; display: block; line-height: 1.4; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
 
+/* ---- Toast 通知 ---- */
 .toast {
-  position: fixed; bottom: 24px; right: 24px; padding: 10px 20px;
-  border-radius: var(--radius-md); font-size: 13px; z-index: 200;
-  animation: slideIn 0.3s ease;
+  position: fixed; bottom: 24px; right: 24px;
+  padding: 12px 24px; border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 600; z-index: 200;
+  animation: toastSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #fff; box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 8px;
 }
-.toast.info { background: var(--accent-primary); color: #fff; }
-.toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
-@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.toast.info { background: var(--accent-primary); }
+.toast.error { background: var(--accent-danger); }
+.toast.success { background: var(--accent-success); }
+@keyframes toastSlideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
+/* ---- 确认对话框 ---- */
 .confirm-dialog {
   background: var(--bg-card);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
-  padding: 28px;
+  padding: 32px;
   width: 380px;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
+  animation: modalScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .confirm-icon {
-  width: 48px; height: 48px;
-  margin: 0 auto 16px;
-  border-radius: 50%;
+  width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(248, 81, 73, 0.12);
-  color: var(--accent-danger);
+  background: rgba(239,68,68,0.1); color: var(--accent-danger);
 }
-.confirm-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
-.confirm-msg { font-size: 13px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5; }
-.confirm-actions { display: flex; justify-content: center; gap: 10px; }
+.confirm-icon svg { width: 26px; height: 26px; }
+.confirm-title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px; }
+.confirm-msg { font-size: 13px; color: var(--text-secondary); margin: 0 0 28px; line-height: 1.6; }
+.confirm-actions { display: flex; justify-content: center; gap: 12px; }
+
 .btn-cancel {
-  padding: 8px 20px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
-  background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; cursor: pointer;
-  transition: background 0.15s ease;
+  padding: 9px 24px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-primary); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
 }
 .btn-cancel:hover { background: var(--bg-hover); }
-.btn-danger-confirm {
-  padding: 8px 20px; border: none; border-radius: var(--radius-md);
-  background: var(--accent-danger); color: #fff; font-size: 13px; cursor: pointer;
-  transition: opacity 0.15s ease;
-}
-.btn-danger-confirm:hover { opacity: 0.88; }
 
+.btn-danger-confirm {
+  padding: 9px 24px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-danger); color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-danger-confirm:hover { opacity: 0.88; box-shadow: 0 2px 8px rgba(239,68,68,0.25); }
+
+/* ---- 生成器选择器 ---- */
 .generator-selector { display: flex; flex-direction: column; gap: 8px; }
 .generator-dropdown-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.gen-category-select, .gen-name-select { flex: 1 1 120px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
-.gen-category-select:focus, .gen-name-select:focus { border-color: var(--accent-primary); }
-.hint-label { font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
-.field-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; display: block; }
-.panel-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-secondary); }
-.btn-save-panel { width: 100%; padding: 10px; font-size: 14px; }
+.gen-category-select, .gen-name-select {
+  flex: 1 1 120px; min-width: 0; padding: 7px 10px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-input); color: var(--text-primary);
+  font-size: 13px; outline: none; box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+.gen-category-select:focus, .gen-name-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.hint-label { font-size: 11px; color: var(--text-tertiary); line-height: 1.5; }
 
+/* ---- 子节点选择器（Group） ---- */
+.group-child-config { display: flex; flex-direction: column; gap: 8px; }
+.group-available-nodes {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 4px;
+  max-height: 140px; overflow-y: auto; padding: 4px 0;
+}
+.child-node-selector { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.child-node-check {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0;
+}
+.child-node-check input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent-primary); }
+
+.group-ordered-list {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  padding: 8px; background: var(--bg-secondary);
+}
+.ordered-child-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border-radius: var(--radius-md); background: var(--bg-card);
+  transition: all 0.15s ease; border: 1px solid transparent;
+}
+.ordered-child-row:hover { background: var(--bg-hover); border-color: var(--border-primary); }
+.order-index {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  background: var(--accent-primary); border-radius: 50%; flex-shrink: 0;
+}
+.order-arrow { color: var(--accent-primary); font-size: 14px; font-weight: bold; flex-shrink: 0; margin-left: -2px; }
+.order-name { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.2s ease; }
+.ordered-child-row:hover .order-actions { opacity: 1; }
+.order-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+  background: var(--bg-card); cursor: pointer; font-size: 12px;
+  color: var(--text-secondary); transition: all 0.15s ease; padding: 0; line-height: 1;
+}
+.order-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.06); }
+.order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.order-btn.remove-btn:hover { border-color: var(--accent-danger); color: var(--accent-danger); background: rgba(239,68,68,0.06); }
+
+/* ---- 响应式 ---- */
 @media (max-width: 900px) {
-  .workspace-split { flex-direction: column; overflow-y: auto; }
-  .config-sidebar { width: 100%; max-width: none; min-width: 0; }
-  .dag-section { min-width: 0; }
+  .main-workspace { flex-direction: column; overflow-y: auto; }
+  .config-sidebar { width: 100%; max-width: none; min-width: 0; border-left: none; border-top: 1px solid var(--border-primary); }
+  .dag-section { min-width: 0; margin: 8px; }
   .scene-detail { height: auto; max-height: none; overflow: visible; }
+  .toolbar { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+  .toolbar-right { flex-wrap: wrap; }
+  .dag-actions { overflow-x: auto; flex-wrap: nowrap; }
+  .csv-editor { width: 98vw; height: 95vh; }
 }
 </style>

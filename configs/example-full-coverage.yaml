@@ -1,0 +1,268 @@
+name: DAG Full Coverage E2E Test
+description: |
+  覆盖所有 DAG 节点类型的端到端测试场景，基于 Mock Server 可完整跑通。
+  节点类型覆盖: setup, http, delay, condition, if-else, group, timer, teardown
+  功能覆盖: 变量嵌套引用、CSV 数据源、Generator 参数生成、Extract 变量提取、
+            IF-ELSE 条件分支、Group 子流程循环、Timer 延迟/间隔、循环次数
+
+variables:
+  - key: env
+    value: test
+  - key: api_host
+    value: localhost:9090
+  - key: base_url
+    value: http://${api_host}/mock/api
+  - key: token
+    value: ""
+  - key: user_id
+    value: "0"
+  - key: product_id
+    value: "1"
+  - key: order_id
+    value: ""
+  - key: payment_status
+    value: ""
+  - key: notify_result
+    value: ""
+  - key: health_url
+    value: http://${api_host}/mock/health
+
+data_sources:
+  - name: user_credentials
+    columns:
+      - username
+      - password
+      - role
+      - credit_limit
+    rows:
+      - username: "admin@example.com"
+        password: "admin123"
+        role: "admin"
+        credit_limit: "5000"
+      - username: "alice@example.com"
+        password: "alice123"
+        role: "user"
+        credit_limit: "2000"
+      - username: "bob@example.com"
+        password: "bob123"
+        role: "user"
+        credit_limit: "1000"
+
+setup:
+  - name: S1-注册用户
+    type: setup
+    config:
+      method: POST
+      url: "${base_url}/users"
+      headers:
+        Content-Type: application/json
+      body: '{"name":"perf_user_${user_credentials.username}","email":"${user_credentials.username}","role":"${user_credentials.role}"}'
+      timeout: 5.0
+
+  - name: S2-登录获取Token
+    type: setup
+    config:
+      method: POST
+      url: "${base_url}/auth/login"
+      headers:
+        Content-Type: application/json
+      body: '{"email":"${user_credentials.username}","password":"${user_credentials.password}"}'
+      timeout: 5.0
+
+nodes:
+  - name: D1-浏览商品列表
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products?page=1"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: D2-查看商品详情
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products/${product_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: D3-用户思考延迟
+    type: delay
+    config:
+      ms: 500
+
+  - name: D4-校验库存
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/products/${product_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: D5-创建订单
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/orders"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"user_id":${user_id},"product_id":${product_id},"total":79.99}'
+      timeout: 5.0
+
+  - name: D6-更新订单状态
+    type: http
+    config:
+      method: PUT
+      url: "${base_url}/orders/${order_id}"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"status":"confirmed"}'
+      timeout: 5.0
+
+  - name: G1-订单处理流程
+    type: group
+    config:
+      node_ids:
+        - D4-校验库存
+        - D5-创建订单
+        - D6-更新订单状态
+      loop_count: 2
+
+  - name: C1-判断是否有订单
+    type: condition
+    config:
+      expr: "${order_id}"
+
+  - name: IF1-是否支付
+    type: if-else
+    config:
+      expr: "${order_id}"
+
+  - name: D7-支付订单
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/payment"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"amount":79.99,"order_id":"${order_id}"}'
+      timeout: 5.0
+
+  - name: D8-查询订单跳过支付
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/orders/${order_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: T1-支付后延迟等待
+    type: timer
+    config:
+      mode: delay
+      seconds: 1
+
+  - name: D9-发送支付通知
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/notify"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${token}"
+      body: '{"event":"payment_success","order_id":"${order_id}"}'
+      timeout: 5.0
+
+  - name: D10-查询用户列表
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/users"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+    loop_count: 3
+
+  - name: D11-健康检查
+    type: http
+    config:
+      method: GET
+      url: "${health_url}"
+      timeout: 5.0
+
+teardown:
+  - name: T2-查询最终订单
+    type: teardown
+    config:
+      method: GET
+      url: "${base_url}/orders/${order_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+  - name: T3-清理测试用户
+    type: teardown
+    config:
+      method: DELETE
+      url: "${base_url}/users/${user_id}"
+      headers:
+        Authorization: "Bearer ${token}"
+      timeout: 5.0
+
+edges:
+  - from: S1-注册用户
+    to: S2-登录获取Token
+
+  - from: S2-登录获取Token
+    to: D1-浏览商品列表
+
+  - from: D1-浏览商品列表
+    to: D2-查看商品详情
+
+  - from: D2-查看商品详情
+    to: D3-用户思考延迟
+
+  - from: D3-用户思考延迟
+    to: G1-订单处理流程
+
+  - from: G1-订单处理流程
+    to: C1-判断是否有订单
+
+  - from: C1-判断是否有订单
+    to: IF1-是否支付
+
+  - from: IF1-是否支付
+    to: D7-支付订单
+    condition: "__if_true__"
+
+  - from: IF1-是否支付
+    to: D8-查询订单跳过支付
+    condition: "__if_false__"
+
+  - from: D7-支付订单
+    to: T1-支付后延迟等待
+
+  - from: T1-支付后延迟等待
+    to: D9-发送支付通知
+
+  - from: D9-发送支付通知
+    to: D10-查询用户列表
+
+  - from: D8-查询订单跳过支付
+    to: D10-查询用户列表
+
+  - from: D10-查询用户列表
+    to: D11-健康检查
+
+  - from: D11-健康检查
+    to: T2-查询最终订单
+
+  - from: T2-查询最终订单
+    to: T3-清理测试用户

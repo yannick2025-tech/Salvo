@@ -38,6 +38,7 @@ func main() {
 		Compress:   cfg.Log.Compress,
 		TimeFormat: cfg.Log.TimeFormat,
 	})
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)

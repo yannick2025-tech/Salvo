@@ -23,3 +23,6 @@ bin/
 logs/
 salvo
 *.vue.js
+
+# codegraph
+.codegraph/
