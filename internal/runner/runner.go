@@ -936,8 +936,36 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 
+	// Collect node IDs that are referenced as children of any Group node,
+	// so they are NOT added as independent DAG nodes — the Group executes them.
+	groupChildIDs := make(map[string]bool)
+	for _, n := range nodeList {
+		if n.Type == model.NodeTypeGroup {
+			var gcfg struct {
+				NodeIDs []string `json:"node_ids"`
+			}
+			if json.Unmarshal([]byte(n.Config), &gcfg) == nil {
+				for _, cid := range gcfg.NodeIDs {
+					groupChildIDs[cid] = true
+				}
+			}
+		}
+	}
+	if len(groupChildIDs) > 0 {
+		names := make([]string, 0, len(groupChildIDs))
+		for name := range groupChildIDs {
+			names = append(names, name)
+		}
+		buildLog.Debug("excluding group child nodes from DAG",
+			logger.F("excluded_nodes", names))
+	}
+
 	nodeMap := make(map[string]snowflake.ID)
 	for _, n := range nodeList {
+		// Skip Group child nodes — they are executed by their parent Group, not by the DAG directly.
+		if groupChildIDs[n.Name] {
+			continue
+		}
 		nodeIDStr := n.ID.String()
 		nodeMap[nodeIDStr] = n.ID
 
@@ -1167,6 +1195,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 	}
 
+	nodeLog.Debug("HTTP request fields after variable resolution",
+		logger.F("method", method),
+		logger.F("timeout_ms", timeout.Milliseconds()),
+		logger.F("header_count", len(cfg.Headers)),
+	)
+
 	req := &httpprotocol.HTTPRequest{
 		Method:  httpprotocol.Method(method),
 		URL:     url,
@@ -1175,7 +1209,26 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	for k, v := range req.Headers {
-		req.Headers[k] = resolveGeneratorRefs(v, genReg, nodeLog)
+		resolved := resolveGeneratorRefs(v, genReg, nodeLog)
+		if input != nil && input.Variables != nil {
+			resolved = resolveWithVariables(resolved, input.Variables)
+		}
+		req.Headers[k] = resolved
+	}
+
+	if len(req.Headers) > 0 {
+		// Mask sensitive header values for debug logging
+		masked := make(map[string]string, len(req.Headers))
+		for k, v := range req.Headers {
+			if isSensitiveHeader(k) {
+				masked[k] = maskValue(v)
+			} else {
+				masked[k] = v
+			}
+		}
+		nodeLog.Debug("resolved headers",
+			logger.F("headers", masked),
+		)
 	}
 
 	if cfg.Body != "" {
@@ -1184,6 +1237,9 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			body = resolveWithVariables(body, input.Variables)
 		}
 		req.Body = []byte(body)
+		nodeLog.Debug("resolved body",
+			logger.F("body_preview", truncateString(body, 300)),
+		)
 	}
 
 	proto := httpprotocol.NewProtocol()
@@ -1402,27 +1458,47 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 }
 
 func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	// Accept multiple field names for the duration value: seconds (canonical),
+	// delay, duration, interval — so YAML configs using any of them work.
 	var cfg struct {
-		Mode    string  `json:"mode"`    // "delay" or "interval"
-		Seconds float64 `json:"seconds"` // duration in seconds
+		Mode     string  `json:"mode"`
+		Seconds  float64 `json:"seconds"`
+		Delay    float64 `json:"delay"`
+		Duration float64 `json:"duration"`
+		Interval float64 `json:"interval"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse timer config", logger.F("error", err))
 		return nil, fmt.Errorf("parse timer config: %w", err)
 	}
 
-	if cfg.Seconds <= 0 {
-		nodeLog.Warn("timer seconds must be > 0, got invalid value",
-			logger.F("seconds", cfg.Seconds),
-			logger.F("mode", cfg.Mode))
-		return nil, fmt.Errorf("timer seconds must be > 0, got %f", cfg.Seconds)
+	// Pick the first non-zero value from the aliased fields.
+	seconds := cfg.Seconds
+	if seconds <= 0 && cfg.Delay > 0 {
+		seconds = cfg.Delay
+	}
+	if seconds <= 0 && cfg.Duration > 0 {
+		seconds = cfg.Duration
+	}
+	if seconds <= 0 && cfg.Interval > 0 {
+		seconds = cfg.Interval
 	}
 
-	duration := time.Duration(cfg.Seconds * float64(time.Second))
+	if seconds <= 0 {
+		nodeLog.Warn("timer duration is zero or missing, using default 1s",
+			logger.F("raw_seconds", cfg.Seconds),
+			logger.F("raw_delay", cfg.Delay),
+			logger.F("raw_duration", cfg.Duration),
+			logger.F("raw_interval", cfg.Interval),
+			logger.F("mode", cfg.Mode))
+		seconds = 1.0
+	}
+
+	duration := time.Duration(seconds * float64(time.Second))
 
 	switch cfg.Mode {
 	case "delay":
-		nodeLog.Info("timer delay started", logger.F("seconds", cfg.Seconds))
+		nodeLog.Info("timer delay started", logger.F("seconds", seconds))
 		select {
 		case <-time.After(duration):
 			nodeLog.Info("timer delay completed")
@@ -1431,7 +1507,7 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 			return nil, fmt.Errorf("timer cancelled: %w", ctx.Err())
 		}
 	case "interval":
-		nodeLog.Info("timer interval started", logger.F("seconds", cfg.Seconds))
+		nodeLog.Info("timer interval started", logger.F("seconds", seconds))
 		ticker := time.NewTicker(duration)
 		defer ticker.Stop()
 
@@ -1818,4 +1894,24 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// isSensitiveHeader returns true for headers that carry secrets/tokens.
+func isSensitiveHeader(key string) bool {
+	lower := strings.ToLower(key)
+	switch lower {
+	case "authorization", "cookie", "x-api-key", "x-auth-token",
+		"x-csrf-token", "proxy-authorization", "set-cookie":
+		return true
+	default:
+		return strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "key")
+	}
+}
+
+// maskValue masks a sensitive value, keeping first 4 and last 4 chars.
+func maskValue(v string) string {
+	if len(v) <= 8 {
+		return "****"
+	}
+	return v[:4] + "****" + v[len(v)-4:]
 }
