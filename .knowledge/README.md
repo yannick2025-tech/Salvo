@@ -43,6 +43,7 @@
 
 | 文件 | 内容 | 触发关键词 |
 |------|------|-----------|
+| [codegraph-workflow.md](./L4-workflows/codegraph-workflow.md) | CodeGraph 使用流程（修改前搜索、修改后同步） | codegraph、搜索、sync、修改代码、SearchCodebase |
 | [code-review-checklist.md](./L4-workflows/code-review-checklist.md) | 变更后自检清单 | 自检、审查、checklist、lint |
 | bug-fix-sop.md | Bug 修复 SOP | 预留 |
 | feature-dev-sop.md | 功能开发 SOP | 预留 |

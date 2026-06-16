@@ -10,6 +10,11 @@ tags: [checklist, code-review, self-check, lint, quality]
 
 > 每次完成代码变更后，按此清单逐项检查。
 
+## CodeGraph 同步
+
+- [ ] 修改前已通过 `SearchCodebase` 查找并理解相关代码（参考 [codegraph-workflow.md](./codegraph-workflow.md)）
+- [ ] 修改后已执行 `codegraph sync` 同步索引
+
 ## 代码质量
 
 - [ ] 代码能编译通过（`go build ./...` / `npm run build`）
