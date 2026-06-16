@@ -1,5 +1,4 @@
-## 
-D Requirements
+## ADDED Requirements
 
 ### Requirement: Variable editing GUI
 The system SHALL provide a variable editing panel on the Scene Detail page that allows users to add, edit, and delete scene-level variables. Each variable entry SHALL have a key and value field. Changes SHALL be persisted to the scene's `variables` JSON field.

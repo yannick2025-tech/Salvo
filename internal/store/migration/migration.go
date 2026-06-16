@@ -41,6 +41,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE run_records ADD COLUMN p90_latency REAL DEFAULT 0`,
 		`ALTER TABLE time_series_samples ADD COLUMN p90_latency_ms REAL DEFAULT 0`,
 		`ALTER TABLE run_records ADD COLUMN count INTEGER DEFAULT 0`,
+		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)

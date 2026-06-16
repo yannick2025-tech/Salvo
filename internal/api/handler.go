@@ -60,19 +60,19 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 }
 
 type yamlScene struct {
-	Name        string          `yaml:"name"`
-	Description string          `yaml:"description"`
-	Variables   []yamlVarItem   `yaml:"variables,omitempty"`
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Variables   []yamlVarItem    `yaml:"variables,omitempty"`
 	DataSources []yamlDataSource `yaml:"data_sources,omitempty"`
-	Setup       []yamlNode      `yaml:"setup,omitempty"`
-	Nodes       []yamlNode      `yaml:"nodes"`
-	Teardown    []yamlNode      `yaml:"teardown,omitempty"`
-	Edges       []yamlEdge      `yaml:"edges,omitempty"`
+	Setup       []yamlNode       `yaml:"setup,omitempty"`
+	Nodes       []yamlNode       `yaml:"nodes"`
+	Teardown    []yamlNode       `yaml:"teardown,omitempty"`
+	Edges       []yamlEdge       `yaml:"edges,omitempty"`
 }
 
 type yamlDataSource struct {
-	Name    string   `yaml:"name"`
-	Columns []string `yaml:"columns"`
+	Name    string              `yaml:"name"`
+	Columns []string            `yaml:"columns"`
 	Rows    []map[string]string `yaml:"rows"`
 }
 
@@ -1298,6 +1298,7 @@ func toReportDTO(rp *model.Report) dto.ReportDTO {
 func toRunRecordDTO(rr *model.RunRecord) dto.RunRecordDTO {
 	return dto.RunRecordDTO{
 		ID:          rr.ID,
+		RunID:       rr.RunID,
 		SceneID:     rr.SceneID,
 		Status:      rr.Status,
 		WorkerCount: rr.WorkerCount,
@@ -1830,17 +1831,17 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	}
 
 	response := dto.DashboardOverviewDTO{
-		TotalReqs:         totalReqs,
-		SuccessReqs:       successReqs,
-		FailedReqs:        failedReqs,
-		P50Latency:        p50,
-		P95Latency:        p95,
-		P99Latency:        p99,
-		AvgLatency:        avg,
-		Running:           running,
-		RecentRuns:        recentRuns,
-		NodeMetrics:       nodeMetrics,
-		TimeSeries:        ts,
+		TotalReqs:   totalReqs,
+		SuccessReqs: successReqs,
+		FailedReqs:  failedReqs,
+		P50Latency:  p50,
+		P95Latency:  p95,
+		P99Latency:  p99,
+		AvgLatency:  avg,
+		Running:     running,
+		RecentRuns:  recentRuns,
+		NodeMetrics: nodeMetrics,
+		TimeSeries:  ts,
 	}
 
 	if sceneID > 0 {
@@ -2473,6 +2474,87 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 		}
 
 		result = append(result, nm)
+	}
+
+	// --- Report Fallback: supplement Group child nodes missing from tracer spans ---
+	// Group child nodes execute via executeGroup() directly, bypassing DAG executor's span recording.
+	// Their metrics exist in r.nodeStats (HTML report) but not in tracer spans (Dashboard).
+	// Fallback: query latest completed run's report detail for missing nodes.
+	tracerNodeSet := make(map[string]bool, len(nodeIDs))
+	for _, id := range nodeIDs {
+		tracerNodeSet[id] = true
+	}
+
+	if sceneID > 0 {
+		if reports, rptErr := h.reports.List(r.Context(), repo.Filter{SceneID: snowflake.ID(sceneID), Limit: 1}); rptErr == nil && len(reports) > 0 {
+			latestReport := reports[0]
+			if latestReport.Detail != "" && latestReport.Detail != "{}" {
+				var rptDetail struct {
+					Metadata struct {
+						StartedAt  string  `json:"started_at"`
+						FinishedAt string  `json:"finished_at"`
+						Duration   float64 `json:"duration_sec"`
+					} `json:"metadata"`
+					NodeMetrics []struct {
+						NodeID   string `json:"node_id"`
+						NodeName string `json:"node_name"`
+						NodeType string `json:"node_type,omitempty"`
+						Summary  struct {
+							TotalRequests int64   `json:"total_requests"`
+							SuccessCount  int64   `json:"success_count"`
+							FailCount     int64   `json:"fail_count"`
+							SuccessRate   float64 `json:"success_rate"`
+							AvgLatencyMs  float64 `json:"avg_latency_ms"`
+							P50LatencyMs  float64 `json:"p50_latency_ms"`
+							P95LatencyMs  float64 `json:"p95_latency_ms"`
+							P99LatencyMs  float64 `json:"p99_latency_ms"`
+							MaxLatencyMs  float64 `json:"max_latency_ms"`
+							MinLatencyMs  float64 `json:"min_latency_ms"`
+						} `json:"summary"`
+					} `json:"node_metrics"`
+				}
+				if json.Unmarshal([]byte(latestReport.Detail), &rptDetail) == nil {
+					runDurSec := rptDetail.Metadata.Duration
+					if runDurSec <= 0 {
+						runDurSec = totalDur.Seconds()
+					}
+					for _, nm := range rptDetail.NodeMetrics {
+						if tracerNodeSet[nm.NodeID] {
+							continue // already in tracer data
+						}
+						avgQPS := float64(0)
+						if runDurSec > 0 && nm.Summary.TotalRequests > 0 {
+							avgQPS = float64(nm.Summary.TotalRequests) / runDurSec
+						}
+						supplement := dto.NodeMetricDTO{
+							NodeID:      nm.NodeID,
+							Name:        nm.NodeName,
+							Type:        nm.NodeType,
+							SortOrder:   orderMap[nm.NodeID],
+							TotalReqs:   nm.Summary.TotalRequests,
+							SuccessReqs: nm.Summary.SuccessCount,
+							AvgLatency:  nm.Summary.AvgLatencyMs,
+							P50Latency:  nm.Summary.P50LatencyMs,
+							P95Latency:  nm.Summary.P95LatencyMs,
+							P99Latency:  nm.Summary.P99LatencyMs,
+							Timestamps:  []string{},
+							TSP50:       []float64{},
+							TSP95:       []float64{},
+							TSP99:       []float64{},
+							TSAvg:       []float64{},
+							TSQPS:       []float64{avgQPS},
+						}
+						if supplement.Name == "" {
+							supplement.Name = nm.NodeID
+						}
+						if supplement.Type == "" {
+							supplement.Type = "http"
+						}
+						result = append(result, supplement)
+					}
+				}
+			}
+		}
 	}
 
 	sort.Slice(result, func(i, j int) bool { return result[i].SortOrder < result[j].SortOrder })

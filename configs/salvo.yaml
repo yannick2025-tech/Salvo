@@ -11,7 +11,7 @@ database:
   log_level: "warn"
 
 log:
-  level: "info"
+  level: "debug"
   format: "json"
   output: "logs/salvo.log"
   max_size: 100

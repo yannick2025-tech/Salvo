@@ -89,6 +89,7 @@ export interface CreateSceneRequest {
 
 export interface RunRecordDTO {
   id: string
+  run_id: string
   scene_id: string
   status: string
   worker_count: number

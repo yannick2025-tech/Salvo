@@ -107,7 +107,8 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>数据KEY</th>
+            <th>运行ID</th>
             <th>场景</th>
             <th>状态</th>
             <th>并发</th>
@@ -121,9 +122,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="runs.length === 0"><td colspan="11" class="empty">暂无运行记录</td></tr>
+          <tr v-if="runs.length === 0"><td colspan="12" class="empty">暂无运行记录</td></tr>
           <tr v-for="r in runs" :key="r.id">
             <td class="mono">{{ r.id }}</td>
+            <td class="mono">{{ r.run_id }}</td>
             <td>{{ r.scene_id }}</td>
             <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
             <td>{{ Math.round(r.worker_count || 0) }}</td>

@@ -604,11 +604,11 @@ func (r *RunRecordRepo) Create(ctx context.Context, rec *model.RunRecord) error 
 	rec.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO run_records (id, scene_id, status, worker_count, run_mode, duration, count,
+		INSERT INTO run_records (id, scene_id, run_id, status, worker_count, run_mode, duration, count,
 			total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 			error_msg, started_at, finished_at, created_at, updated_at, deleted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-		rec.ID, rec.SceneID, rec.Status, rec.WorkerCount, rec.RunMode, rec.Duration, rec.Count,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		rec.ID, rec.SceneID, rec.RunID, rec.Status, rec.WorkerCount, rec.RunMode, rec.Duration, rec.Count,
 		rec.TotalReqs, rec.SuccessReqs, rec.FailedReqs,
 		rec.AvgLatency, rec.P50Latency, rec.P90Latency, rec.P95Latency, rec.P99Latency,
 		rec.ErrorMsg, rec.StartedAt, rec.FinishedAt,
@@ -618,7 +618,7 @@ func (r *RunRecordRepo) Create(ctx context.Context, rec *model.RunRecord) error 
 
 func (r *RunRecordRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.RunRecord, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, status, worker_count, run_mode, duration, count,
+		SELECT id, run_id, scene_id, status, worker_count, run_mode, duration, count,
 			total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 			error_msg, started_at, finished_at, created_at, updated_at
 		FROM run_records WHERE id=? AND deleted_at IS NULL`, id)
@@ -626,7 +626,7 @@ func (r *RunRecordRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Ru
 }
 
 func (r *RunRecordRepo) List(ctx context.Context, filter repo.Filter) ([]*model.RunRecord, error) {
-	query := `SELECT id, scene_id, status, worker_count, run_mode, duration, count,
+	query := `SELECT id, run_id, scene_id, status, worker_count, run_mode, duration, count,
 		total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 		error_msg, started_at, finished_at, created_at, updated_at
 		FROM run_records WHERE deleted_at IS NULL`
@@ -685,7 +685,7 @@ func scanRunRecord(row interface {
 	Scan(dest ...any) error
 }) (*model.RunRecord, error) {
 	rec := &model.RunRecord{}
-	err := row.Scan(&rec.ID, &rec.SceneID, &rec.Status, &rec.WorkerCount,
+	err := row.Scan(&rec.ID, &rec.RunID, &rec.SceneID, &rec.Status, &rec.WorkerCount,
 		&rec.RunMode, &rec.Duration, &rec.Count, &rec.TotalReqs, &rec.SuccessReqs,
 		&rec.FailedReqs, &rec.AvgLatency, &rec.P50Latency, &rec.P90Latency, &rec.P95Latency,
 		&rec.P99Latency, &rec.ErrorMsg, &rec.StartedAt, &rec.FinishedAt,

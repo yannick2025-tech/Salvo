@@ -187,6 +187,7 @@ type Runner struct {
 	dataSources repo.DataSourceRepo
 	tracer      *tracelib.Tracer
 	runID       snowflake.ID
+	dbRecordID  snowflake.ID // DB-assigned PK after runs.Create(), used for Update/Delete queries
 	nodeGen     *snowflake.Node
 
 	startedAt  time.Time
@@ -354,6 +355,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	runRecord := &model.RunRecord{
 		Model:       model.Model{ID: r.runID},
+		RunID:       r.runID,
 		SceneID:     r.cfg.SceneID,
 		Status:      model.RunStatusRunning,
 		WorkerCount: r.cfg.Workers,
@@ -369,7 +371,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	r.mu.Lock()
-	r.runID = runRecord.ID
+	r.dbRecordID = runRecord.ID
 	r.mu.Unlock()
 
 	err = r.execute(dagObj, scope)
@@ -468,11 +470,11 @@ func (r *Runner) Stop() {
 
 func (r *Runner) saveFinalSnapshot() {
 	r.mu.Lock()
-	if r.runID == 0 || r.runs == nil {
+	if r.dbRecordID == 0 || r.runs == nil {
 		r.mu.Unlock()
 		return
 	}
-	runID := r.runID
+	runID := r.dbRecordID
 	sceneID := r.cfg.SceneID
 	startedAt := r.startedAt
 	r.mu.Unlock()
@@ -631,7 +633,7 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	reportCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	dbRecords, dbErr := r.tsStore.QueryByRunID(reportCtx, r.runID)
+	dbRecords, dbErr := r.tsStore.QueryByRunID(reportCtx, r.dbRecordID)
 	if dbErr != nil {
 		r.log.Warn("failed to query full time series from db, falling back to in-memory", logger.F("error", dbErr))
 	} else {
@@ -936,17 +938,35 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 
-	// Collect node IDs that are referenced as children of any Group node,
+	// Collect nodes that are referenced as children of any Group node,
 	// so they are NOT added as independent DAG nodes — the Group executes them.
-	groupChildIDs := make(map[string]bool)
+	// node_ids in YAML may contain either node names or snowflake IDs (depends
+	// on how the scene was imported/saved), so we resolve both to actual Node models.
+	groupChildIDs := make(map[string]bool)        // key = node.Name (for skip check)
+	groupChildRef := make(map[string]*model.Node) // key = raw value from YAML (name or ID) → resolved Node
 	for _, n := range nodeList {
 		if n.Type == model.NodeTypeGroup {
 			var gcfg struct {
 				NodeIDs []string `json:"node_ids"`
 			}
 			if json.Unmarshal([]byte(n.Config), &gcfg) == nil {
-				for _, cid := range gcfg.NodeIDs {
-					groupChildIDs[cid] = true
+				for _, ref := range gcfg.NodeIDs {
+					// Resolve ref → actual Node: try name first, then ID
+					var child *model.Node
+					for _, cn := range nodeList {
+						if cn.Name == ref || cn.ID.String() == ref {
+							child = cn
+							break
+						}
+					}
+					if child != nil {
+						groupChildIDs[child.Name] = true
+						groupChildRef[ref] = child
+					} else {
+						buildLog.Warn("group child reference could not be resolved",
+							logger.F("group_name", n.Name),
+							logger.F("ref", ref))
+					}
 				}
 			}
 		}
@@ -961,12 +981,18 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	}
 
 	nodeMap := make(map[string]snowflake.ID)
+	var dagNodeNames []string // track which nodes end up in DAG for diagnostics
 	for _, n := range nodeList {
 		// Skip Group child nodes — they are executed by their parent Group, not by the DAG directly.
 		if groupChildIDs[n.Name] {
+			buildLog.Debug("skipping group child node from DAG",
+				logger.F("node_id", n.ID.String()),
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type))
 			continue
 		}
 		nodeIDStr := n.ID.String()
+		dagNodeNames = append(dagNodeNames, n.Name)
 		nodeMap[nodeIDStr] = n.ID
 
 		r.nodeStats[nodeIDStr] = NewNodeStats(10000)
@@ -1011,14 +1037,16 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		}
 	}
 
-	// Resolve Group node children: look up child node IDs from config
-	// and store references to the actual DAG nodes.
+	// Resolve Group node children: look up child nodes by name from nodeList
+	// (not from DAG, since Group children are intentionally excluded from DAG topology)
+	// and build sceneNode instances for them.
 	for _, n := range nodeList {
 		if n.Type != model.NodeTypeGroup {
 			continue
 		}
 		var cfg struct {
-			NodeIDs []string `json:"node_ids"`
+			NodeIDs   []string `json:"node_ids"`
+			LoopCount int      `json:"loop_count"`
 		}
 		if err := json.Unmarshal([]byte(n.Config), &cfg); err != nil {
 			buildLog.Error("failed to parse group node config",
@@ -1035,25 +1063,63 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		if !ok {
 			continue
 		}
-		for _, childID := range cfg.NodeIDs {
-			child, found := dagObj.Node(childID)
-			if !found {
+		for _, childRef := range cfg.NodeIDs {
+			// Use pre-resolved reference (supports both name and ID as ref)
+			childModel := groupChildRef[childRef]
+			if childModel == nil {
 				buildLog.Error("group node references non-existent child",
 					logger.F("group_node_id", n.ID.String()),
 					logger.F("group_name", n.Name),
-					logger.F("child_id", childID))
-				return nil, fmt.Errorf("group node %s references non-existent child %s", n.ID, childID)
+					logger.F("child_ref", childRef))
+				return nil, fmt.Errorf("group node %s references non-existent child %s", n.ID, childRef)
+			}
+			// Build sceneNode for this child (same as buildDAGNode but not added to DAG)
+			childStatKey := childModel.ID.String()
+			if _, exists := r.nodeStats[childStatKey]; !exists {
+				r.nodeStats[childStatKey] = NewNodeStats(10000)
+			}
+			childSN := &sceneNode{
+				id:            childModel.ID.String(),
+				nodeType:      childModel.Type,
+				config:        childModel.Config,
+				loopCount:     childModel.LoopCount,
+				mode:          dag.ExecSync,
+				stats:         r.stats,
+				httpOnlyStats: r.httpOnlyStats,
+				nodeStats:     r.nodeStats[childStatKey],
+				log:           r.log,
+				traceID:       r.runID.String(),
+			}
+			if childSN.loopCount <= 0 {
+				childSN.loopCount = 1
 			}
 			// Validate: Group cannot contain another Group
-			if childSN, ok := child.(*sceneNode); ok && childSN.nodeType == model.NodeTypeGroup {
+			if childModel.Type == model.NodeTypeGroup {
 				buildLog.Error("group node cannot contain another group",
 					logger.F("group_node_id", n.ID.String()),
-					logger.F("nested_group_id", childID))
-				return nil, fmt.Errorf("group node %s cannot contain another group node %s", n.ID, childID)
+					logger.F("child_ref", childRef))
+				return nil, fmt.Errorf("group node %s cannot contain group child %s", n.ID, childRef)
 			}
-			sn.childNodes = append(sn.childNodes, child)
+			sn.childNodes = append(sn.childNodes, childSN)
+			buildLog.Debug("resolved group child",
+				logger.F("group_name", n.Name),
+				logger.F("child_ref", childRef),
+				logger.F("child_name", childModel.Name),
+				logger.F("child_id", childModel.ID.String()),
+				logger.F("child_type", childModel.Type))
+		}
+		if len(sn.childNodes) > 0 {
+			buildLog.Info("group node resolved",
+				logger.F("group_name", n.Name),
+				logger.F("child_count", len(sn.childNodes)),
+				logger.F("loop_count", cfg.LoopCount))
 		}
 	}
+
+	// Log final DAG composition for diagnostics
+	buildLog.Info("DAG built successfully",
+		logger.F("total_nodes_in_dag", len(dagNodeNames)),
+		logger.F("dag_nodes", dagNodeNames))
 
 	return dagObj, nil
 }
@@ -1297,8 +1363,8 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 		Ms int64 `json:"ms"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
-		if n.stats != nil {
-			n.stats.RecordLatency(0, false)
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
 		}
 		nodeLog.Error("failed to parse delay config", logger.F("error", err))
 		return nil, fmt.Errorf("parse delay config: %w", err)
@@ -1325,8 +1391,8 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 		)
 		return &dag.Output{Response: map[string]any{"delay_ms": cfg.Ms}}, nil
 	case <-ctx.Done():
-		if n.stats != nil {
-			n.stats.RecordLatency(0, false)
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
 		}
 		nodeLog.Warn("delay node cancelled", logger.F("error", ctx.Err()))
 		return nil, ctx.Err()
@@ -1353,8 +1419,8 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 		logger.F("resolved_expr", resolvedExpr),
 		logger.F("result", result),
 	)
-	if n.stats != nil {
-		n.stats.RecordLatency(0, true)
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(0, true)
 	}
 	return &dag.Output{Response: map[string]any{"condition": result}}, nil
 }
@@ -1374,8 +1440,8 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 		logger.F("result", result),
 		logger.F("branch", map[bool]string{true: "if_true", false: "if_false"}[result]),
 	)
-	if n.stats != nil {
-		n.stats.RecordLatency(0, true)
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(0, true)
 	}
 	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
 }
@@ -1445,8 +1511,8 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 		}
 	}
 
-	if n.stats != nil {
-		n.stats.RecordLatency(0, true)
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(0, true)
 	}
 
 	return &dag.Output{Response: map[string]any{
@@ -1495,6 +1561,7 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 	}
 
 	duration := time.Duration(seconds * float64(time.Second))
+	startTime := time.Now()
 
 	switch cfg.Mode {
 	case "delay":
@@ -1504,6 +1571,10 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 			nodeLog.Info("timer delay completed")
 		case <-ctx.Done():
 			nodeLog.Info("timer delay cancelled")
+			elapsed := time.Since(startTime)
+			if n.nodeStats != nil {
+				n.nodeStats.RecordLatency(elapsed, false)
+			}
 			return nil, fmt.Errorf("timer cancelled: %w", ctx.Err())
 		}
 	case "interval":
@@ -1519,6 +1590,10 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 				nodeLog.Info("timer tick", logger.F("tick", tickCount))
 			case <-ctx.Done():
 				nodeLog.Info("timer interval stopped", logger.F("ticks", tickCount))
+				elapsed := time.Since(startTime)
+				if n.nodeStats != nil {
+					n.nodeStats.RecordLatency(elapsed, true)
+				}
 				return &dag.Output{Response: map[string]any{
 					"node_id": n.id,
 					"type":    "timer",
@@ -1531,11 +1606,16 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 		nodeLog.Warn("invalid timer mode",
 			logger.F("mode", cfg.Mode),
 			logger.F("valid_modes", []string{"delay", "interval"}))
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
 		return nil, fmt.Errorf("invalid timer mode %q, must be \"delay\" or \"interval\"", cfg.Mode)
 	}
 
-	if n.stats != nil {
-		n.stats.RecordLatency(0, true)
+	// delay mode completed successfully
+	elapsed := time.Since(startTime)
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(elapsed, true)
 	}
 
 	return &dag.Output{Response: map[string]any{

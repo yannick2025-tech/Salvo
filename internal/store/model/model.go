@@ -141,6 +141,7 @@ const (
 // RunRecord represents a single test execution record.
 type RunRecord struct {
 	Model
+	RunID       snowflake.ID `json:"run_id,string"`
 	SceneID     snowflake.ID `json:"scene_id,string"`
 	Status      string       `json:"status"`
 	WorkerCount int          `json:"worker_count"`

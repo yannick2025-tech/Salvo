@@ -334,6 +334,7 @@ type ListRunRecordsRequest struct {
 // RunRecordDTO is the run record detail returned in API responses.
 type RunRecordDTO struct {
 	ID          snowflake.ID `json:"id"`
+	RunID       snowflake.ID `json:"run_id"`
 	SceneID     snowflake.ID `json:"scene_id"`
 	Status      string       `json:"status"`
 	WorkerCount int          `json:"worker_count"`
