@@ -1126,3 +1126,92 @@ func (r *DataSourceRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE data_sources SET deleted_at=? WHERE id=?`, now, id)
 	return err
 }
+
+// SOPluginRepo implements repo.SOPluginRepo using SQLite.
+type SOPluginRepo struct {
+	db *DB
+}
+
+func NewSOPluginRepo(db *DB) *SOPluginRepo {
+	return &SOPluginRepo{db: db}
+}
+
+func (r *SOPluginRepo) Create(ctx context.Context, p *model.SOPlugin) error {
+	now := time.Now().UTC()
+	p.ID = int64(r.db.NextID())
+	p.CreatedAt = now
+	p.UpdatedAt = now
+
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO so_plugins (id, name, version, file_path, status, config, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		p.ID, p.Name, p.Version, p.FilePath, p.Status, p.Config, p.CreatedAt, p.UpdatedAt)
+	return err
+}
+
+func (r *SOPluginRepo) GetByID(ctx context.Context, id int64) (*model.SOPlugin, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, name, version, file_path, status, config, created_at, updated_at
+		FROM so_plugins WHERE id=? AND deleted_at IS NULL`, id)
+	p := &model.SOPlugin{}
+	err := row.Scan(&p.ID, &p.Name, &p.Version, &p.FilePath, &p.Status, &p.Config, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *SOPluginRepo) List(ctx context.Context, filter repo.Filter) ([]*model.SOPlugin, error) {
+	query := `SELECT id, name, version, file_path, status, config, created_at, updated_at
+		FROM so_plugins WHERE deleted_at IS NULL`
+	args := make([]any, 0)
+
+	if filter.Status != "" {
+		query += ` AND status=?`
+		args = append(args, filter.Status)
+	}
+	query += ` ORDER BY name ASC, version DESC`
+
+	if filter.Limit > 0 {
+		query += fmt.Sprintf(` LIMIT %d`, filter.Limit)
+	} else {
+		query += ` LIMIT 50`
+	}
+	if filter.Offset > 0 {
+		query += fmt.Sprintf(` OFFSET %d`, filter.Offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var plugins []*model.SOPlugin
+	for rows.Next() {
+		p := &model.SOPlugin{}
+		if err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.FilePath, &p.Status, &p.Config, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		plugins = append(plugins, p)
+	}
+	return plugins, rows.Err()
+}
+
+func (r *SOPluginRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET status=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, status, now, id)
+	return err
+}
+
+func (r *SOPluginRepo) UpdateConfig(ctx context.Context, id int64, config string) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET config=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, config, now, id)
+	return err
+}
+
+func (r *SOPluginRepo) Delete(ctx context.Context, id int64) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, now, id)
+	return err
+}

@@ -15,7 +15,10 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/auth"
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
@@ -58,7 +61,8 @@ func New(cfg Config) *Server {
 		perms:      sqlite.NewPermissionRepo(cfg.DB),
 		rp:         sqlite.NewRolePermissionRepo(cfg.DB),
 		dataSources: sqlite.NewDataSourceRepo(cfg.DB),
-		jwt:        cfg.JWT,
+		soPlugins:   sqlite.NewSOPluginRepo(cfg.DB),
+		jwt:         cfg.JWT,
 		rbac:       cfg.RBAC,
 		globalVars: cfg.Variables,
 	}
@@ -82,6 +86,17 @@ func New(cfg Config) *Server {
 
 	h.tsStore = runner.NewSQLiteTimeSeriesStore(cfg.DB.DB)
 	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.dataSources, h.tracer, h.tsStore, cfg.Logger)
+
+	// Bootstrap SO plugin system: create a registry and load enabled plugins.
+	soReg := expr.NewFunctionRegistry()
+	builtin.RegisterAll(soReg)
+	soLoader, err := so.InitFromDB(context.Background(), h.soPlugins, soReg)
+	if err != nil {
+		cfg.Logger.Warn("so plugin bootstrap completed with errors", logger.F("error", err))
+	} else {
+		cfg.Logger.Info("so plugin bootstrap completed")
+	}
+	_ = soLoader // available for future reload endpoint
 
 	s := &Server{
 		db:      cfg.DB,
@@ -151,6 +166,12 @@ var routePermissions = map[string]string{
 	"/api/v1/scenes/status":        "runner:read",
 	"/api/v1/plugins/list":         "settings:read",
 	"/api/v1/plugins/config":       "settings:write",
+	"/api/v1/so-plugins/create":    "admin:write",
+	"/api/v1/so-plugins/list":      "admin:read",
+	"/api/v1/so-plugins/get":       "admin:read",
+	"/api/v1/so-plugins/status":    "admin:write",
+	"/api/v1/so-plugins/config":    "admin:write",
+	"/api/v1/so-plugins/delete":    "admin:write",
 	"/api/v1/reports/list":         "report:read",
 	"/api/v1/reports/get":          "report:read",
 	"/api/v1/runs/list":            "runner:read",
@@ -208,6 +229,13 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
 	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
+
+	mux.HandleFunc("POST /api/v1/so-plugins/create", s.handleAuth(s.handler.UploadSOPlugin))
+	mux.HandleFunc("POST /api/v1/so-plugins/list", s.handleAuth(s.handler.ListSOPlugins))
+	mux.HandleFunc("POST /api/v1/so-plugins/get", s.handleAuth(s.handler.GetSOPlugin))
+	mux.HandleFunc("POST /api/v1/so-plugins/status", s.handleAuth(s.handler.UpdateSOPluginStatus))
+	mux.HandleFunc("POST /api/v1/so-plugins/config", s.handleAuth(s.handler.UpdateSOPluginConfig))
+	mux.HandleFunc("POST /api/v1/so-plugins/delete", s.handleAuth(s.handler.DeleteSOPlugin))
 
 	mux.HandleFunc("POST /api/v1/generators/list", s.handleAuth(s.handler.ListGenerators))
 
@@ -427,6 +455,7 @@ type Handler struct {
 	perms       repo.PermissionRepo
 	rp          repo.RolePermissionRepo
 	dataSources repo.DataSourceRepo
+	soPlugins   repo.SOPluginRepo
 	tracer      *tracelib.Tracer
 	traceStore  *tracestore.Store
 	tsStore     runner.TimeSeriesStore

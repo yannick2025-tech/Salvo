@@ -229,6 +229,40 @@ type UploadDataSourceRequest struct {
 	Content  string       `json:"content"` // raw CSV content
 }
 
+// --- SO Plugin ---
+
+type UploadSOPluginRequest struct {
+	Name     string `json:"name"`
+	Version  string `json:"version"`
+	FilePath string `json:"file_path"`
+	Status   string `json:"status"`
+	Config   string `json:"config"`
+}
+
+type ListSOPluginsRequest struct {
+	Offset int    `json:"offset"`
+	Limit  int    `json:"limit"`
+	Status string `json:"status"`
+}
+
+type GetSOPluginRequest struct {
+	ID int64 `json:"id"`
+}
+
+type UpdateSOPluginStatusRequest struct {
+	ID     int64  `json:"id"`
+	Status string `json:"status"`
+}
+
+type UpdateSOPluginConfigRequest struct {
+	ID     int64  `json:"id"`
+	Config string `json:"config"`
+}
+
+type DeleteSOPluginRequest struct {
+	ID int64 `json:"id"`
+}
+
 // DataSourceDTO is the data source detail returned in API responses.
 type DataSourceDTO struct {
 	ID        snowflake.ID `json:"id"`
@@ -239,6 +273,18 @@ type DataSourceDTO struct {
 	RowCount  int          `json:"row_count"`
 	CreatedAt time.Time    `json:"created_at"`
 	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// SOPluginDTO is the SO plugin detail returned in API responses.
+type SOPluginDTO struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Version   string    `json:"version"`
+	FilePath  string    `json:"file_path"`
+	Status    string    `json:"status"`
+	Config    string    `json:"config"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // DataSourcePreviewDTO is the data source preview with sample rows.

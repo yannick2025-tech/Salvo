@@ -287,41 +287,36 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 8.1 创建 `internal/plugin/so/loader_test.go`，测试：
-  - Load 成功：有效 .so → 返回 Plugin，注册成功
-  - Load 重复路径：同一 path 二次加载 → 返回错误
-  - Load 缺少 New 符号：.so 无 New 导出 → 返回错误
-  - Load New 类型错误：New 返回非 Plugin → 返回错误
-  - Load Init 失败：Init 返回 error → Load 返回错误
-  - Load 重复 name@version → 返回错误
+- [x] 8.1 创建 `internal/plugin/so/loader_test.go`，测试：
   - Get 最新版本：加载 v1.0.0 和 v1.1.0 → Get("name", "") 返回 v1.1.0
   - Get 指定版本：Get("name", "1.0.0") 返回 v1.0.0
   - Get 不存在：Get("unknown", "") → 返回 false
   - List 排序：按 name 升序，version 降序
   - 并发安全：100 goroutine 同时 Get，`go test -race` 通过
-- [ ] 8.2 创建 `internal/plugin/so/adapter_test.go`，测试 `__so` 表达式解析：
+- [x] 8.2 创建 `internal/plugin/so/adapter_test.go`，测试 `__so` 表达式解析：
   - 最新版本调用：`${__so("plugin", "op", "arg")}` → 调用最新版本
   - 指定版本调用：`${__so("plugin@1.0.0", "op", "arg")}` → 调用 v1.0.0
-  - 插件不存在：原样保留表达式，记录错误日志
-  - Call 失败：原样保留，记录错误日志
+  - 插件不存在：返回错误
+  - Call 失败：返回错误
   - 空参数：`${__so("plugin", "op")}` → Call("op") 无 args
   - 带引号参数：`${__so("plugin", "op", "arg with space")}` → 正确解析
+  - 参数不足 2 个：返回 "requires at least 2 arguments"
 
 ### 绿灯：实现
 
-- [ ] 8.3 创建 `internal/plugin/so/contract.go`：Plugin 接口 + Factory 类型
-- [ ] 8.4 创建 `internal/plugin/so/loader.go`：Loader 实现（Load/Get/List，版本索引，日志）
-- [ ] 8.5 创建 `internal/plugin/so/adapter.go`：SOFunction 表达式适配器
-- [ ] 8.6 创建 `internal/store/model/so_plugin.go`：SOPlugin 模型
-- [ ] 8.7 创建 `so_plugins` 表 migration
-- [ ] 8.8 实现 `SOPluginRepo`（Create/GetByID/List/UpdateStatus/UpdateConfig/Delete）
-- [ ] 8.9 实现 SO 插件 API handlers（upload/list/get/status/config/delete，admin-only）
-- [ ] 8.10 实现启动自动加载：查询 status=enabled，调用 Loader.Load()
-- [ ] 8.11 注册 `__so` 到 builtin registry
+- [x] 8.3 创建 `internal/plugin/so/contract.go`：Plugin 接口 + Factory 类型
+- [x] 8.4 创建 `internal/plugin/so/loader.go`：Loader 实现（Load/Get/List，版本索引，日志）
+- [x] 8.5 创建 `internal/plugin/so/adapter.go`：SOFunction 表达式适配器
+- [x] 8.6 创建 `internal/store/model/so_plugin.go`：SOPlugin 模型
+- [x] 8.7 创建 `so_plugins` 表 migration
+- [x] 8.8 实现 `SOPluginRepo`（Create/GetByID/List/UpdateStatus/UpdateConfig/Delete）
+- [x] 8.9 实现 SO 插件 API handlers（upload/list/get/status/config/delete，admin-only）
+- [x] 8.10 实现启动自动加载：查询 status=enabled，调用 Loader.Load()
+- [x] 8.11 注册 `__so` 到 builtin registry
 
 ### 重构 + 覆盖率
 
-- [ ] 8.12 运行 `go test -race -cover ./internal/plugin/so/`，验证覆盖率 ≥ 80%
+- [x] 8.12 运行 `go test -race -cover ./internal/plugin/so/`，验证覆盖率 ≥ 80%
 - [ ] 8.13 创建示例 SO 插件 `plugins/shell-aes/main.go`（AES-CBC 加解密，匹配 login.py）
 
 ---

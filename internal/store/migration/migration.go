@@ -29,6 +29,7 @@ func Migrate(db *sql.DB) error {
 		{"users", createUsersTable},
 		{"time_series_samples", createTimeSeriesSamplesTable},
 		{"data_sources", createDataSourcesTable},
+		{"so_plugins", createSoPluginsTable},
 	}
 
 	for _, m := range migrations {
@@ -196,7 +197,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 4
+const currentVersion = 5
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -354,4 +355,21 @@ CREATE TABLE IF NOT EXISTS data_sources (
 CREATE INDEX IF NOT EXISTS idx_data_sources_scene_id ON data_sources(scene_id);
 CREATE INDEX IF NOT EXISTS idx_data_sources_name ON data_sources(name);
 CREATE INDEX IF NOT EXISTS idx_data_sources_deleted_at ON data_sources(deleted_at);
+`
+
+const createSoPluginsTable = `
+CREATE TABLE IF NOT EXISTS so_plugins (
+	id              INTEGER PRIMARY KEY,
+	name            TEXT    NOT NULL,
+	version         TEXT    NOT NULL,
+	file_path       TEXT    NOT NULL,
+	status          TEXT    NOT NULL DEFAULT 'disabled',
+	config          TEXT    DEFAULT '',
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_name ON so_plugins(name);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_status ON so_plugins(status);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_deleted_at ON so_plugins(deleted_at);
 `
