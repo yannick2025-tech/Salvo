@@ -1176,6 +1176,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		return n.executeWhile(ctx, input, nodeLog)
 	case model.NodeTypeParallel:
 		return n.executeParallel(ctx, input, nodeLog)
+	case model.NodeTypeLoop:
+		return n.executeLoop(ctx, input, nodeLog)
 	case model.NodeTypeSubFlow:
 		return n.executeSubFlow(ctx, input, nodeLog)
 	case model.NodeTypeTimer:

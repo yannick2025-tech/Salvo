@@ -261,20 +261,25 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 7.1 创建 `internal/runner/loop_node_test.go`，测试：
+- [x] 7.1 创建 `internal/runner/loop_node_test.go`，测试：
   - 固定循环 3 次：loop_count=3 → 子步骤执行 3 次
   - loop_count=0：不执行
   - loop_count=1：执行 1 次
-  - 变量累积：每次迭代提取的变量在下次迭代可用
+  - 变量累积：每次迭代提取的变量在下次迭代可用（iterationNum=3）
   - 与 while 区别：loop 是固定次数，while 是条件退出
+  - 空步骤列表：steps=[] → 不执行
+  - 上下文取消 → 返回错误
+  - 子步骤条件：条件不满足时跳过执行
+  - Nil input：正常运行
+  - Think time：每次迭代的 think_time 生效
 
 ### 绿灯：实现
 
-- [ ] 7.2 实现 `executeLoop()`：固定次数循环执行子步骤
+- [x] 7.2 创建 `internal/runner/loop_node.go`：实现 `executeLoop()` — 固定次数循环执行子步骤，通过 mergedVars 变量累积跨迭代传递变量，复用 buildStepHTTPRequest/extractVarsFromResponse，支持 think_time、条件跳过、上下文取消
 
 ### 重构 + 覆盖率
 
-- [ ] 7.3 运行 `go test -race -cover -run LoopNode ./internal/runner/`
+- [x] 7.3 运行 `go test -race -cover -run Loop ./internal/runner/`，10 个测试全部通过，覆盖固定次数/零次/一次/变量累积/空步骤/上下文取消/条件跳过/nil input/think time
 
 ---
 
