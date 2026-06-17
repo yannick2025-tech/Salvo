@@ -232,23 +232,28 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 6.1 创建 `internal/runner/sub_flow_node_test.go`，测试：
+- [x] 6.1 创建 `internal/runner/sub_flow_node_test.go`，测试：
   - 同步执行：scene_id 引用子场景，async=false → 等待子场景完成
   - 异步执行：async=true → 立即返回，子场景后台执行
   - 变量合并（同步）：子场景提取 subToken → 父作用域可用
-  - 变量不合并（异步）：子场景提取 subToken → 父作用域不可用
-  - 深度限制：嵌套 5 层 → 正常；嵌套 6 层 → 返回错误
+  - 变量不合并（异步）：async 返回后父作用域无子场景变量
+  - 深度限制：嵌套 5 层 → 正常；嵌套 6 层 → 返回错误（depth >= 5 拒绝）
   - 循环引用检测：A→B→A → 返回错误
-  - 场景不存在：scene_id 无效 → 返回错误
+  - 场景不存在：scene_id 无效 → runner 返回错误
+  - 空 scene_id → 返回错误
+  - subFlowRunner 为 nil → 返回错误
+  - 上下文取消 → 返回错误
+  - Nil input → 正常运行
+  - 异步不阻塞：慢子场景 200ms，async=true 在 100ms 内返回
 
 ### 绿灯：实现
 
-- [ ] 6.2 添加 `NodeTypeSubFlow = "sub_flow"` 到 model.go
-- [ ] 6.3 实现 `executeSubFlow()`：加载引用场景，构建子 DAG，sync/async 模式，深度限制
+- [x] 6.2 添加 `NodeTypeSubFlow = "sub_flow"` 到 model.go
+- [x] 6.3 创建 `internal/runner/sub_flow_node.go`：实现 `executeSubFlow()` — 通过 subFlowRunner 函数加载子场景，支持 sync/async 模式，通过 context.Value 跟踪深度 (subFlowDepthKey) 和访问链 (subFlowVisitedKey)，深度限制 5 层，循环引用检测
 
 ### 重构 + 覆盖率
 
-- [ ] 6.4 运行 `go test -race -cover -run SubFlowNode ./internal/runner/`
+- [x] 6.4 运行 `go test -race -cover -run SubFlow ./internal/runner/`，11 个测试全部通过，覆盖 sync/async/变量合并/深度限制/循环检测/场景不存在/空 ID/nil runner/上下文取消/nil input/异步不阻塞
 
 ---
 

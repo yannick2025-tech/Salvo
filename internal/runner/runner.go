@@ -1140,6 +1140,9 @@ type sceneNode struct {
 	// childNodes holds references to child nodes for Group execution.
 	// Populated after DAG construction via resolveGroupChildren.
 	childNodes []dag.Node
+	// subFlowRunner is set by Runner for sub-flow nodes to load and execute
+	// a sub-scene dynamically. Nil when not a sub-flow or in tests.
+	subFlowRunner func(ctx context.Context, sceneID string, variables map[string]any) (*dag.Output, error)
 }
 
 func (n *sceneNode) ID() string             { return n.id }
@@ -1173,6 +1176,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		return n.executeWhile(ctx, input, nodeLog)
 	case model.NodeTypeParallel:
 		return n.executeParallel(ctx, input, nodeLog)
+	case model.NodeTypeSubFlow:
+		return n.executeSubFlow(ctx, input, nodeLog)
 	case model.NodeTypeTimer:
 		return n.executeTimer(ctx, input, nodeLog)
 	default:

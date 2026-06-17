@@ -64,6 +64,7 @@ const (
 	NodeTypeGroup     = "group"
 	NodeTypeWhile     = "while"
 	NodeTypeParallel  = "parallel"
+	NodeTypeSubFlow   = "sub_flow"
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
 	NodeTypeTimer     = "timer"
