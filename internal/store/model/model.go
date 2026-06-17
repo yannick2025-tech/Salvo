@@ -62,6 +62,7 @@ const (
 	NodeTypeIfElse    = "if-else"
 	NodeTypeLoop      = "loop"
 	NodeTypeGroup     = "group"
+	NodeTypeWhile     = "while"
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
 	NodeTypeTimer     = "timer"

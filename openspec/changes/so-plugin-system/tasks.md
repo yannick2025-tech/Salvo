@@ -175,7 +175,7 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 4.1 创建 `internal/runner/while_node_test.go`，测试：
+- [x] 4.1 创建 `internal/runner/while_node_test.go`，测试：
   - 退出条件满足：exit_condition `status == "4"`，第 3 次迭代 status 变为 "4" → 循环退出，返回成功
   - 退出条件不满足：exit_condition 永远不满足 + max_iterations=5 → 5 次后强制退出，返回错误
   - max_duration_minutes 超时：设置 0.01 分钟（0.6 秒），interval=0.2s → 超时退出
@@ -190,13 +190,13 @@
 
 ### 绿灯：实现
 
-- [ ] 4.2 添加 `NodeTypeWhile = "while"` 到 `internal/store/model/model.go`
-- [ ] 4.3 实现 `executeWhile()` in runner.go：循环执行 steps → 检查 exit_conditions → 等待 interval → 重复
-- [ ] 4.4 实现 max_iterations / max_duration_minutes / fail_after_consecutive / timed_trigger / think_time
+- [x] 4.2 添加 `NodeTypeWhile = "while"` 到 `internal/store/model/model.go`
+- [x] 4.3 创建 `internal/runner/while_node.go`：实现 `executeWhile()` 循环执行 steps → 检查 exit_conditions → 等待 interval → 重复，包括子步骤 HTTP 请求、变量提取、JSON Path 解析
+- [x] 4.4 实现 max_iterations / max_duration_minutes / fail_after_consecutive / timed_trigger / think_time / retry / 子步骤条件
 
 ### 重构 + 覆盖率
 
-- [ ] 4.5 运行 `go test -race -cover -run WhileNode ./internal/runner/`，验证覆盖率
+- [x] 4.5 运行 `go test -race -cover -run While ./internal/runner/`，全部 25 个测试通过，新增 while_node.go + while_node_test.go 覆盖 exit_conditions、max_iterations、上下文取消、无限循环保护、空步骤、子步骤条件、连续失败、think_time、JSON Path 解析、Extract Entry 解析、HTTP 请求构建、变量提取、多条件退出、重试、时间触发等场景
 
 ---
 
