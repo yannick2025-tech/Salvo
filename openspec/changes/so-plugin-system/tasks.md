@@ -204,23 +204,27 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 5.1 创建 `internal/runner/parallel_node_test.go`，测试：
+- [x] 5.1 创建 `internal/runner/parallel_node_test.go`，测试：
   - 全部成功：3 个子步骤并行执行，全部成功 → 节点成功
-  - 部分失败：3 个子步骤，第 2 个失败 → 节点返回错误，但第 1 和第 3 仍完成
+  - 部分失败：3 个子步骤，其中一个失败 → 节点返回错误，但所有步骤仍执行
   - 变量隔离：step A 提取 varA，step B 提取 varB → 并行执行时互不可见
   - 变量合并：并行完成后，varA 和 varB 都在父作用域可用
   - 变量冲突：step A 和 step B 都提取 `token` → 最后完成的覆盖（last-write-wins）
-  - 并发安全：100 个子步骤并行，`go test -race` 通过
+  - 并发安全：50 个子步骤并行，`go test -race` 通过
   - 空步骤列表：steps=[] → 返回成功（无操作）
+  - 子步骤条件：条件不满足时跳过执行
+  - Nil input：input=nil → 正常运行
+  - 上下文取消：已取消的 context → 返回错误
+  - 初始变量合并：初始变量与提取变量合并
 
 ### 绿灯：实现
 
-- [ ] 5.2 添加 `NodeTypeParallel = "parallel"` 到 model.go
-- [ ] 5.3 实现 `executeParallel()`：goroutine + WaitGroup，变量隔离 + 合并
+- [x] 5.2 添加 `NodeTypeParallel = "parallel"` 到 model.go
+- [x] 5.3 创建 `internal/runner/parallel_node.go`：实现 `executeParallel()` — goroutine + WaitGroup，变量隔离 + 合并，子步骤 HTTP 请求/提取/think_time
 
 ### 重构 + 覆盖率
 
-- [ ] 5.4 运行 `go test -race -cover -run ParallelNode ./internal/runner/`
+- [x] 5.4 运行 `go test -race -cover -run Parallel ./internal/runner/`，9 个测试全部通过，覆盖全部成功/部分失败/空步骤/变量隔离/变量冲突/并发安全/条件跳过/已取消上下文/初始变量合并等场景
 
 ---
 

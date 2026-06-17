@@ -63,6 +63,7 @@ const (
 	NodeTypeLoop      = "loop"
 	NodeTypeGroup     = "group"
 	NodeTypeWhile     = "while"
+	NodeTypeParallel  = "parallel"
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
 	NodeTypeTimer     = "timer"
