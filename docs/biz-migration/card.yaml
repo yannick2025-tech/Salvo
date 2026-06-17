@@ -1,0 +1,464 @@
+flow_name: personal_card_charge
+description: |
+  个人卡充电流程(TaskType=0)。
+  payType=1(CARD_PAY)，支持B2B用户、VIP、安行充、签名机制。
+  完整链路：模拟器准备→创建订单→支付→启动充电→轮询→充电曲线→强制停止→支付未付→评论→重置。
+
+data_generation:
+  data_sources:
+    users:
+      type: csv
+      file: "${USER_DATA_SOURCE}"
+      columns: [phone, userid, cardnum, b2b_userid, b2b_cardnum, b2b_cardpwd, user_vip, safe_buy_flag]
+    chargers:
+      type: csv
+      file: "${CHARGER_DATA_SOURCE}"
+      columns: [charger, pointId, equipNo, connectorId, stationId, power, city_code]
+
+  config_params:
+    subTaskId:
+      function: snowflakeId
+    ifPrepare:
+      values: [1, 2]
+    orderSource:
+      values: [0]
+    payType:
+      values: [1]  # 1=CARD_PAY(固定)
+    payChannel:
+      values: [2]  # 2=CARD(固定)
+    preOccupyTime:
+      range: { min: "${CHARGE_PREOCCUPY_MIN}", max: "${CHARGE_PREOCCUPY_MAX}" }
+    afterOccupyTime:
+      range: { min: "${CHARGE_AFTEROCCUPY_MIN}", max: "${CHARGE_AFTEROCCUPY_MAX}" }
+    chargeTime:
+      range: { min: "${CARD_CHARGE_TIME_MIN}", max: "${CARD_CHARGE_TIME_MAX}" }
+    autoPay:
+      weighted_choice: { probability: "${CARD_AUTO_PAY_PROBABILITY}", true_value: 1, false_value: 0 }
+    forceStopCharge:
+      weighted_choice: { probability: "${CARD_FORCE_STOP_PROBABILITY}", true_value: 1, false_value: 0 }
+    chargePostOffline:
+      weighted_choice: { probability: "${CARD_CHARGE_POST_OFFLINE_PROBABILITY}", true_value: 1, false_value: 0 }
+    raiseErrorCode:
+      weighted_choice: { probability: "${CARD_RAISE_ERROR_PROBABILITY}", true_value: 1, false_value: 0 }
+    minChargeTime:
+      range: { min: "${MIN_CHARGE_TIME_MIN}", max: "${MIN_CHARGE_TIME_MAX}" }
+    minChargePower:
+      range: { min: "${MIN_CHARGE_POWER_MIN}", max: "${MIN_CHARGE_POWER_MAX}" }
+    maxChargePower:
+      range: { min: "${MAX_CHARGE_POWER_MIN}", max: "${MAX_CHARGE_POWER_MAX}" }
+    maxChargePowerKw:
+      expression: "${maxChargePower} / 1000"
+    minSoc:
+      range: { min: "${MIN_SOC_MIN}", max: "${MIN_SOC_MAX}" }
+    maxSoc:
+      range: { min: "${MAX_SOC_MIN}", max: "${MAX_SOC_MAX}" }
+    singleMaxPower:
+      range: { min: "${SINGLE_MAX_POWER_MIN}", max: "${SINGLE_MAX_POWER_MAX}" }
+    meterSamplePeriod:
+      range: { min: "${METER_SAMPLE_PERIOD_MIN}", max: "${METER_SAMPLE_PERIOD_MAX}" }
+    raiseErrorCodeVal:
+      values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+    safeBuyFlag:
+      values: [0, 1]
+    userVip:
+      values: [true, false]
+
+  derived_params:
+    - name: chargePostOfflineTimeRanking
+      range: { min: "${CHARGE_POST_OFFLINE_TIME_RANK_MIN}", max: "${CHARGE_POST_OFFLINE_TIME_RANK_MAX}" }
+    - name: chargePostOfflineTime
+      expression: "${chargeTime} * ${chargePostOfflineTimeRanking} / 100"
+    - name: chargePostOnlineTime
+      range: { min: "${chargePostOfflineTime}", max: "${chargePostOfflineTime + 300}" }
+    - name: raiseErrTimeRanking
+      range: { min: "${RAISE_ERR_TIME_RANK_MIN}", max: "${RAISE_ERR_TIME_RANK_MAX}" }
+    - name: raiseErrorTime
+      expression: "${chargeTime} * ${raiseErrTimeRanking} / 100"
+    - name: commentStar
+      values: [10, 20, 30, 40, 50]
+    - name: tags
+      function: pickMany
+      source: [1, 2, 3, 4, 5, 6, 7]
+
+steps:
+  # ---------- 1. 连接模拟器 ----------
+  - name: 连接模拟器
+    request:
+      url: "${SIM_URL}${API_CONNECT}"
+      method: POST
+      body:
+        equipNo: "${CHARGERS.equipNo}"
+        connectorId: "${CHARGERS.connectorId}"
+    extract:
+      - simAddr: $.result.simAddr
+      - simPort: $.result.simPort
+      - simConnId: $.result.simConnId
+
+  # ---------- 2-4. 模拟器状态设置 ----------
+  - name: 空闲未插枪
+    request:
+      url: "${SIM_URL}${API_SET_CONNECTOR_STATUS}"
+      method: POST
+      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", status: 1 }
+    think_time: { min: 1000, max: 3000 }
+
+  - name: 空闲已插枪
+    request:
+      url: "${SIM_URL}${API_SET_CONNECTOR_STATUS}"
+      method: POST
+      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", status: 2 }
+    think_time: { min: 1000, max: 3000 }
+
+  - name: 配置充电数据
+    request:
+      url: "${SIM_URL}${API_SET_CHARGE_DATA}"
+      method: POST
+      body:
+        simAddr: "${simAddr}"
+        simPort: "${simPort}"
+        simConnId: "${simConnId}"
+        minChargeTime: "${minChargeTime}"
+        minChargePower: "${minChargePower}"
+        maxChargePower: "${maxChargePowerKw}"
+        minSoc: "${minSoc}"
+        maxSoc: "${maxSoc}"
+        singleMaxPower: "${singleMaxPower}"
+        meterSamplePeriod: "${meterSamplePeriod}"
+    think_time: { min: 1000, max: 3000 }
+
+  # ---------- 5. 前占位(概率性) ----------
+  - name: 前占位
+    condition:
+      variable: preOccupyTime
+      operator: greater_than
+      value: 0
+    request:
+      url: "${SIM_URL}${API_OCCUPY}"
+      method: POST
+      body:
+        simAddr: "${simAddr}"
+        simPort: "${simPort}"
+        simConnId: "${simConnId}"
+        occupyTime: "${preOccupyTime}"
+
+  # ---------- 6. 获取Token ----------
+  - name: 获取Token
+    request:
+      url: "${BASE_URL}${API_GET_TOKEN}"
+      method: POST
+      body:
+        phone: "${USERS.phone}"
+    extract:
+      - token: $.result.token
+
+  # ---------- 7. 获取签名API列表(可选) ----------
+  - name: 获取签名API列表
+    condition:
+      variable: signEnabled
+      operator: equals
+      value: true
+    request:
+      url: "${BASE_URL}${API_GET_SIGN_API_LIST}"
+      method: GET
+      headers:
+        Authorization: "${token}"
+    extract:
+      - signApiList: $.result
+
+  # ---------- 8. 查询待支付订单 ----------
+  - name: 查询待支付订单
+    request:
+      url: "${BASE_URL}${API_QUERY_UNPAID}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        cardNum: "${USERS.cardnum}"
+    extract:
+      - unpaidOrderId: $.result.orderId
+
+  # ---------- 9. 支付待支付订单(条件性) ----------
+  - name: 支付待支付订单
+    condition:
+      variable: unpaidOrderId
+      operator: not_empty
+    request:
+      url: "${BASE_URL}${API_PAY_UNPAID}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        orderId: "${unpaidOrderId}"
+        payType: 1
+        payChannel: 2
+        payPwd: "${USERS.b2b_cardpwd}"
+    think_time: { min: 1000, max: 3000 }
+
+  # ---------- 10. 获取AccountID ----------
+  - name: 获取AccountID
+    request:
+      url: "${BASE_URL}${API_GET_ACCOUNT_ID}"
+      method: GET
+      headers:
+        Authorization: "${token}"
+    extract:
+      - accountId: $.result.accountId
+
+  # ---------- 11. 查询券包(条件性) ----------
+  - name: 查询券包
+    condition:
+      variable: cardVoucherPackageSwitch
+      operator: equals
+      value: true
+    request:
+      url: "${BASE_URL}${API_QUERY_COUPON}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        accountId: "${accountId}"
+
+  # ---------- 12. 查询安行充(条件性) ----------
+  - name: 查询安行充
+    condition:
+      variable: safeBuyFlag
+      operator: equals
+      value: 1
+    request:
+      url: "${BASE_URL}${API_QUERY_SAFE_BUY}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        accountId: "${accountId}"
+
+  # ---------- 13. 获取VIP(条件性) ----------
+  - name: 获取VIP
+    condition:
+      variable: userVip
+      operator: equals
+      value: true
+    request:
+      url: "${BASE_URL}${API_GET_VIP}"
+      method: GET
+      headers:
+        Authorization: "${token}"
+
+  # ---------- 14. 生成订单号 ----------
+  - name: 生成订单号
+    request:
+      url: "${SIM_URL}${API_GENERATE_ORDER_SEQ}"
+      method: POST
+      body:
+        simAddr: "${simAddr}"
+        simPort: "${simPort}"
+        simConnId: "${simConnId}"
+    extract:
+      - orderId: $.result.orderId
+    think_time: { min: 2000, max: 5000 }
+
+  # ---------- 15. 创建订单 ----------
+  - name: 创建订单
+    request:
+      url: "${BASE_URL}${API_CREATE_ORDER}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        orderId: "${orderId}"
+        pointId: "${CHARGERS.pointId}"
+        charger: "${CHARGERS.charger}"
+        cardNum: "${USERS.cardnum}"
+        payType: 1
+        payChannel: 2
+        orderSource: 0
+        chargeStrategy: 0
+    extract:
+      - startChargeSeq: $.result.startChargeSeq
+    think_time: { min: 2000, max: 5000 }
+
+  # ---------- 16. 启动充电 ----------
+  - name: 启动充电
+    request:
+      url: "${BASE_URL}${API_START_CHARGE}"
+      method: POST
+      headers:
+        Authorization: "${token}"
+      body:
+        startChargeSeq: "${startChargeSeq}"
+
+  # ---------- 17. 轮询充电状态 ----------
+  - name: 轮询充电状态
+    type: while
+    exit_conditions:
+      - variable: chargingStatus
+        operator: equals
+        value: "4"
+    interval_seconds: 30
+    steps:
+      - name: 查询充电状态
+        request:
+          url: "${BASE_URL}${API_CHARGE_STATUS}"
+          method: POST
+          headers:
+            Authorization: "${token}"
+          body:
+            startChargeSeq: "${startChargeSeq}"
+        extract:
+          - chargingStatus: $.result.status
+          - chargeKwh: $.result.chargeKwh
+          - chargeMoney: $.result.chargeMoney
+      - name: 启动超时检查
+        condition:
+          variable: chargingStatus
+          operator: equals
+          value: "1"
+        fail_after_consecutive: 10
+        fail_message: "启动超时(连续10次启动中)"
+      - name: 桩离线(时间触发)
+        condition: { variable: chargePostOffline, operator: equals, value: 1 }
+        timed_trigger: { after_seconds: "${chargePostOfflineTime}", once: true }
+        request:
+          url: "${SIM_URL}${API_SET_STATION_STATUS}"
+          method: POST
+          body: { simAddr: "${simAddr}", simPort: "${simPort}", stationStatus: 2 }
+      - name: 桩上线(时间触发)
+        condition: { variable: chargePostOffline, operator: equals, value: 1 }
+        timed_trigger: { after_seconds: "${chargePostOnlineTime}", once: true }
+        request:
+          url: "${SIM_URL}${API_SET_STATION_STATUS}"
+          method: POST
+          body: { simAddr: "${simAddr}", simPort: "${simPort}", stationStatus: 0 }
+      - name: 设置故障码(时间触发)
+        condition: { variable: raiseErrorCode, operator: equals, value: 1 }
+        timed_trigger: { after_seconds: "${raiseErrorTime}", once: true }
+        request:
+          url: "${SIM_URL}${API_SET_FAULT}"
+          method: POST
+          body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", raiseErrorCode: true }
+      - name: 充电时长到达后停止
+        condition:
+          variable: chargeTimeReached
+          operator: equals
+          value: true
+        request:
+          url: "${BASE_URL}${API_STOP_CHARGE}"
+          method: POST
+          headers: { Authorization: "${token}" }
+          body: { startChargeSeq: "${startChargeSeq}" }
+        retry: { max_attempts: 10, on_429: retry }
+
+  # ---------- 18. 强制停止充电(概率性) ----------
+  - name: 强制停止充电
+    condition: { variable: forceStopCharge, operator: equals, value: 1 }
+    request:
+      url: "${BASE_URL}${API_STOP_CHARGE}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body: { startChargeSeq: "${startChargeSeq}" }
+
+  # ---------- 22. 查询充电曲线 ----------
+  - name: 查询充电曲线
+    request:
+      url: "${BASE_URL}${API_CHARGE_CURVE}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body: { startChargeSeq: "${startChargeSeq}" }
+
+  # ---------- 23. 查询未支付订单 ----------
+  - name: 查询未支付订单
+    request:
+      url: "${BASE_URL}${API_QUERY_UNPAID}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body: { cardNum: "${USERS.cardnum}" }
+    extract:
+      - finalUnpaidOrderId: $.result.orderId
+
+  # ---------- 24. 支付未支付订单 ----------
+  - name: 支付未支付订单
+    condition:
+      variable: finalUnpaidOrderId
+      operator: not_empty
+    request:
+      url: "${BASE_URL}${API_PAY_UNPAID}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body:
+        orderId: "${finalUnpaidOrderId}"
+        payType: 1
+        payChannel: 2
+        payPwd: "${USERS.b2b_cardpwd}"
+
+  # ---------- 25. 强制支付(检查订单状态) ----------
+  - name: 查询订单状态
+    request:
+      url: "${BASE_URL}${API_QUERY_ORDER}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body: { orderId: "${orderId}" }
+    extract:
+      - orderStatus: $.result.orderStatus
+
+  - name: 强制支付
+    condition:
+      variable: orderStatus
+      operator: not_equals
+      value: "COMPLETED"
+    request:
+      url: "${BASE_URL}${API_FORCE_PAY}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body:
+        orderId: "${orderId}"
+        payType: 1
+        payChannel: 2
+
+  # ---------- 26. 评论+上传图片(概率性) ----------
+  - name: 获取评论标签
+    request:
+      url: "${BASE_URL}${API_GET_COMMENT_TAG}"
+      method: GET
+      headers: { Authorization: "${token}" }
+    extract:
+      - commentTags: $.result.tags
+
+  - name: 上传评论
+    request:
+      url: "${BASE_URL}${API_SAVE_COMMENT}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body:
+        orderId: "${orderId}"
+        commentStar: "${commentStar}"
+        tags: "${tags}"
+    extract:
+      - commentId: $.result.commentId
+
+  - name: 上传评论图片
+    request:
+      url: "${BASE_URL}${API_UPLOAD_COMMENT_PICTURE}"
+      method: POST
+      headers: { Authorization: "${token}" }
+      body:
+        commentId: "${commentId}"
+        pictures: ["${commentPicturePath}"]
+
+  # ---------- 27. 后占位(概率性) ----------
+  - name: 后占位
+    condition: { variable: afterOccupyTime, operator: greater_than, value: 0 }
+    request:
+      url: "${SIM_URL}${API_OCCUPY}"
+      method: POST
+      body:
+        simAddr: "${simAddr}"
+        simPort: "${simPort}"
+        simConnId: "${simConnId}"
+        occupyTime: "${afterOccupyTime}"
+
+  # ---------- 28. 重置充电枪 ----------
+  - name: 重置充电枪
+    request:
+      url: "${SIM_URL}${API_RESET}"
+      method: POST
+      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}" }
