@@ -335,12 +335,12 @@
 
 ## 10. Frontend: Menu & Settings Restructure
 
-- [ ] 10.1 `MainLayout.vue`：设置菜单标签 "系统设置" → "个人设置"
-- [ ] 10.2 新增菜单项：`{ path: '/plugins', label: 'SO 插件管理', icon: PluginIcon, permission: 'plugins:read' }`
-- [ ] 10.3 创建 PluginIcon SVG 组件（拼图/包图标）
-- [ ] 10.4 添加路由 `/plugins` → PluginsPage.vue
-- [ ] 10.5 `SettingsPage.vue`：页面标题 "系统设置" → "个人设置"
-- [ ] 10.6 验证 `canAccess(['plugins:read'])` 仅 admin 返回 true
+- [x] 10.1 `MainLayout.vue`：设置菜单标签 "系统设置" → "个人设置"
+- [x] 10.2 新增菜单项：`{ path: '/plugins', label: 'SO 插件管理', icon: PluginIcon, permission: 'plugins:read' }`
+- [x] 10.3 创建 PluginIcon SVG 组件（拼图/包图标）
+- [x] 10.4 添加路由 `/plugins` → PluginsPage.vue
+- [x] 10.5 `SettingsPage.vue`：页面标题 "系统设置" → "个人设置"
+- [x] 10.6 验证 `canAccess(['plugins:read'])` 仅 admin 返回 true
 
 ---
 

@@ -1,7 +1,7 @@
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <h2>系统设置</h2>
+      <h2>个人设置</h2>
     </div>
 
     <div class="settings-grid">

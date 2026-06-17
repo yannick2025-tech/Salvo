@@ -153,6 +153,21 @@ const SettingsIcon = {
   },
 }
 
+const PluginIcon = {
+  render() {
+    return h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
+      h('rect', { x: 2, y: 2, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 14, y: 2, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 2, y: 14, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 14, y: 14, width: 8, height: 8, rx: 2 }),
+      h('line', { x1: 10, y1: 6, x2: 14, y2: 6 }),
+      h('line', { x1: 6, y1: 10, x2: 6, y2: 14 }),
+      h('line', { x1: 18, y1: 10, x2: 18, y2: 14 }),
+      h('line', { x1: 10, y1: 18, x2: 14, y2: 18 }),
+    ])
+  },
+}
+
 const allMenuItems = [
   { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
   { path: '/scenes', label: '场景管理', icon: SceneIcon },
@@ -160,7 +175,8 @@ const allMenuItems = [
   { path: '/reports', label: '测试报告', icon: ReportIcon },
   { path: '/traces', label: '链路追踪', icon: TraceIcon },
   { path: '/users', label: '用户管理', icon: UserIcon, permission: 'users:read' },
-  { path: '/settings', label: '系统设置', icon: SettingsIcon },
+  { path: '/plugins', label: 'SO 插件管理', icon: PluginIcon, permission: 'plugins:read' },
+  { path: '/settings', label: '个人设置', icon: SettingsIcon },
 ]
 
 const menuItems = computed(() => {
