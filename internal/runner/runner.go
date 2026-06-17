@@ -18,6 +18,7 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/core/cascade"
 	"github.com/yannick2025-tech/Salvo/internal/core/dag"
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
 	"github.com/yannick2025-tech/Salvo/internal/core/lifecycle"
 	"github.com/yannick2025-tech/Salvo/internal/core/pool"
 	"github.com/yannick2025-tech/Salvo/internal/core/variable"
@@ -1408,15 +1409,13 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 		return nil, fmt.Errorf("parse condition config: %w", err)
 	}
 
-	resolvedExpr := cfg.Expr
+	var variables map[string]any
 	if input != nil && input.Variables != nil {
-		resolvedExpr = resolveWithVariables(cfg.Expr, input.Variables)
+		variables = input.Variables
 	}
-
-	result := resolvedExpr != "" && resolvedExpr != "false" && resolvedExpr != "0"
+	result := expr.EvaluateConditionExpr(cfg.Expr, variables)
 	nodeLog.Info("condition node evaluated",
 		logger.F("expr", cfg.Expr),
-		logger.F("resolved_expr", resolvedExpr),
 		logger.F("result", result),
 	)
 	if n.nodeStats != nil {
@@ -1625,16 +1624,17 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 	}}, nil
 }
 
-func evaluateExpression(expr string, input *dag.Input) bool {
-	if expr == "" {
+func evaluateExpression(exprStr string, input *dag.Input) bool {
+	if exprStr == "" {
 		return true
 	}
 
+	var variables map[string]any
 	if input != nil && input.Variables != nil {
-		expr = resolveWithVariables(expr, input.Variables)
+		variables = input.Variables
 	}
 
-	return expr != "" && expr != "false" && expr != "0" && expr != "''" && expr != "\"\""
+	return expr.EvaluateConditionExpr(exprStr, variables)
 }
 
 func (r *Runner) evalCondition(ctx context.Context, condition string, output *dag.Output) bool {
@@ -1664,7 +1664,16 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 		return false
 	}
 
-	return condition != "false" && condition != "0"
+	// For generic DAG edge conditions, build variables from the upstream
+	// node's output response (if it's a map) and evaluate the expression.
+	var variables map[string]any
+	if output != nil {
+		if resp, ok := output.Response.(map[string]any); ok {
+			variables = resp
+		}
+	}
+
+	return expr.EvaluateConditionExpr(condition, variables)
 }
 
 func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, error) {

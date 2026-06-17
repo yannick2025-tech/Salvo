@@ -158,11 +158,16 @@
 ### 绿灯：实现
 
 - [x] 3.2 创建 `internal/core/expr/evaluator.go`：实现 `EvaluateCondition(variable, operator, value, variables) bool`
-- [ ] 3.3 集成到 while 退出条件、if-else 分支、步骤条件、DAG 条件边
+- [x] 3.3 集成到 while 退出条件、if-else 分支、步骤条件、DAG 条件边
+  - `evaluateExpression` → 使用 `EvaluateConditionExpr` 替代 truthy 检查
+  - `executeCondition` → 使用 `EvaluateConditionExpr` 替代 `resolveWithVariables` + truthy 检查
+  - `evalCondition` → 使用 `EvaluateConditionExpr`，保留 `__if_true__` / `__if_false__` 特殊处理
+  - 新增 `EvaluateConditionExpr(expr, variables) bool` 解析 `${var} operator value` 格式
+  - 新增 `parseConditionExpr(expr)` 正则解析器，支持符号运算符和关键字运算符
 
 ### 重构 + 覆盖率
 
-- [x] 3.4 运行 `go test -race -cover ./internal/core/expr/`，验证覆盖率 ≥ 80% (82.5%)
+- [x] 3.4 运行 `go test -race -cover ./internal/core/expr/`，验证覆盖率 ≥ 80% (83.6%)
 
 ---
 

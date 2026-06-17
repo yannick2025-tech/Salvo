@@ -3,8 +3,89 @@ package expr
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 )
+
+// conditionExprRegex matches expressions like `${var} operator value`.
+// Group 1: variable name, Group 2: operator, Group 3: value (optional, may be quoted).
+var conditionExprRegex = regexp.MustCompile(`^\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}\s+(==|!=|>=|<=|>|<|equals|not_equals|greater_than_or_equal|gte|greater_than|less_than_or_equal|lte|less_than|empty|not_empty|size_equals|size_greater_than_or_equal|size_gte|size_greater_than|size_less_than_or_equal|size_lte|size_less_than)\s*(.*)$`)
+
+// operatorMap maps symbolic operators to EvaluateCondition operator names.
+var operatorMap = map[string]string{
+	"==":       "equals",
+	"!=":       "not_equals",
+	">":        "greater_than",
+	">=":       "greater_than_or_equal",
+	"<":        "less_than",
+	"<=":       "less_than_or_equal",
+	"gte":      "greater_than_or_equal",
+	"lte":      "less_than_or_equal",
+	"size_gte": "size_greater_than_or_equal",
+	"size_lte": "size_less_than_or_equal",
+}
+
+// EvaluateConditionExpr evaluates a condition expression string against the
+// provided variables. Supports:
+//
+//	${var} operator value    — e.g. `${status} == "4"`, `${count} > 10`
+//	${var}                   — truthy check (variable exists and not empty)
+//
+// If the expression doesn't match a known pattern, falls back to truthy
+// evaluation (non-empty, not "false", not "0").
+func EvaluateConditionExpr(expr string, variables map[string]any) bool {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return true
+	}
+
+	// Try to parse as a structured condition expression.
+	if variable, operator, value, ok := parseConditionExpr(expr); ok {
+		return EvaluateCondition(variable, operator, value, variables)
+	}
+
+	// Fall back: bare `${var}` — truthy check.
+	if strings.HasPrefix(expr, "${") && strings.HasSuffix(expr, "}") {
+		varName := expr[2 : len(expr)-1]
+		return EvaluateCondition(varName, "not_empty", "", variables)
+	}
+
+	// Fall back: negation `!${var}` — empty check.
+	if strings.HasPrefix(expr, "!${") && strings.HasSuffix(expr, "}") {
+		varName := expr[3 : len(expr)-1]
+		return EvaluateCondition(varName, "empty", "", variables)
+	}
+
+	// Fall back: simple truthy evaluation.
+	return expr != "" && expr != "false" && expr != "0" && expr != "''" && expr != "\"\""
+}
+
+// parseConditionExpr parses a condition expression like `${var} == "value"`.
+// Returns the variable name, mapped operator name, value (unquoted), and true if parsed.
+func parseConditionExpr(expr string) (variable, operator, value string, ok bool) {
+	matches := conditionExprRegex.FindStringSubmatch(expr)
+	if matches == nil {
+		return "", "", "", false
+	}
+
+	variable = matches[1]
+	opSym := matches[2]
+	value = strings.TrimSpace(matches[3])
+
+	// Map symbolic operator to canonical name.
+	if mapped, exists := operatorMap[opSym]; exists {
+		operator = mapped
+	} else {
+		operator = opSym
+	}
+
+	// Strip surrounding double quotes from value if present.
+	value = strings.TrimPrefix(value, "\"")
+	value = strings.TrimSuffix(value, "\"")
+
+	return variable, operator, value, true
+}
 
 // EvaluateCondition evaluates a condition expression against the provided variables.
 // It returns true if the condition is satisfied, false otherwise.

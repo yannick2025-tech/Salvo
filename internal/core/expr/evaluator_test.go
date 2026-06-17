@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEvaluateCondition(t *testing.T) {
@@ -185,4 +186,161 @@ func TestEvaluateConditionConcurrent(t *testing.T) {
 	for i := 0; i < runs; i++ {
 		<-done
 	}
+}
+
+func TestEvaluateConditionExpr(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty expr returns true", func(t *testing.T) {
+		assert.True(t, EvaluateConditionExpr("", nil))
+	})
+
+	t.Run("${var} == value with quotes", func(t *testing.T) {
+		vars := map[string]any{"status": "4"}
+		assert.True(t, EvaluateConditionExpr(`${status} == "4"`, vars))
+		assert.False(t, EvaluateConditionExpr(`${status} == "3"`, vars))
+	})
+
+	t.Run("${var} == value without quotes", func(t *testing.T) {
+		vars := map[string]any{"status": "4"}
+		assert.True(t, EvaluateConditionExpr(`${status} == 4`, vars))
+	})
+
+	t.Run("${var} != value", func(t *testing.T) {
+		vars := map[string]any{"status": "COMPLETED"}
+		assert.True(t, EvaluateConditionExpr(`${status} != "PENDING"`, vars))
+		assert.False(t, EvaluateConditionExpr(`${status} != "COMPLETED"`, vars))
+	})
+
+	t.Run("${var} > numeric", func(t *testing.T) {
+		vars := map[string]any{"count": 10}
+		assert.True(t, EvaluateConditionExpr(`${count} > 5`, vars))
+		assert.False(t, EvaluateConditionExpr(`${count} > 10`, vars))
+		assert.False(t, EvaluateConditionExpr(`${count} > 20`, vars))
+	})
+
+	t.Run("${var} >= numeric", func(t *testing.T) {
+		vars := map[string]any{"count": 10}
+		assert.True(t, EvaluateConditionExpr(`${count} >= 10`, vars))
+		assert.True(t, EvaluateConditionExpr(`${count} >= 5`, vars))
+		assert.False(t, EvaluateConditionExpr(`${count} >= 20`, vars))
+	})
+
+	t.Run("${var} < numeric", func(t *testing.T) {
+		vars := map[string]any{"count": 10}
+		assert.True(t, EvaluateConditionExpr(`${count} < 20`, vars))
+		assert.False(t, EvaluateConditionExpr(`${count} < 10`, vars))
+	})
+
+	t.Run("${var} <= numeric", func(t *testing.T) {
+		vars := map[string]any{"count": 10}
+		assert.True(t, EvaluateConditionExpr(`${count} <= 10`, vars))
+		assert.False(t, EvaluateConditionExpr(`${count} <= 5`, vars))
+	})
+
+	t.Run("${var} equals keyword", func(t *testing.T) {
+		vars := map[string]any{"status": "4"}
+		assert.True(t, EvaluateConditionExpr(`${status} equals "4"`, vars))
+	})
+
+	t.Run("${var} not_equals keyword", func(t *testing.T) {
+		vars := map[string]any{"status": "4"}
+		assert.False(t, EvaluateConditionExpr(`${status} not_equals "4"`, vars))
+	})
+
+	t.Run("${var} greater_than keyword", func(t *testing.T) {
+		vars := map[string]any{"count": 10}
+		assert.True(t, EvaluateConditionExpr(`${count} greater_than 5`, vars))
+	})
+
+	t.Run("bare ${var} truthy check", func(t *testing.T) {
+		assert.True(t, EvaluateConditionExpr(`${existing}`, map[string]any{"existing": "value"}))
+		assert.False(t, EvaluateConditionExpr(`${missing}`, map[string]any{}))
+		assert.False(t, EvaluateConditionExpr(`${empty}`, map[string]any{"empty": ""}))
+	})
+
+	t.Run("!${var} negation check", func(t *testing.T) {
+		assert.True(t, EvaluateConditionExpr(`!${missing}`, map[string]any{}))
+		assert.False(t, EvaluateConditionExpr(`!${existing}`, map[string]any{"existing": "value"}))
+	})
+
+	t.Run("size_equals expr", func(t *testing.T) {
+		vars := map[string]any{"items": []string{"a", "b", "c"}}
+		assert.True(t, EvaluateConditionExpr(`${items} size_equals 3`, vars))
+		assert.False(t, EvaluateConditionExpr(`${items} size_equals 2`, vars))
+	})
+
+	t.Run("fallback truthy for non-matching exprs", func(t *testing.T) {
+		assert.True(t, EvaluateConditionExpr("true", nil))
+		assert.True(t, EvaluateConditionExpr("some_text", nil))
+		assert.False(t, EvaluateConditionExpr("false", nil))
+		assert.False(t, EvaluateConditionExpr("0", nil))
+	})
+
+	t.Run("size_less_than with keyword", func(t *testing.T) {
+		vars := map[string]any{"items": []string{"a"}}
+		assert.True(t, EvaluateConditionExpr(`${items} size_less_than 5`, vars))
+		assert.False(t, EvaluateConditionExpr(`${items} size_less_than 1`, vars))
+	})
+
+	t.Run("concurrent safety", func(t *testing.T) {
+		vars := map[string]any{"status": "4", "count": 10}
+		done := make(chan bool, 100)
+		for i := 0; i < 100; i++ {
+			go func() {
+				assert.True(t, EvaluateConditionExpr(`${status} == "4"`, vars))
+				assert.True(t, EvaluateConditionExpr(`${count} > 5`, vars))
+				done <- true
+			}()
+		}
+		for i := 0; i < 100; i++ {
+			<-done
+		}
+	})
+}
+
+func TestParseConditionExpr(t *testing.T) {
+	t.Parallel()
+
+	t.Run("variable with quoted value", func(t *testing.T) {
+		v, op, val, ok := parseConditionExpr(`${status} == "4"`)
+		require.True(t, ok)
+		assert.Equal(t, "status", v)
+		assert.Equal(t, "equals", op)
+		assert.Equal(t, "4", val)
+	})
+
+	t.Run("variable with unquoted numeric", func(t *testing.T) {
+		v, op, val, ok := parseConditionExpr(`${count} > 10`)
+		require.True(t, ok)
+		assert.Equal(t, "count", v)
+		assert.Equal(t, "greater_than", op)
+		assert.Equal(t, "10", val)
+	})
+
+	t.Run("variable with keyword operator", func(t *testing.T) {
+		v, op, val, ok := parseConditionExpr(`${status} equals "COMPLETED"`)
+		require.True(t, ok)
+		assert.Equal(t, "status", v)
+		assert.Equal(t, "equals", op)
+		assert.Equal(t, "COMPLETED", val)
+	})
+
+	t.Run("not matching returns false", func(t *testing.T) {
+		_, _, _, ok := parseConditionExpr("just some text")
+		assert.False(t, ok)
+	})
+
+	t.Run("empty expr returns false", func(t *testing.T) {
+		_, _, _, ok := parseConditionExpr("")
+		assert.False(t, ok)
+	})
+
+	t.Run("not_empty keyword no value", func(t *testing.T) {
+		v, op, val, ok := parseConditionExpr(`${var} not_empty`)
+		require.True(t, ok)
+		assert.Equal(t, "var", v)
+		assert.Equal(t, "not_empty", op)
+		assert.Equal(t, "", val)
+	})
 }
