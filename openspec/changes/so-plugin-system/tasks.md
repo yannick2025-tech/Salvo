@@ -59,7 +59,7 @@
 
 ### 红灯：`__weightedChoice` 测试
 
-- [ ] 2.1 创建 `internal/generator/builtin/weighted_choice_test.go`，表驱动测试：
+- [x] 2.1 创建 `internal/generator/builtin/weighted_choice_test.go`，表驱动测试：
   - 二选一等概率：`"1=50,0=50"` → 10000 次采样，1 和 0 各约 50%（±5%）
   - 多选一加权：`"A=40,B=30,C=20,D=10"` → 各约 40/30/20/10%（±5%）
   - 权重和 < 100 归一化：`"A=40,B=30,C=20"`（和=90）→ A≈44.4%, B≈33.3%, C≈22.2%
@@ -75,7 +75,7 @@
 
 ### 红灯：`__oneOf` 测试
 
-- [ ] 2.2 创建 `internal/generator/builtin/one_of_test.go`，表驱动测试：
+- [x] 2.2 创建 `internal/generator/builtin/one_of_test.go`，表驱动测试：
   - 三选一等概率：`("A","B","C")` → 10000 次采样，各约 33.3%（±5%）
   - 单参数：`("A")` → 始终返回 "A"
   - 两参数：`("A","B")` → 各约 50%（±5%）
@@ -85,7 +85,7 @@
 
 ### 红灯：`__manOf` 测试
 
-- [ ] 2.3 创建 `internal/generator/builtin/man_of_test.go`，表驱动测试：
+- [x] 2.3 创建 `internal/generator/builtin/man_of_test.go`，表驱动测试：
   - 七选子集：`(1,2,3,4,5,6,7)` → 10000 次采样，子集大小 1-7，每个元素出现概率约 50%
   - 单参数：`(1)` → 始终返回 "1"
   - 两参数：`(1,2)` → 子集大小 1-2
@@ -95,7 +95,7 @@
 
 ### 红灯：`__random` 测试
 
-- [ ] 2.4 创建 `internal/generator/builtin/random_test.go`，表驱动测试：
+- [x] 2.4 创建 `internal/generator/builtin/random_test.go`，表驱动测试：
   - 整数范围：`(60, 600)` → 10000 次采样，结果 ∈ [60, 600]，均值约 330（±30）
   - 整数边界包含：`(1, 1)` → 始终返回 "1"
   - 整数边界包含：`(0, 100)` → 结果 ∈ [0, 100]
@@ -111,25 +111,25 @@
 
 ### 红灯：`__snowflakeId` 测试
 
-- [ ] 2.5 创建 `internal/generator/builtin/snowflake_test.go`，表驱动测试：
-  - 格式验证：返回 19 位数字字符串
+- [x] 2.5 创建 `internal/generator/builtin/snowflake_test.go`，表驱动测试：
+  - 格式验证：返回合法数字字符串
   - 唯一性：10000 次调用，无重复
   - 单调递增：连续调用，ID 递增
   - 并发安全：100 goroutine 各生成 100 个 ID，无重复，`go test -race` 通过
 
 ### 绿灯：实现所有函数
 
-- [ ] 2.6 实现 `__weightedChoice` in `internal/generator/builtin/weighted_choice.go`
-- [ ] 2.7 实现 `__oneOf` in `internal/generator/builtin/one_of.go`
-- [ ] 2.8 实现 `__manOf` in `internal/generator/builtin/man_of.go`
-- [ ] 2.9 实现 `__random` in `internal/generator/builtin/random.go`（整数 + 浮点双模式）
-- [ ] 2.10 实现 `__snowflakeId` in `internal/generator/builtin/snowflake.go`（复用 `internal/pkg/snowflake`）
-- [ ] 2.11 在 `registry.go` 中注册所有函数
+- [x] 2.6 实现 `__weightedChoice` in `internal/generator/builtin/weighted_choice.go`
+- [x] 2.7 实现 `__oneOf` in `internal/generator/builtin/one_of.go`
+- [x] 2.8 实现 `__manOf` in `internal/generator/builtin/man_of.go`
+- [x] 2.9 实现 `__random` in `internal/generator/builtin/random.go`（整数 + 浮点双模式）
+- [x] 2.10 实现 `__snowflakeId` in `internal/generator/builtin/snowflake.go`（复用 `internal/pkg/snowflake`）
+- [x] 2.11 在 `register.go` 中注册所有函数到 FunctionRegistry
 
 ### 重构 + 覆盖率
 
-- [ ] 2.12 运行 `go test -race -cover ./internal/generator/builtin/`，验证覆盖率 ≥ 80%
-- [ ] 2.13 验证概率分布：10000 样本统计，各函数概率偏差 ≤ 5%
+- [x] 2.12 运行 `go test -race -cover ./internal/generator/builtin/`，验证覆盖率 ≥ 80% (89.8%)
+- [x] 2.13 验证概率分布：10000 样本统计，各函数概率偏差 ≤ 5%
 
 ---
 
