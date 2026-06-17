@@ -317,7 +317,7 @@
 ### 重构 + 覆盖率
 
 - [x] 8.12 运行 `go test -race -cover ./internal/plugin/so/`，验证覆盖率 ≥ 80%
-- [ ] 8.13 创建示例 SO 插件 `plugins/shell-aes/main.go`（AES-CBC 加解密，匹配 login.py）
+- [x] 8.13 创建示例 SO 插件 `plugins/shell-aes/main.go`（AES-CBC 加解密，匹配 login.py）
 
 ---
 
