@@ -137,7 +137,7 @@
 
 ### 红灯：先写失败测试
 
-- [ ] 3.1 创建 `internal/core/expr/evaluator_test.go`，表驱动测试 12 个运算符：
+- [x] 3.1 创建 `internal/core/expr/evaluator_test.go`，表驱动测试 12 个运算符：
   - `equals`：字符串相等 `"4" == "4"` → true；数字相等 `5 == 5` → true；不等 `"3" == "4"` → false
   - `not_equals`：字符串不等 `"COMPLETED" != "PENDING"` → true；相等 → false
   - `greater_than`：`5 > 0` → true；`0 > 5` → false；`5 > 5` → false
@@ -157,12 +157,12 @@
 
 ### 绿灯：实现
 
-- [ ] 3.2 创建 `internal/core/expr/evaluator.go`：实现 `EvaluateCondition(variable, operator, value, variables) bool`
+- [x] 3.2 创建 `internal/core/expr/evaluator.go`：实现 `EvaluateCondition(variable, operator, value, variables) bool`
 - [ ] 3.3 集成到 while 退出条件、if-else 分支、步骤条件、DAG 条件边
 
 ### 重构 + 覆盖率
 
-- [ ] 3.4 运行 `go test -race -cover ./internal/core/expr/`，验证覆盖率 ≥ 80%
+- [x] 3.4 运行 `go test -race -cover ./internal/core/expr/`，验证覆盖率 ≥ 80% (82.5%)
 
 ---
 
