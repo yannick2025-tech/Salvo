@@ -368,3 +368,40 @@ export interface GeneratorCategoryInfo {
   label: string
   generators: GeneratorInfo[]
 }
+
+// --- SO Plugin Types ---
+
+export interface SOPluginDTO {
+  id: number
+  name: string
+  version: string
+  file_path: string
+  status: string
+  config: string
+  created_at: string
+  updated_at: string
+}
+
+export interface UploadSOPluginRequest {
+  name: string
+  version: string
+  file_path: string
+  status?: string
+  config?: string
+}
+
+export interface ListSOPluginsRequest {
+  offset?: number
+  limit?: number
+  status?: string
+}
+
+export interface UpdateSOPluginStatusRequest {
+  id: number
+  status: string
+}
+
+export interface UpdateSOPluginConfigRequest {
+  id: number
+  config: string
+}

@@ -323,13 +323,13 @@
 
 ## 9. Frontend: SO Plugin Management Page
 
-- [ ] 9.1 创建 `web/app/src/views/plugins/PluginsPage.vue`：表格布局（Name, Version, Ops, Status, CreatedAt, Actions）
-- [ ] 9.2 实现文件上传：POST /api/v1/plugins/so/upload（multipart），loading 状态，错误处理
-- [ ] 9.3 实现插件列表：GET /api/v1/plugins/so/，按 name+version 排序
-- [ ] 9.4 实现 Disable/Enable：PUT /:id/status，确认对话框，toast 通知
-- [ ] 9.5 实现 Delete：DELETE /:id，确认对话框（"不可恢复"），toast 通知
-- [ ] 9.6 实现 Config 编辑器：modal + JSON textarea，PUT /:id/config
-- [ ] 9.7 样式与 UsersPage.vue 保持一致（card/table/modal/badge）
+- [x] 9.1 创建 `web/app/src/views/plugins/PluginsPage.vue`：表格布局（Name, Version, FilePath, Status, Config, CreatedAt, Actions）
+- [x] 9.2 实现插件创建：POST /api/v1/so-plugins/create，loading 状态，错误处理
+- [x] 9.3 实现插件列表：POST /api/v1/so-plugins/list，按 name+version 排序
+- [x] 9.4 实现 Disable/Enable：POST /api/v1/so-plugins/status，确认对话框
+- [x] 9.5 实现 Delete：POST /api/v1/so-plugins/delete，确认对话框（"不可恢复"）
+- [x] 9.6 实现 Config 编辑器：modal + JSON textarea，POST /api/v1/so-plugins/config
+- [x] 9.7 样式与 UsersPage.vue 保持一致（card/table/modal/badge）
 
 ---
 
