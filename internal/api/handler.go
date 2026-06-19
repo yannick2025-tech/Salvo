@@ -60,14 +60,16 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 }
 
 type yamlScene struct {
-	Name        string           `yaml:"name"`
-	Description string           `yaml:"description"`
-	Variables   []yamlVarItem    `yaml:"variables,omitempty"`
-	DataSources []yamlDataSource `yaml:"data_sources,omitempty"`
-	Setup       []yamlNode       `yaml:"setup,omitempty"`
-	Nodes       []yamlNode       `yaml:"nodes"`
-	Teardown    []yamlNode       `yaml:"teardown,omitempty"`
-	Edges       []yamlEdge       `yaml:"edges,omitempty"`
+	Name          string           `yaml:"name"`
+	Description   string           `yaml:"description"`
+	Variables     []yamlVarItem    `yaml:"variables,omitempty"`
+	ConfigParams  map[string]string `yaml:"config_params,omitempty"`
+	DerivedParams map[string]string `yaml:"derived_params,omitempty"`
+	DataSources   []yamlDataSource `yaml:"data_sources,omitempty"`
+	Setup         []yamlNode       `yaml:"setup,omitempty"`
+	Nodes         []yamlNode       `yaml:"nodes"`
+	Teardown      []yamlNode       `yaml:"teardown,omitempty"`
+	Edges         []yamlEdge       `yaml:"edges,omitempty"`
 }
 
 type yamlDataSource struct {
@@ -76,10 +78,19 @@ type yamlDataSource struct {
 	Rows    []map[string]string `yaml:"rows"`
 }
 
+type yamlRetry struct {
+	Count    int    `yaml:"count" json:"count"`
+	Interval string `yaml:"interval" json:"interval"`
+}
+
 type yamlNode struct {
-	Name   string         `yaml:"name"`
-	Type   string         `yaml:"type"`
-	Config map[string]any `yaml:"config"`
+	Name         string         `yaml:"name"`
+	Type         string         `yaml:"type"`
+	Config       map[string]any `yaml:"config,omitempty"`
+	ThinkTime    string         `yaml:"think_time,omitempty"`
+	Retry        *yamlRetry     `yaml:"retry,omitempty"`
+	Condition    string         `yaml:"condition,omitempty"`
+	TimedTrigger string         `yaml:"timed_trigger,omitempty"`
 }
 
 type yamlEdge struct {
@@ -115,13 +126,25 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, "scene name is required")
 	}
 
+	// Construct scene-level Variables from YAML variables + config_params + derived_params.
 	var varsJSON string
-	if len(ys.Variables) > 0 {
-		vm := make(map[string]string)
-		for _, v := range ys.Variables {
-			vm[v.Key] = v.Value
-		}
-		vb, _ := json.Marshal(vm)
+	type varEntry struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	var varEntries []varEntry
+
+	for _, v := range ys.Variables {
+		varEntries = append(varEntries, varEntry{Key: v.Key, Value: v.Value})
+	}
+	for k, v := range ys.ConfigParams {
+		varEntries = append(varEntries, varEntry{Key: k, Value: v})
+	}
+	for k, v := range ys.DerivedParams {
+		varEntries = append(varEntries, varEntry{Key: k, Value: v})
+	}
+	if len(varEntries) > 0 {
+		vb, _ := json.Marshal(varEntries)
 		varsJSON = string(vb)
 	}
 
@@ -169,6 +192,24 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		if err := validateNodeName(yn.Name); err != nil {
 			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", yn.Name, err))
 		}
+
+		// Merge think_time, retry, condition, timed_trigger into Config.
+		if yn.Config == nil {
+			yn.Config = make(map[string]any)
+		}
+		if yn.ThinkTime != "" {
+			yn.Config["think_time"] = yn.ThinkTime
+		}
+		if yn.Retry != nil {
+			yn.Config["retry"] = yn.Retry
+		}
+		if yn.Condition != "" {
+			yn.Config["condition"] = yn.Condition
+		}
+		if yn.TimedTrigger != "" {
+			yn.Config["timed_trigger"] = yn.TimedTrigger
+		}
+
 		configBytes, _ := json.Marshal(yn.Config)
 		node := &model.Node{
 			SceneID: scene.ID,
@@ -370,6 +411,191 @@ func (h *Handler) DeleteScene(r *http.Request) dto.Response {
 	}
 
 	return dto.OK(nil)
+}
+
+// ExportYAML serializes a scene and all its nodes, edges, variables,
+// and data sources into a YAML document for backup or migration.
+func (h *Handler) ExportYAML(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	scene, err := h.scenes.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	}
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+	}
+
+	// Fetch all nodes.
+	nodes, err := h.nodes.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("list nodes: %v", err))
+	}
+
+	// Fetch all edges.
+	edges, err := h.edges.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
+	}
+
+	// Parse Variables JSON.
+	var varsList []yamlVarItem
+	var configParams map[string]string
+	var derivedParams map[string]string
+	if scene.Variables != "" {
+		var raw []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal([]byte(scene.Variables), &raw); err == nil {
+			for _, v := range raw {
+				entry := yamlVarItem{Key: v.Key, Value: v.Value}
+				// Heuristic: if value looks like an expression ${...}, treat as derived_param.
+				if strings.Contains(v.Value, "${") && strings.Contains(v.Value, "}") {
+					if derivedParams == nil {
+						derivedParams = make(map[string]string)
+					}
+					derivedParams[v.Key] = v.Value
+					continue
+				}
+				// Heuristic: if key starts with cfg_, treat as config_param.
+				if strings.HasPrefix(v.Key, "cfg_") {
+					if configParams == nil {
+						configParams = make(map[string]string)
+					}
+					configParams[v.Key] = v.Value
+					continue
+				}
+				varsList = append(varsList, entry)
+			}
+		}
+	}
+
+	// Build YAML nodes.
+	var yamlNodes []yamlNode
+	var yamlSetup []yamlNode
+	var yamlTeardown []yamlNode
+	nodeNameMap := make(map[string]*model.Node)
+
+	for _, n := range nodes {
+		nodeNameMap[n.Name] = n
+
+		parsedConfig := make(map[string]any)
+		if n.Config != "" {
+			json.Unmarshal([]byte(n.Config), &parsedConfig)
+		}
+
+		yn := yamlNode{
+			Name:   n.Name,
+			Type:   n.Type,
+			Config: nil,
+		}
+
+		// Extract known top-level fields back out of config.
+		var extraConfig map[string]any
+		if parsedConfig != nil {
+			extraConfig = make(map[string]any)
+			for k, v := range parsedConfig {
+				switch k {
+				case "think_time":
+					if s, ok := v.(string); ok {
+						yn.ThinkTime = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "retry":
+					if m, ok := v.(map[string]any); ok {
+						yn.Retry = &yamlRetry{}
+						if c, ok2 := m["count"].(float64); ok2 {
+							yn.Retry.Count = int(c)
+						}
+						if iv, ok2 := m["interval"].(string); ok2 {
+							yn.Retry.Interval = iv
+						}
+					} else {
+						extraConfig[k] = v
+					}
+				case "condition":
+					if s, ok := v.(string); ok {
+						yn.Condition = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "timed_trigger":
+					if s, ok := v.(string); ok {
+						yn.TimedTrigger = s
+					} else {
+						extraConfig[k] = v
+					}
+				default:
+					extraConfig[k] = v
+				}
+			}
+		}
+		// Only set Config if there are remaining fields.
+		if len(extraConfig) > 0 {
+			yn.Config = extraConfig
+		}
+
+		switch n.Type {
+		case model.NodeTypeSetup:
+			yamlSetup = append(yamlSetup, yn)
+		case model.NodeTypeTeardown:
+			yamlTeardown = append(yamlTeardown, yn)
+		default:
+			yamlNodes = append(yamlNodes, yn)
+		}
+	}
+
+	// Build YAML edges.
+	var yamlEdges []yamlEdge
+	for _, e := range edges {
+		fromName := ""
+		toName := ""
+		for name, n := range nodeNameMap {
+			if n.ID == e.FromNode {
+				fromName = name
+			}
+			if n.ID == e.ToNode {
+				toName = name
+			}
+		}
+		if fromName != "" && toName != "" {
+			yamlEdges = append(yamlEdges, yamlEdge{
+				From:      fromName,
+				To:        toName,
+				Condition: e.Condition,
+			})
+		}
+	}
+
+	// Build YAML scene.
+	ys := yamlScene{
+		Name:          scene.Name,
+		Description:   scene.Description,
+		Variables:     varsList,
+		ConfigParams:  configParams,
+		DerivedParams: derivedParams,
+		Setup:         yamlSetup,
+		Nodes:         yamlNodes,
+		Teardown:      yamlTeardown,
+		Edges:         yamlEdges,
+	}
+
+	yamlBytes, err := yaml.Marshal(ys)
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("marshal yaml: %v", err))
+	}
+
+	return dto.OK(dto.ExportYAMLResponse{
+		YAML: string(yamlBytes),
+	})
 }
 
 func (h *Handler) ListScenes(r *http.Request) dto.Response {

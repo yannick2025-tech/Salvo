@@ -357,11 +357,11 @@
 
 ## 12. Backend: YAML Import/Export Extension
 
-- [ ] 12.1 扩展 `yamlNode` 支持 while/parallel/sub_flow/loop 类型及配置字段
-- [ ] 12.2 ImportYAML：解析 while/parallel/sub_flow/loop 节点，创建 Node 记录
-- [ ] 12.3 YAML 导出：序列化 while/parallel/sub_flow/loop 节点完整配置
-- [ ] 12.4 支持 `config_params` 和 `derived_params` 段落（映射到系统函数）
-- [ ] 12.5 支持 `think_time`、`retry`、`condition`、`timed_trigger` 字段
+- [x] 12.1 扩展 `yamlNode` 支持 while/parallel/sub_flow/loop 类型及配置字段
+- [x] 12.2 ImportYAML：解析 while/parallel/sub_flow/loop 节点，创建 Node 记录
+- [x] 12.3 YAML 导出：序列化 while/parallel/sub_flow/loop 节点完整配置
+- [x] 12.4 支持 `config_params` 和 `derived_params` 段落（映射到系统函数）
+- [x] 12.5 支持 `think_time`、`retry`、`condition`、`timed_trigger` 字段
 
 ---
 

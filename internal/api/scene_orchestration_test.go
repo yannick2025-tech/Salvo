@@ -777,3 +777,361 @@ nodes:
 	assert.Equal(t, 400, result.Code, "should reject YAML without name")
 	assert.Contains(t, result.Message, "name is required")
 }
+
+// --- 12. Backend YAML Import/Export Extension ---
+
+func TestYAMLImportWithWhileParallelSubFlowLoop(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	yamlContent := `
+name: yaml-all-types-test
+nodes:
+  - name: Start
+    type: http
+    config:
+      url: /api/start
+  - name: DataFetch
+    type: sub_flow
+    config:
+      scene_id: "sub-scene-123"
+  - name: LoopBlock
+    type: loop
+    config:
+      loop_count: 3
+  - name: WhileBlock
+    type: while
+    config:
+      exit_conditions:
+        - field: $.status
+          operator: eq
+          value: success
+  - name: ParallelBlock
+    type: parallel
+    config:
+      async: true
+setup:
+  - name: SetupInit
+    type: setup
+    config:
+      url: /api/init
+teardown:
+  - name: TeardownClean
+    type: teardown
+    config:
+      url: /api/clean
+`
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "YAML All Types",
+		YAML: yamlContent,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "import failed: %s", result.Message)
+
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+	assert.Equal(t, "YAML All Types", scene.Name)
+	assert.NotZero(t, scene.ID)
+
+	// List nodes and verify all types exist.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var listResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+	nodes := listResp.Items
+	assert.Equal(t, 7, len(nodes), "expected 7 nodes (setup + 5 + teardown)")
+
+	typeCount := make(map[string]int)
+	for _, n := range nodes {
+		typeCount[n.Type]++
+	}
+	assert.Equal(t, 1, typeCount["http"], "http")
+	assert.Equal(t, 1, typeCount["sub_flow"], "sub_flow")
+	assert.Equal(t, 1, typeCount["loop"], "loop")
+	assert.Equal(t, 1, typeCount["while"], "while")
+	assert.Equal(t, 1, typeCount["parallel"], "parallel")
+	assert.Equal(t, 1, typeCount["setup"], "setup")
+	assert.Equal(t, 1, typeCount["teardown"], "teardown")
+
+	// Verify sub_flow config has scene_id.
+	for _, n := range nodes {
+		if n.Type == "sub_flow" {
+			var cfg map[string]any
+			require.NoError(t, json.Unmarshal([]byte(n.Config), &cfg))
+			assert.Equal(t, "sub-scene-123", cfg["scene_id"])
+		}
+		if n.Type == "loop" {
+			var cfg map[string]any
+			require.NoError(t, json.Unmarshal([]byte(n.Config), &cfg))
+			// JSON numbers decode as float64
+			assert.Equal(t, float64(3), cfg["loop_count"])
+		}
+		if n.Type == "parallel" {
+			var cfg map[string]any
+			require.NoError(t, json.Unmarshal([]byte(n.Config), &cfg))
+			assert.Equal(t, true, cfg["async"])
+		}
+		if n.Type == "while" {
+			var cfg map[string]any
+			require.NoError(t, json.Unmarshal([]byte(n.Config), &cfg))
+			conditions, ok := cfg["exit_conditions"].([]any)
+			require.True(t, ok, "exit_conditions should be an array")
+			require.Equal(t, 1, len(conditions))
+			cond := conditions[0].(map[string]any)
+			assert.Equal(t, "$.status", cond["field"])
+			assert.Equal(t, "eq", cond["operator"])
+			assert.Equal(t, "success", cond["value"])
+		}
+	}
+}
+
+func TestYAMLImportWithConfigAndDerivedParams(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	yamlContent := `
+name: cfg-derived-params-test
+config_params:
+  cfg_base_url: "http://localhost:8080"
+  cfg_timeout: "30s"
+derived_params:
+  full_url: "${cfg_base_url}/api/v1/users"
+  request_id: "${__uuid()}"
+nodes:
+  - name: GetUsers
+    type: http
+    config:
+      url: "${full_url}"
+      method: GET
+`
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Config Derived Params",
+		YAML: yamlContent,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "import failed: %s", result.Message)
+
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Verify variables stored include config_params and derived_params.
+	var vars []struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(scene.Variables), &vars))
+	varKeys := make(map[string]string)
+	for _, v := range vars {
+		varKeys[v.Key] = v.Value
+	}
+	assert.Equal(t, "http://localhost:8080", varKeys["cfg_base_url"])
+	assert.Equal(t, "30s", varKeys["cfg_timeout"])
+	assert.Equal(t, "${cfg_base_url}/api/v1/users", varKeys["full_url"])
+	assert.Equal(t, "${__uuid()}", varKeys["request_id"])
+}
+
+func TestYAMLImportWithThinkTimeRetryConditionTimedTrigger(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	yamlContent := `
+name: thinktime-retry-test
+nodes:
+  - name: GetUsers
+    type: http
+    config:
+      url: /api/users
+      method: GET
+    think_time: "1000ms"
+    retry:
+      count: 3
+      interval: "500ms"
+    condition: "${cfg_retry_count} > 0"
+  - name: HealthCheck
+    type: http
+    config:
+      url: /api/health
+    timed_trigger: "@every 10s"
+`
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "ThinkTime Retry",
+		YAML: yamlContent,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "import failed: %s", result.Message)
+
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// List nodes and verify merged config.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var listResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+	nodes := listResp.Items
+	assert.Equal(t, 2, len(nodes))
+
+	for _, n := range nodes {
+		var cfg map[string]any
+		require.NoError(t, json.Unmarshal([]byte(n.Config), &cfg))
+
+		if n.Name == "GetUsers" {
+			assert.Equal(t, "1000ms", cfg["think_time"])
+			assert.Equal(t, "${cfg_retry_count} > 0", cfg["condition"])
+
+			retry, ok := cfg["retry"].(map[string]any)
+			require.True(t, ok, "retry should be an object")
+			// JSON numbers decode as float64
+			assert.Equal(t, float64(3), retry["count"])
+			assert.Equal(t, "500ms", retry["interval"])
+		}
+		if n.Name == "HealthCheck" {
+			assert.Equal(t, "@every 10s", cfg["timed_trigger"])
+		}
+	}
+}
+
+func TestYAMLExportRoundTrip(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	originalYAML := `
+name: round-trip-test
+config_params:
+  cfg_host: "localhost"
+derived_params:
+  url_template: "${cfg_host}:8080/api"
+nodes:
+  - name: Start
+    type: http
+    config:
+      url: "${url_template}"
+      method: GET
+    think_time: "500ms"
+    retry:
+      count: 2
+      interval: "1s"
+  - name: LoopStep
+    type: loop
+    config:
+      loop_count: 5
+  - name: WhileStep
+    type: while
+    config:
+      exit_conditions:
+        - field: $.code
+          operator: eq
+          value: "200"
+  - name: ParallelStep
+    type: parallel
+    config:
+      async: true
+  - name: SubFlowStep
+    type: sub_flow
+    config:
+      scene_id: "my-sub-flow"
+edges:
+  - from: Start
+    to: LoopStep
+  - from: LoopStep
+    to: ParallelStep
+  - from: ParallelStep
+    to: SubFlowStep
+`
+
+	// Step 1: Import.
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Round Trip Test",
+		YAML: originalYAML,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "import failed: %s", result.Message)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Step 2: Export.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/export", dto.IDRequest{ID: scene.ID})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "export failed: %s", result.Message)
+
+	var exportResp dto.ExportYAMLResponse
+	exportData, _ := json.Marshal(result.Data)
+	require.NoError(t, json.Unmarshal(exportData, &exportResp))
+	assert.NotEmpty(t, exportResp.YAML)
+
+	// Step 3: Re-import the exported YAML into a new scene.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Round Trip Re-import",
+		YAML: exportResp.YAML,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "re-import failed: %s", result.Message)
+	sceneData2, _ := json.Marshal(result.Data)
+	var scene2 dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData2, &scene2))
+
+	// Verify re-imported scene has same nodes.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene2.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var listResp2 dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp2))
+	nodes2 := listResp2.Items
+	assert.Equal(t, 5, len(nodes2), "expected 5 nodes in round-tripped scene")
+
+	typeCount := make(map[string]int)
+	for _, n := range nodes2 {
+		typeCount[n.Type]++
+	}
+	assert.Equal(t, 1, typeCount["http"])
+	assert.Equal(t, 1, typeCount["loop"])
+	assert.Equal(t, 1, typeCount["while"])
+	assert.Equal(t, 1, typeCount["parallel"])
+	assert.Equal(t, 1, typeCount["sub_flow"])
+
+	// Verify edges are also exported and re-imported.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/edges/list", dto.ListEdgesRequest{
+		SceneID: scene2.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+	edgesData, _ := json.Marshal(result.Data)
+	var edgesResp dto.ListResponse[[]dto.EdgeDTO]
+	require.NoError(t, json.Unmarshal(edgesData, &edgesResp))
+	edges2 := edgesResp.Items
+	assert.Equal(t, 3, len(edges2), "expected 3 edges in round-tripped scene")
+}
+
+func TestYAMLExportSceneNotFound(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/export", dto.IDRequest{
+		ID: 99999999,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 404, result.Code, "should return 404 for non-existent scene")
+	assert.Contains(t, result.Message, "not found")
+}

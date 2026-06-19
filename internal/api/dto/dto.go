@@ -78,6 +78,11 @@ type ImportYAMLRequest struct {
 	YAML        string `json:"yaml"`
 }
 
+// ExportYAMLResponse is the response body for POST /api/v1/scenes/export.
+type ExportYAMLResponse struct {
+	YAML string `json:"yaml"`
+}
+
 // UpdateSceneRequest is the request body for POST /api/v1/scenes/update.
 type UpdateSceneRequest struct {
 	ID          snowflake.ID `json:"id"`

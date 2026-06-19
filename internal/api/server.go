@@ -205,6 +205,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/scenes/list", s.handleAuth(s.handler.ListScenes))
 	mux.HandleFunc("POST /api/v1/scenes/create", s.handleAuth(s.handler.CreateScene))
 	mux.HandleFunc("POST /api/v1/scenes/import", s.handleAuth(s.handler.ImportYAML))
+	mux.HandleFunc("POST /api/v1/scenes/export", s.handleAuth(s.handler.ExportYAML))
 	mux.HandleFunc("POST /api/v1/scenes/get", s.handleAuth(s.handler.GetScene))
 	mux.HandleFunc("POST /api/v1/scenes/update", s.handleAuth(s.handler.UpdateScene))
 	mux.HandleFunc("POST /api/v1/scenes/delete", s.handleAuth(s.handler.DeleteScene))
