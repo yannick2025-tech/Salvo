@@ -30,6 +30,10 @@
             <button class="btn-sm" @click="addNode('if-else')">+ IF-ELSE</button>
             <button class="btn-sm" @click="addNode('group')">+ 分组</button>
             <button class="btn-sm" @click="addNode('timer')">+ 定时器</button>
+            <button class="btn-sm" @click="addNode('while')">+ While</button>
+            <button class="btn-sm" @click="addNode('parallel')">+ 并行</button>
+            <button class="btn-sm" @click="addNode('sub_flow')">+ 子流程</button>
+            <button class="btn-sm" @click="addNode('loop')">+ 循环</button>
             <button class="btn-sm" @click="addNode('teardown')">+ 清理</button>
           </div>
         </div>
@@ -225,6 +229,108 @@
         </div>
       </div>
 
+      <!-- ➕ While 节点配置 -->
+      <div v-else-if="selectedNode.type === 'while'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>退出条件</label>
+          <div class="condition-rows">
+            <div v-for="(cond, idx) in whileConfig.exit_conditions" :key="idx" class="condition-row">
+              <input v-model="cond.variable" placeholder="变量" class="cond-input" @change="saveNodeConfig" />
+              <select v-model="cond.operator" class="cond-op" @change="saveNodeConfig">
+                <option value="==">==</option>
+                <option value="!=">!=</option>
+                <option value=">">&gt;</option>
+                <option value="<">&lt;</option>
+                <option value=">=">&gt;=</option>
+                <option value="<=">&lt;=</option>
+              </select>
+              <input v-model="cond.value" placeholder="值" class="cond-input" @change="saveNodeConfig" />
+              <button class="btn-icon btn-del-var" @click="removeWhileCondition(idx)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          </div>
+          <button class="btn-sm drawer-add-btn" @click="addWhileCondition">+ 添加条件</button>
+        </div>
+        <div class="form-row inline">
+          <label>轮询间隔(秒)</label>
+          <input v-model.number="whileConfig.interval_seconds" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>最大迭代</label>
+          <input v-model.number="whileConfig.max_iterations" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>最大时长(分)</label>
+          <input v-model.number="whileConfig.max_duration_minutes" type="number" min="0" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>连续失败次数</label>
+          <input v-model.number="whileConfig.fail_after_consecutive" type="number" min="0" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>失败消息</label>
+          <input v-model="whileConfig.fail_message" placeholder="可选" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">While 节点会循环执行子步骤，直到条件满足或达到上限</label>
+        </div>
+      </div>
+
+      <!-- ➕ Parallel 节点配置 -->
+      <div v-else-if="selectedNode.type === 'parallel'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>异步执行</label>
+          <input type="checkbox" v-model="parallelConfig.async" true-value="true" false-value="false" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">并行节点中的步骤将同时执行。启用异步后不会阻塞后续节点。</label>
+        </div>
+      </div>
+
+      <!-- ➕ Sub_flow 节点配置 -->
+      <div v-else-if="selectedNode.type === 'sub_flow'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>目标场景</label>
+          <select v-model="subFlowConfig.scene_id" @change="saveNodeConfig">
+            <option value="">选择场景</option>
+            <option v-for="s in availableScenes" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+        <div class="form-row inline">
+          <label>异步执行</label>
+          <input type="checkbox" v-model="subFlowConfig.async" true-value="true" false-value="false" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">子流程节点将执行另一个场景的全部 DAG 节点。异步时不等待完成。</label>
+        </div>
+      </div>
+
+      <!-- ➕ Loop 节点配置 -->
+      <div v-else-if="selectedNode.type === 'loop'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>循环次数</label>
+          <input v-model.number="loopConfig.loop_count" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">循环节点会重复执行子步骤指定的次数。</label>
+        </div>
+      </div>
+
       <div class="panel-footer">
         <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode">保存配置</button>
       </div>
@@ -360,6 +466,10 @@
             <option value="if-else">IF-ELSE 分支</option>
             <option value="group">分组</option>
             <option value="timer">定时器</option>
+            <option value="while">While 循环</option>
+            <option value="parallel">并行执行</option>
+            <option value="sub_flow">子流程</option>
+            <option value="loop">循环</option>
             <option value="teardown">Teardown (清理)</option>
           </select>
         </div>
@@ -532,7 +642,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene, batchSetVariables } from '@/api/scene'
+import { getScene, createScene, startScene, batchSetVariables, listScenes } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
 import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
@@ -583,6 +693,10 @@ const pagedRows = computed(() => {
 const groupConfig = reactive({ node_ids: [] as string[], loop_count: 1, async: false })
 // Timer node config
 const timerConfig = reactive({ mode: 'delay', seconds: 1 })
+const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==', value: '' }], interval_seconds: 1, max_iterations: 100, max_duration_minutes: 0, fail_after_consecutive: 0, fail_message: '' })
+const parallelConfig = reactive({ async: false })
+const subFlowConfig = reactive({ scene_id: '', async: false })
+const loopConfig = reactive({ loop_count: 3 })
 
 function parseVariables(sceneVars: string): { key: string; value: string }[] {
   try {
@@ -891,6 +1005,29 @@ function removeChild(childId: string) {
   saveNodeConfig()
 }
 
+function addWhileCondition() {
+  whileConfig.exit_conditions.push({ variable: '', operator: '==', value: '' })
+  saveNodeConfig()
+}
+
+function removeWhileCondition(idx: number) {
+  whileConfig.exit_conditions.splice(idx, 1)
+  saveNodeConfig()
+}
+
+const availableScenes = computed(() => {
+  return scenes.value.filter(s => s.id !== route.params.id)
+})
+
+const scenes = ref<{ id: string; name: string }[]>([])
+
+async function fetchSceneList() {
+  try {
+    const resp = await listScenes({ limit: 100 })
+    if (resp.code === 0) scenes.value = (resp.data.items || []).map((s: any) => ({ id: s.id, name: s.name }))
+  } catch { /* ignore */ }
+}
+
 async function saveIfElseBranches() {
   if (!selectedNode.value) return
   const sceneId = route.params.id as string
@@ -1069,6 +1206,9 @@ function nodeIcon(type: string) {
     case 'condition': return '◇'
     case 'if-else': return '⑂'
     case 'loop': return '↻'
+    case 'while': return '↺'
+    case 'parallel': return '∥'
+    case 'sub_flow': return '⊞'
     case 'teardown': return '■'
     default: return '○'
   }
@@ -1082,6 +1222,9 @@ function nodeTypeLabel(type: string) {
     case 'condition': return 'CONDITION'
     case 'if-else': return 'IF-ELSE'
     case 'loop': return 'LOOP'
+    case 'while': return 'WHILE'
+    case 'parallel': return 'PARALLEL'
+    case 'sub_flow': return 'SUBFLOW'
     case 'teardown': return 'TEARDOWN'
     default: return type.toUpperCase()
   }
@@ -1282,6 +1425,14 @@ async function handleSaveNode() {
     config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: nodeForm.loop_count, async: false })
   } else if (nodeForm.type === 'timer') {
     config = JSON.stringify({ mode: timerConfig.mode, seconds: timerConfig.seconds })
+  } else if (nodeForm.type === 'while') {
+    config = JSON.stringify(whileConfig)
+  } else if (nodeForm.type === 'parallel') {
+    config = JSON.stringify(parallelConfig)
+  } else if (nodeForm.type === 'sub_flow') {
+    config = JSON.stringify(subFlowConfig)
+  } else if (nodeForm.type === 'loop') {
+    config = JSON.stringify(loopConfig)
   }
 
   // Add loop_count for all types except group/timer
@@ -1436,6 +1587,21 @@ function selectNode(node: NodeDTO | null) {
     timerConfig.mode = cfg.mode || 'delay'
     timerConfig.seconds = cfg.seconds || 1
     
+    // Parse configs for new node types
+    whileConfig.exit_conditions = cfg.exit_conditions || [{ variable: '', operator: '==', value: '' }]
+    whileConfig.interval_seconds = cfg.interval_seconds || 1
+    whileConfig.max_iterations = cfg.max_iterations || 100
+    whileConfig.max_duration_minutes = cfg.max_duration_minutes || 0
+    whileConfig.fail_after_consecutive = cfg.fail_after_consecutive || 0
+    whileConfig.fail_message = cfg.fail_message || ''
+    
+    parallelConfig.async = cfg.async ?? false
+    
+    subFlowConfig.scene_id = cfg.scene_id || ''
+    subFlowConfig.async = cfg.async ?? false
+    
+    loopConfig.loop_count = cfg.loop_count || 3
+    
     if (node.type === 'if-else') {
       const nodeEdges = edges.value.filter(e => e.from_node === node.id)
       const trueEdge = nodeEdges.find(e => e.condition === '__if_true__')
@@ -1520,6 +1686,14 @@ async function saveNodeConfig() {
     config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: groupConfig.loop_count, async: groupConfig.async })
   } else if (nodeType === 'timer') {
     config = JSON.stringify(timerConfig)
+  } else if (nodeType === 'while') {
+    config = JSON.stringify(whileConfig)
+  } else if (nodeType === 'parallel') {
+    config = JSON.stringify(parallelConfig)
+  } else if (nodeType === 'sub_flow') {
+    config = JSON.stringify(subFlowConfig)
+  } else if (nodeType === 'loop') {
+    config = JSON.stringify(loopConfig)
   }
 
   try {
@@ -1643,6 +1817,7 @@ onMounted(() => {
   fetchEdges()
   fetchGenerators()
   fetchDataSources()
+  fetchSceneList()
 })
 </script>
 

@@ -102,12 +102,12 @@ const defaultEdgeOptions = computed(() => ({
 }))
 
 function getNodeTypeLabel(type: string) {
-  const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN', group: 'GROUP', timer: 'TIMER' }
+  const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN', group: 'GROUP', timer: 'TIMER', while: 'WHILE', parallel: 'PARALLEL', sub_flow: 'SUBFLOW', loop: 'LOOP' }
   return map[type] || type.toUpperCase()
 }
 
 function getNodeIcon(type: string) {
-  const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■', group: '⊞', timer: '⏲' }
+  const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■', group: '⊞', timer: '⏲', while: '↺', parallel: '∥', sub_flow: '⊞', loop: '↻' }
   return map[type] || '?'
 }
 
@@ -487,6 +487,10 @@ function minimapNodeColor(node: any) {
   if (t === 'delay') return 'var(--accent-warning)'
   if (t === 'if-else') return '#e67e22'
   if (t === 'teardown') return 'var(--accent-danger)'
+  if (t === 'while') return '#8e44ad'
+  if (t === 'parallel') return '#16a085'
+  if (t === 'sub_flow') return '#2980b9'
+  if (t === 'loop') return '#d35400'
   return 'var(--text-tertiary)'
 }
 </script>

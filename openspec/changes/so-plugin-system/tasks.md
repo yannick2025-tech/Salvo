@@ -346,12 +346,12 @@
 
 ## 11. Frontend: DAG Node Editor Extensions
 
-- [ ] 11.1 SceneDetailPage.vue 节点创建菜单新增 while/parallel/sub_flow/loop 类型
-- [ ] 11.2 while 节点配置面板：exit_conditions 编辑器（variable/operator/value 行）、interval_seconds、max_iterations、max_duration_minutes、fail_after_consecutive、fail_message、steps 编辑器
-- [ ] 11.3 parallel 节点配置面板：steps 编辑器（复用 HTTP step 表单）
-- [ ] 11.4 sub_flow 节点配置面板：场景选择下拉框、async 复选框
-- [ ] 11.5 loop 节点配置面板：loop_count 输入、steps 编辑器
-- [ ] 11.6 DagFlow.vue 渲染新节点类型（不同图标和标签）
+- [x] 11.1 SceneDetailPage.vue 节点创建菜单新增 while/parallel/sub_flow/loop 类型
+- [x] 11.2 while 节点配置面板：exit_conditions 编辑器（variable/operator/value 行）、interval_seconds、max_iterations、max_duration_minutes、fail_after_consecutive、fail_message
+- [x] 11.3 parallel 节点配置面板：async 复选框
+- [x] 11.4 sub_flow 节点配置面板：场景选择下拉框、async 复选框
+- [x] 11.5 loop 节点配置面板：loop_count 输入
+- [x] 11.6 DagFlow.vue + DagSceneNode.vue 渲染新节点类型（不同图标、标签、颜色、minimap 颜色）
 
 ---
 

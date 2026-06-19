@@ -162,6 +162,10 @@ function getChildIcon(type: string): string {
   icons['teardown'] = '\u25A0'
   icons['group'] = '\u229E'
   icons['timer'] = '\u23F2'
+  icons['while'] = '\u21BA'
+  icons['parallel'] = '\u2225'
+  icons['sub_flow'] = '\u229E'
+  icons['loop'] = '\u21BB'
   return icons[type] || '?'
 }
 
@@ -175,6 +179,10 @@ function getNodeTypeLabel(type: string): string {
   labels['teardown'] = 'TEARDOWN'
   labels['group'] = 'GROUP'
   labels['timer'] = 'TIMER'
+  labels['while'] = 'WHILE'
+  labels['parallel'] = 'PARALLEL'
+  labels['sub_flow'] = 'SUBFLOW'
+  labels['loop'] = 'LOOP'
   return labels[type] || type.toUpperCase()
 }
 </script>
@@ -210,6 +218,10 @@ function getNodeTypeLabel(type: string): string {
 .scene-node.group { border-left: 3.5px solid #1abc9c; border-style: dashed; min-width: 300px; max-width: none; }
 .scene-node.group.expanded { border-style: solid; border-color: rgba(26,188,156,0.4); background: var(--bg-secondary); }
 .scene-node.timer { border-left: 3.5px solid #e84393; }
+.scene-node.while { border-left: 3.5px solid #8e44ad; }
+.scene-node.parallel { border-left: 3.5px solid #16a085; }
+.scene-node.sub_flow { border-left: 3.5px solid #2980b9; }
+.scene-node.loop { border-left: 3.5px solid #d35400; }
 
 .node-body {
   display: flex;
@@ -238,6 +250,10 @@ function getNodeTypeLabel(type: string): string {
 .node-icon-wrap.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
 .node-icon-wrap.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
 .node-icon-wrap.timer { background: rgba(232,67,147,0.12); color: #e84393; }
+.node-icon-wrap.while { background: rgba(142,68,173,0.12); color: #8e44ad; }
+.node-icon-wrap.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
+.node-icon-wrap.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
+.node-icon-wrap.loop { background: rgba(211,84,0,0.12); color: #d35400; }
 
 .node-icon { font-size: 15px; line-height: 1; }
 
@@ -281,6 +297,10 @@ function getNodeTypeLabel(type: string): string {
 .type-badge.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
 .type-badge.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
 .type-badge.timer { background: rgba(232,67,147,0.12); color: #e84393; }
+.type-badge.while { background: rgba(142,68,173,0.12); color: #8e44ad; }
+.type-badge.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
+.type-badge.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
+.type-badge.loop { background: rgba(211,84,0,0.12); color: #d35400; }
 
 .loop-badge {
   font-size: 9.5px;
@@ -456,6 +476,10 @@ function getNodeTypeLabel(type: string): string {
 .child-icon.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
 .child-icon.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
 .child-icon.timer { background: rgba(232,67,147,0.12); color: #e84393; }
+.child-icon.while { background: rgba(142,68,173,0.12); color: #8e44ad; }
+.child-icon.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
+.child-icon.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
+.child-icon.loop { background: rgba(211,84,0,0.12); color: #d35400; }
 
 .child-name {
   font-size: 11.5px;
@@ -485,6 +509,10 @@ function getNodeTypeLabel(type: string): string {
 .child-type-badge.teardown { background: rgba(231,76,60,0.11); color: #e74c3c; }
 .child-type-badge.group { background: rgba(26,188,156,0.12); color: #1abc9c; }
 .child-type-badge.timer { background: rgba(232,67,147,0.12); color: #e84393; }
+.child-type-badge.while { background: rgba(142,68,173,0.12); color: #8e44ad; }
+.child-type-badge.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
+.child-type-badge.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
+.child-type-badge.loop { background: rgba(211,84,0,0.12); color: #d35400; }
 </style>
 
 <style>
