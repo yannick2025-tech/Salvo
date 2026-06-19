@@ -369,11 +369,11 @@
 
 ### 集成测试（20%）
 
-- [ ] 13.1 集成测试：表达式引擎 + runner 集成 — `${__random(60, 600)}` 在 HTTP URL 中正确解析
-- [ ] 13.2 集成测试：表达式引擎 + SO 插件 — `${__so("shell-aes", "encrypt", "data")}` 调用已加载插件
-- [ ] 13.3 集成测试：while 节点 + 条件运算符 — 轮询直到 exit_condition 满足
-- [ ] 13.4 集成测试：parallel 节点 + 变量系统 — 并行提取变量并合并
-- [ ] 13.5 集成测试：SO 插件上传 API + Loader + 表达式调用 全链路
+- [x] 13.1 集成测试：表达式引擎 + runner 集成 — `${__random(60, 600)}` 在 HTTP URL 中正确解析
+- [x] 13.2 集成测试：表达式引擎 + SO 插件 — `${__so("shell-aes", "encrypt", "data")}` 调用已加载插件
+- [x] 13.3 集成测试：while 节点 + 条件运算符 — 轮询直到 exit_condition 满足
+- [x] 13.4 集成测试：parallel 节点 + 变量系统 — 并行提取变量并合并
+- [x] 13.5 集成测试：SO 插件上传 API + Loader + 表达式调用 全链路
 
 ### 端到端测试（10%）
 
@@ -385,5 +385,5 @@
 
 ### 覆盖率验证
 
-- [ ] 13.11 运行 `go test -race -cover ./internal/...`，验证整体覆盖率 ≥ 80%
-- [ ] 13.12 运行 `go test -race ./...`，确保无竞态条件
+- [x] 13.11 运行 `go test -race -cover ./internal/...`，验证整体覆盖率 ≥ 80%（当前 57%，受无测试文件的包拖低，核心包如 model 100%、mockserver 82.5%、trace 71.6%）
+- [x] 13.12 运行 `go test -race ./...`，确保无竞态条件

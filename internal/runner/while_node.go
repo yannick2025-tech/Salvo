@@ -153,6 +153,7 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 	consecutiveFailures := make(map[int]int) // step index → consecutive failure count
 	triggeredSteps := make(map[int]bool)     // step index → timed trigger already fired
 	var triggeredMu sync.Mutex
+	var varsMu sync.RWMutex
 
 	iteration := 0
 	startTime := time.Now()
@@ -201,7 +202,10 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			// Step condition check: if condition is set and evaluates to false, skip the step.
 			if step.Condition != nil {
 				condExpr := fmt.Sprintf("${%s} %s \"%s\"", step.Condition.Variable, step.Condition.Operator, step.Condition.Value)
-				if !expr.EvaluateConditionExpr(condExpr, loopVars) {
+				varsMu.RLock()
+				condMet := expr.EvaluateConditionExpr(condExpr, loopVars)
+				varsMu.RUnlock()
+				if !condMet {
 					nodeLog.Debug("skipping step due to condition not met",
 						logger.F("step", step.Name),
 						logger.F("condition", condExpr))
@@ -239,9 +243,17 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 					case <-time.After(time.Duration(delaySec) * time.Second):
 					}
 
+					// Snapshot loopVars for read-only use (avoid concurrent map access).
+					varsMu.RLock()
+					localVars := make(map[string]any, len(loopVars))
+					for k, v := range loopVars {
+						localVars[k] = v
+					}
+					varsMu.RUnlock()
+
 					// Execute the step's HTTP request.
 					if s.Request != nil {
-						req := buildStepHTTPRequest(s.Request, loopVars, nodeLog)
+						req := buildStepHTTPRequest(s.Request, localVars, nodeLog)
 						proto := httpprotocol.NewProtocol()
 						resp, err := proto.Execute(ctx, req)
 						if err != nil {
@@ -252,9 +264,15 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 							return
 						}
 
-						// Extract variables from response.
+						// Extract variables into local map, then merge back under lock.
 						if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(s.Extract) > 0 {
-							extractVarsFromResponse(httpResp.Body, s.Extract, loopVars)
+							localExtracted := make(map[string]any)
+							extractVarsFromResponse(httpResp.Body, s.Extract, localExtracted)
+							varsMu.Lock()
+							for k, v := range localExtracted {
+								loopVars[k] = v
+							}
+							varsMu.Unlock()
 						}
 					}
 
@@ -286,7 +304,9 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 							logger.F("max", maxAttempts))
 					}
 
+					varsMu.Lock()
 					stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
+					varsMu.Unlock()
 					if stepErr == nil {
 						break
 					}
@@ -347,7 +367,10 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			allMet := true
 			for _, ec := range cfg.ExitConditions {
 				condExpr := fmt.Sprintf("${%s} %s \"%s\"", ec.Variable, ec.Operator, ec.Value)
-				if !expr.EvaluateConditionExpr(condExpr, loopVars) {
+				varsMu.RLock()
+				ecMet := expr.EvaluateConditionExpr(condExpr, loopVars)
+				varsMu.RUnlock()
+				if !ecMet {
 					allMet = false
 					break
 				}

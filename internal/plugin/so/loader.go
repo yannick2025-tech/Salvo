@@ -70,6 +70,23 @@ func (l *Loader) Load(path string) (Plugin, error) {
 	return inst, nil
 }
 
+// Register adds a Plugin instance directly to the loader without requiring
+// a .so file. This is primarily useful for testing scenarios where plugins
+// are created in-memory. Returns an error if the same name@version is
+// already registered.
+func (l *Loader) Register(p Plugin) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	key := l.pluginKey(p.Name(), p.Version())
+	if _, exists := l.plugin[key]; exists {
+		return fmt.Errorf("so: plugin %q already registered", key)
+	}
+
+	l.plugin[key] = p
+	return nil
+}
+
 // Get retrieves a plugin by name. If version is empty, returns the
 // plugin with the highest version. Returns false if not found.
 func (l *Loader) Get(name, version string) (Plugin, bool) {

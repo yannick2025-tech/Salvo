@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -103,12 +102,11 @@ func postJSONAuth(t *testing.T, srv *Server, token, path string, body any) *http
 
 func decodeResponse(t *testing.T, resp *http.Response) dto.Response {
 	t.Helper()
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	_ = resp.Body.Close()
-
+	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
 	var result dto.Response
-	require.NoError(t, json.Unmarshal(body, &result))
+	require.NoError(t, dec.Decode(&result))
+	_ = resp.Body.Close()
 	return result
 }
 
