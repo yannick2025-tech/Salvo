@@ -1,0 +1,1 @@
+import{t as e}from"./client-rK0MEaiS.js";function t(t){return e(`/traces/list`,t)}function n(t){return e(`/traces/get`,{id:t})}export{t as n,n as t};

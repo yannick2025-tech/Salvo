@@ -297,17 +297,6 @@ onMounted(() => {
 .page-header { display: flex; justify-content: space-between; align-items: center; }
 .page-header h2 { font-size: 18px; font-weight: 600; }
 
-.btn-login-primary {
-  padding: 8px 16px; border: none; border-radius: var(--radius-md);
-  background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer;
-  transition: opacity 0.15s ease;
-}
-.btn-login-primary:hover { opacity: 0.88; }
-.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary {
-  padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
-  background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
-}
 .btn-sm {
   padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
   background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer;

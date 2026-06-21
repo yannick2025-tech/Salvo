@@ -12,6 +12,7 @@ const router = createRouter({
     },
     {
       path: '/',
+      name: 'Layout',
       component: () => import('@/layouts/MainLayout.vue'),
       meta: { requiresAuth: true },
       children: [
@@ -25,10 +26,10 @@ const router = createRouter({
         { path: 'traces', name: 'Traces', component: () => import('@/views/traces/TracesPage.vue') },
         { path: 'traces/:id', name: 'TraceDetail', component: () => import('@/views/traces/TraceDetailPage.vue'), props: true },
         { path: 'users', name: 'Users', component: () => import('@/views/users/UsersPage.vue'), meta: { permission: 'users:read' } },
-        { path: 'plugins', name: 'Plugins', component: () => import('@/views/plugins/PluginsPage.vue'), meta: { permission: 'plugins:read' } },
         { path: 'settings', name: 'Settings', component: () => import('@/views/settings/SettingsPage.vue') },
       ],
     },
+    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],
 })
 
