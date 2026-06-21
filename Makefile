@@ -1,4 +1,4 @@
-.PHONY: all backend frontend dev dev-backend dev-frontend build clean test lint help
+.PHONY: all backend frontend dev dev-backend dev-frontend build clean test lint help plugins-build plugins-clean
 
 CONFIG ?= configs/salvo.yaml
 BIN ?= bin/salvo
@@ -23,6 +23,8 @@ help:
 	@echo "  lint           Run Go linter"
 	@echo "  stop           Stop running backend process"
 	@echo "  restart        Stop and restart backend"
+	@echo "  plugins-build  Build all SO plugins under plugins/"
+	@echo "  plugins-clean  Remove all compiled .so files under plugins/"
 
 build:
 	go build -o $(BIN) ./cmd/salvo
@@ -71,3 +73,24 @@ stop:
 	@sleep 1 && echo "stopped"
 
 restart: stop backend
+
+# --- SO Plugin targets ---
+
+# Auto-discover plugin directories (each must contain a main.go)
+PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d)
+
+plugins-build:
+	@echo "Building SO plugins..."
+	@count=0; \
+	for dir in $(PLUGIN_DIRS); do \
+		name=$$(basename $$dir); \
+		echo "  → building $$name..."; \
+		go build -buildmode=plugin -o $$dir/$$name.so $$dir/main.go || exit 1; \
+		count=$$((count + 1)); \
+	done; \
+	echo "Done. Built $$count plugin(s)."
+
+plugins-clean:
+	@echo "Cleaning SO plugins..."
+	@find plugins -name '*.so' -delete
+	@echo "Done."
