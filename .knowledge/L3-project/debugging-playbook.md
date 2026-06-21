@@ -89,6 +89,57 @@ while (el !== document.body) {
 getComputedStyle(el).width / maxWidth / boxSizing
 ```
 
+### 后台问题排查模板（四级链路日志法）
+
+当后台测试执行异常时，按照以下 SOP 利用四级链路日志定位问题：
+
+```bash
+# 1️⃣ 检查 Runner 生命周期日志（Scene 级别）
+grep "scene run started\|scene run completed\|failed to" /var/log/salvo.log
+
+# 2️⃣ 检查 DAG 构建日志（Chain 级别）
+grep "DAG built\|buildDAG\|building DAG edges\|DAG built successfully" /var/log/salvo.log
+
+# 3️⃣ 检查节点执行日志（Node 级别）
+grep "node execution started\|node execution completed\|node execution failed" /var/log/salvo.log
+
+# 4️⃣ 检查 Generator 和内部函数日志（Function 级别）
+grep "generator:" /var/log/salvo.log
+```
+
+**排查流程**：
+
+```
+Step 1: 定位失败场景
+   ↓ 搜索 error 级别日志 → 找到第一个错误
+   ↓ 提取 trace_id / scene_id / chain_id / node_id
+
+Step 2: 追踪链路
+   ↓ 用 trace_id 过滤该场景所有日志
+   ↓ 按时间线排列：scene run → DAG → node execution → function
+
+Step 3: 判断失败原因类型
+   ↓ 初始化失败 → 检查 buildDAG/buildScope 日志
+   ↓ 执行失败 → 检查节点 error 日志中的 error 字段
+   ↓ Panic → 搜索 "goroutine panicked" + stacktrace
+   ↓ Worker 层面 → 检查 "worker pool" 相关日志
+
+Step 4: 验证修复
+   ↓ 修复后检查 error 日志是否消失
+   ↓ 检查 run_record 中 status 是否正确更新
+```
+
+**关键字段索引**：
+
+| 字段 | 用途 | 示例值 |
+|------|------|--------|
+| `trace_id` | 关联同一场景所有日志 | `"trace_id": "123456789"` |
+| `scene_id` | 过滤特定场景 | `"scene_id": "10001"` |
+| `chain_id` | 关联同一轮 DAG 执行 | `"chain_id": "chain-001"` |
+| `node_id` | 定位具体节点 | `"node_id": "node-42"` |
+| `goroutine` | 定位 goroutine panic | `"goroutine": "scene-runner"` |
+| `stacktrace` | Panic 时包含完整调用栈 | `"stacktrace": "goroutine 46 [running]..."` |
+
 ## 反模式警告 ⚠️
 
 以下做法已被证明低效，**禁止作为首选方法**：

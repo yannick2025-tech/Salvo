@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -61,6 +62,37 @@ func TestConfigValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunnerError(t *testing.T) {
+	t.Run("nil when no error set", func(t *testing.T) {
+		r := &Runner{}
+		assert.Nil(t, r.Error(), "Error() should return nil when no error set")
+	})
+
+	t.Run("returns set error", func(t *testing.T) {
+		r := &Runner{}
+		testErr := assert.AnError
+		r.setError(testErr)
+		assert.Equal(t, testErr, r.Error(), "Error() should return the set error")
+	})
+
+	t.Run("nil error does not overwrite", func(t *testing.T) {
+		r := &Runner{}
+		testErr := assert.AnError
+		r.setError(testErr)
+		r.setError(nil)
+		assert.Equal(t, testErr, r.Error(), "setError(nil) should not clear existing error")
+	})
+
+	t.Run("only first error is stored", func(t *testing.T) {
+		r := &Runner{}
+		firstErr := assert.AnError
+		r.setError(firstErr)
+		r.setError(fmt.Errorf("second error"))
+		assert.Equal(t, firstErr, r.Error(), "setError should store only the first error")
+		assert.NotContains(t, r.Error().Error(), "second", "error message should not be overwritten")
+	})
 }
 
 func TestStatsRecordLatency(t *testing.T) {

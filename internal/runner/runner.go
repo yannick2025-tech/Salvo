@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,6 +34,36 @@ import (
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
 )
 
+// genLogAdapter adapts logger.Logger to the generator.Logger interface so that
+// the generator registry can log function-level spans through the runner's logger.
+type genLogAdapter struct {
+	log logger.Logger
+}
+
+func (a *genLogAdapter) Debug(msg string, fields ...any) {
+	a.log.Debug(msg, toFields(fields...)...)
+}
+
+func (a *genLogAdapter) Info(msg string, fields ...any) {
+	a.log.Info(msg, toFields(fields...)...)
+}
+
+func (a *genLogAdapter) Error(msg string, fields ...any) {
+	a.log.Error(msg, toFields(fields...)...)
+}
+
+// toFields converts a variadic any slice to logger.Field slice.
+// Pairs of (string, any) are expected, matching the standard log field pattern.
+func toFields(pairs ...any) []logger.Field {
+	fields := make([]logger.Field, 0, len(pairs)/2)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		key, _ := pairs[i].(string)
+		fields = append(fields, logger.F(key, pairs[i+1]))
+	}
+	return fields
+}
+
+// RunMode is the execution mode for a test scene.
 type RunMode string
 
 const (
@@ -179,6 +210,7 @@ type Runner struct {
 	mu            sync.Mutex
 	done          chan struct{}
 	log           logger.Logger
+	runErr        atomic.Value // stores error for Error() method
 
 	scenes      repo.SceneRepo
 	nodes       repo.NodeRepo
@@ -257,11 +289,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.mu.Unlock()
 
 	traceID := r.runID.String()
-	runLog := r.log.With(
-		logger.F("trace_id", traceID),
-		logger.F("scene_id", r.cfg.SceneID.String()),
-		logger.F("run_id", traceID),
-	)
+
+	// Create a context with trace context for logging
+	runCtx := logger.ContextWithTraceID(r.ctx, traceID)
+	runCtx = logger.ContextWithSceneID(runCtx, r.cfg.SceneID.String())
+
+	runLog := r.log.WithContext(runCtx)
 
 	r.collector.SetStatsProvider(r)
 
@@ -306,6 +339,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		r.status.Store(StatusFailed)
 		runLog.Error("failed to build DAG", logger.F("error", err))
+		r.createFailedRunRecord(runLog, err, "build_dag")
 		return fmt.Errorf("runner: build dag: %w", err)
 	}
 	runLog.Info("DAG built", logger.F("nodes", len(dagObj.Nodes())), logger.F("edges", len(dagObj.Edges())))
@@ -314,8 +348,10 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		r.status.Store(StatusFailed)
 		runLog.Error("failed to build scope", logger.F("error", err))
+		r.createFailedRunRecord(runLog, err, "build_scope")
 		return fmt.Errorf("runner: build scope: %w", err)
 	}
+	runLog.Info("scope built", logger.F("variable_count", len(scope.Keys())))
 
 	// Load data sources and create row iterators
 	if r.dataSources != nil {
@@ -351,8 +387,10 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := lc.Run(r.ctx, lifecycle.HookSceneSetup); err != nil {
 		runLog.Error("scene setup lifecycle hook failed", logger.F("error", err))
 		r.status.Store(StatusFailed)
+		r.createFailedRunRecord(runLog, err, "scene_setup")
 		return fmt.Errorf("runner: scene setup: %w", err)
 	}
+	runLog.Info("lifecycle setup done")
 
 	runRecord := &model.RunRecord{
 		Model:       model.Model{ID: r.runID},
@@ -374,6 +412,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.mu.Lock()
 	r.dbRecordID = runRecord.ID
 	r.mu.Unlock()
+	runLog.Info("run started", logger.F("run_id", r.runID.String()))
 
 	err = r.execute(dagObj, scope)
 
@@ -451,6 +490,10 @@ func (r *Runner) Run(ctx context.Context) error {
 	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
 
 	r.stopWg.Wait()
+
+	runLog.Info("scene run completed",
+		logger.F("elapsed_ms", time.Since(r.startedAt).Milliseconds()),
+	)
 
 	return err
 }
@@ -537,6 +580,57 @@ func (r *Runner) saveFinalSnapshot() {
 
 func (r *Runner) Status() Status {
 	return r.status.Load().(Status)
+}
+
+// Error returns the error stored by setError, or nil if no error occurred.
+func (r *Runner) Error() error {
+	if v := r.runErr.Load(); v != nil {
+		return v.(error)
+	}
+	return nil
+}
+
+// setError stores the error for later retrieval via Error().
+// Only the first error is stored.
+func (r *Runner) setError(err error) {
+	if err == nil {
+		return
+	}
+	r.runErr.CompareAndSwap(nil, err)
+}
+
+// createFailedRunRecord creates a run record with Status=failed and the given
+// error message. It is called when Runner.Run() fails during early
+// initialization steps (buildDAG, buildScope, lifecycle setup) before the
+// normal run record is created.
+func (r *Runner) createFailedRunRecord(log logger.Logger, runErr error, failedStep string) {
+	now := time.Now().UTC()
+	record := &model.RunRecord{
+		Model:       model.Model{ID: r.runID},
+		RunID:       r.runID,
+		SceneID:     r.cfg.SceneID,
+		Status:      model.RunStatusFailed,
+		ErrorMsg:    runErr.Error(),
+		WorkerCount: r.cfg.Workers,
+		RunMode:     string(r.cfg.RunMode),
+		Duration:    r.cfg.Duration.Seconds(),
+		Count:       r.cfg.Count,
+		StartedAt:   &now,
+	}
+	if err := r.runs.Create(r.ctx, record); err != nil {
+		log.Error("failed to create failed run record",
+			logger.F("error", err),
+			logger.F("step", failedStep),
+		)
+	} else {
+		r.mu.Lock()
+		r.dbRecordID = record.ID
+		r.mu.Unlock()
+		log.Info("created failed run record for early initialization failure",
+			logger.F("step", failedStep),
+			logger.F("error_msg", runErr.Error()),
+		)
+	}
 }
 
 func (r *Runner) Stats() *Stats {
@@ -802,11 +896,9 @@ func (r *Runner) Duration() time.Duration {
 }
 
 func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
-	traceID := r.runID.String()
-	execLog := r.log.With(
-		logger.F("trace_id", traceID),
-		logger.F("scene_id", r.cfg.SceneID.String()),
-	)
+	execCtx := logger.ContextWithTraceID(r.ctx, r.runID.String())
+	execCtx = logger.ContextWithSceneID(execCtx, r.cfg.SceneID.String())
+	execLog := r.log.WithContext(execCtx)
 
 	poolCfg := pool.Config{
 		RunMode:  pool.RunModeCount,
@@ -846,6 +938,16 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 	pluginReg := plugin.NewRegistry()
 
 	task := func(ctx context.Context) error {
+		defer func() {
+			if p := recover(); p != nil {
+				execLog.Error("task panicked",
+					logger.F("panic", fmt.Sprintf("%v", p)),
+					logger.F("stacktrace", string(debug.Stack())),
+				)
+				r.stats.RecordLatency(0, false)
+			}
+		}()
+
 		sceneTimeout := r.cfg.Timeout
 		if sceneTimeout <= 0 {
 			sceneTimeout = 30 * time.Second
@@ -854,7 +956,12 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		defer cancel()
 
 		chainID := r.nodeGen.Generate()
+		taskCtx = logger.ContextWithChainID(taskCtx, chainID.String())
 		taskCtx = context.WithValue(taskCtx, dag.ChainIDKey, chainID.String())
+
+		// Use context-based logger so chain_id is automatically injected.
+		chainLog := r.log.WithContext(taskCtx)
+		chainLog.Info("chain execution started")
 
 		var execOpts []dag.ExecutorOption
 		if r.tracer != nil {
@@ -862,6 +969,12 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 			execOpts = append(execOpts, dag.WithTraceHook(hook, r.cfg.SceneID, r.runID))
 		}
 		execOpts = append(execOpts, dag.WithConditionEvaluator(r.evalCondition))
+		execOpts = append(execOpts, dag.WithConditionWarnLogger(func(msg string, kv ...any) {
+			chainLog.Warn(msg, toFields(kv...)...)
+		}))
+		execOpts = append(execOpts, dag.WithConditionErrorLogger(func(msg string, kv ...any) {
+			chainLog.Error(msg, toFields(kv...)...)
+		}))
 
 		exec := dag.NewExecutor(dagObj, execOpts...)
 
@@ -905,10 +1018,12 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 	switch r.cfg.RunMode {
 	case RunModeCount:
+		execLog.Info("worker pool starting", logger.F("mode", "count"), logger.F("count", r.cfg.Count))
 		for i := int64(0); i < r.cfg.Count; i++ {
 			p.Submit(task)
 		}
 	case RunModeDuration:
+		execLog.Info("worker pool starting", logger.F("mode", "duration"), logger.F("duration", r.cfg.Duration))
 		go func() {
 			ticker := time.NewTicker(10 * time.Millisecond)
 			defer ticker.Stop()
@@ -923,7 +1038,12 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		}()
 	}
 
-	return p.Wait()
+	err = p.Wait()
+	execLog.Info("worker pool stopped",
+		logger.F("submitted", p.Submitted()),
+		logger.F("completed", p.Completed()),
+	)
+	return err
 }
 
 func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
@@ -1021,6 +1141,9 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		return nil, fmt.Errorf("list edges: %w", err)
 	}
 
+	buildLog.Debug("building DAG edges",
+		logger.F("edge_count", len(edgeList)))
+
 	for _, e := range edgeList {
 		fromStr := e.FromNode.String()
 		toStr := e.ToNode.String()
@@ -1028,6 +1151,11 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		if e.Condition != "" {
 			edgeType = dag.EdgeCondition
 		}
+		buildLog.Debug("adding edge to DAG",
+			logger.F("from", fromStr),
+			logger.F("to", toStr),
+			logger.F("edge_type", edgeType),
+			logger.F("condition", e.Condition))
 		if addErr := dagObj.AddEdge(fromStr, toStr, edgeType, e.Condition); addErr != nil {
 			buildLog.Error("failed to add edge to DAG",
 				logger.F("from", fromStr),
@@ -1151,41 +1279,54 @@ func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
-	chainID, _ := ctx.Value(dag.ChainIDKey).(string)
-	nodeLog := n.log.With(
-		logger.F("trace_id", n.traceID),
-		logger.F("chain_id", chainID),
-		logger.F("node_id", n.id),
-		logger.F("node_type", n.nodeType),
-	)
+	// Use context-based logging so that trace_id, chain_id, node_id etc.
+	// are automatically injected by logger.WithContext.
+	logCtx := logger.ContextWithNodeID(ctx, n.id)
+	nodeLog := n.log.WithContext(logCtx)
 
 	nodeLog.Info("node execution started")
 
+	var out *dag.Output
+	var err error
+
 	switch n.nodeType {
 	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
-		return n.executeHTTP(ctx, input, nodeLog)
+		out, err = n.executeHTTP(ctx, input, nodeLog)
 	case model.NodeTypeDelay:
-		return n.executeDelay(ctx, nodeLog)
+		out, err = n.executeDelay(ctx, nodeLog)
 	case model.NodeTypeCondition:
-		return n.executeCondition(input, nodeLog)
+		out, err = n.executeCondition(input, nodeLog)
 	case model.NodeTypeIfElse:
-		return n.executeIfElse(input, nodeLog)
+		out, err = n.executeIfElse(input, nodeLog)
 	case model.NodeTypeGroup:
-		return n.executeGroup(ctx, input, nodeLog)
+		out, err = n.executeGroup(ctx, input, nodeLog)
 	case model.NodeTypeWhile:
-		return n.executeWhile(ctx, input, nodeLog)
+		out, err = n.executeWhile(ctx, input, nodeLog)
 	case model.NodeTypeParallel:
-		return n.executeParallel(ctx, input, nodeLog)
+		out, err = n.executeParallel(ctx, input, nodeLog)
 	case model.NodeTypeLoop:
-		return n.executeLoop(ctx, input, nodeLog)
+		out, err = n.executeLoop(ctx, input, nodeLog)
 	case model.NodeTypeSubFlow:
-		return n.executeSubFlow(ctx, input, nodeLog)
+		out, err = n.executeSubFlow(ctx, input, nodeLog)
 	case model.NodeTypeTimer:
-		return n.executeTimer(ctx, input, nodeLog)
+		out, err = n.executeTimer(ctx, input, nodeLog)
 	default:
 		nodeLog.Warn("unknown node type, skipping")
-		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
+		out = &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}
 	}
+
+	if err != nil {
+		nodeLog.Error("node execution failed",
+			logger.F("error", err),
+			logger.F("node_type", n.nodeType),
+		)
+	} else {
+		nodeLog.Info("node execution completed",
+			logger.F("node_type", n.nodeType),
+		)
+	}
+
+	return out, err
 }
 
 func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
@@ -1207,6 +1348,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	url := cfg.URL
 
 	genReg := builtin.DefaultRegistry()
+	genReg.SetLogger(&genLogAdapter{nodeLog})
 	url = resolveGeneratorRefs(url, genReg, nodeLog)
 	nodeLog.Info("resolved generator references in URL", logger.F("url", url))
 

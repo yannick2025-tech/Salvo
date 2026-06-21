@@ -56,12 +56,20 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 
 	m.runners[cfg.SceneID] = r
 
-	go func() {
-		_ = r.Run(context.Background())
+	safeGo(context.Background(), m.log, "manager-start", func() {
+		err := r.Run(context.Background())
+		if err != nil {
+			r.setError(err)
+			m.log.Error("runner run failed",
+				logger.F("scene_id", cfg.SceneID.String()),
+				logger.F("run_id", r.runID.String()),
+				logger.F("error", err),
+			)
+		}
 		m.mu.Lock()
 		delete(m.runners, cfg.SceneID)
 		m.mu.Unlock()
-	}()
+	})
 
 	return r, nil
 }

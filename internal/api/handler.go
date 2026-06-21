@@ -127,24 +127,20 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	}
 
 	// Construct scene-level Variables from YAML variables + config_params + derived_params.
+	// Stored as JSON object (map[string]string) to be compatible with buildScope, BatchSetVariables, etc.
 	var varsJSON string
-	type varEntry struct {
-		Key   string `json:"key"`
-		Value string `json:"value"`
-	}
-	var varEntries []varEntry
-
+	vm := make(map[string]string)
 	for _, v := range ys.Variables {
-		varEntries = append(varEntries, varEntry{Key: v.Key, Value: v.Value})
+		vm[v.Key] = v.Value
 	}
 	for k, v := range ys.ConfigParams {
-		varEntries = append(varEntries, varEntry{Key: k, Value: v})
+		vm[k] = v
 	}
 	for k, v := range ys.DerivedParams {
-		varEntries = append(varEntries, varEntry{Key: k, Value: v})
+		vm[k] = v
 	}
-	if len(varEntries) > 0 {
-		vb, _ := json.Marshal(varEntries)
+	if len(vm) > 0 {
+		vb, _ := json.Marshal(vm)
 		varsJSON = string(vb)
 	}
 
@@ -1744,6 +1740,12 @@ func (h *Handler) StartScene(r *http.Request) dto.Response {
 
 	rn, err := h.runnerMgr.Start(r.Context(), cfg)
 	if err != nil {
+		h.log.Error("failed to start scene",
+			logger.F("scene_id", req.SceneID.String()),
+			logger.F("workers", workers),
+			logger.F("run_mode", runMode),
+			logger.F("error", err),
+		)
 		return dto.ErrorResp(400, err.Error())
 	}
 
@@ -1826,6 +1828,11 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	runRecords, err := h.runs.List(r.Context(), filter)
 	if err != nil {
 		return dto.ErrorResp(500, "failed to list runs")
+	}
+
+	if len(runRecords) == 0 && sceneID > 0 {
+		h.log.Warn("no run records found for scene in DashboardOverview",
+			logger.F("scene_id", sceneID))
 	}
 
 	if sceneID > 0 && len(runRecords) > 0 {

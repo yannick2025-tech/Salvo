@@ -172,6 +172,113 @@ getComputedStyle(el).width / maxWidth / boxSizing
 
 ---
 
-## Lesson 3: (待记录)
+## Lesson 3: Goroutine 吞没错误导致排查困难 — 后台 Runner (2026-06-19)
 
-> 下次遇到值得记录的问题时在此处添加。
+### 现象
+场景运行失败后，前端 Dashboard 无法显示失败原因（展示为空白或未知错误）。后台日志仅显示 `"done"` 状态，没有 error 信息。排查时发现 run_record 数据库中缺少失败记录，无法确认是哪个环节出了问题。
+
+### 根因分析（2 层叠加）
+
+| # | 问题层 | 影响 | 修复 |
+|---|--------|------|------|
+| **1** | **Goroutine 吞没错误** | `Manager.Start` 使用 `go func()` 启动 goroutine 执行 `r.Run()`，但 goroutine 中 `r.Run()` 返回的 error 未被捕获和传播，导致调用方（API handler）永远无法感知执行失败 | 引入 `safeGo` 工具函数统一管理 goroutine，在 panic 时记录错误日志；增加 `runErr atomic.Value` 和 `setError()`/`Error()` 方法传播错误 |
+| **2** | **缺少失败 run_record** | `Runner.Run()` 在 buildDAG/buildScope/setup 等初始化步骤失败时，直接 return error，没有创建 run_record，导致数据库中没有失败记录，前端 Dashboard 无法显示错误信息 | 在初始化失败路径中调用 `createFailedRunRecord()` 创建状态为 `failed` 的记录，写入 error_msg 字段 |
+
+### 排查方法
+
+**Step 1: 搜索 error 日志**
+```bash
+grep "error" /var/log/salvo.log | grep -v "health"
+```
+
+**Step 2: 检查 run_record 数据库**
+```sql
+SELECT id, scene_id, status, error_msg, started_at
+FROM run_records
+WHERE scene_id = <目标场景ID>
+ORDER BY id DESC LIMIT 5;
+```
+
+**Step 3: 检查 Manager goroutine 行为**
+- 如果 run_record 不存在但返回了 400 给前端 → 说明 `Manager.Start` 返回了 error
+- 如果 run_record 不存在且前端收到了 200 → 说明 error 被 goroutine 吞没了
+
+### 最终修复方案
+
+```go
+// 1️⃣ 统一使用 safeGo 管理 goroutine
+safeGo(ctx, log, "scene-runner", func() {
+    runErr := r.Run(ctx)
+    if runErr != nil {
+        r.setError(runErr)
+        log.Error("scene run failed",
+            logger.F("scene_id", r.cfg.SceneID.String()),
+            logger.F("error", runErr))
+    }
+})
+
+// 2️⃣ 初始化失败时创建 run_record
+func (r *Runner) createFailedRunRecord(log logger.Logger, runErr error, failedStep string) {
+    record := &model.RunRecord{
+        Model:   model.Model{ID: r.runID},
+        RunID:   r.runID,
+        SceneID: r.cfg.SceneID,
+        Status:  model.RunStatusFailed,
+        ErrorMsg: runErr.Error(),
+        // ... other fields
+    }
+    if err := r.runs.Create(r.ctx, record); err != nil {
+        log.Error("failed to create failed run record")
+    }
+}
+
+// 3️⃣ 通过 Error() 方法获取后台错误
+err := rn.Error()  // 获取 goroutine 中存储的错误
+```
+
+### 效果对比
+
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| 初始化失败可排查性 | ❌ run_record 不存在，无错误信息 | ✅ run_record 含 error_msg，日志含详细字段 |
+| Goroutine panic 可观测性 | ❌ panic 导致进程崩溃或静默吞没 | ✅ safeGo 捕获 panic 并记录 stacktrace |
+| API handler 错误感知 | ❌ 只能感知 `Manager.Start()` 自身错误 | ✅ 能获取 `r.Run()` 内部错误 |
+
+### Lessons Learned
+
+#### 1. Goroutine 中的错误必须显式传播
+- `go func()` 启动的 goroutine 内部错误不会被调用方感知
+- 使用 `safeGo` 统一管理 + `atomic.Value` 存储错误
+
+#### 2. 所有失败路径都必须写入持久化存储
+- 初始化阶段（buildDAG/buildScope/setup）失败不能仅 return error，必须创建 run_record
+- 数据库中的错误记录是排查的第一手资料
+
+#### 3. Panic 恢复应包含结构化日志
+```go
+// ✅ 正确：包含 goroutine 名称、panic 值、stacktrace
+log.Error("goroutine panicked",
+    logger.F("goroutine", name),
+    logger.F("panic", fmt.Sprintf("%v", r)),
+    logger.F("stacktrace", string(debug.Stack())),
+)
+
+// ❌ 错误：缺乏上下文信息
+fmt.Printf("panic: %v\n", r)
+```
+
+#### 4. 四级链路日志是排查的核心工具
+- **Scene 级**：`scene run started/completed/failed` — 宏观定位
+- **Chain 级**：`DAG built` / `chain execution started` — DAG 层面
+- **Node 级**：`node execution started/completed/failed` — 节点级别
+- **Function 级**：`generator:` — 函数级别
+
+#### 5. 错误优先的日志策略
+- 在 `Runner.Run()` 中，先做可能失败的操作（buildDAG/buildScope），成功后才有 info 日志
+- 失败时立即输出 error 日志并写入 run_record
+- 所有关键步骤都要有成功/失败两条路径的日志
+
+#### 6. Manager.Start 中的 error 要返回给调用方
+- 不要只记录日志就返回 nil
+- 使用 `r.setError(err)` 存储错误 ×
+- 从 `Manager.Runners()` 返回 runner 实例，调用方通过 `rn.Error()` 获取错误

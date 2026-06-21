@@ -14,6 +14,11 @@
 //	   Registry → picks matching Generator → Generate() → value
 package generator
 
+import (
+	"fmt"
+	"time"
+)
+
 // Type represents a JSON Schema type.
 type Type string
 
@@ -26,6 +31,21 @@ const (
 	TypeObject  Type = "object"
 	TypeNull    Type = "null"
 )
+
+// Logger is the minimal interface required for function-level span logging.
+// The generator package uses this interface to avoid importing the full logger.
+type Logger interface {
+	Debug(msg string, fields ...any)
+	Info(msg string, fields ...any)
+	Error(msg string, fields ...any)
+}
+
+// noopLogger silences log output when no logger is set.
+type noopLogger struct{}
+
+func (noopLogger) Debug(string, ...any) {}
+func (noopLogger) Info(string, ...any)  {}
+func (noopLogger) Error(string, ...any) {}
 
 // Schema is the normalized internal representation of a JSON Schema.
 // It captures all Draft 7 keywords that affect value generation.
@@ -80,11 +100,21 @@ type Generator interface {
 // generation to the first matching generator.
 type Registry struct {
 	generators []Generator
+	log        Logger
 }
 
 // NewRegistry creates an empty generator registry.
 func NewRegistry() *Registry {
-	return &Registry{}
+	return &Registry{
+		log: noopLogger{},
+	}
+}
+
+// SetLogger attaches a logger for function-level span recording.
+func (r *Registry) SetLogger(l Logger) {
+	if l != nil {
+		r.log = l
+	}
 }
 
 // Register adds a generator to the registry. Generators registered
@@ -102,20 +132,50 @@ func (r *Registry) Generate(schema *Schema) (any, error) {
 	}
 
 	if schema.HasConst {
+		r.log.Debug("generator: using const value",
+			"generator", "const",
+			"type", string(schema.Type),
+		)
 		return schema.ConstVal, nil
 	}
 
 	if schema.HasDefault {
+		r.log.Debug("generator: using default value",
+			"generator", "default",
+			"type", string(schema.Type),
+		)
 		return schema.DefaultVal, nil
 	}
 
 	if len(schema.Enum) > 0 {
+		r.log.Debug("generator: selecting from enum",
+			"generator", "enum",
+			"type", string(schema.Type),
+			"enum_size", len(schema.Enum),
+		)
 		return schema.Enum[0], nil
 	}
 
 	for _, g := range r.generators {
 		if g.CanHandle(schema) {
-			return g.Generate(schema)
+			start := time.Now()
+			val, err := g.Generate(schema)
+			elapsed := time.Since(start)
+			if err != nil {
+				r.log.Error("generator: function failed",
+					"generator", g.Name(),
+					"type", string(schema.Type),
+					"elapsed_ms", elapsed.Milliseconds(),
+					"error", err,
+				)
+				return nil, fmt.Errorf("generator %s: %w", g.Name(), err)
+			}
+			r.log.Debug("generator: function executed",
+				"generator", g.Name(),
+				"type", string(schema.Type),
+				"elapsed_ms", elapsed.Milliseconds(),
+			)
+			return val, nil
 		}
 	}
 

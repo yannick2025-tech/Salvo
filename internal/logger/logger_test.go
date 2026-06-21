@@ -143,6 +143,56 @@ func TestLoggerWithContextNil(t *testing.T) {
 	assert.Equal(t, "nil context", entry["msg"])
 }
 
+func TestLoggerWithContextChainID(t *testing.T) {
+	l, buf := newTestLogger(t, FormatJSON)
+	ctx := ContextWithChainID(context.Background(), "chain-001")
+	child := l.WithContext(ctx)
+	child.Info("with chain id")
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &entry))
+	assert.Equal(t, "chain-001", entry["chain_id"])
+	assert.Equal(t, "with chain id", entry["msg"])
+}
+
+func TestLoggerWithContextNodeID(t *testing.T) {
+	l, buf := newTestLogger(t, FormatJSON)
+	ctx := ContextWithNodeID(context.Background(), "node-42")
+	child := l.WithContext(ctx)
+	child.Info("with node id")
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &entry))
+	assert.Equal(t, "node-42", entry["node_id"])
+	assert.Equal(t, "with node id", entry["msg"])
+}
+
+func TestLoggerWithContextSceneID(t *testing.T) {
+	l, buf := newTestLogger(t, FormatJSON)
+	ctx := ContextWithSceneID(context.Background(), "scene-100")
+	child := l.WithContext(ctx)
+	child.Info("with scene id")
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &entry))
+	assert.Equal(t, "scene-100", entry["scene_id"])
+	assert.Equal(t, "with scene id", entry["msg"])
+}
+
+func TestLoggerWithContextMultipleFields(t *testing.T) {
+	l, buf := newTestLogger(t, FormatJSON)
+	ctx := ContextWithTraceID(context.Background(), "trace-abc")
+	ctx = ContextWithChainID(ctx, "chain-def")
+	ctx = ContextWithNodeID(ctx, "node-789")
+	ctx = ContextWithSceneID(ctx, "scene-xyz")
+	child := l.WithContext(ctx)
+	child.Info("all context fields")
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &entry))
+	assert.Equal(t, "trace-abc", entry["trace_id"])
+	assert.Equal(t, "chain-def", entry["chain_id"])
+	assert.Equal(t, "node-789", entry["node_id"])
+	assert.Equal(t, "scene-xyz", entry["scene_id"])
+	assert.Equal(t, "all context fields", entry["msg"])
+}
+
 func TestLoggerLevelFiltering(t *testing.T) {
 	var buf bytes.Buffer
 	cfg := Config{
@@ -237,8 +287,8 @@ func TestLoggerMultipleFields(t *testing.T) {
 
 func TestParseLevel(t *testing.T) {
 	tests := []struct {
-		input    LogLevel
-		wantErr  bool
+		input   LogLevel
+		wantErr bool
 	}{
 		{input: DebugLevel, wantErr: false},
 		{input: InfoLevel, wantErr: false},

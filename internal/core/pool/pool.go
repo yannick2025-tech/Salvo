@@ -13,6 +13,7 @@ package pool
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -120,6 +121,11 @@ func (p *Pool) start() {
 
 	if p.cfg.RunMode == RunModeDuration {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("[pool] duration timer panicked: %v\n%s\n", r, debug.Stack())
+				}
+			}()
 			timer := time.NewTimer(p.cfg.Duration)
 			defer timer.Stop()
 			select {
@@ -140,12 +146,25 @@ func (p *Pool) worker() {
 		case <-p.ctx.Done():
 			return
 		case task := <-p.tasks:
-			if err := task(p.ctx); err != nil {
-				p.errOnce.Do(func() {
-					p.firstErr = err
-					p.cancel()
-				})
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Log the panic using standard log output; the pool
+						// does not have a structured logger dependency.
+						fmt.Printf("[pool] worker panicked: %v\n%s\n", r, debug.Stack())
+						p.errOnce.Do(func() {
+							p.firstErr = fmt.Errorf("worker panicked: %v", r)
+							p.cancel()
+						})
+					}
+				}()
+				if err := task(p.ctx); err != nil {
+					p.errOnce.Do(func() {
+						p.firstErr = err
+						p.cancel()
+					})
+				}
+			}()
 			p.completed.Add(1)
 		}
 	}

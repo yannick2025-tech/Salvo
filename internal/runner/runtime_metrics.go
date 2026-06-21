@@ -5,7 +5,9 @@
 package runner
 
 import (
+	"fmt"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -177,6 +179,12 @@ func (c *RuntimeMetricsCollector) Snapshots() []RuntimeMetricsSnapshot {
 
 // run is the main sampling loop.
 func (c *RuntimeMetricsCollector) run() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("[runtime-metrics] sampling goroutine panicked: %v\n%s\n", r, debug.Stack())
+		}
+	}()
+
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 

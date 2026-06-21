@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
@@ -23,6 +24,22 @@ func WithConditionEvaluator(fn ConditionEvaluator) ExecutorOption {
 	}
 }
 
+// WithConditionWarnLogger sets a warn-level logger for condition evaluation
+// events (e.g. condition not met, node skipped).
+func WithConditionWarnLogger(fn func(msg string, keysAndValues ...any)) ExecutorOption {
+	return func(e *Executor) {
+		e.logWarn = fn
+	}
+}
+
+// WithConditionErrorLogger sets an error-level logger for condition evaluation
+// failures (e.g. panic in condition evaluator).
+func WithConditionErrorLogger(fn func(msg string, keysAndValues ...any)) ExecutorOption {
+	return func(e *Executor) {
+		e.logError = fn
+	}
+}
+
 // Executor traverses a DAG and executes each node respecting dependencies,
 // execution modes (sync/async), loop counts, and conditional edges.
 //
@@ -38,6 +55,8 @@ type Executor struct {
 	traceSceneID  snowflake.ID
 	traceRunID    snowflake.ID
 	initialVars   map[string]any
+	logWarn       func(msg string, keysAndValues ...any)
+	logError      func(msg string, keysAndValues ...any)
 }
 
 // NewExecutor creates a new Executor for the given DAG.
@@ -118,9 +137,33 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 					parentOutput := e.results[edge.From]
 					e.mu.RUnlock()
 
-					if !e.evalCondition(ctx, edge.Condition, parentOutput) {
-						// Condition not met; skip this node but signal
-						// dependants so they don't hang.
+					conditionMet := true
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								if e.logError != nil {
+									e.logError("condition evaluation panicked",
+										"condition", edge.Condition,
+										"edge_from", edge.From,
+										"edge_to", edge.To,
+										"panic", fmt.Sprintf("%v", r),
+										"stacktrace", string(debug.Stack()),
+									)
+								}
+								conditionMet = false
+							}
+						}()
+						conditionMet = e.evalCondition(ctx, edge.Condition, parentOutput)
+					}()
+
+					if !conditionMet {
+						if e.logWarn != nil {
+							e.logWarn("condition not met, skipping node",
+								"condition", edge.Condition,
+								"edge_from", edge.From,
+								"edge_to", edge.To,
+							)
+						}
 						close(sig)
 						return
 					}

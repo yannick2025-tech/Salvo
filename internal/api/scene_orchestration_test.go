@@ -924,15 +924,9 @@ nodes:
 	require.NoError(t, json.Unmarshal(sceneData, &scene))
 
 	// Verify variables stored include config_params and derived_params.
-	var vars []struct {
-		Key   string `json:"key"`
-		Value string `json:"value"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(scene.Variables), &vars))
-	varKeys := make(map[string]string)
-	for _, v := range vars {
-		varKeys[v.Key] = v.Value
-	}
+	// Variables are stored as JSON object (map[string]string).
+	var varKeys map[string]string
+	require.NoError(t, json.Unmarshal([]byte(scene.Variables), &varKeys))
 	assert.Equal(t, "http://localhost:8080", varKeys["cfg_base_url"])
 	assert.Equal(t, "30s", varKeys["cfg_timeout"])
 	assert.Equal(t, "${cfg_base_url}/api/v1/users", varKeys["full_url"])

@@ -62,3 +62,77 @@ tags: [go, vue, typescript, code-style, naming, comments, error-handling]
 - 行宽：软限制 120 字符
 - 文件末尾保留一个空行
 - 不提交 IDE 配置文件（`.idea/`, `.vscode/` 等）
+
+## 日志规范 (Logging Conventions)
+
+### 日志级别
+
+- **Info**：关键里程碑（start/stop/completed），节点执行成功，场景生命周期事件
+- **Warn**：非致命异常（数据源加载失败，成功率低于阈值），意料之中的边界情况
+- **Error**：Panic recovery，节点执行失败，初始化失败（buildDAG/buildScope/setup），系统错误
+
+### Golang 日志模式
+
+#### 1. 优先使用 `logger.WithContext(ctx)` 而非手动拼字段
+
+```go
+// ✅ 正确：使用 WithContext 从 context 提取 trace_id/chain_id/node_id/scene_id
+runCtx := logger.ContextWithTraceID(r.ctx, traceID)
+runCtx = logger.ContextWithSceneID(runCtx, r.cfg.SceneID.String())
+runLog := r.log.WithContext(runCtx)
+
+// ❌ 避免手动构造字段（除非 context 无法提供）
+runLog := r.log.With(logger.F("trace_id", traceID), logger.F("scene_id", sceneID))
+```
+
+#### 2. 结构化字段使用 `logger.F()`，禁止字符串拼接
+
+```go
+// ✅ 正确
+runLog.Info("scene run started", logger.F("workers", r.cfg.Workers))
+
+// ❌ 错误
+runLog.Info(fmt.Sprintf("scene run started: %d workers", r.cfg.Workers))
+```
+
+#### 3. Goroutine panic recovery 统一使用 `safeGo`
+
+```go
+// ✅ 正确
+safeGo(ctx, log, "worker-name", func() {
+    // goroutine logic
+})
+
+// ❌ 避免自己写 defer/recover
+go func() {
+    defer func() { ... }()
+    // ...
+}()
+```
+
+#### 4. 节点执行日志范式
+
+```go
+nodeLog.Info("node execution started")
+out, err := n.doSomething(ctx, input, nodeLog)
+if err != nil {
+    nodeLog.Error("node execution failed", logger.F("error", err))
+} else {
+    nodeLog.Info("node execution completed")
+}
+```
+
+#### 5. 错误传播与失败记录
+
+- 使用 `r.setError(err)` 存储首个错误（通过 `atomic.Value`）
+- 在 buildDAG/buildScope/setup 失败时调用 `r.createFailedRunRecord()` 创建失败记录
+- API Handler 层记录详细错误日志后再返回给客户端
+
+### Context 注入的字段
+
+| 字段名 | Context Key | 注入时机 |
+|--------|-------------|---------|
+| `trace_id` | `logger.traceIDKey` | Runner.Run() 开始 |
+| `scene_id` | `logger.sceneIDKey` | Runner.Run() / execute() 开始 |
+| `chain_id` | `logger.chainIDKey` | 每轮迭代开始 |
+| `node_id` | `logger.nodeIDKey` | sceneNode.Execute() 开始 |

@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"log"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -171,6 +172,11 @@ func (c *TimeSeriesCollector) GetCollectedData() *CollectedData {
 
 func (c *TimeSeriesCollector) sampleLoop() {
 	defer c.wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[timeseries] sampleLoop panicked: %v\n%s", r, debug.Stack())
+		}
+	}()
 
 	ticker := time.NewTicker(c.cfg.SampleInterval)
 	defer ticker.Stop()
@@ -187,6 +193,11 @@ func (c *TimeSeriesCollector) sampleLoop() {
 
 func (c *TimeSeriesCollector) flushLoop() {
 	defer c.wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[timeseries] flushLoop panicked: %v\n%s", r, debug.Stack())
+		}
+	}()
 
 	ticker := time.NewTicker(c.cfg.FlushInterval)
 	defer ticker.Stop()
