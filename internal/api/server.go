@@ -85,7 +85,7 @@ func New(cfg Config) *Server {
 	}
 
 	h.tsStore = runner.NewSQLiteTimeSeriesStore(cfg.DB.DB)
-	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.dataSources, h.tracer, h.tsStore, cfg.Logger)
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.dataSources, h.tracer, h.tsStore, cfg.Logger, nil)
 
 	// Bootstrap SO plugin system: create a registry and load enabled plugins.
 	soReg := expr.NewFunctionRegistry()
@@ -96,6 +96,9 @@ func New(cfg Config) *Server {
 	} else {
 		cfg.Logger.Info("so plugin bootstrap completed")
 	}
+	// Pass the SO expression registry to the runner manager so that generator
+	// nodes can resolve ${__so(...)} expressions.
+	h.runnerMgr.SetExprRegistry(soReg)
 	_ = soLoader // available for future reload endpoint
 
 	s := &Server{
@@ -166,6 +169,7 @@ var routePermissions = map[string]string{
 	"/api/v1/scenes/status":        "runner:read",
 	"/api/v1/plugins/list":         "settings:read",
 	"/api/v1/plugins/config":       "settings:write",
+	"/api/v1/so-plugins/upload-file": "admin:write",
 	"/api/v1/so-plugins/create":    "admin:write",
 	"/api/v1/so-plugins/list":      "admin:read",
 	"/api/v1/so-plugins/get":       "admin:read",
@@ -231,6 +235,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
 	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
 
+	mux.HandleFunc("POST /api/v1/so-plugins/upload-file", s.handleAuth(s.handler.UploadSOPluginFile))
 	mux.HandleFunc("POST /api/v1/so-plugins/create", s.handleAuth(s.handler.UploadSOPlugin))
 	mux.HandleFunc("POST /api/v1/so-plugins/list", s.handleAuth(s.handler.ListSOPlugins))
 	mux.HandleFunc("POST /api/v1/so-plugins/get", s.handleAuth(s.handler.GetSOPlugin))

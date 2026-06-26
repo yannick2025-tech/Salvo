@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so/contract"
 )
 
 // Loader manages a collection of dynamically loaded SO plugins.
@@ -13,13 +15,13 @@ import (
 // concurrent safe access, and automatic latest-version resolution.
 type Loader struct {
 	mu     sync.RWMutex
-	plugin map[string]Plugin // key: "name@version"
+	plugin map[string]contract.Plugin // key: "name@version"
 }
 
 // NewLoader creates an empty plugin loader.
 func NewLoader() *Loader {
 	return &Loader{
-		plugin: make(map[string]Plugin),
+		plugin: make(map[string]contract.Plugin),
 	}
 }
 
@@ -30,7 +32,7 @@ func NewLoader() *Loader {
 //   - the New function returns an error
 //   - the same name@version is already registered
 //   - the same file path is already loaded
-func (l *Loader) Load(path string) (Plugin, error) {
+func (l *Loader) Load(path string) (contract.Plugin, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -51,9 +53,9 @@ func (l *Loader) Load(path string) (Plugin, error) {
 		return nil, fmt.Errorf("so: %q missing New symbol: %w", path, err)
 	}
 
-	factory, ok := sym.(func() (Plugin, error))
+	factory, ok := sym.(func() (contract.Plugin, error))
 	if !ok {
-		return nil, fmt.Errorf("so: %q New symbol has wrong type %T, expected func() (Plugin, error)", path, sym)
+		return nil, fmt.Errorf("so: %q New symbol has wrong type %T, expected func() (contract.Plugin, error)", path, sym)
 	}
 
 	inst, err := factory()
@@ -74,7 +76,7 @@ func (l *Loader) Load(path string) (Plugin, error) {
 // a .so file. This is primarily useful for testing scenarios where plugins
 // are created in-memory. Returns an error if the same name@version is
 // already registered.
-func (l *Loader) Register(p Plugin) error {
+func (l *Loader) Register(p contract.Plugin) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -89,7 +91,7 @@ func (l *Loader) Register(p Plugin) error {
 
 // Get retrieves a plugin by name. If version is empty, returns the
 // plugin with the highest version. Returns false if not found.
-func (l *Loader) Get(name, version string) (Plugin, bool) {
+func (l *Loader) Get(name, version string) (contract.Plugin, bool) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -99,7 +101,7 @@ func (l *Loader) Get(name, version string) (Plugin, bool) {
 	}
 
 	// No version specified: find the highest version.
-	var best Plugin
+	var best contract.Plugin
 	var bestVer string
 	for key, p := range l.plugin {
 		pName, pVer := l.splitKey(key)
@@ -114,11 +116,11 @@ func (l *Loader) Get(name, version string) (Plugin, bool) {
 }
 
 // List returns all loaded plugins sorted by name ascending, version descending.
-func (l *Loader) List() []Plugin {
+func (l *Loader) List() []contract.Plugin {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	result := make([]Plugin, 0, len(l.plugin))
+	result := make([]contract.Plugin, 0, len(l.plugin))
 	for _, p := range l.plugin {
 		result = append(result, p)
 	}

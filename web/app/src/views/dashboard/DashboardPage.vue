@@ -405,6 +405,7 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
 const overview = ref<DashboardOverviewDTO | null>(null)
 
 const historyData = ref<RunHistoryDTO[]>([])
+const pollCheckCounter = ref(0)
 const selectedSceneId = ref<string>('')
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
@@ -555,11 +556,35 @@ async function fetchSceneList() {
       }))
 
       if (!selectedSceneId.value && sceneList.value.length > 0) {
-        const firstRunning = sceneList.value.find(s => s.status === 'running')
-        if (firstRunning) {
-          selectedSceneId.value = firstRunning.scene_id
-        } else {
-          selectedSceneId.value = sceneList.value[0].scene_id
+        // Try to find the scene with the most recent run by querying history (no scene filter)
+        try {
+          const historyResp = await fetch('/api/v1/dashboard/history', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ limit: 1 })
+          })
+          const historyJson = await historyResp.json()
+          if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
+            const latestRun = historyJson.data.history[0]
+            const latestSceneId = String(latestRun.scene_id)
+            // Only switch if the scene exists in the scene list
+            if (sceneList.value.some(s => s.scene_id === latestSceneId)) {
+              selectedSceneId.value = latestSceneId
+            } else {
+              const firstRunning = sceneList.value.find(s => s.status === 'running')
+              selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
+            }
+          } else {
+            const firstRunning = sceneList.value.find(s => s.status === 'running')
+            selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
+          }
+        } catch {
+          // Fallback: select first running scene or first scene in list
+          const firstRunning = sceneList.value.find(s => s.status === 'running')
+          selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
         }
       }
 
@@ -1351,8 +1376,41 @@ function renderNodeDetailChart(nodeId: string) {
   }
 }
 
+async function checkLatestRunScene() {
+  try {
+    const token = localStorage.getItem('salvo_token')
+    const historyResp = await fetch('/api/v1/dashboard/history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ limit: 1 })
+    })
+    const historyJson = await historyResp.json()
+    if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
+      const latestRunSceneId = String(historyJson.data.history[0].scene_id)
+      // Switch to the latest run's scene if different from current selection
+      // The next poll will automatically fetch overview for the new scene
+      if (latestRunSceneId !== selectedSceneId.value) {
+        selectedSceneId.value = latestRunSceneId
+      }
+    }
+  } catch {
+    // Silently fail - keep current scene
+  }
+}
+
 async function fetchOverview() {
   try {
+    // Periodically check if a different scene has the most recent run
+    // (every 6th poll = every 30 seconds with default 5s interval)
+    pollCheckCounter.value++
+    if (pollCheckCounter.value >= 6) {
+      pollCheckCounter.value = 0
+      await checkLatestRunScene()
+    }
+
     const sceneId = selectedSceneId.value || undefined
     const requestData = { range_seconds: 0, scene_id: sceneId }
 

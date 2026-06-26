@@ -1189,16 +1189,17 @@ variables:                      # 全局默认变量
 
 | 命令 | 用途 |
 |------|------|
-| `make build` | 编译为`bin/salvo`二进制文件 |
-| `make dev` | 启动后端（端口8766）+ 前端（端口3000） |
-| `make dev-backend` | 仅后端，带热重载（`go run`） |
-| `make dev-frontend` | 仅前端，带Vite HMR |
-| `make build-frontend` | 生产构建到`web/dist/` |
+| `make build-all` | 同时编译SO插件和主程序（版本安全） |
+| `make start` | 后台启动后端（端口8766）+ 前端（端口3000） |
+| `make restart` | 停止并重启后端和前端（不编译） |
+| `make dev` | `build-all` + `start`（一键编译并启动） |
+| `make stop` | 停止所有运行中的进程 |
 | `make test` | 运行所有Go测试（详细输出） |
 | `make lint` | 运行`go vet`静态分析 |
-| `make clean` | 移除二进制文件、数据库、日志、node_modules |
-| `make stop` | 停止正在运行的进程 |
-| `make restart` | 停止 + 启动后端 |
+| `make clean` | 清理日志、数据库、so、bin、前端dist（保留node_modules） |
+| `make clean-so` | 仅清理.so文件 |
+| `make clean-db` | 仅清理数据库文件 |
+| `make clean-logs` | 仅清理日志文件 |
 
 ### 生产环境部署
 

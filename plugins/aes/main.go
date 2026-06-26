@@ -1,6 +1,6 @@
-// Package main implements the shell-aes SO plugin for AES-CBC encryption/decryption.
+// Package main implements the aes SO plugin for AES-CBC encryption/decryption.
 //
-// Build: go build -buildmode=plugin -o shell-aes.so plugins/shell-aes/main.go
+// Build: go build -buildmode=plugin -o aes.so plugins/aes/main.go
 //
 // The plugin matches the AES-CBC cipher used by login.py (AESCiphers):
 //   - Key: raw string (e.g. 32-byte "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
@@ -9,8 +9,9 @@
 //   - Decrypt input: base64-encoded ciphertext
 //
 // Usage from expressions:
-//   ${__so("shell-aes", "encrypt", "key", "iv", "plaintext")}
-//   ${__so("shell-aes", "decrypt", "key", "iv", "base64ciphertext")}
+//
+//	${__so("aes", "encrypt", "key", "iv", "plaintext")}
+//	${__so("aes", "decrypt", "key", "iv", "base64ciphertext")}
 package main
 
 import (
@@ -20,23 +21,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so/contract"
 )
 
-// shellAES implements the so.Plugin interface for AES-CBC encryption.
-type shellAES struct{}
+// aesPlugin implements the so.Plugin interface for AES-CBC encryption.
+type aesPlugin struct{}
 
 // Name returns the plugin name.
-func (s *shellAES) Name() string { return "shell-aes" }
+func (s *aesPlugin) Name() string { return "aes" }
 
 // Version returns the plugin version.
-func (s *shellAES) Version() string { return "1.0.0" }
+func (s *aesPlugin) Version() string { return "1.0.0" }
 
 // Call executes the named operation.
 // Supported operations:
 //   - encrypt(key, iv, plaintext) → base64 ciphertext
 //   - decrypt(key, iv, ciphertext) → plaintext
-func (s *shellAES) Call(op string, args []string) (string, error) {
+func (s *aesPlugin) Call(op string, args []string) (string, error) {
 	switch op {
 	case "encrypt":
 		return s.encrypt(args)
@@ -50,7 +51,7 @@ func (s *shellAES) Call(op string, args []string) (string, error) {
 // encrypt performs AES-CBC encryption.
 // Args: [key, iv_base64, plaintext]
 // Returns: base64-encoded ciphertext (IV prepended, matching login.py format).
-func (s *shellAES) encrypt(args []string) (string, error) {
+func (s *aesPlugin) encrypt(args []string) (string, error) {
 	if len(args) < 3 {
 		return "", errors.New("encrypt requires 3 args: key, iv (base64), plaintext")
 	}
@@ -84,7 +85,7 @@ func (s *shellAES) encrypt(args []string) (string, error) {
 // decrypt performs AES-CBC decryption.
 // Args: [key, iv_base64, ciphertext_base64]
 // Returns: plaintext string.
-func (s *shellAES) decrypt(args []string) (string, error) {
+func (s *aesPlugin) decrypt(args []string) (string, error) {
 	if len(args) < 3 {
 		return "", errors.New("decrypt requires 3 args: key, iv (base64), ciphertext (base64)")
 	}
@@ -157,6 +158,6 @@ func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
 }
 
 // New is the factory function exported for the SO plugin loader.
-func New() (so.Plugin, error) {
-	return &shellAES{}, nil
+func New() (contract.Plugin, error) {
+	return &aesPlugin{}, nil
 }

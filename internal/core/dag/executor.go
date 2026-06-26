@@ -55,6 +55,7 @@ type Executor struct {
 	traceSceneID  snowflake.ID
 	traceRunID    snowflake.ID
 	initialVars   map[string]any
+	varsMu        sync.Mutex // protects initialVars for cross-node variable writes
 	logWarn       func(msg string, keysAndValues ...any)
 	logError      func(msg string, keysAndValues ...any)
 }
@@ -265,17 +266,19 @@ func (e *Executor) Results() map[string]*Output {
 // for parameter correlation.
 func (e *Executor) buildInput(nodeID string) *Input {
 	inEdges := e.dag.InEdges(nodeID)
-	
-	// Start with initial variables
+
+	// Start with initial variables (use lock to avoid race condition with SetVariable)
 	variables := make(map[string]any)
+	e.varsMu.Lock()
 	if e.initialVars != nil {
 		for k, v := range e.initialVars {
 			variables[k] = v
 		}
 	}
-	
+	e.varsMu.Unlock()
+
 	if len(inEdges) == 0 {
-		return &Input{Variables: variables}
+		return &Input{Variables: variables, Executor: e}
 	}
 
 	e.mu.RLock()
@@ -285,14 +288,31 @@ func (e *Executor) buildInput(nodeID string) *Input {
 	for _, edge := range inEdges {
 		if out, ok := e.results[edge.From]; ok {
 			lastParentOutput = out
+			// Merge parent output variables into input variables.
+			// This ensures variables set by generator nodes (e.g. jwt_token)
+			// are available to subsequent nodes.
+			if out.Variables != nil {
+				for k, v := range out.Variables {
+					variables[k] = v
+				}
+			}
 		}
 	}
 
 	input := &Input{
 		Variables: variables,
+		Executor:  e,
 	}
 	if lastParentOutput != nil {
 		input.Response = lastParentOutput.Response
 	}
 	return input
+}
+
+// SetVariable writes a value back to the shared initialVars map,
+// making it available to subsequent nodes in the DAG.
+func (e *Executor) SetVariable(key string, value any) {
+	e.varsMu.Lock()
+	e.initialVars[key] = value
+	e.varsMu.Unlock()
 }

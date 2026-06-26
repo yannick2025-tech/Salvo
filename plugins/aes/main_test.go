@@ -13,14 +13,14 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
 )
 
-func TestShellAESName(t *testing.T) {
-	p := &shellAES{}
-	assert.Equal(t, "shell-aes", p.Name())
+func TestAESName(t *testing.T) {
+	p := &aesPlugin{}
+	assert.Equal(t, "aes", p.Name())
 	assert.Equal(t, "1.0.0", p.Version())
 }
 
-func TestShellAESEncryptDecryptRoundTrip(t *testing.T) {
-	p := &shellAES{}
+func TestAESEncryptDecryptRoundTrip(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" // 32 bytes = AES-256
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456")) // 16 bytes
 
@@ -34,8 +34,8 @@ func TestShellAESEncryptDecryptRoundTrip(t *testing.T) {
 	assert.Equal(t, plaintext, decResult)
 }
 
-func TestShellAESEncryptDeterministic(t *testing.T) {
-	p := &shellAES{}
+func TestAESEncryptDeterministic(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
 
@@ -48,8 +48,8 @@ func TestShellAESEncryptDeterministic(t *testing.T) {
 	assert.Equal(t, result1, result2, "CBC with fixed IV should produce the same ciphertext")
 }
 
-func TestShellAESEncryptDiffIV(t *testing.T) {
-	p := &shellAES{}
+func TestAESEncryptDiffIV(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 	iv1 := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
@@ -63,8 +63,8 @@ func TestShellAESEncryptDiffIV(t *testing.T) {
 	assert.NotEqual(t, result1, result2, "Different IVs should produce different ciphertexts")
 }
 
-func TestShellAESDecryptInvalidBase64(t *testing.T) {
-	p := &shellAES{}
+func TestAESDecryptInvalidBase64(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
 
@@ -72,52 +72,52 @@ func TestShellAESDecryptInvalidBase64(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestShellAESUnknownOp(t *testing.T) {
-	p := &shellAES{}
+func TestAESUnknownOp(t *testing.T) {
+	p := &aesPlugin{}
 	_, err := p.Call("unknown", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown operation")
 }
 
-func TestShellAESEncryptWrongArgCount(t *testing.T) {
-	p := &shellAES{}
+func TestAESEncryptWrongArgCount(t *testing.T) {
+	p := &aesPlugin{}
 	_, err := p.Call("encrypt", []string{"key", "iv"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "requires 3 args")
 }
 
-func TestShellAESDecryptWrongArgCount(t *testing.T) {
-	p := &shellAES{}
+func TestAESDecryptWrongArgCount(t *testing.T) {
+	p := &aesPlugin{}
 	_, err := p.Call("decrypt", []string{"key"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "requires 3 args")
 }
 
-func TestShellAESInvalidIV(t *testing.T) {
-	p := &shellAES{}
+func TestAESInvalidIV(t *testing.T) {
+	p := &aesPlugin{}
 	_, err := p.Call("encrypt", []string{"key", "invalid-iv!!!", "data"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "decoding iv")
 }
 
-func TestShellAESShortKey(t *testing.T) {
-	p := &shellAES{}
+func TestAESShortKey(t *testing.T) {
+	p := &aesPlugin{}
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
 	_, err := p.Call("encrypt", []string{"short", iv, "data"})
 	assert.Error(t, err)
 }
 
-// TestShellAESBuildAndLoad builds the .so and loads it via the SO loader.
-func TestShellAESBuildAndLoad(t *testing.T) {
+// TestAESBuildAndLoad builds the .so and loads it via the SO loader.
+func TestAESBuildAndLoad(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping build test in short mode")
 	}
 
-	soPath := "/tmp/shell-aes-test.so"
+	soPath := "/tmp/aes-test.so"
 
 	// Build the plugin.
 	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", soPath, ".")
-	cmd.Dir = "/Users/xiongyang/Desktop/home/code/snailx/plugins/shell-aes"
+	cmd.Dir = "/Users/xiongyang/Desktop/home/code/snailx/plugins/aes"
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "build failed: %s", string(output))
 	defer os.Remove(soPath)
@@ -141,7 +141,7 @@ func TestShellAESBuildAndLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify plugin interface.
-	assert.Equal(t, "shell-aes", inst.Name())
+	assert.Equal(t, "aes", inst.Name())
 	assert.Equal(t, "1.0.0", inst.Version())
 
 	// Test encrypt/decrypt via the loaded plugin.
@@ -156,9 +156,9 @@ func TestShellAESBuildAndLoad(t *testing.T) {
 	assert.Equal(t, "loaded plugin test", decResult)
 }
 
-// TestShellAESWithLoginPyKey verifies compatibility with login.py's hardcoded key/IV.
-func TestShellAESWithLoginPyKey(t *testing.T) {
-	p := &shellAES{}
+// TestAESWithLoginPyKey verifies compatibility with login.py's hardcoded key/IV.
+func TestAESWithLoginPyKey(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	iv := "BBBBBBBBBBBBBBBBBBBBBA=="
 
@@ -178,9 +178,9 @@ func TestShellAESWithLoginPyKey(t *testing.T) {
 	assert.Equal(t, plaintext, decResult)
 }
 
-// TestShellAESConcurrent verifies concurrent access is safe.
-func TestShellAESConcurrent(t *testing.T) {
-	p := &shellAES{}
+// TestAESConcurrent verifies concurrent access is safe.
+func TestAESConcurrent(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
 
@@ -201,9 +201,9 @@ func TestShellAESConcurrent(t *testing.T) {
 	runConcurrent(10) // just verify no panics
 }
 
-// TestShellAESLargeData tests encryption/decryption of larger payloads.
-func TestShellAESLargeData(t *testing.T) {
-	p := &shellAES{}
+// TestAESLargeData tests encryption/decryption of larger payloads.
+func TestAESLargeData(t *testing.T) {
+	p := &aesPlugin{}
 	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
 

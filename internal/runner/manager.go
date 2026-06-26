@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
@@ -24,9 +25,10 @@ type Manager struct {
 	tracer      *tracelib.Tracer
 	tsStore     TimeSeriesStore
 	log         logger.Logger
+	exprReg     *expr.FunctionRegistry
 }
 
-func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) *Manager {
+func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger, exprReg *expr.FunctionRegistry) *Manager {
 	return &Manager{
 		runners:     make(map[snowflake.ID]*Runner),
 		scenes:      scenes,
@@ -38,6 +40,7 @@ func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo,
 		tracer:      tracer,
 		tsStore:     tsStore,
 		log:         log,
+		exprReg:     exprReg,
 	}
 }
 
@@ -53,6 +56,8 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Pass the expression registry to the runner
+	r.exprReg = m.exprReg
 
 	m.runners[cfg.SceneID] = r
 
@@ -102,4 +107,12 @@ func (m *Manager) List() map[snowflake.ID]*Runner {
 		cp[k] = v
 	}
 	return cp
+}
+
+// SetExprRegistry sets the expression engine registry for all runners managed
+// by this manager. Must be called before Start() to take effect.
+func (m *Manager) SetExprRegistry(reg *expr.FunctionRegistry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.exprReg = reg
 }

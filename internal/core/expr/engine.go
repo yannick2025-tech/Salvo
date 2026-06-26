@@ -262,9 +262,11 @@ func resolveNestedInArgs(argsStr string, variables map[string]any, registry *Fun
 	return resolveDepth(argsStr, variables, registry, depth+1)
 }
 
-// parseArgs parses a comma-separated argument string, respecting double-quoted strings.
+// parseArgs parses a comma-separated argument string, respecting double-quoted
+// and single-quoted strings.
 // "a,b,c" → ["a", "b", "c"]
 // `"a,b",c` → ["a,b", "c"]
+// `'a,b',c` → ["a,b", "c"]
 func parseArgs(input string) []string {
 	input = strings.TrimSpace(input)
 	if input == "" {
@@ -273,15 +275,19 @@ func parseArgs(input string) []string {
 
 	var args []string
 	var current strings.Builder
-	inQuote := false
+	inDoubleQuote := false
+	inSingleQuote := false
 
 	for i := 0; i < len(input); i++ {
 		c := input[i]
 		switch {
-		case c == '"':
-			inQuote = !inQuote
+		case c == '"' && !inSingleQuote:
+			inDoubleQuote = !inDoubleQuote
 			current.WriteByte(c)
-		case c == ',' && !inQuote:
+		case c == '\'' && !inDoubleQuote:
+			inSingleQuote = !inSingleQuote
+			current.WriteByte(c)
+		case c == ',' && !inDoubleQuote && !inSingleQuote:
 			arg := strings.TrimSpace(current.String())
 			arg = trimQuotes(arg)
 			args = append(args, arg)
@@ -300,9 +306,12 @@ func parseArgs(input string) []string {
 	return args
 }
 
-// trimQuotes removes surrounding double quotes from a string if present.
+// trimQuotes removes surrounding double or single quotes from a string if present.
 func trimQuotes(s string) string {
 	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
 		return s[1 : len(s)-1]
 	}
 	return s

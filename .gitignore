@@ -29,3 +29,6 @@ salvo
 
 # go
 *.cover
+
+# docs
+docs/biz-migration/login.md

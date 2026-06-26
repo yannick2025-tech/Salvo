@@ -1,0 +1,53 @@
+name: B端登录测试
+description: |
+  使用 login SO 插件完成 B端登录流程。
+  login 操作内部自动完成 AES-GCM 加密→获取salt→解密→bcrypt hash→登录→返回JWT。
+  通过 extract 将 JWT 存入变量，再用 POST /get-user-setting 验证登录状态。
+
+# --- 环境变量 ---
+variables:
+  # 获取 salt 的 URL
+  - key: salt_base_url
+    value: "https://uat-manhattan.shell.com.cn/jv/tob-adapter/tob-adapter-application/crm/jv/auth/v1"
+  # 登录 URL
+  - key: login_base_url
+    value: "https://uat-manhattan.shell.com.cn/jv/tob-adapter/jv/auth/v1"
+  # CRM 服务 URL (用于验证登录)
+  - key: crm_base_url
+    value: "https://uat-manhattan.shell.com.cn/jv/tob-adapter/tob-adapter-application/crm/crm-service/v1"
+  # 测试账号
+  - key: username
+    value: "18936879143"
+  - key: password
+    value: "Abcd1234!@#$"
+  # 运行时变量
+  - key: jwt_token
+    value: ""
+
+# --- 节点 ---
+nodes:
+  # Node1: generator 节点执行 SO 插件 login 操作，将 JWT 存入 jwt_token 变量
+  - name: 获取JWT-Token
+    type: generator
+    config:
+      expression: "${__so('login','login','${salt_base_url}','${login_base_url}','${username}','${password}')}"
+      variable: jwt_token
+
+  # Node2: 用 JWT 验证登录状态
+  - name: 验证Token-查询用户设置
+    type: http
+    config:
+      method: POST
+      url: "${crm_base_url}/get-user-setting"
+      headers:
+        Content-Type: application/json
+        Authorization: "${jwt_token}"
+      body: '{"type":"quickMenu"}'
+      timeout: 10000
+      expect_status: [200]
+      expect_body:
+        errorCode: 0
+
+edges:
+  - from: 获取JWT-Token
+    to: 验证Token-查询用户设置

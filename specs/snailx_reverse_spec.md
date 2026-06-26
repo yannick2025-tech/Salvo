@@ -1181,16 +1181,17 @@ variables:                      # Global default variables
 
 | Command | Purpose |
 |---------|---------|
-| `make build` | Compile to `bin/salvo` binary |
-| `make dev` | Start backend (port 8766) + frontend (port 3000) |
-| `make dev-backend` | Backend only with hot-reload (`go run`) |
-| `make dev-frontend` | Frontend only with Vite HMR |
-| `make build-frontend` | Production build to `web/dist/` |
+| `make build-all` | Compile SO plugins + main binary in one session (version-safe) |
+| `make start` | Start backend (port 8766) + frontend (port 3000) in background |
+| `make restart` | Stop + start backend + frontend (no compile) |
+| `make dev` | `build-all` + `start` (one-shot compile and launch) |
+| `make stop` | Kill running processes |
 | `make test` | Run all Go tests with verbose output |
 | `make lint` | Run `go vet` static analysis |
-| `make clean` | Remove binaries, databases, logs, node_modules |
-| `make stop` | Kill running processes |
-| `make restart` | Stop + start backend |
+| `make clean` | Remove logs, db, so, bin, frontend dist (keeps node_modules) |
+| `make clean-so` | Remove compiled .so files only |
+| `make clean-db` | Remove database files only |
+| `make clean-logs` | Remove log files only |
 
 ### Production Deployment
 

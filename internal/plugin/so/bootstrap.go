@@ -3,6 +3,7 @@ package so
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/yannick2025-tech/Salvo/internal/core/expr"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
@@ -25,14 +26,21 @@ func InitFromDB(ctx context.Context, soRepo repo.SOPluginRepo, reg *expr.Functio
 		return nil, fmt.Errorf("so: list enabled plugins: %w", err)
 	}
 
+	log.Printf("[so-bootstrap] found %d enabled plugins in database", len(plugins))
+
 	var loadErrs error
 	for _, p := range plugins {
-		_, err := loader.Load(p.FilePath)
+		log.Printf("[so-bootstrap] loading plugin: name=%s, version=%s, filePath=%s, status=%d", p.Name, p.Version, p.FilePath, p.Status)
+		inst, err := loader.Load(p.FilePath)
 		if err != nil {
+			log.Printf("[so-bootstrap] FAILED to load plugin %q: %v", p.Name, err)
 			loadErrs = fmt.Errorf("so: load %q (id=%d): %w\n%v", p.Name, p.ID, err, loadErrs)
 			continue
 		}
+		log.Printf("[so-bootstrap] successfully loaded plugin: name=%s, version=%s", inst.Name(), inst.Version())
 	}
+
+	log.Printf("[so-bootstrap] loader contains %d plugins", loader.Count())
 
 	// Register __so even if no plugins loaded — it will return a clear
 	// "plugin not found" error when called.

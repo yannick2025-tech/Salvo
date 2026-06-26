@@ -32,7 +32,7 @@
             <td>{{ formatTime(p.created_at) }}</td>
             <td class="actions">
               <button class="btn-sm" :class="p.status === 'enabled' ? 'warn' : 'ok'" @click="toggleStatus(p)">
-                {{ p.status === 'enabled' ? '停用' : '启用' }}
+                {{ p.status === 'enabled' ? '禁用' : '启用' }}
               </button>
               <button class="btn-sm" @click="editConfig(p)">配置</button>
               <button class="btn-sm danger" @click="handleDelete(p)">删除</button>
@@ -48,15 +48,29 @@
         <h3>上传 SO 插件</h3>
         <div class="form-group">
           <label>名称 <span class="required">*</span></label>
-          <input v-model="uploadForm.name" placeholder="例如: shell-aes" />
+          <input v-model="uploadForm.name" placeholder="例如: aes" />
         </div>
         <div class="form-group">
           <label>版本 <span class="required">*</span></label>
           <input v-model="uploadForm.version" placeholder="例如: 1.0.0" />
         </div>
         <div class="form-group">
-          <label>文件路径 <span class="required">*</span></label>
-          <input v-model="uploadForm.file_path" placeholder="插件 .so 文件的绝对路径" />
+          <label>插件文件 <span class="required">*</span></label>
+          <div class="file-upload-wrapper">
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".so"
+              class="file-input-hidden"
+              @change="handleFileSelect"
+            />
+            <button class="btn-file-select" @click="fileInputRef?.click()">
+              {{ selectedFile ? selectedFile.name : '选择 .so 文件' }}
+            </button>
+            <span v-if="selectedFile" class="file-info">{{ formatFileSize(selectedFile.size) }}</span>
+            <button v-if="selectedFile" class="btn-file-clear" @click="clearFile">✕</button>
+          </div>
+          <div v-if="uploadingFile" class="upload-progress">上传中...</div>
         </div>
         <div class="form-group">
           <label>配置 (JSON，可选)</label>
@@ -135,7 +149,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { listSOPlugins, createSOPlugin, updateSOPluginStatus, updateSOPluginConfig, deleteSOPlugin } from '@/api/so-plugin'
+import { listSOPlugins, createSOPlugin, updateSOPluginStatus, updateSOPluginConfig, deleteSOPlugin, uploadSOPluginFile } from '@/api/so-plugin'
 import type { SOPluginDTO } from '@/types'
 
 const plugins = ref<SOPluginDTO[]>([])
@@ -145,6 +159,30 @@ const showUpload = ref(false)
 const uploadForm = reactive({ name: '', version: '', file_path: '', config: '' })
 const uploadError = ref('')
 const uploading = ref(false)
+const uploadingFile = ref(false)
+const selectedFile = ref<File | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function handleFileSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files && input.files.length > 0) {
+    selectedFile.value = input.files[0]
+    uploadForm.file_path = '' // will be set after upload
+    uploadError.value = ''
+  }
+}
+
+function clearFile() {
+  selectedFile.value = null
+  uploadForm.file_path = ''
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
 
 function closeUpload() {
   showUpload.value = false
@@ -153,16 +191,37 @@ function closeUpload() {
   uploadForm.file_path = ''
   uploadForm.config = ''
   uploadError.value = ''
+  selectedFile.value = null
+  uploadingFile.value = false
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
 async function handleUpload() {
   uploadError.value = ''
-  if (!uploadForm.name || !uploadForm.version || !uploadForm.file_path) {
-    uploadError.value = '名称、版本和文件路径为必填项'
+  if (!uploadForm.name || !uploadForm.version) {
+    uploadError.value = '名称和版本为必填项'
+    return
+  }
+  if (!selectedFile.value && !uploadForm.file_path) {
+    uploadError.value = '请选择 .so 文件或填写文件路径'
     return
   }
   uploading.value = true
   try {
+    // Step 1: Upload file if selected.
+    if (selectedFile.value) {
+      uploadingFile.value = true
+      try {
+        const result = await uploadSOPluginFile(selectedFile.value)
+        uploadForm.file_path = result.file_path
+      } catch (e: any) {
+        uploadError.value = e.response?.data?.message || e.message || '文件上传失败'
+        return
+      } finally {
+        uploadingFile.value = false
+      }
+    }
+    // Step 2: Create plugin record.
     const resp = await createSOPlugin({
       name: uploadForm.name,
       version: uploadForm.version,
@@ -170,7 +229,7 @@ async function handleUpload() {
       config: uploadForm.config || undefined,
     })
     if (resp.code !== 0) {
-      uploadError.value = resp.message || '上传失败'
+      uploadError.value = resp.message || '创建插件失败'
       return
     }
     closeUpload()
@@ -360,6 +419,24 @@ onMounted(() => {
 .form-group textarea { resize: vertical; font-family: monospace; }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--accent-primary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* File upload */
+.file-upload-wrapper { display: flex; align-items: center; gap: 8px; }
+.file-input-hidden { display: none; }
+.btn-file-select {
+  padding: 8px 14px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+  background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s ease;
+}
+.btn-file-select:hover { background: var(--bg-hover); border-color: var(--accent-primary); }
+.file-info { font-size: 12px; color: var(--text-secondary); }
+.btn-file-clear {
+  padding: 4px 8px; border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--accent-danger); font-size: 14px;
+  cursor: pointer; line-height: 1;
+}
+.btn-file-clear:hover { background: rgba(248,81,73,0.1); }
+.upload-progress { font-size: 12px; color: var(--accent-primary); margin-top: 4px; }
 .config-preview { background: var(--bg-tertiary); padding: 12px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.5; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 
 .confirm-dialog {

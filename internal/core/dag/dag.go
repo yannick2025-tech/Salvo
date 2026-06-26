@@ -44,6 +44,9 @@ type Input struct {
 	// Response carries the output of the immediate predecessor node
 	// (for parameter correlation).
 	Response any
+	// Executor provides access to the DAG executor for cross-node operations
+	// (e.g. writing variables back to the shared scope).
+	Executor *Executor
 }
 
 // Output is the result produced by a Node's Execute method.
@@ -52,6 +55,8 @@ type Output struct {
 	Response any
 	// Error is set when the node execution failed.
 	Error error
+	// Variables is a map of variable assignments to propagate to subsequent nodes.
+	Variables map[string]any
 }
 
 // Node is the core abstraction for a single step in a test scenario.

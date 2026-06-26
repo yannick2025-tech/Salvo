@@ -45,7 +45,7 @@
 
       <div class="card status-card">
         <h3>运行状态</h3>
-        <div v-if="activeRuns.length === 0 && recentFailedRuns.length === 0" class="empty">暂无运行中的场景</div>
+        <div v-if="activeRuns.length === 0 && recentFinishedRuns.length === 0" class="empty">暂无运行中的场景</div>
         <div v-for="run in activeRuns" :key="run.id" class="run-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
@@ -86,16 +86,17 @@
             </div>
           </div>
         </div>
-        <div v-for="run in recentFailedRuns" :key="'fail-'+run.id" class="run-item failed-item">
+        <div v-for="run in recentFinishedRuns" :key="'fin-'+run.id" :class="['run-item', run.status === 'failed' ? 'failed-item' : 'completed-item']">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
-            <span class="status failed">已失败</span>
+            <span :class="['status', run.status === 'failed' ? 'failed' : 'completed']">{{ run.status === 'failed' ? '已失败' : '已完成' }}</span>
           </div>
           <div v-if="run.error_msg" class="error-msg">{{ run.error_msg }}</div>
           <div class="run-metrics">
             <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
             <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
             <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
+            <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
           </div>
         </div>
       </div>
@@ -217,10 +218,15 @@ async function fetchRuns() {
   } catch { /* ignore */ }
 }
 
-const recentFailedRuns = computed(() => {
+const recentFinishedRuns = computed(() => {
   return runs.value
-    .filter((r) => r.status === 'failed')
-    .slice(0, 5)
+    .filter((r) => r.status !== 'running')
+    .sort((a, b) => {
+      const aTime = a.started_at ? new Date(a.started_at).getTime() : 0
+      const bTime = b.started_at ? new Date(b.started_at).getTime() : 0
+      return bTime - aTime
+    })
+    .slice(0, 10)
 })
 
 function showToast(msg: string, type = 'info') {
@@ -487,7 +493,9 @@ onUnmounted(() => {
 .mode-tag.duration { background: rgba(210,153,34,0.15); color: #9a6700; }
 .mode-tag.count { background: rgba(130,80,223,0.15); color: #8250df; }
 .status.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+.status.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .failed-item { border-left: 3px solid var(--accent-danger); }
+.completed-item { border-left: 3px solid var(--accent-success); }
 .error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }
 
 .toast {

@@ -1,62 +1,118 @@
-.PHONY: all backend frontend dev dev-backend dev-frontend build clean test lint help plugins-build plugins-clean
+.PHONY: all help build-all start restart dev stop \
+        clean clean-so clean-db clean-logs \
+        test lint \
+        plugins-build plugins-clean
 
 CONFIG ?= configs/salvo.yaml
 BIN ?= bin/salvo
 
-all: build
+# Auto-discover plugin directories (each must contain a main.go)
+PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d)
+
+all: build-all
 
 help:
 	@echo "Salvo - HTTP Performance Testing Tool"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  build          Build backend binary"
-	@echo "  backend        Build and run backend"
-	@echo "  frontend       Install deps and run frontend dev server"
-	@echo "  dev            Run both backend and frontend (dev mode)"
-	@echo "  dev-backend    Run backend in dev mode (hot reload)"
-	@echo "  dev-frontend   Run frontend dev server only"
-	@echo "  build-frontend Build frontend for production"
-	@echo "  clean          Remove build artifacts and temp files"
+	@echo "Build & Run:"
+	@echo "  build-all      Compile SO plugins + main binary in one session (version-safe)"
+	@echo "  start          Start backend + frontend in background (no compile)"
+	@echo "  restart        Stop + start backend + frontend (no compile)"
+	@echo "  dev            build-all + start (one-shot compile and launch)"
+	@echo "  stop           Stop all running processes"
+	@echo ""
+	@echo "Clean:"
+	@echo "  clean-so       Remove compiled .so files only"
+	@echo "  clean-db       Remove database files only"
+	@echo "  clean-logs     Remove log files only"
+	@echo "  clean          Remove all artifacts (logs, db, so, bin, frontend dist)"
+	@echo ""
+	@echo "Other:"
 	@echo "  test           Run all Go tests"
 	@echo "  lint           Run Go linter"
-	@echo "  stop           Stop running backend process"
-	@echo "  restart        Stop and restart backend"
 	@echo "  plugins-build  Build all SO plugins under plugins/"
-	@echo "  plugins-clean  Remove all compiled .so files under plugins/"
+	@echo "  plugins-clean  Remove all compiled .so files (alias for clean-so)"
 
-build:
+# ============================================================
+# Build
+# ============================================================
+
+# Compile plugins and main binary in the same build session
+# to ensure identical build cache (required by Go plugin mechanism).
+build-all:
+	@echo "Building SO plugins + main binary..."
+	@for dir in $(PLUGIN_DIRS); do \
+		name=$$(basename $$dir); \
+		echo "  → building $$name.so..."; \
+		go build -buildmode=plugin -o plugins/$$name.so $$dir/main.go || exit 1; \
+	done
 	go build -o $(BIN) ./cmd/salvo
+	@echo "Build complete."
 
-backend: build
-	mkdir -p logs
-	./$(BIN) -config $(CONFIG)
+# ============================================================
+# Start / Stop / Restart
+# ============================================================
 
-dev-backend:
-	mkdir -p logs
-	SALVO_ROOT=$(shell pwd) go run ./cmd/salvo -config $(CONFIG)
-
-dev-frontend:
-	@find web/app/src -name "*.vue.js" -delete
-	cd web/app && npm install && npm run dev
-
-dev:
-	@echo "Starting backend and frontend (dev mode)..."
-	@echo "  → Frontend: http://localhost:3000  (Vite HMR, use this port!)"
+start:
+	@mkdir -p logs
+	@# Start backend
+	@lsof -i :8766 >/dev/null 2>&1 && echo "Backend already running on :8766" || ( \
+		nohup ./$(BIN) -config $(CONFIG) > logs/salvo-stdout.log 2> logs/salvo-stderr.log & \
+		echo "Backend started (PID $$!)" \
+	)
+	@# Start frontend
+	@lsof -i :3000 >/dev/null 2>&1 && echo "Frontend already running on :3000" || ( \
+		cd web/app && nohup npm run dev > ../../logs/frontend.log 2>&1 & \
+		echo "Frontend started" \
+	)
+	@sleep 2
+	@echo ""
+	@echo "  → Frontend: http://localhost:3000"
 	@echo "  → Backend:  http://localhost:8766"
-	@find web/app/src -name "*.vue.js" -delete
-	@cd web/app && npm install
-	@make dev-backend & make dev-frontend & wait
 
-build-frontend:
-	cd web/app && npm install && npm run build
+stop:
+	@-pkill -f "bin/salvo" 2>/dev/null || true
+	@-pkill -f "vite" 2>/dev/null || true
+	@-pkill -f "node.*vite" 2>/dev/null || true
+	@sleep 1
+	@echo "All processes stopped."
 
-clean:
-	rm -rf bin/ logs/ *.db *.db-shm *.db-wal salvo
-	rm -rf web/app/dist web/app/node_modules web/app/.vite web/dist
-	find web/app/src -name "*.vue.js" -delete
-	@echo "Cleaned build artifacts and temp files"
+restart: stop start
+
+# ============================================================
+# Dev (compile + start)
+# ============================================================
+
+dev: build-all start
+
+# ============================================================
+# Clean
+# ============================================================
+
+clean-so:
+	@find plugins -name '*.so' -delete
+	@echo "Removed .so files."
+
+clean-db:
+	@rm -f *.db *.db-shm *.db-wal
+	@echo "Removed database files."
+
+clean-logs:
+	@rm -rf logs/
+	@mkdir -p logs
+	@echo "Removed log files."
+
+clean: clean-logs clean-db clean-so
+	@rm -rf bin/ salvo
+	@rm -rf web/app/dist web/app/.vite web/dist
+	@find web/app/src -name "*.vue.js" -delete 2>/dev/null || true
+	@echo "Cleaned all artifacts."
+
+# ============================================================
+# Test & Lint
+# ============================================================
 
 test:
 	go test -v -count=1 ./...
@@ -64,33 +120,10 @@ test:
 lint:
 	go vet ./...
 
-stop:
-	-pkill -f "bin/salvo" 2>/dev/null || true
-	-pkill -f "salvo" 2>/dev/null || true
-	-pkill -f "go run ./cmd/salvo" 2>/dev/null || true
-	-pkill -f "vite" 2>/dev/null || true
-	-pkill -f "node.*vite" 2>/dev/null || true
-	@sleep 1 && echo "stopped"
+# ============================================================
+# SO Plugin targets (aliases)
+# ============================================================
 
-restart: stop backend
+plugins-build: build-all
 
-# --- SO Plugin targets ---
-
-# Auto-discover plugin directories (each must contain a main.go)
-PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d)
-
-plugins-build:
-	@echo "Building SO plugins..."
-	@count=0; \
-	for dir in $(PLUGIN_DIRS); do \
-		name=$$(basename $$dir); \
-		echo "  → building $$name..."; \
-		go build -buildmode=plugin -o $$dir/$$name.so $$dir/main.go || exit 1; \
-		count=$$((count + 1)); \
-	done; \
-	echo "Done. Built $$count plugin(s)."
-
-plugins-clean:
-	@echo "Cleaning SO plugins..."
-	@find plugins -name '*.so' -delete
-	@echo "Done."
+plugins-clean: clean-so

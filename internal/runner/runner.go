@@ -79,7 +79,8 @@ type Config struct {
 	Duration            time.Duration
 	Timeout             time.Duration
 	Variables           map[string]string
-	EnableSystemMetrics bool // Enable runtime/system metrics collection (default: true)
+	EnableSystemMetrics bool                   // Enable runtime/system metrics collection (default: true)
+	ExprRegistry        *expr.FunctionRegistry // Expression engine registry with __so and builtins registered
 }
 
 func (c Config) Validate() error {
@@ -235,6 +236,9 @@ type Runner struct {
 	tsStore          TimeSeriesStore
 	runtimeCollector *RuntimeMetricsCollector
 	stopWg           sync.WaitGroup
+
+	// exprReg holds the expression engine registry with __so and builtins registered.
+	exprReg *expr.FunctionRegistry
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
@@ -263,6 +267,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		done:          make(chan struct{}),
 		log:           log,
 		nodeStats:     make(map[string]*NodeStats),
+		exprReg:       cfg.ExprRegistry,
 		collector: NewTimeSeriesCollector(TimeSeriesConfig{
 			SampleInterval:  1 * time.Second,
 			FlushInterval:   10 * time.Second,
@@ -1265,12 +1270,16 @@ type sceneNode struct {
 	nodeStats     *NodeStats
 	log           logger.Logger
 	traceID       string
+	// executor is set by Runner for generator nodes to write back variables.
+	executor *dag.Executor
 	// childNodes holds references to child nodes for Group execution.
 	// Populated after DAG construction via resolveGroupChildren.
 	childNodes []dag.Node
 	// subFlowRunner is set by Runner for sub-flow nodes to load and execute
 	// a sub-scene dynamically. Nil when not a sub-flow or in tests.
 	subFlowRunner func(ctx context.Context, sceneID string, variables map[string]any) (*dag.Output, error)
+	// exprReg holds the expression engine registry with __so and builtins registered.
+	exprReg *expr.FunctionRegistry
 }
 
 func (n *sceneNode) ID() string             { return n.id }
@@ -1310,6 +1319,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		out, err = n.executeSubFlow(ctx, input, nodeLog)
 	case model.NodeTypeTimer:
 		out, err = n.executeTimer(ctx, input, nodeLog)
+	case model.NodeTypeGenerator:
+		out, err = n.executeGenerator(ctx, input, nodeLog)
 	default:
 		nodeLog.Warn("unknown node type, skipping")
 		out = &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}
@@ -1331,11 +1342,12 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 
 func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
-		Method  string            `json:"method"`
-		URL     string            `json:"url"`
-		Headers map[string]string `json:"headers"`
-		Body    string            `json:"body"`
-		Timeout any               `json:"timeout"` // float64 or string (variable ref like ${timeout_ms})
+		Method     string            `json:"method"`
+		URL        string            `json:"url"`
+		Headers    map[string]string `json:"headers"`
+		Body       string            `json:"body"`
+		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
+		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -1437,17 +1449,8 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	if len(req.Headers) > 0 {
-		// Mask sensitive header values for debug logging
-		masked := make(map[string]string, len(req.Headers))
-		for k, v := range req.Headers {
-			if isSensitiveHeader(k) {
-				masked[k] = maskValue(v)
-			} else {
-				masked[k] = v
-			}
-		}
 		nodeLog.Debug("resolved headers",
-			logger.F("headers", masked),
+			logger.F("headers", req.Headers),
 		)
 	}
 
@@ -1495,7 +1498,63 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			if !httpResp.IsSuccess() && len(httpResp.Body) > 0 {
 				nodeLog.Debug("HTTP response body (non-2xx)",
 					logger.F("status", httpResp.StatusCode),
-					logger.F("body_preview", truncateString(string(httpResp.Body), 500)))
+					logger.F("body_preview", truncateString(string(httpResp.Body), 500)),
+				)
+			} else if len(httpResp.Body) > 0 {
+				nodeLog.Debug("HTTP response body",
+					logger.F("status", httpResp.StatusCode),
+					logger.F("body_preview", truncateString(string(httpResp.Body), 500)),
+				)
+			}
+		}
+	}
+
+	// Validate expect_body assertions against the JSON response body
+	if len(cfg.ExpectBody) > 0 {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
+			var bodyJSON map[string]any
+			if err := json.Unmarshal(httpResp.Body, &bodyJSON); err != nil {
+				nodeLog.Error("failed to parse response body for expect_body validation",
+					logger.F("error", err),
+					logger.F("body_preview", truncateString(string(httpResp.Body), 200)),
+				)
+			} else {
+				for key, expectedVal := range cfg.ExpectBody {
+					actualVal, exists := bodyJSON[key]
+					if !exists {
+						errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
+						nodeLog.Error("expect_body validation failed",
+							logger.F("field", key),
+							logger.F("error", errMsg),
+						)
+						if n.stats != nil {
+							n.stats.RecordLatency(httpResp.Latency, false)
+						}
+						if n.httpOnlyStats != nil {
+							n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
+						}
+						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
+					}
+					// Compare numeric values (JSON numbers are float64)
+					if fmt.Sprintf("%v", actualVal) != fmt.Sprintf("%v", expectedVal) {
+						errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, expectedVal, actualVal)
+						nodeLog.Error("expect_body validation failed",
+							logger.F("field", key),
+							logger.F("expected", expectedVal),
+							logger.F("actual", actualVal),
+						)
+						if n.stats != nil {
+							n.stats.RecordLatency(httpResp.Latency, false)
+						}
+						if n.httpOnlyStats != nil {
+							n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
+						}
+						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
+					}
+				}
+				nodeLog.Info("expect_body validation passed",
+					logger.F("assertions", cfg.ExpectBody),
+				)
 			}
 		}
 	}
@@ -1510,6 +1569,69 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	return &dag.Output{Response: resp}, nil
+}
+
+func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		Expression string `json:"expression"`
+		Variable   string `json:"variable"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse generator config", logger.F("error", err))
+		return nil, fmt.Errorf("parse generator config: %w", err)
+	}
+
+	if cfg.Expression == "" || cfg.Variable == "" {
+		return nil, fmt.Errorf("generator requires expression and variable fields")
+	}
+
+	nodeLog.Info("executing generator",
+		logger.F("expression", cfg.Expression),
+		logger.F("variable", cfg.Variable),
+	)
+
+	genReg := builtin.DefaultRegistry()
+
+	// Resolve variables in the expression first
+	exprStr := cfg.Expression
+	if input != nil && input.Variables != nil {
+		exprStr = resolveWithVariables(exprStr, input.Variables)
+	}
+
+	// Resolve generator refs (${generator.xxx} patterns)
+	result := resolveGeneratorRefs(exprStr, genReg, nodeLog)
+
+	// Resolve expression engine functions (${__so(...)}, ${__random(...)}, etc.)
+	// This is needed because the expression engine's FunctionRegistry handles __so()
+	// and other system functions, which resolveGeneratorRefs does not handle.
+	if n.exprReg != nil && (strings.Contains(result, "${__")) {
+		resolved, err := expr.Resolve(result, nil, n.exprReg)
+		if err != nil {
+			nodeLog.Warn("expression engine resolve failed, using original",
+				logger.F("expression", result),
+				logger.F("error", err),
+			)
+		} else {
+			result = resolved
+		}
+	}
+
+	nodeLog.Info("generator result",
+		logger.F("variable", cfg.Variable),
+		logger.F("value", result),
+	)
+
+	// Write back to variables if executor is available
+	if input != nil && input.Executor != nil {
+		input.Executor.SetVariable(cfg.Variable, result)
+	}
+
+	return &dag.Output{
+		Response: result,
+		Variables: map[string]any{
+			cfg.Variable: result,
+		},
+	}, nil
 }
 
 func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*dag.Output, error) {
@@ -1841,6 +1963,7 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		nodeStats:     nodeStat,
 		log:           r.log,
 		traceID:       r.runID.String(),
+		exprReg:       r.exprReg,
 	}
 
 	if n.LoopCount <= 0 {

@@ -68,6 +68,7 @@ const (
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
 	NodeTypeTimer     = "timer"
+	NodeTypeGenerator = "generator"
 )
 
 // DataSource represents a CSV data source attached to a scene.
