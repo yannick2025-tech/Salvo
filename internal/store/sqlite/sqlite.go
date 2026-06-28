@@ -1138,7 +1138,7 @@ func NewSOPluginRepo(db *DB) *SOPluginRepo {
 
 func (r *SOPluginRepo) Create(ctx context.Context, p *model.SOPlugin) error {
 	now := time.Now().UTC()
-	p.ID = int64(r.db.NextID())
+	p.ID = snowflake.ID(r.db.NextID())
 	p.CreatedAt = now
 	p.UpdatedAt = now
 
@@ -1149,7 +1149,7 @@ func (r *SOPluginRepo) Create(ctx context.Context, p *model.SOPlugin) error {
 	return err
 }
 
-func (r *SOPluginRepo) GetByID(ctx context.Context, id int64) (*model.SOPlugin, error) {
+func (r *SOPluginRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.SOPlugin, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, name, version, file_path, status, config, created_at, updated_at
 		FROM so_plugins WHERE id=? AND deleted_at IS NULL`, id)
@@ -1198,19 +1198,19 @@ func (r *SOPluginRepo) List(ctx context.Context, filter repo.Filter) ([]*model.S
 	return plugins, rows.Err()
 }
 
-func (r *SOPluginRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
+func (r *SOPluginRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET status=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, status, now, id)
 	return err
 }
 
-func (r *SOPluginRepo) UpdateConfig(ctx context.Context, id int64, config string) error {
+func (r *SOPluginRepo) UpdateConfig(ctx context.Context, id snowflake.ID, config string) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET config=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, config, now, id)
 	return err
 }
 
-func (r *SOPluginRepo) Delete(ctx context.Context, id int64) error {
+func (r *SOPluginRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, now, id)
 	return err

@@ -60,7 +60,7 @@
             <input
               ref="fileInputRef"
               type="file"
-              accept=".so"
+              accept="*"
               class="file-input-hidden"
               @change="handleFileSelect"
             />
@@ -148,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { listSOPlugins, createSOPlugin, updateSOPluginStatus, updateSOPluginConfig, deleteSOPlugin, uploadSOPluginFile } from '@/api/so-plugin'
 import type { SOPluginDTO } from '@/types'
 
@@ -166,7 +166,14 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 function handleFileSelect(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files && input.files.length > 0) {
-    selectedFile.value = input.files[0]
+    const file = input.files[0]
+    // Validate file extension since accept attribute is broadened for macOS compatibility.
+    if (!file.name.toLowerCase().endsWith('.so')) {
+      uploadError.value = '只能上传 .so 文件'
+      input.value = ''
+      return
+    }
+    selectedFile.value = file
     uploadForm.file_path = '' // will be set after upload
     uploadError.value = ''
   }
@@ -195,6 +202,14 @@ function closeUpload() {
   uploadingFile.value = false
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
+
+// Watch showUpload to reset file input when modal opens.
+// This ensures the file picker works correctly on first open after page load.
+watch(showUpload, (val) => {
+  if (val && fileInputRef.value) {
+    fileInputRef.value.value = ''
+  }
+})
 
 async function handleUpload() {
   uploadError.value = ''

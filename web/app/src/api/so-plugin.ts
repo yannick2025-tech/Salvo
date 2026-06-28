@@ -21,18 +21,18 @@ export async function uploadSOPluginFile(file: File): Promise<{ file_path: strin
   return resp.data.data
 }
 
-export function getSOPlugin(id: number) {
+export function getSOPlugin(id: string) {
   return post<SOPluginDTO>('/so-plugins/get', { id })
 }
 
-export function updateSOPluginStatus(id: number, status: string) {
+export function updateSOPluginStatus(id: string, status: string) {
   return post<null>('/so-plugins/status', { id, status })
 }
 
-export function updateSOPluginConfig(id: number, config: string) {
+export function updateSOPluginConfig(id: string, config: string) {
   return post<null>('/so-plugins/config', { id, config })
 }
 
-export function deleteSOPlugin(id: number) {
+export function deleteSOPlugin(id: string) {
   return post<null>('/so-plugins/delete', { id })
 }

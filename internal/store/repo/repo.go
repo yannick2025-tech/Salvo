@@ -143,9 +143,9 @@ type DataSourceRepo interface {
 // SOPluginRepo provides persistence operations for SOPlugin entities.
 type SOPluginRepo interface {
 	Create(ctx context.Context, p *model.SOPlugin) error
-	GetByID(ctx context.Context, id int64) (*model.SOPlugin, error)
+	GetByID(ctx context.Context, id snowflake.ID) (*model.SOPlugin, error)
 	List(ctx context.Context, filter Filter) ([]*model.SOPlugin, error)
-	UpdateStatus(ctx context.Context, id int64, status string) error
-	UpdateConfig(ctx context.Context, id int64, config string) error
-	Delete(ctx context.Context, id int64) error
+	UpdateStatus(ctx context.Context, id snowflake.ID, status string) error
+	UpdateConfig(ctx context.Context, id snowflake.ID, config string) error
+	Delete(ctx context.Context, id snowflake.ID) error
 }

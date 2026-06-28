@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 )
@@ -94,6 +95,22 @@ func (h *Handler) UploadSOPlugin(r *http.Request) dto.Response {
 
 	if err := h.soPlugins.Create(r.Context(), p); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("create so plugin: %v", err))
+	}
+
+	// Hot-load the plugin into memory if status is enabled
+	if status == model.SOPluginStatusEnabled && h.soLoader != nil {
+		if _, err := h.soLoader.Load(req.FilePath); err != nil {
+			h.log.Warn("failed to hot-load SO plugin",
+				logger.F("name", req.Name),
+				logger.F("version", req.Version),
+				logger.F("error", err),
+			)
+		} else {
+			h.log.Info("SO plugin hot-loaded successfully",
+				logger.F("name", req.Name),
+				logger.F("version", req.Version),
+			)
+		}
 	}
 
 	return dto.OK(toSOPluginDTO(p))
@@ -183,6 +200,26 @@ func (h *Handler) DeleteSOPlugin(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, err.Error())
 	}
 
+	// Get the plugin record first so we can delete the .so file from disk.
+	p, err := h.soPlugins.GetByID(r.Context(), req.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Plugin already deleted or not found, return success (idempotent delete)
+			// This handles the case where the plugin was already soft-deleted
+			return dto.OK(nil)
+		}
+		return dto.ErrorResp(500, fmt.Sprintf("get so plugin for delete: %v", err))
+	}
+
+	// Delete the .so file from disk (best-effort, don't fail if file is missing).
+	if p.FilePath != "" {
+		if removeErr := os.Remove(p.FilePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			// Log but don't fail the delete — the DB record is more important.
+			fmt.Printf("[WARN] failed to delete so plugin file %s: %v\n", p.FilePath, removeErr)
+		}
+	}
+
+	// Soft-delete the DB record.
 	if err := h.soPlugins.Delete(r.Context(), req.ID); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("delete so plugin: %v", err))
 	}

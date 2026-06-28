@@ -121,10 +121,18 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 
 			// Wait for all parent nodes to signal readiness.
 			inEdges := e.dag.InEdges(n.ID())
+			parentFailed := false
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
+					// Check if parent actually succeeded by checking results map.
+					e.mu.RLock()
+					_, parentSucceeded := e.results[edge.From]
+					e.mu.RUnlock()
+					if !parentSucceeded {
+						parentFailed = true
+					}
 				case <-ctx.Done():
 					errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
 					// Still close the signal so dependants don't hang.
@@ -169,6 +177,12 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 						return
 					}
 				}
+			}
+
+			// Skip this node if any parent failed.
+			if parentFailed {
+				close(sig)
+				return
 			}
 
 			// For async nodes, signal dependants immediately (fire-and-forget).

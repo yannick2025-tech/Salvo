@@ -28,6 +28,8 @@ import (
 
 type Server struct {
 	httpServer *http.Server
+	soLoader   *so.Loader
+	soReg      *expr.FunctionRegistry
 	db         *sqlite.DB
 	logger     logger.Logger
 	handler    *Handler
@@ -63,6 +65,7 @@ func New(cfg Config) *Server {
 		dataSources: sqlite.NewDataSourceRepo(cfg.DB),
 		soPlugins:   sqlite.NewSOPluginRepo(cfg.DB),
 		jwt:         cfg.JWT,
+		soLoader:    nil, // will be set after bootstrap
 		rbac:       cfg.RBAC,
 		globalVars: cfg.Variables,
 	}
@@ -99,10 +102,13 @@ func New(cfg Config) *Server {
 	// Pass the SO expression registry to the runner manager so that generator
 	// nodes can resolve ${__so(...)} expressions.
 	h.runnerMgr.SetExprRegistry(soReg)
-	_ = soLoader // available for future reload endpoint
+	// Store soLoader in handler for hot-load after upload.
+	h.soLoader = soLoader
 
 	s := &Server{
-		db:      cfg.DB,
+		soLoader: soLoader,
+		soReg:    soReg,
+		db:       cfg.DB,
 		logger:  cfg.Logger,
 		handler: h,
 		jwt:     cfg.JWT,
@@ -462,6 +468,7 @@ type Handler struct {
 	rp          repo.RolePermissionRepo
 	dataSources repo.DataSourceRepo
 	soPlugins   repo.SOPluginRepo
+	soLoader    *so.Loader
 	tracer      *tracelib.Tracer
 	traceStore  *tracestore.Store
 	tsStore     runner.TimeSeriesStore

@@ -216,8 +216,8 @@ type SetVariableRequest struct {
 // BatchSetVariablesRequest is the request body for POST /api/v1/scenes/variables/batch-set.
 // It replaces all scene-level variables with the provided key-value map.
 type BatchSetVariablesRequest struct {
-	SceneID   snowflake.ID        `json:"scene_id"`
-	Variables map[string]string   `json:"variables"`
+	SceneID   snowflake.ID      `json:"scene_id"`
+	Variables map[string]string `json:"variables"`
 }
 
 // BatchSetVariablesResponse is the response for the batch-set endpoint.
@@ -251,21 +251,21 @@ type ListSOPluginsRequest struct {
 }
 
 type GetSOPluginRequest struct {
-	ID int64 `json:"id"`
+	ID snowflake.ID `json:"id"`
 }
 
 type UpdateSOPluginStatusRequest struct {
-	ID     int64  `json:"id"`
-	Status string `json:"status"`
+	ID     snowflake.ID `json:"id"`
+	Status string       `json:"status"`
 }
 
 type UpdateSOPluginConfigRequest struct {
-	ID     int64  `json:"id"`
-	Config string `json:"config"`
+	ID     snowflake.ID `json:"id"`
+	Config string       `json:"config"`
 }
 
 type DeleteSOPluginRequest struct {
-	ID int64 `json:"id"`
+	ID snowflake.ID `json:"id"`
 }
 
 // DataSourceDTO is the data source detail returned in API responses.
@@ -282,27 +282,27 @@ type DataSourceDTO struct {
 
 // SOPluginDTO is the SO plugin detail returned in API responses.
 type SOPluginDTO struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Version   string    `json:"version"`
-	FilePath  string    `json:"file_path"`
-	Status    string    `json:"status"`
-	Config    string    `json:"config"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        snowflake.ID `json:"id"`
+	Name      string       `json:"name"`
+	Version   string       `json:"version"`
+	FilePath  string       `json:"file_path"`
+	Status    string       `json:"status"`
+	Config    string       `json:"config"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
 }
 
 // DataSourcePreviewDTO is the data source preview with sample rows.
 type DataSourcePreviewDTO struct {
-	ID        snowflake.ID       `json:"id"`
-	SceneID   snowflake.ID       `json:"scene_id"`
-	Name      string             `json:"name"`
-	FileName  string             `json:"file_name"`
-	Columns   []string           `json:"columns"`
-	RowCount  int                `json:"row_count"`
+	ID        snowflake.ID        `json:"id"`
+	SceneID   snowflake.ID        `json:"scene_id"`
+	Name      string              `json:"name"`
+	FileName  string              `json:"file_name"`
+	Columns   []string            `json:"columns"`
+	RowCount  int                 `json:"row_count"`
 	Rows      []map[string]string `json:"rows"`
-	CreatedAt time.Time          `json:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at"`
+	CreatedAt time.Time           `json:"created_at"`
+	UpdatedAt time.Time           `json:"updated_at"`
 }
 
 // VariableDTO is the variable detail returned in API responses.
@@ -586,21 +586,21 @@ type DashboardOverviewRequest struct {
 }
 
 type DashboardOverviewDTO struct {
-	TotalReqs      int64                `json:"total_reqs"`
-	SuccessReqs    int64                `json:"success_reqs"`
-	FailedReqs     int64                `json:"failed_reqs"`
-	P50Latency     float64              `json:"p50_latency"`
-	P95Latency     float64              `json:"p95_latency"`
-	P99Latency     float64              `json:"p99_latency"`
-	AvgLatency     float64              `json:"avg_latency"`
-	Running        int                  `json:"running"`
-	SceneID        int64                `json:"scene_id,omitempty"`
-	RecentRuns              []RunRecordDTO       `json:"recent_runs"`
-	NodeMetrics             []NodeMetricDTO      `json:"node_metrics"`
-	TimeSeries              *TimeSeriesDTO       `json:"time_series,omitempty"`
-	HttpOnlyTimeSeries       *TimeSeriesDTO       `json:"http_only_time_series,omitempty"`
-	SystemMetrics           *RuntimeMetricsDTO   `json:"system_metrics,omitempty"`
-	SystemMetricsTimeSeries []RuntimeMetricsDTO  `json:"system_metrics_time_series,omitempty"`
+	TotalReqs               int64               `json:"total_reqs"`
+	SuccessReqs             int64               `json:"success_reqs"`
+	FailedReqs              int64               `json:"failed_reqs"`
+	P50Latency              float64             `json:"p50_latency"`
+	P95Latency              float64             `json:"p95_latency"`
+	P99Latency              float64             `json:"p99_latency"`
+	AvgLatency              float64             `json:"avg_latency"`
+	Running                 int                 `json:"running"`
+	SceneID                 int64               `json:"scene_id,omitempty"`
+	RecentRuns              []RunRecordDTO      `json:"recent_runs"`
+	NodeMetrics             []NodeMetricDTO     `json:"node_metrics"`
+	TimeSeries              *TimeSeriesDTO      `json:"time_series,omitempty"`
+	HttpOnlyTimeSeries      *TimeSeriesDTO      `json:"http_only_time_series,omitempty"`
+	SystemMetrics           *RuntimeMetricsDTO  `json:"system_metrics,omitempty"`
+	SystemMetricsTimeSeries []RuntimeMetricsDTO `json:"system_metrics_time_series,omitempty"`
 }
 
 // RuntimeMetricsDTO holds the latest runtime/system metrics snapshot

@@ -372,7 +372,7 @@ export interface GeneratorCategoryInfo {
 // --- SO Plugin Types ---
 
 export interface SOPluginDTO {
-  id: number
+  id: string
   name: string
   version: string
   file_path: string
@@ -397,11 +397,11 @@ export interface ListSOPluginsRequest {
 }
 
 export interface UpdateSOPluginStatusRequest {
-  id: number
+  id: string
   status: string
 }
 
 export interface UpdateSOPluginConfigRequest {
-  id: number
+  id: string
   config: string
 }
