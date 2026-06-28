@@ -28,13 +28,13 @@ const (
 
 // Config is the top-level configuration for the Salvo application.
 type Config struct {
-	Server    ServerConfig    `yaml:"server"`
-	Database  DatabaseConfig  `yaml:"database"`
-	Log       LogConfig       `yaml:"log"`
-	Pool      PoolConfig      `yaml:"pool"`
-	Storage   StorageConfig   `yaml:"storage"`
-	Auth      AuthConfig      `yaml:"auth"`
-	Mock      MockConfig      `yaml:"mock"`
+	Server    ServerConfig      `yaml:"server"`
+	Database  DatabaseConfig    `yaml:"database"`
+	Log       LogConfig         `yaml:"log"`
+	Pool      PoolConfig        `yaml:"pool"`
+	Storage   StorageConfig     `yaml:"storage"`
+	Auth      AuthConfig        `yaml:"auth"`
+	Mock      MockConfig        `yaml:"mock"`
 	Variables map[string]string `yaml:"variables"`
 }
 
@@ -61,14 +61,14 @@ type DatabaseConfig struct {
 
 // LogConfig configures the structured logger.
 type LogConfig struct {
-	Level      logger.LogLevel `yaml:"level"`
+	Level      logger.LogLevel  `yaml:"level"`
 	Format     logger.LogFormat `yaml:"format"`
-	Output     string          `yaml:"output"`
-	MaxSize    int             `yaml:"max_size"`
-	MaxBackups int             `yaml:"max_backups"`
-	MaxAge     int             `yaml:"max_age"`
-	Compress   bool            `yaml:"compress"`
-	TimeFormat string          `yaml:"time_format"`
+	Output     string           `yaml:"output"`
+	MaxSize    int              `yaml:"max_size"`
+	MaxBackups int              `yaml:"max_backups"`
+	MaxAge     int              `yaml:"max_age"`
+	Compress   bool             `yaml:"compress"`
+	TimeFormat string           `yaml:"time_format"`
 }
 
 // PoolConfig configures the goroutine pool that drives test execution.
@@ -97,8 +97,11 @@ type AuthConfig struct {
 }
 
 type MockConfig struct {
-	Enabled bool `yaml:"enabled"`
-	Port    int  `yaml:"port"`
+	Enabled      bool    `yaml:"enabled"`
+	Port         int     `yaml:"port"`
+	ErrorRate    float64 `yaml:"error_rate"`
+	LatencyMinMs int     `yaml:"latency_min_ms"`
+	LatencyMaxMs int     `yaml:"latency_max_ms"`
 }
 
 // Default returns a Config populated with sensible defaults.
@@ -132,8 +135,11 @@ func Default() *Config {
 			JWTSecret: "salvo-default-jwt-secret-change-me",
 		},
 		Mock: MockConfig{
-			Enabled: false,
-			Port:    9090,
+			Enabled:      false,
+			Port:         9090,
+			ErrorRate:    0.03,
+			LatencyMinMs: 30,
+			LatencyMaxMs: 226,
 		},
 	}
 }

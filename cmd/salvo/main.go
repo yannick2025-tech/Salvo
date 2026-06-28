@@ -86,13 +86,18 @@ func main() {
 
 	var mockSrv *mock.MockServer
 	if cfg.Mock.Enabled {
-		mockSrv = mock.NewMockServer(cfg.Mock.Port)
+		mockSrv = mock.NewMockServer(cfg.Mock.Port, cfg.Mock.ErrorRate, cfg.Mock.LatencyMinMs, cfg.Mock.LatencyMaxMs)
 		go func() {
 			if err := mockSrv.Start(); err != nil {
 				log.Error("mock server stopped", logger.F("error", err))
 			}
 		}()
-		log.Info("mock server started", logger.F("port", cfg.Mock.Port))
+		log.Info("mock server started",
+			logger.F("port", cfg.Mock.Port),
+			logger.F("error_rate", cfg.Mock.ErrorRate),
+			logger.F("latency_min_ms", cfg.Mock.LatencyMinMs),
+			logger.F("latency_max_ms", cfg.Mock.LatencyMaxMs),
+		)
 	}
 
 	go func() {

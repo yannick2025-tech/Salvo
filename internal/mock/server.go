@@ -81,12 +81,20 @@ func init() {
 }
 
 type MockServer struct {
-	server *http.Server
-	port   int
+	server       *http.Server
+	port         int
+	errorRate    float64
+	latencyMinMs int
+	latencyMaxMs int
 }
 
-func NewMockServer(port int) *MockServer {
-	return &MockServer{port: port}
+func NewMockServer(port int, errorRate float64, latencyMinMs, latencyMaxMs int) *MockServer {
+	return &MockServer{
+		port:         port,
+		errorRate:    errorRate,
+		latencyMinMs: latencyMinMs,
+		latencyMaxMs: latencyMaxMs,
+	}
 }
 
 func (m *MockServer) Start() error {
@@ -281,11 +289,16 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
 		if r.URL.Path != "/mock/health" {
-			delayMs := rand.Intn(197) + 30
+			minMs := m.latencyMinMs
+			maxMs := m.latencyMaxMs
+			if maxMs <= minMs {
+				maxMs = minMs + 1
+			}
+			delayMs := rand.Intn(maxMs-minMs) + minMs
 			time.Sleep(time.Duration(delayMs) * time.Millisecond)
 		}
 
-		if r.URL.Path != "/mock/health" && rand.Float64() < 0.07 {
+		if r.URL.Path != "/mock/health" && rand.Float64() < m.errorRate {
 			code := errorCodes[rand.Intn(len(errorCodes))]
 			writeJSON(rw, code, map[string]any{"code": code, "message": http.StatusText(code), "_injected": true})
 			reqLog.Printf("%s %s | %d | %.2fms [INJECTED]", r.Method, r.URL.Path, code, float64(time.Since(start).Microseconds())/1000)
