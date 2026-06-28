@@ -70,13 +70,14 @@
             <span v-if="selectedFile" class="file-info">{{ formatFileSize(selectedFile.size) }}</span>
             <button v-if="selectedFile" class="btn-file-clear" @click="clearFile">✕</button>
           </div>
-          <div v-if="uploadingFile" class="upload-progress">上传中...</div>
         </div>
         <div class="form-group">
           <label>配置 (JSON，可选)</label>
           <textarea v-model="uploadForm.config" rows="4" placeholder='{"key": "value"}'></textarea>
         </div>
-        <div v-if="uploadError" class="form-error">{{ uploadError }}</div>
+        <div class="form-error-slot">
+          <div v-if="uploadError" class="form-error">{{ uploadError }}</div>
+        </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeUpload">取消</button>
           <button class="btn-login-primary" :disabled="uploading" @click="handleUpload">
@@ -159,7 +160,6 @@ const showUpload = ref(false)
 const uploadForm = reactive({ name: '', version: '', file_path: '', config: '' })
 const uploadError = ref('')
 const uploading = ref(false)
-const uploadingFile = ref(false)
 const selectedFile = ref<File | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -199,7 +199,6 @@ function closeUpload() {
   uploadForm.config = ''
   uploadError.value = ''
   selectedFile.value = null
-  uploadingFile.value = false
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
@@ -225,15 +224,12 @@ async function handleUpload() {
   try {
     // Step 1: Upload file if selected.
     if (selectedFile.value) {
-      uploadingFile.value = true
       try {
         const result = await uploadSOPluginFile(selectedFile.value)
         uploadForm.file_path = result.file_path
       } catch (e: any) {
         uploadError.value = e.response?.data?.message || e.message || '文件上传失败'
         return
-      } finally {
-        uploadingFile.value = false
       }
     }
     // Step 2: Create plugin record.
@@ -247,8 +243,9 @@ async function handleUpload() {
       uploadError.value = resp.message || '创建插件失败'
       return
     }
+    // Refresh list first, then close modal to avoid UI flicker.
+    await fetchPlugins()
     closeUpload()
-    fetchPlugins()
   } catch (e: any) {
     uploadError.value = e.message || '上传失败'
   } finally {
@@ -388,6 +385,8 @@ onMounted(() => {
   background: rgba(248,81,73,0.1); padding: 6px 10px;
   border-radius: var(--radius-sm); margin-bottom: 8px;
 }
+/* Reserve fixed height for error area to prevent dialog height jitter */
+.form-error-slot { min-height: 32px; margin-bottom: 8px; }
 .required { color: var(--accent-danger); }
 .text-muted { color: var(--text-tertiary); font-size: 12px; }
 
@@ -451,7 +450,6 @@ onMounted(() => {
   cursor: pointer; line-height: 1;
 }
 .btn-file-clear:hover { background: rgba(248,81,73,0.1); }
-.upload-progress { font-size: 12px; color: var(--accent-primary); margin-top: 4px; }
 .config-preview { background: var(--bg-tertiary); padding: 12px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.5; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 
 .confirm-dialog {
