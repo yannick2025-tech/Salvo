@@ -8,12 +8,12 @@
         <span v-if="scene" :class="['status-badge', scene.status]">{{ scene.status }}</span>
       </div>
       <div class="toolbar-right">
-        <button class="btn-sm toolbar-btn" @click="showSettings = !showSettings" :class="{ active: showSettings }" title="场景设置（变量 / 数据源）">
+        <button class="btn-sm toolbar-btn" :disabled="!canWriteScene" :title="canWriteScene ? '场景设置（变量 / 数据源）' : '您当前的角色没有编辑权限'" @click="showSettings = !showSettings" :class="{ active: showSettings }">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           设置
         </button>
-        <button class="btn-outline btn-sm" @click="showCopyModal = true">复制</button>
-        <button class="btn-login-primary btn-sm" @click="showRunConfig = true">▶ 启动测试</button>
+        <button class="btn-outline btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCopyModal = true">复制</button>
+        <button class="btn-login-primary btn-sm" :disabled="!canRunScene" :title="canRunScene ? '' : '您当前的角色没有运行权限'" @click="showRunConfig = true">▶ 启动测试</button>
       </div>
     </div>
 
@@ -23,18 +23,18 @@
         <div class="section-header">
           <h3>DAG 请求流</h3>
           <div class="dag-actions">
-            <button class="btn-sm" @click="addNode('setup')">+ 初始化</button>
-            <button class="btn-sm" @click="addNode('http')">+ HTTP</button>
-            <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
-            <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
-            <button class="btn-sm" @click="addNode('if-else')">+ IF-ELSE</button>
-            <button class="btn-sm" @click="addNode('group')">+ 分组</button>
-            <button class="btn-sm" @click="addNode('timer')">+ 定时器</button>
-            <button class="btn-sm" @click="addNode('while')">+ While</button>
-            <button class="btn-sm" @click="addNode('parallel')">+ 并行</button>
-            <button class="btn-sm" @click="addNode('sub_flow')">+ 子流程</button>
-            <button class="btn-sm" @click="addNode('loop')">+ 循环</button>
-            <button class="btn-sm" @click="addNode('teardown')">+ 清理</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('setup')">+ 初始化</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('http')">+ HTTP</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('delay')">+ 延迟</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('condition')">+ 条件</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('if-else')">+ IF-ELSE</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('group')">+ 分组</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('timer')">+ 定时器</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('while')">+ While</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('parallel')">+ 并行</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('sub_flow')">+ 子流程</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('loop')">+ 循环</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('teardown')">+ 清理</button>
           </div>
         </div>
 
@@ -332,7 +332,7 @@
       </div>
 
       <div class="panel-footer">
-        <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode">保存配置</button>
+        <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode || !canWriteScene">保存配置</button>
       </div>
     </div>
     </div>
@@ -428,7 +428,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
-          <button class="btn-login-primary" :disabled="nodes.length === 0" @click="handleStart">
+          <button class="btn-login-primary" :disabled="nodes.length === 0 || !canRunScene" @click="handleStart">
             {{ nodes.length === 0 ? '无 DAG 节点' : '启动' }}
           </button>
         </div>
@@ -649,10 +649,14 @@ import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datas
 import { previewDataSource } from '@/api/datasource'
 import type { DataSourceDTO, DataSourcePreviewDTO } from '@/api/datasource'
 import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 import DagFlow from './DagFlow.vue'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const canWriteScene = computed(() => authStore.canAccess(['scene:write']))
+const canRunScene = computed(() => authStore.canAccess(['scene:run']))
 
 const scene = ref<SceneDTO | null>(null)
 const nodes = ref<NodeDTO[]>([])
@@ -1910,6 +1914,7 @@ onMounted(() => {
   cursor: pointer; transition: all 0.2s ease;
 }
 .btn-outline:hover { background: rgba(0,229,255,0.08); }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 小型按钮 */
 .btn-sm {
@@ -1918,6 +1923,8 @@ onMounted(() => {
   color: var(--text-secondary); font-size: 12px; font-weight: 500;
   cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
 }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.04); }
 
 /* 工具栏按钮变体 */

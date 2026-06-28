@@ -35,7 +35,7 @@
           <label>总请求数</label>
           <input v-model.number="form.count" type="number" min="1" />
         </div>
-        <button class="btn-login-primary" @click="handleStart" :disabled="!form.scene_id || starting || selectedSceneHasNoDAG">
+        <button class="btn-login-primary" @click="handleStart" :disabled="!canRunScene || !form.scene_id || starting || selectedSceneHasNoDAG" :title="canRunScene ? '' : '您当前的角色没有运行权限'">
           {{ starting ? '启动中...' : '启动' }}
         </button>
         <div v-if="form.scene_id && selectedSceneHasNoDAG" class="no-dag-warning">
@@ -60,7 +60,8 @@
               <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
             </div>
             <button class="btn-sm danger" 
-                    :disabled="stoppingSceneIds.has(run.scene_id) || run.status !== 'running'" 
+                    :disabled="!canRunScene || stoppingSceneIds.has(run.scene_id) || run.status !== 'running'" 
+                    :title="canRunScene ? '' : '您当前的角色没有运行权限'"
                     @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
               {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
             </button>
@@ -151,7 +152,11 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
+import { useAuthStore } from '@/stores/auth'
 import type { SceneDTO, RunRecordDTO } from '@/types'
+
+const authStore = useAuthStore()
+const canRunScene = computed(() => authStore.canAccess(['scene:run']))
 
 const scenes = ref<SceneDTO[]>([])
 const runs = ref<RunRecordDTO[]>([])
@@ -344,6 +349,7 @@ onUnmounted(() => {
 
 .btn-primary { padding: 8px 20px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; margin-top: 8px; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .no-dag-warning { margin-top: 8px; font-size: 12px; color: #f0ad4e; background: rgba(240,173,78,0.1); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(240,173,78,0.3); }
 
 .btn-sm {

@@ -3,8 +3,8 @@
     <div class="page-header">
       <h2>场景管理</h2>
       <div class="header-actions">
-        <button class="btn-secondary" @click="showImport = true">导入 YAML</button>
-        <button class="btn-login-primary" @click="showCreate = true">+ 新建场景</button>
+        <button class="btn-secondary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showImport = true">导入 YAML</button>
+        <button class="btn-login-primary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCreate = true">+ 新建场景</button>
       </div>
     </div>
 
@@ -37,8 +37,8 @@
             <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? '--' : '-') }}</td>
             <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
             <td class="actions">
-              <button class="btn-sm" :class="{ disabled: isSceneRunning(s) }" :disabled="isSceneRunning(s)" @click="editScene(s)">编辑</button>
-              <button class="btn-sm danger" @click="handleDelete(s.id)">删除</button>
+              <button class="btn-sm" :class="{ disabled: isSceneRunning(s) || !canWriteScene }" :disabled="isSceneRunning(s) || !canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="editScene(s)">编辑</button>
+              <button class="btn-sm danger" :class="{ disabled: !canWriteScene }" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有删除权限'" @click="handleDelete(s.id)">删除</button>
             </td>
           </tr>
         </tbody>
@@ -108,12 +108,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { listScenes, createScene, deleteScene, importYAML } from '@/api/scene'
+import { useAuthStore } from '@/stores/auth'
 import type { SceneDTO } from '@/types'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const canWriteScene = computed(() => authStore.canAccess(['scene:write']))
 const scenes = ref<SceneDTO[]>([])
 const showCreate = ref(false)
 const createForm = reactive({ name: '', description: '' })
@@ -879,6 +882,8 @@ onMounted(() => {
   padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
 }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm {
   padding: 4px 10px;
   border: 1px solid var(--border-primary);
