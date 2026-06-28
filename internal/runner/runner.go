@@ -1572,16 +1572,24 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 }
 
 func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	startTime := time.Now()
+
 	var cfg struct {
 		Expression string `json:"expression"`
 		Variable   string `json:"variable"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
 		nodeLog.Error("failed to parse generator config", logger.F("error", err))
 		return nil, fmt.Errorf("parse generator config: %w", err)
 	}
 
 	if cfg.Expression == "" || cfg.Variable == "" {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
 		return nil, fmt.Errorf("generator requires expression and variable fields")
 	}
 
@@ -1611,9 +1619,21 @@ func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, node
 				logger.F("expression", result),
 				logger.F("error", err),
 			)
-		} else {
-			result = resolved
+			// SO plugin execution failed: record as a failed request so that
+			// the request count is consistent with HTTP nodes (the generator
+			// counts as one request regardless of success/failure).
+			if n.stats != nil {
+				n.stats.RecordLatency(0, false)
+			}
+			return nil, fmt.Errorf("generator expression resolve failed: %w", err)
 		}
+		result = resolved
+	}
+
+	// Generator succeeded: record as a successful request so that the total
+	// request count includes generator nodes (consistent with HTTP nodes).
+	if n.stats != nil {
+		n.stats.RecordLatency(time.Since(startTime), true)
 	}
 
 	nodeLog.Info("generator result",
