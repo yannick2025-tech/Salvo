@@ -1348,7 +1348,7 @@ func generateReportFilename(sceneID snowflake.ID) string {
 		last8 = sceneStr
 	}
 	now := time.Now()
-	return fmt.Sprintf("report-%s-%s-%s", last8, now.Format("20060102"), now.Format("150405"))
+	return fmt.Sprintf("salvo-report-%s-%s-%s", last8, now.Format("20060102"), now.Format("150405"))
 }
 
 // --- RunRecord Handlers ---
