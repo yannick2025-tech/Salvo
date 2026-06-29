@@ -176,19 +176,19 @@
         </div>
         <div class="sys-gauge-card" :class="gaugeStatus('heap')" :style="{ borderColor: gaugeColor('heap'), '--gauge-color': gaugeColor('heap') }" data-tooltip="堆内存分配量 (Heap Alloc)：Go 运行时当前已分配的堆内存大小 (MB)" :data-alert="gaugeAlert('heap')">
           <div class="gauge-label">Heap Alloc</div>
-          <div class="gauge-value" :style="{ color: gaugeValueColor('heap') }">{{ overview.system_metrics.heap_alloc_mb.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('heap') }">{{ overview.system_metrics.heap_alloc_mb.toFixed(3) }}</div>
           <div class="gauge-unit">MB</div>
           <div v-if="gaugeAlert('heap')" class="gauge-alert">{{ gaugeAlert('heap') }}</div>
         </div>
         <div class="sys-gauge-card" :class="gaugeStatus('cpu')" :style="{ borderColor: gaugeColor('cpu'), '--gauge-color': gaugeColor('cpu') }" data-tooltip="CPU 使用率：当前进程瞬时 CPU 占用百分比" :data-alert="gaugeAlert('cpu')">
           <div class="gauge-label">CPU</div>
-          <div class="gauge-value" :style="{ color: gaugeValueColor('cpu') }">{{ overview.system_metrics.cpu_percent.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('cpu') }">{{ overview.system_metrics.cpu_percent.toFixed(3) }}</div>
           <div class="gauge-unit">%</div>
           <div v-if="gaugeAlert('cpu')" class="gauge-alert">{{ gaugeAlert('cpu') }}</div>
         </div>
         <div class="sys-gauge-card" :class="gaugeStatus('wait')" :style="{ borderColor: gaugeColor('wait'), '--gauge-color': gaugeColor('wait') }" data-tooltip="任务等待时间 P99：99% 的任务从入队到被 Worker 取出的等待时间" :data-alert="gaugeAlert('wait')">
           <div class="gauge-label">Task Wait P99</div>
-          <div class="gauge-value" :style="{ color: gaugeValueColor('wait') }">{{ overview.system_metrics.task_wait_p99_ms.toFixed(1) }}</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('wait') }">{{ overview.system_metrics.task_wait_p99_ms.toFixed(3) }}</div>
           <div class="gauge-unit">ms</div>
           <div v-if="gaugeAlert('wait')" class="gauge-alert">{{ gaugeAlert('wait') }}</div>
         </div>
@@ -504,9 +504,10 @@ function onRefreshIntervalChange() {
 function restartPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   const interval = refreshInterval.value * 1000
-  pollTimer = setInterval(() => {
+  pollTimer = setInterval(async () => {
     if (!userAdjustedZoom.value) {
-      fetchOverview()
+      await fetchSceneList()
+      await fetchOverview()
     }
   }, interval)
 }

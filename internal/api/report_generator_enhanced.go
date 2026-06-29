@@ -977,23 +977,23 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             </div>
             <div class="sys-summary-card" style="border-color: #58a6ff;">
                 <div class="sys-summary-label">Heap 峰值</div>
-                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.HeapAllocMaxMB}} MB</div>
-                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.HeapAllocAvgMB}} MB</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.HeapAllocMaxMB}} MB</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.HeapAllocAvgMB}} MB</div>
             </div>
             <div class="sys-summary-card" style="border-color: #bf8700;">
                 <div class="sys-summary-label">CPU 峰值</div>
-                <div class="sys-summary-value" style="color: {{if gt .SystemMetrics.Summary.CPUMax 90.0}}#cf222e{{else if gt .SystemMetrics.Summary.CPUMax 70.0}}#bf8700{{else}}#bf8700{{end}}">{{printf "%.1f" .SystemMetrics.Summary.CPUMax}}%</div>
-                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.CPUAvg}}%</div>
+                <div class="sys-summary-value" style="color: {{if gt .SystemMetrics.Summary.CPUMax 90.0}}#cf222e{{else if gt .SystemMetrics.Summary.CPUMax 70.0}}#bf8700{{else}}#bf8700{{end}}">{{printf "%.3f" .SystemMetrics.Summary.CPUMax}}%</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.CPUAvg}}%</div>
             </div>
             <div class="sys-summary-card" style="border-color: #cf222e;">
                 <div class="sys-summary-label">GC 暂停</div>
-                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.GCPauseTotalMs}} ms</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.GCPauseTotalMs}} ms</div>
                 <div class="sys-summary-sub">共 {{.SystemMetrics.Summary.GCCount}} 次</div>
             </div>
             <div class="sys-summary-card" style="border-color: #cf222e;">
                 <div class="sys-summary-label">任务等待 P99 峰值</div>
-                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.TaskWaitP99MaxMs}} ms</div>
-                <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.TaskWaitAvgMs}} ms</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.TaskWaitP99MaxMs}} ms</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.TaskWaitAvgMs}} ms</div>
             </div>
             <div class="sys-summary-card" style="border-color: #0969da;">
                 <div class="sys-summary-label">Pending Queue 峰值</div>
