@@ -259,30 +259,40 @@
 
         <!-- Summary Cards -->
         <div v-if="metrics.system_metrics.summary || metrics.system_metrics.time_series?.length" class="sys-summary-row">
-          <div class="sys-summary-card" title="Goroutine 峰值：测试运行期间 Go 运行时中活跃协程的最大数量。包含 Worker、HTTP 连接池、内部管理协程等。100 Worker 通常对应 1000-1500 Goroutine 属于正常范围">
+          <div class="sys-summary-card" style="border-color: #0d9488;" title="Goroutine 峰值：测试运行期间 Go 运行时中活跃协程的最大数量。包含 Worker、HTTP 连接池、内部管理协程等。100 Worker 通常对应 1000-1500 Goroutine 属于正常范围">
             <div class="sys-summary-label">Goroutine 峰值</div>
             <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.goroutine_max || 0).toLocaleString() }}</div>
             <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.goroutine_avg || 0).toFixed(0) }}</div>
           </div>
-          <div class="sys-summary-card" title="Heap 峰值：测试运行期间堆内存分配的最大值（MB）。反映应用程序的内存使用峰值">
+          <div class="sys-summary-card" style="border-color: #58a6ff;" title="Heap 峰值：测试运行期间堆内存分配的最大值（MB）。反映应用程序的内存使用峰值">
             <div class="sys-summary-label">Heap 峰值</div>
             <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.heap_alloc_max_mb || 0).toFixed(3) }} MB</div>
             <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.heap_alloc_avg_mb || 0).toFixed(3) }} MB</div>
           </div>
-          <div class="sys-summary-card" title="CPU 峰值：测试运行期间进程 CPU 占用的最大百分比。基于两次采样间 CPU 时间差计算。多核环境可能超过 100%">
+          <div class="sys-summary-card" style="border-color: #bf8700;" title="CPU 峰值：测试运行期间进程 CPU 占用的最大百分比。基于两次采样间 CPU 时间差计算。多核环境可能超过 100%">
             <div class="sys-summary-label">CPU 峰值</div>
             <div class="sys-summary-value" :style="{ color: (metrics.system_metrics.summary?.cpu_max || 0) > 90 ? 'var(--accent-danger)' : (metrics.system_metrics.summary?.cpu_max || 0) > 70 ? 'var(--accent-warning)' : 'var(--text-primary)' }">{{ (metrics.system_metrics.summary?.cpu_max || 0).toFixed(3) }}%</div>
             <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.cpu_avg || 0).toFixed(3) }}%</div>
           </div>
-          <div class="sys-summary-card" title="GC 暂停：测试运行期间垃圾回收暂停的总时间和次数。频繁或长时间的 GC 暂停会影响测试精度">
+          <div class="sys-summary-card" style="border-color: #cf222e;" title="GC 暂停：测试运行期间垃圾回收暂停的总时间和次数。频繁或长时间的 GC 暂停会影响测试精度">
             <div class="sys-summary-label">GC 暂停</div>
             <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.gc_pause_total_ms || 0).toFixed(3) }} ms</div>
             <div class="sys-summary-sub">共 {{ metrics.system_metrics.summary?.gc_count || 0 }} 次</div>
           </div>
-          <div class="sys-summary-card" title="任务等待 P99 峰值：99% 的任务从进入队列到被 Worker 取出的最大等待时间（ms）。&gt;100ms 说明 Worker 不够用，应增加 Worker 数量">
+          <div class="sys-summary-card" style="border-color: #cf222e;" title="任务等待 P99 峰值：99% 的任务从进入队列到被 Worker 取出的最大等待时间（ms）。&gt;100ms 说明 Worker 不够用，应增加 Worker 数量">
             <div class="sys-summary-label">任务等待 P99 峰值</div>
             <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.task_wait_p99_max_ms || 0).toFixed(3) }} ms</div>
             <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.task_wait_avg_ms || 0).toFixed(3) }} ms</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #0969da;" title="Pending Queue 峰值：待处理队列中积压任务的最大数量。0 表示所有任务被即时消费">
+            <div class="sys-summary-label">Pending Queue 峰值</div>
+            <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.pending_queue_max || 0).toLocaleString() }}</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.pending_queue_avg || 0).toFixed(0) }}</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #1a7f37;" title="Active Workers 峰值：当前正在执行任务的 Worker 协程最大数量">
+            <div class="sys-summary-label">Active Workers 峰值</div>
+            <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.active_workers_max || 0).toLocaleString() }}</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.active_workers_avg || 0).toFixed(0) }}</div>
           </div>
         </div>
 
@@ -318,6 +328,14 @@
             <div class="chart-type-toggle center">
               <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
               <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Pending Queue 趋势</h3></div>
+            <div class="chart-body" ref="sysQueueChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysQueue === 'smooth' }]" @click.stop="switchChartType('sysQueue', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysQueue === 'step' }]" @click.stop="switchChartType('sysQueue', 'step')">阶梯</button>
             </div>
           </div>
         </div>
@@ -435,6 +453,7 @@ const sysGoroutineChartRef = ref<HTMLElement>()
 const sysHeapChartRef = ref<HTMLElement>()
 const sysCpuChartRef = ref<HTMLElement>()
 const sysTaskWaitChartRef = ref<HTMLElement>()
+const sysQueueChartRef = ref<HTMLElement>()
 
 let qpsChart: echarts.ECharts | null = null
 let latTrendChart: echarts.ECharts | null = null
@@ -446,6 +465,7 @@ let sysGoroutineChart: echarts.ECharts | null = null
 let sysHeapChart: echarts.ECharts | null = null
 let sysCpuChart: echarts.ECharts | null = null
 let sysTaskWaitChart: echarts.ECharts | null = null
+let sysQueueChart: echarts.ECharts | null = null
 let themeObserver: MutationObserver | null = null
 
 interface NodeTimeSeries {
@@ -480,6 +500,7 @@ const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   sysHeap: 'smooth',
   sysCpu: 'smooth',
   sysTaskWait: 'smooth',
+  sysQueue: 'smooth',
 })
 
 const tableSortKey = ref<string>('timestamp')
@@ -565,6 +586,7 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'sysHeap') renderSysHeapChart(tc)
   else if (chartId === 'sysCpu') renderSysCpuChart(tc)
   else if (chartId === 'sysTaskWait') renderSysTaskWaitChart(tc)
+  else if (chartId === 'sysQueue') renderSysQueueChart(tc)
 }
 
 function setNodeChartRef(idx: number, el: HTMLElement | null) {
@@ -861,6 +883,33 @@ function renderSysTaskWaitChart(tc: any) {
   }, true)
 }
 
+function renderSysQueueChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysQueueChartRef.value || !sm?.time_series?.length) return
+  if (sysQueueChart) sysQueueChart.dispose()
+  sysQueueChart = echarts.init(sysQueueChartRef.value)
+  const isSmooth = chartTypes.value.sysQueue === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const queueData = ts.map((s: any) => s.pending_queue_len || s.PendingQueueLen || 0)
+  // Track historical max for y-axis scaling
+  const maxVal = Math.max(...queueData, 10)
+  sysQueueChart.setOption({
+    backgroundColor: tc.bg,
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: maxVal, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    series: [
+      { name: 'Pending Queue', data: queueData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2 }, itemStyle: { color: tc.colors[6] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(148,163,184,0.25)' }, { offset: 1, color: 'rgba(148,163,184,0.02)' }]) } },
+    ],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value)}</strong><br/>` }); return h } },
+    legend: { data: ['Pending Queue'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
 function renderErrorRateChart(tc: any, m: any) {
   if (!errorRateChartRef.value) return
   if (errRateChart) errRateChart.dispose()
@@ -1095,6 +1144,7 @@ function renderAll() {
   renderSysHeapChart(tc)
   renderSysCpuChart(tc)
   renderSysTaskWaitChart(tc)
+  renderSysQueueChart(tc)
 }
 
 function renderQPSTrend(tc: any, m: any) {
@@ -1493,7 +1543,7 @@ onMounted(() => {
 onUnmounted(() => {
   themeObserver?.disconnect()
   qpsChart?.dispose(); latTrendChart?.dispose(); latChart?.dispose(); ovChart?.dispose(); errRateChart?.dispose()
-  sysGoroutineChart?.dispose(); sysHeapChart?.dispose(); sysCpuChart?.dispose(); sysTaskWaitChart?.dispose()
+  sysGoroutineChart?.dispose(); sysHeapChart?.dispose(); sysCpuChart?.dispose(); sysTaskWaitChart?.dispose(); sysQueueChart?.dispose()
   nodeCharts.forEach(c => c.dispose())
 })
 </script>

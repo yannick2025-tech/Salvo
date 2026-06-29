@@ -57,7 +57,7 @@ type RuntimeMetricsCollector struct {
 	done      chan struct{}
 	stopOnce  sync.Once
 
-	waitStatsProvider WaitTimeStatsProvider
+	waitStatsProvider   WaitTimeStatsProvider
 	runnerStateProvider RunnerStateProvider
 }
 
@@ -257,10 +257,10 @@ type SystemMetricsSummary struct {
 	SampleCount int `json:"sample_count"`
 
 	// Goroutine
-	GoroutineMin   int64   `json:"goroutine_min"`
-	GoroutineMax   int64   `json:"goroutine_max"`
-	GoroutineAvg   float64 `json:"goroutine_avg"`
-	GoroutinePeakAt string `json:"goroutine_peak_at,omitempty"`
+	GoroutineMin    int64   `json:"goroutine_min"`
+	GoroutineMax    int64   `json:"goroutine_max"`
+	GoroutineAvg    float64 `json:"goroutine_avg"`
+	GoroutinePeakAt string  `json:"goroutine_peak_at,omitempty"`
 
 	// Heap
 	HeapAllocMinMB float64 `json:"heap_alloc_min_mb"`
@@ -268,18 +268,26 @@ type SystemMetricsSummary struct {
 	HeapAllocAvgMB float64 `json:"heap_alloc_avg_mb"`
 
 	// CPU
-	CPUMin   float64 `json:"cpu_min"`
-	CPUMax   float64 `json:"cpu_max"`
-	CPUAvg   float64 `json:"cpu_avg"`
-	CPUPeakAt string `json:"cpu_peak_at,omitempty"`
+	CPUMin    float64 `json:"cpu_min"`
+	CPUMax    float64 `json:"cpu_max"`
+	CPUAvg    float64 `json:"cpu_avg"`
+	CPUPeakAt string  `json:"cpu_peak_at,omitempty"`
 
 	// GC
 	GCPauseTotalMs float64 `json:"gc_pause_total_ms"`
 	GCCount        uint32  `json:"gc_count"`
 
 	// Task Wait
-	TaskWaitAvgMs   float64 `json:"task_wait_avg_ms"`
+	TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
 	TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+
+	// Pending Queue
+	PendingQueueMax int     `json:"pending_queue_max"`
+	PendingQueueAvg float64 `json:"pending_queue_avg"`
+
+	// Active Workers
+	ActiveWorkersMax int     `json:"active_workers_max"`
+	ActiveWorkersAvg float64 `json:"active_workers_avg"`
 
 	// Time range
 	FirstSampleAt time.Time `json:"first_sample_at"`
@@ -299,7 +307,7 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 	}
 
 	summary := SystemMetricsSummary{
-		SampleCount:  len(snapshots),
+		SampleCount:   len(snapshots),
 		FirstSampleAt: snapshots[0].Timestamp,
 		LastSampleAt:  snapshots[len(snapshots)-1].Timestamp,
 	}
@@ -319,6 +327,10 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 	var taskWaitAvgTotal float64
 	var taskWaitP99Max float64
 	var taskWaitSamples int64
+	var pendingQueueTotal int
+	var pendingQueueMax int
+	var activeWorkersTotal int
+	var activeWorkersMax int
 
 	for _, s := range snapshots {
 		// Goroutine
@@ -366,6 +378,18 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 		if s.TaskWaitP99Ms > taskWaitP99Max {
 			taskWaitP99Max = s.TaskWaitP99Ms
 		}
+
+		// Pending Queue
+		if s.PendingQueueLen > pendingQueueMax {
+			pendingQueueMax = s.PendingQueueLen
+		}
+		pendingQueueTotal += s.PendingQueueLen
+
+		// Active Workers
+		if s.ActiveWorkers > activeWorkersMax {
+			activeWorkersMax = s.ActiveWorkers
+		}
+		activeWorkersTotal += s.ActiveWorkers
 	}
 
 	n := float64(len(snapshots))
@@ -377,6 +401,10 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 		summary.TaskWaitAvgMs = taskWaitAvgTotal / float64(taskWaitSamples)
 	}
 	summary.TaskWaitP99MaxMs = taskWaitP99Max
+	summary.PendingQueueMax = pendingQueueMax
+	summary.PendingQueueAvg = float64(pendingQueueTotal) / n
+	summary.ActiveWorkersMax = activeWorkersMax
+	summary.ActiveWorkersAvg = float64(activeWorkersTotal) / n
 
 	return summary
 }

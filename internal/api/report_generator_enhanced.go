@@ -970,30 +970,40 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <section class="nodes-section">
         <h3>系统性能分析</h3>
         <div class="sys-summary-row">
-            <div class="sys-summary-card">
+            <div class="sys-summary-card" style="border-color: #0d9488;">
                 <div class="sys-summary-label">Goroutine 峰值</div>
                 <div class="sys-summary-value">{{.SystemMetrics.Summary.GoroutineMax}}</div>
                 <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.GoroutineAvg}}</div>
             </div>
-            <div class="sys-summary-card">
+            <div class="sys-summary-card" style="border-color: #58a6ff;">
                 <div class="sys-summary-label">Heap 峰值</div>
                 <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.HeapAllocMaxMB}} MB</div>
                 <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.HeapAllocAvgMB}} MB</div>
             </div>
-            <div class="sys-summary-card">
+            <div class="sys-summary-card" style="border-color: #bf8700;">
                 <div class="sys-summary-label">CPU 峰值</div>
-                <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.CPUMax}}%</div>
+                <div class="sys-summary-value" style="color: {{if gt .SystemMetrics.Summary.CPUMax 90.0}}#cf222e{{else if gt .SystemMetrics.Summary.CPUMax 70.0}}#bf8700{{else}}#bf8700{{end}}">{{printf "%.1f" .SystemMetrics.Summary.CPUMax}}%</div>
                 <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.CPUAvg}}%</div>
             </div>
-            <div class="sys-summary-card">
+            <div class="sys-summary-card" style="border-color: #cf222e;">
                 <div class="sys-summary-label">GC 暂停</div>
                 <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.GCPauseTotalMs}} ms</div>
                 <div class="sys-summary-sub">共 {{.SystemMetrics.Summary.GCCount}} 次</div>
             </div>
-            <div class="sys-summary-card">
+            <div class="sys-summary-card" style="border-color: #cf222e;">
                 <div class="sys-summary-label">任务等待 P99 峰值</div>
                 <div class="sys-summary-value">{{printf "%.1f" .SystemMetrics.Summary.TaskWaitP99MaxMs}} ms</div>
                 <div class="sys-summary-sub">平均 {{printf "%.1f" .SystemMetrics.Summary.TaskWaitAvgMs}} ms</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #0969da;">
+                <div class="sys-summary-label">Pending Queue 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.PendingQueueMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.PendingQueueAvg}}</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #1a7f37;">
+                <div class="sys-summary-label">Active Workers 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.ActiveWorkersMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.ActiveWorkersAvg}}</div>
             </div>
         </div>
         {{if gt (len .SystemMetrics.TimeSeries) 1}}
@@ -1028,6 +1038,14 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
                 <div class="chart-type-toggle">
                     <button class="type-btn active" onclick="switchChartType('sysTaskWait', 'smooth')">平滑</button>
                     <button class="type-btn" onclick="switchChartType('sysTaskWait', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>Pending Queue 趋势</h3></div>
+                <div class="chart-body" id="sysQueueChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysQueue', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysQueue', 'step')">阶梯</button>
                 </div>
             </div>
         </div>
@@ -1094,7 +1112,7 @@ let qpsType = 'smooth';
 let latTrendType = 'smooth';
 let nodeType = 'smooth';
 
-const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth', sysGoroutine: 'smooth', sysHeap: 'smooth', sysCpu: 'smooth', sysTaskWait: 'smooth' };
+const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth', sysGoroutine: 'smooth', sysHeap: 'smooth', sysCpu: 'smooth', sysTaskWait: 'smooth', sysQueue: 'smooth' };
 
 function initNodeChartTypes() {
     if (reportData.node_metrics) {
@@ -1114,6 +1132,7 @@ function switchChartType(chartId, type) {
     else if (chartId === 'sysHeap') { updateSysToggleButtons('sysHeapChart'); renderSysHeapChart(); }
     else if (chartId === 'sysCpu') { updateSysToggleButtons('sysCpuChart'); renderSysCpuChart(); }
     else if (chartId === 'sysTaskWait') { updateSysToggleButtons('sysTaskWaitChart'); renderSysTaskWaitChart(); }
+    else if (chartId === 'sysQueue') { updateSysToggleButtons('sysQueueChart'); renderSysQueueChart(); }
 }
 
 function updateSysToggleButtons(chartId) {
@@ -1249,6 +1268,40 @@ function renderSysTaskWaitChart() {
             }
         },
         legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysQueueChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysQueueChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysQueue === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var queueData = ts.map(function(s) { return s.pending_queue_len; });
+    // Track historical max for y-axis scaling
+    var maxVal = 0;
+    queueData.forEach(function(v) { if (v > maxVal) maxVal = v; });
+    if (maxVal < 10) maxVal = 10;
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', min: 0, max: maxVal, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        series: [
+            { name: 'Pending Queue', data: queueData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2 }, itemStyle: { color: tc.colors[6] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(148,163,184,0.25)' }, { offset: 1, color: 'rgba(148,163,184,0.02)' }]) } },
+        ],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' Pending Queue: <strong>' + Number(params[0].value) + '</strong>';
+            }
+        },
+        legend: { data: ['Pending Queue'], textStyle: { color: tc.textColor }, top: 0 },
     }, true);
 }
 
@@ -1418,6 +1471,7 @@ function initCharts() {
     renderSysHeapChart();
     renderSysCpuChart();
     renderSysTaskWaitChart();
+    renderSysQueueChart();
     initSysMetricsTable();
     {{end}}
 }
@@ -1910,7 +1964,7 @@ function applyDarkMode(isDark) {
     tc.dangerColor = isDark ? '#f85149' : '#cf222e';
 
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
-                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
+                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart', 'sysQueueChart'];
     if (reportData.node_metrics) {
         reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeChart' + idx); });
     }
@@ -1933,6 +1987,7 @@ function applyDarkMode(isDark) {
     renderSysHeapChart();
     renderSysCpuChart();
     renderSysTaskWaitChart();
+    renderSysQueueChart();
     {{end}}
 }
 
@@ -2002,6 +2057,10 @@ type EnhancedSystemMetricsSummary struct {
 	GCCount          uint32  `json:"gc_count"`
 	TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
 	TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+	PendingQueueMax  int     `json:"pending_queue_max"`
+	PendingQueueAvg  float64 `json:"pending_queue_avg"`
+	ActiveWorkersMax int     `json:"active_workers_max"`
+	ActiveWorkersAvg float64 `json:"active_workers_avg"`
 }
 
 // EnhancedSystemMetricsSample holds a single system metrics sample for the exported HTML report.
@@ -2011,6 +2070,8 @@ type EnhancedSystemMetricsSample struct {
 	HeapAllocMB     float64 `json:"heap_alloc_mb"`
 	HeapSysMB       float64 `json:"heap_sys_mb"`
 	CPUUsagePercent float64 `json:"cpu_percent"`
+	ActiveWorkers   int     `json:"active_workers"`
+	PendingQueueLen int     `json:"pending_queue_len"`
 	TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
 	TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
 	TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
@@ -2244,6 +2305,10 @@ func buildEnhancedContext(detail *runner.ReportDetail) *EnhancedReportContext {
 				GCCount:          sm.Summary.GCCount,
 				TaskWaitAvgMs:    sm.Summary.TaskWaitAvgMs,
 				TaskWaitP99MaxMs: sm.Summary.TaskWaitP99MaxMs,
+				PendingQueueMax:  sm.Summary.PendingQueueMax,
+				PendingQueueAvg:  sm.Summary.PendingQueueAvg,
+				ActiveWorkersMax: sm.Summary.ActiveWorkersMax,
+				ActiveWorkersAvg: sm.Summary.ActiveWorkersAvg,
 			},
 		}
 		for _, s := range sm.TimeSeries {
@@ -2253,6 +2318,8 @@ func buildEnhancedContext(detail *runner.ReportDetail) *EnhancedReportContext {
 				HeapAllocMB:     s.HeapAllocMB,
 				HeapSysMB:       s.HeapSysMB,
 				CPUUsagePercent: s.CPUUsagePercent,
+				ActiveWorkers:   s.ActiveWorkers,
+				PendingQueueLen: s.PendingQueueLen,
 				TaskWaitP50Ms:   s.TaskWaitP50Ms,
 				TaskWaitP95Ms:   s.TaskWaitP95Ms,
 				TaskWaitP99Ms:   s.TaskWaitP99Ms,

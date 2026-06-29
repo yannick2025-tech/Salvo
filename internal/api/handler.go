@@ -2175,6 +2175,10 @@ func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake
 				TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
 				TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
 				GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
+				PendingQueueMax  float64 `json:"pending_queue_max"`
+				PendingQueueAvg  float64 `json:"pending_queue_avg"`
+				ActiveWorkersMax float64 `json:"active_workers_max"`
+				ActiveWorkersAvg float64 `json:"active_workers_avg"`
 			} `json:"summary"`
 		} `json:"system_metrics,omitempty"`
 	}
@@ -2192,8 +2196,8 @@ func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake
 		HeapSysMB:       0,
 		CPUUsagePercent: sm.Summary.CPUMax,
 		RSSMemoryMB:     0,
-		ActiveWorkers:   0,
-		PendingQueueLen: 0,
+		ActiveWorkers:   int(sm.Summary.ActiveWorkersMax),
+		PendingQueueLen: int(sm.Summary.PendingQueueMax),
 		TaskWaitP50Ms:   0,
 		TaskWaitP95Ms:   0,
 		TaskWaitP99Ms:   sm.Summary.TaskWaitP99MaxMs,
