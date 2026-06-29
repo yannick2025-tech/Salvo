@@ -32,7 +32,7 @@ mock:
   port: 9090
   error_rate: 0.02
   latency_min_ms: 30
-  latency_max_ms: 150
+  latency_max_ms: 250
 
 variables:
   base_url: "http://localhost:9090/mock/api"

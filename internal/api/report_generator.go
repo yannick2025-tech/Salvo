@@ -17,11 +17,11 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
     <title>测试报告 - Salvo</title>
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --success: #1a7f37;
+            --warning: #bf8700;
+            --danger: #cf222e;
             --bg-primary: #ffffff;
             --bg-secondary: #f9fafb;
             --bg-tertiary: #f3f4f6;
@@ -101,11 +101,11 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
             color: white;
         }
 
-        .icon-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-        .icon-green { background: linear-gradient(135deg, #10b981, #059669); }
-        .icon-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .icon-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .icon-blue { background: linear-gradient(135deg, #0969da, #0a6fbb); }
+        .icon-green { background: linear-gradient(135deg, #1a7f37, #15803d); }
+        .icon-orange { background: linear-gradient(135deg, #bc4c00, #973604); }
+        .icon-red { background: linear-gradient(135deg, #cf222e, #a40e26); }
+        .icon-purple { background: linear-gradient(135deg, #0d9488, #0f766e); }
 
         .metrics-grid {
             display: grid;

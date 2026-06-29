@@ -98,10 +98,10 @@ function latencyLevel(span: SpanDTO): string {
 
 function latencyColor(span: SpanDTO): string {
   switch (latencyLevel(span)) {
-    case 'ok': return '#4ade80'
-    case 'warn': return '#3b82f6'
-    case 'alert': return '#eab308'
-    case 'critical': return '#ef4444'
+    case 'ok': return '#3fb950'
+    case 'warn': return '#58a6ff'
+    case 'alert': return '#e3b341'
+    case 'critical': return '#f85149'
     default: return 'var(--accent-primary)'
   }
 }
@@ -249,14 +249,14 @@ function formatDurationMs(ns: number): string {
 .legend { display: flex; gap: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-secondary); }
 .legend-item { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.dot.lat-ok { background: #4ade80; }
-.dot.lat-warn { background: #3b82f6; }
-.dot.lat-alert { background: #eab308; }
-.dot.lat-critical { background: #ef4444; }
-.lat-ok { color: #4ade80; }
-.lat-warn { color: #3b82f6; }
-.lat-alert { color: #eab308; font-weight: 700; }
-.lat-critical { color: #ef4444; font-weight: 700; }
+.dot.lat-ok { background: #3fb950; }
+.dot.lat-warn { background: #58a6ff; }
+.dot.lat-alert { background: #e3b341; }
+.dot.lat-critical { background: #f85149; }
+.lat-ok { color: #3fb950; }
+.lat-warn { color: #58a6ff; }
+.lat-alert { color: #e3b341; font-weight: 700; }
+.lat-critical { color: #f85149; font-weight: 700; }
 
 .span-list { display: flex; flex-direction: column; gap: 10px; }
 .span-item { padding: 12px 14px; background: var(--bg-tertiary); border-radius: var(--radius-sm); border-left: 3px solid transparent; }

@@ -108,17 +108,19 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             --bg-secondary: #f9fafb;
             --bg-card: #ffffff;
             --bg-tertiary: #f3f4f6;
-            --bg-hover: rgba(8,145,178,0.04);
+            --bg-hover: rgba(45,212,191,0.04);
             --text-primary: #111827;
             --text-secondary: #374151;
             --text-tertiary: #6b7280;
             --border-primary: #e5e7eb;
             --border-secondary: #e5e7eb;
-            --accent-primary: #0891b2;
-            --accent-success: #16a34a;
-            --accent-danger: #dc2626;
-            --accent-warning: #ca8a04;
-            --accent-info: #2563eb;
+            --border-color: #e5e7eb;
+            --border-light: #f3f4f6;
+            --accent-primary: #0d9488;
+            --accent-success: #1a7f37;
+            --accent-danger: #cf222e;
+            --accent-warning: #bf8700;
+            --accent-info: #0969da;
             --radius-sm: 6px;
             --radius-md: 8px;
         }
@@ -155,17 +157,27 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             flex: 1;
         }
         #themeToggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             padding: 6px 12px;
-            font-size: 18px;
+            font-size: 13px;
             border: 1px solid var(--border-secondary);
             border-radius: var(--radius-sm);
             background: transparent;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s ease;
+            color: var(--text-secondary);
         }
         #themeToggle:hover {
             background: var(--bg-hover);
+            color: var(--text-primary);
             border-color: var(--accent-primary);
+        }
+        #themeToggle svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
         }
 
         /* Metrics Row */
@@ -281,7 +293,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             border-radius: var(--radius-sm);
             font-size: 12px;
             font-weight: 600;
-            background: rgba(8,145,178,0.1);
+            background: rgba(45,212,191,0.1);
             color: var(--accent-primary);
         }
         .actual-val {
@@ -296,10 +308,10 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-weight: 600;
             letter-spacing: 0.04em;
         }
-        .status-badge.success { background: rgba(22,163,74,0.15); color: #16a34a; }
-        .status-badge.partial { background: rgba(217,119,6,0.15); color: #d97706; }
-        .status-badge.failed { background: rgba(220,38,38,0.15); color: #dc2626; }
-        .status-badge.running { background: rgba(8,145,178,0.15); color: #0891b2; }
+        .status-badge.success { background: rgba(26,127,55,0.15); color: #1a7f37; }
+        .status-badge.partial { background: rgba(191,135,0,0.15); color: #bf8700; }
+        .status-badge.failed { background: rgba(207,34,46,0.15); color: #cf222e; }
+        .status-badge.running { background: rgba(13,148,136,0.15); color: #0d9488; }
         .status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
         .status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
@@ -530,20 +542,20 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         .table-header-row h4 {
             font-size: 14px;
             font-weight: 600;
-            color: #111827;
+            color: var(--text-primary);
             margin: 0;
         }
 
         .table-info {
             font-size: 12px;
-            color: #6b7280;
+            color: var(--text-tertiary);
         }
 
         .table-wrapper {
             overflow-x: auto;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: white;
+            background: var(--bg-card);
         }
 
         .data-table {
@@ -553,7 +565,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         }
 
         .data-table thead {
-            background: #f9fafb;
+            background: var(--bg-secondary);
             position: sticky;
             top: 0;
             z-index: 10;
@@ -563,8 +575,8 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             padding: 10px 12px;
             text-align: left;
             font-weight: 600;
-            color: #111827;
-            border-bottom: 2px solid #e5e7eb;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
             white-space: nowrap;
             user-select: none;
         }
@@ -575,7 +587,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         }
 
         .data-table th.sortable:hover {
-            background: #f3f4f6;
+            background: var(--bg-hover);
         }
 
         .sort-icon {
@@ -586,12 +598,12 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 
         .data-table td {
             padding: 8px 12px;
-            border-bottom: 1px solid #f3f4f6;
-            color: #111827;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-primary);
         }
 
         .data-table tbody tr:hover {
-            background: #f9fafb;
+            background: var(--bg-hover);
         }
 
         .danger-row {
@@ -599,7 +611,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         }
 
         .danger-cell {
-            color: #dc2626 !important;
+            color: var(--accent-danger) !important;
             font-weight: 600;
         }
 
@@ -614,17 +626,17 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         .page-btn {
             padding: 6px 12px;
             font-size: 12px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
-            background: white;
-            color: #111827;
+            background: var(--bg-card);
+            color: var(--text-primary);
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .page-btn:hover:not(:disabled) {
-            background: #f3f4f6;
-            border-color: #3b82f6;
+            background: var(--bg-hover);
+            border-color: var(--accent-info);
         }
 
         .page-btn:disabled {
@@ -639,44 +651,49 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             text-align: center;
         }
 
-        .dark-theme {
-            --bg-primary: #0f172a;
+        html.dark-theme {
+            --bg-primary: #0d1117;
             --bg-secondary: #161b22;
             --bg-card: #161b22;
             --bg-tertiary: #21262d;
+            --bg-hover: #21262d;
             --text-primary: #c9d1d9;
             --text-secondary: #8b949e;
+            --text-tertiary: #6e7681;
+            --border-primary: #30363d;
+            --border-secondary: #30363d;
             --border-color: #30363d;
             --border-light: #21262d;
-            --border-primary: #30363d;
-            --bg-hover: #21262d;
-            --accent-primary: #00E5FF;
+            --accent-primary: #2dd4bf;
+            --accent-success: #3fb950;
+            --accent-danger: #f85149;
+            --accent-warning: #e3b341;
+            --accent-info: #58a6ff;
         }
-
-        .dark-theme body { background: var(--bg-primary); color: var(--text-primary); }
-        .dark-theme .container { background: var(--bg-primary); }
-        .dark-theme .metric-card, .dark-theme .chart-card, .dark-theme .sys-summary-card { background: var(--bg-card); border-color: var(--border-color); }
-        .dark-theme .metric-label, .dark-theme .sys-summary-label, .dark-theme .chart-header h3, .dark-theme h2, .dark-theme h3, .dark-theme h4 { color: var(--text-primary); }
-        .dark-theme .metric-sub, .dark-theme .sys-summary-sub, .dark-theme .table-info { color: var(--text-secondary); }
-        .dark-theme .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
-        .dark-theme .data-table thead { background: var(--bg-secondary); }
-        .dark-theme .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
-        .dark-theme .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
-        .dark-theme .data-table tbody tr:hover { background: var(--bg-hover); }
-        .dark-theme .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
-        .dark-theme .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
-        .dark-theme .type-btn { background: transparent; color: var(--text-secondary); border-color: var(--border-color); }
-        .dark-theme .type-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
-        .dark-theme .type-btn:hover:not(.active) { background: var(--bg-hover); border-color: var(--accent-primary); }
-        .dark-theme .node-badge { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); }
-        .dark-theme .info-card { background: var(--bg-card); border-color: var(--border-color); }
-        .dark-theme .info-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
-        .dark-theme .status-badge { border: 1px solid var(--border-color); }
-        .dark-theme .page-info { color: var(--text-secondary); }
-        .dark-theme .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
-        .dark-theme .banner-text strong { color: var(--text-primary); }
-            .banner-text p { color: var(--text-secondary); }
-        }
+        html.dark-theme body { background: var(--bg-primary); color: var(--text-primary); }
+        html.dark-theme .container { background: var(--bg-primary); }
+        html.dark-theme .metric-card, html.dark-theme .chart-card, html.dark-theme .sys-summary-card, html.dark-theme .nodes-section, html.dark-theme .charts-section { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .metric-label, html.dark-theme .sys-summary-label, html.dark-theme .chart-header h3, html.dark-theme h2, html.dark-theme h3, html.dark-theme h4, html.dark-theme .charts-toolbar h3, html.dark-theme .nodes-section h3 { color: var(--text-primary); }
+        html.dark-theme .metric-sub, html.dark-theme .sys-summary-sub, html.dark-theme .table-info { color: var(--text-secondary); }
+        html.dark-theme .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .data-table thead { background: var(--bg-secondary); }
+        html.dark-theme .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
+        html.dark-theme .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        html.dark-theme .data-table tbody tr:hover { background: var(--bg-hover); }
+        html.dark-theme .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
+        html.dark-theme .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
+        html.dark-theme .type-btn { background: transparent; color: var(--text-secondary); border-color: var(--border-color); }
+        html.dark-theme .type-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+        html.dark-theme .type-btn:hover:not(.active) { background: var(--bg-hover); border-color: var(--accent-primary); }
+        html.dark-theme .node-badge { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        html.dark-theme .info-card { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .perf-divider { background: var(--border-color); }
+        html.dark-theme .info-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        html.dark-theme .status-badge { border: 1px solid var(--border-color); }
+        html.dark-theme .page-info { color: var(--text-secondary); }
+        html.dark-theme .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
+        html.dark-theme .banner-text strong { color: var(--text-primary); }
+        html.dark-theme .banner-text p { color: var(--text-secondary); }
 
         @media print {
             body { background: white; color: black; }
@@ -696,7 +713,15 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 <div class="container">
     <div class="page-header">
         <h2>测试报告</h2>
-        <button id="themeToggle" onclick="toggleTheme()" title="切换主题">🌓</button>
+        <button id="themeToggle" onclick="toggleTheme()" title="切换主题">
+            <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <span id="themeText">深色</span>
+        </button>
     </div>
 
     {{if .Metrics}}
@@ -704,7 +729,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <div class="metrics-row">
         <div class="metric-card">
             <div class="metric-label">成功率</div>
-            <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#16a34a{{else if gt .Metrics.SuccessRate 70.0}}#d97706{{else}}#dc2626{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
+            <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#1a7f37{{else if gt .Metrics.SuccessRate 70.0}}#bf8700{{else}}#cf222e{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
             <div class="metric-sub">{{formatNumber .Metrics.SuccessCount}} / {{formatNumber .Metrics.TotalRequests}} 次请求</div>
         </div>
 
@@ -1054,12 +1079,14 @@ const reportData = {{.JSONData}};
 
 // Theme colors
 const tc = {
-    bg: '#0f172a',
+    bg: '#0d1117',
     textColor: '#c9d1d9',
     lineColor: '#30363d',
-    colors: ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF', '#ef4444', '#eab308', '#3b82f6', '#94a3b8'],
-    latencyColors: ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF'],
-    dangerColor: '#ef4444'
+    // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
+    colors: ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8'],
+    // 延迟曲线语义色：P50 绿 → P90 黄 → P95 橙 → P99 红
+    latencyColors: ['#3fb950', '#e3b341', '#f0883e', '#f85149'],
+    dangerColor: '#f85149'
 };
 
 let errorRateType = 'smooth';
@@ -1115,7 +1142,7 @@ function renderSysGoroutineChart() {
         grid: { top: 30, right: 20, bottom: 50, left: 50 },
         xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-        series: [{ name: 'Goroutines', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: '#ca8a04' }, label: { formatter: '10K', color: '#ca8a04', fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
+        series: [{ name: 'Goroutines', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: tc.colors[2] }, label: { formatter: '10K', color: tc.colors[2], fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
         tooltip: {
             trigger: 'axis',
             confine: true,
@@ -1146,7 +1173,7 @@ function renderSysHeapChart() {
         yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}MB' } },
         series: [
             { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
-            { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#2563eb', width: 2, type: 'dashed' }, itemStyle: { color: '#2563eb' } },
+            { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2, type: 'dashed' }, itemStyle: { color: tc.colors[5] } },
         ],
         tooltip: {
             trigger: 'axis',
@@ -1176,7 +1203,7 @@ function renderSysCpuChart() {
         grid: { top: 30, right: 60, bottom: 50, left: 50 },
         xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
-        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(234,179,8,0.2)' }, { offset: 1, color: 'rgba(234,179,8,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: '#ca8a04' }, label: { formatter: '70%', color: '#ca8a04', fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10, position: 'end' } }] } }],
+        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.2)' }, { offset: 1, color: 'rgba(88,166,255,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: tc.colors[5] }, label: { formatter: '70%', color: tc.colors[5], fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10, position: 'end' } }] } }],
         tooltip: {
             trigger: 'axis',
             confine: true,
@@ -1207,8 +1234,8 @@ function renderSysTaskWaitChart() {
         xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
         series: [
-            { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#2563eb', width: 2 }, itemStyle: { color: '#2563eb' } },
-            { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: '#ca8a04', width: 2 }, itemStyle: { color: '#ca8a04' } },
+            { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.latencyColors[0], width: 2 }, itemStyle: { color: tc.latencyColors[0] } },
+            { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.latencyColors[2], width: 2 }, itemStyle: { color: tc.latencyColors[2] } },
             { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
         ],
         tooltip: {
@@ -1229,6 +1256,7 @@ function renderSysTaskWaitChart() {
 let tableSortKey = 'timestamp';
 let tableSortOrder = 'asc';
 let currentPage = 1;
+let totalPages = 1;
 const pageSize = 20;
 let tableData = [];
 
@@ -1332,7 +1360,7 @@ function renderTablePage() {
 }
 
 function updatePagination() {
-    var totalPages = getTotalPages();
+    totalPages = getTotalPages();
     var pagination = document.getElementById('tablePagination');
     var pageInfo = document.getElementById('pageInfo');
     if (!pagination || !pageInfo) return;
@@ -1346,7 +1374,7 @@ function updatePagination() {
 }
 
 function goToPage(page) {
-    var totalPages = getTotalPages();
+    totalPages = getTotalPages();
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
     currentPage = page;
@@ -1402,11 +1430,11 @@ function renderOverviewChart() {
     const success = Number(m.success_reqs || 0);
     const failed = Number(m.failed_reqs || 0);
 
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = document.documentElement.classList.contains('dark-theme');
 
     chart.setOption({
         backgroundColor: tc.bg,
-        color: [tc.colors[1], tc.colors[3]],
+        color: [tc.colors[1], tc.colors[4]],
         tooltip: {
             trigger: 'item',
             confine: true,
@@ -1485,10 +1513,10 @@ function renderOverviewChart() {
             },
             data: [
                 { value: success, name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-                    { offset: 0, color: '#16a34a' }, { offset: 1, color: '#15803d' }
+                    { offset: 0, color: isDark ? '#3fb950' : '#1a7f37' }, { offset: 1, color: isDark ? '#46c759' : '#15803d' }
                 ])}},
                 { value: failed, name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
-                    { offset: 0, color: '#dc2626' }, { offset: 1, color: '#b91c1c' }
+                    { offset: 0, color: isDark ? '#f85149' : '#cf222e' }, { offset: 1, color: isDark ? '#da3633' : '#a40e26' }
                 ])}}
             ]
         }]
@@ -1513,7 +1541,7 @@ function renderErrorRateChart() {
     const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100);
 
     const chart = echarts.init(document.getElementById('errorRateChart'));
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = document.documentElement.classList.contains('dark-theme');
 
     chart.setOption({
         backgroundColor: tc.bg,
@@ -1560,7 +1588,7 @@ function renderLatencyChart() {
     const m = reportData.metrics || {};
     const chart = echarts.init(document.getElementById('latencyChart'));
 
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = document.documentElement.classList.contains('dark-theme');
 
     chart.setOption({
         backgroundColor: tc.bg,
@@ -1601,19 +1629,19 @@ function renderLatencyChart() {
             barWidth: '40%',
             data: [
                 { value: parseFloat(m.avg_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: tc.colors[0] }, { offset: 1, color: isDark ? '#0891b2' : '#0e7490' }
+                    { offset: 0, color: tc.latencyColors[0] }, { offset: 1, color: isDark ? '#2ea043' : '#15803d' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p50_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: tc.colors[0] }, { offset: 1, color: isDark ? '#0891b2' : '#0e7490' }
+                    { offset: 0, color: tc.latencyColors[0] }, { offset: 1, color: isDark ? '#2ea043' : '#15803d' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p90_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: tc.colors[2] }, { offset: 1, color: isDark ? '#d97706' : '#b45309' }
+                    { offset: 0, color: tc.latencyColors[1] }, { offset: 1, color: isDark ? '#d29922' : '#9a6700' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p95_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: tc.colors[2] }, { offset: 1, color: isDark ? '#d97706' : '#b45309' }
+                    { offset: 0, color: tc.latencyColors[2] }, { offset: 1, color: isDark ? '#db6d28' : '#8a3a00' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p99_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: tc.colors[3] }, { offset: 1, color: isDark ? '#8b5cf6' : '#7c3aed' }
+                    { offset: 0, color: tc.latencyColors[3] }, { offset: 1, color: isDark ? '#da3633' : '#a40e26' }
                 ]), borderRadius: [6, 6, 2, 2] }}
             ],
             label: {
@@ -1634,6 +1662,7 @@ function renderQPSTrend() {
     
     const timeLabels = timestamps.map(ts => ts.substring(11, 19));
     const isSmooth = chartTypes.qpsTrend === 'smooth';
+    const isDark = document.documentElement.classList.contains('dark-theme');
     
     const chart = echarts.init(document.getElementById('qpsChart'));
     chart.setOption({
@@ -1641,21 +1670,21 @@ function renderQPSTrend() {
         tooltip: {
             trigger: 'axis',
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.96)',
-            borderColor: 'rgba(148,163,184,0.2)',
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
             borderWidth: 1,
             borderRadius: 12,
             padding: [12, 16],
-            textStyle: { fontSize: 11, color: '#475569' },
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
             extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
             formatter: function(params) {
                 const idx = params[0].dataIndex;
-                return '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[idx] + '</div>' +
+                return '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[idx] + '</div>' +
                        'QPS: <strong>' + params[0].value.toFixed(3) + '</strong>';
             }
         },
         grid: { left: 50, right: 20, top: 20, bottom: 50 },
-        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         series: [{
@@ -1667,7 +1696,7 @@ function renderQPSTrend() {
             lineStyle: { width: 2, color: tc.colors[0] },
             itemStyle: { color: tc.colors[0] },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(8,145,178, 0.15)' }, { offset: 1, color: 'rgba(8,145,178, 0.01)' }
+                { offset: 0, color: 'rgba(45,212,191, 0.15)' }, { offset: 1, color: 'rgba(45,212,191, 0.01)' }
             ])},
             symbol: 'none'
         }]
@@ -1678,6 +1707,7 @@ function renderLatencyTrend() {
     const m = reportData.metrics || {};
     const timestamps = m.timestamps || [];
     const isSmooth = chartTypes.latTrend === 'smooth';
+    const isDark = document.documentElement.classList.contains('dark-theme');
     
     if (!timestamps.length) return;
     
@@ -1689,15 +1719,15 @@ function renderLatencyTrend() {
         tooltip: {
             trigger: 'axis',
             confine: true,
-            backgroundColor: 'rgba(255,255,255,0.96)',
-            borderColor: 'rgba(148,163,184,0.2)',
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
             borderWidth: 1,
             borderRadius: 12,
             padding: [12, 16],
-            textStyle: { fontSize: 11, color: '#475569' },
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
             extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
             formatter: function(params) {
-                let h = '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
+                let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
                 params.forEach(function(item) {
                     h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong>ms<br/>';
                 });
@@ -1705,23 +1735,24 @@ function renderLatencyTrend() {
             }
         },
         grid: { top: 30, right: 20, bottom: 50, left: 50 },
-        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: [
             { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
             { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } } }
         ],
         series: [
-            { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#0891b2' }, itemStyle: { color: '#0891b2' }, symbol: 'none' },
-            { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
-            { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
-            { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
+            { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[0] }, itemStyle: { color: tc.latencyColors[0] }, symbol: 'none' },
+            { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[1] }, itemStyle: { color: tc.latencyColors[1] }, symbol: 'none' },
+            { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[2] }, itemStyle: { color: tc.latencyColors[2] }, symbol: 'none' },
+            { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[3] }, itemStyle: { color: tc.latencyColors[3] }, symbol: 'none' }
         ]
     });
 }
 
 function renderNodeCharts() {
     const nodes = reportData.node_metrics || [];
+    const isDark = document.documentElement.classList.contains('dark-theme');
     nodes.forEach(function(node, idx) {
         const el = document.getElementById('nodeChart' + idx);
         if (!el) return;
@@ -1740,15 +1771,15 @@ function renderNodeCharts() {
             tooltip: {
                 trigger: 'axis',
                 confine: true,
-                backgroundColor: 'rgba(255,255,255,0.96)',
-                borderColor: 'rgba(148,163,184,0.2)',
+                backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+                borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
                 borderWidth: 1,
                 borderRadius: 12,
                 padding: [12, 16],
-                textStyle: { fontSize: 11, color: '#475569' },
+                textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
                 extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
                 formatter: function(params) {
-                    let h = '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
+                    let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
                     params.forEach(function(item) {
                         h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong><br/>';
                     });
@@ -1756,7 +1787,7 @@ function renderNodeCharts() {
                 }
             },
             grid: { top: 28, right: 48, bottom: 36, left: 48 },
-            dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+            dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
             xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
             yAxis: [
                 { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
@@ -1764,12 +1795,12 @@ function renderNodeCharts() {
             ],
             series: [
                 { name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: qpsData, yAxisIndex: 0, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(8,145,178, 0.12)' }, { offset: 1, color: 'rgba(8,145,178, 0.01)' }
+                    { offset: 0, color: 'rgba(45,212,191, 0.12)' }, { offset: 1, color: 'rgba(45,212,191, 0.01)' }
                 ])}, symbol: 'none' },
-                { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p50 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#0891b2' }, itemStyle: { color: '#0891b2' }, symbol: 'none' },
-                { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p90 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
-                { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p95 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
-                { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
+                { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p50 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[0] }, itemStyle: { color: tc.latencyColors[0] }, symbol: 'none' },
+                { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p90 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[1] }, itemStyle: { color: tc.latencyColors[1] }, symbol: 'none' },
+                { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p95 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[2] }, itemStyle: { color: tc.latencyColors[2] }, symbol: 'none' },
+                { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[3] }, itemStyle: { color: tc.latencyColors[3] }, symbol: 'none' }
             ]
         });
     });
@@ -1784,7 +1815,7 @@ function renderErrorBreakdownChart() {
         return { value: e.count, name: e.code || e.status || e.error_type || 'Unknown' };
     });
 
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = document.documentElement.classList.contains('dark-theme');
 
     chart.setOption({
         backgroundColor: tc.bg,
@@ -1865,16 +1896,18 @@ window.addEventListener('beforeprint', function() {
 });
 
 function applyDarkMode(isDark) {
-    tc.bg = isDark ? '#0f172a' : '#ffffff';
+    tc.bg = isDark ? '#0d1117' : '#ffffff';
     tc.textColor = isDark ? '#c9d1d9' : '#656d76';
     tc.lineColor = isDark ? '#30363d' : '#dde2e8';
+    // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
     tc.colors = isDark
-        ? ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF', '#ef4444', '#eab308', '#3b82f6', '#94a3b8']
-        : ['#0891b2', '#16a34a', '#d97706', '#8b5cf6', '#dc2626', '#ca8a04', '#2563eb', '#64748b'];
+        ? ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8']
+        : ['#0d9488', '#1a7f37', '#bf8700', '#bc4c00', '#cf222e', '#0969da', '#64748b'];
+    // 延迟曲线语义色：P50 绿(好) → P90 黄(注意) → P95 橙(警告) → P99 红(危险)
     tc.latencyColors = isDark
-        ? ['#00E5FF', '#4ade80', '#FFB74D', '#B388FF']
-        : ['#0891b2', '#16a34a', '#d97706', '#8b5cf6'];
-    tc.dangerColor = isDark ? '#ef4444' : '#dc2626';
+        ? ['#3fb950', '#e3b341', '#f0883e', '#f85149']
+        : ['#1a7f37', '#bf8700', '#bc4c00', '#cf222e'];
+    tc.dangerColor = isDark ? '#f85149' : '#cf222e';
 
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
                      'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
@@ -1908,16 +1941,31 @@ let isDarkMode = false;
 function toggleTheme() {
     isDarkMode = !isDarkMode;
     applyTheme();
-    var btn = document.getElementById('themeToggle');
-    btn.textContent = isDarkMode ? '☀️' : '🌓';
-    document.body.classList.toggle('dark-theme', isDarkMode);
+}
+
+function updateThemeIcon() {
+    var sunIcon = document.getElementById('themeIconSun');
+    var moonIcon = document.getElementById('themeIconMoon');
+    var themeText = document.getElementById('themeText');
+    if (sunIcon && moonIcon) {
+        sunIcon.style.display = isDarkMode ? 'block' : 'none';
+        moonIcon.style.display = isDarkMode ? 'none' : 'block';
+    }
+    if (themeText) {
+        themeText.textContent = isDarkMode ? '深色' : '浅色';
+    }
 }
 
 function applyTheme() {
     applyDarkMode(isDarkMode);
-    document.body.classList.toggle('dark-theme', isDarkMode);
-    var btn = document.getElementById('themeToggle');
-    if (btn) btn.textContent = isDarkMode ? '☀️' : '🌓';
+    document.documentElement.classList.toggle('dark-theme', isDarkMode);
+    updateThemeIcon();
+    // Re-render error breakdown chart so it picks up the new tc.bg
+    if (reportData.error_breakdown && reportData.error_breakdown.length) {
+        var ebChart = echarts.getInstanceByDom(document.getElementById('errorBreakdownChart'));
+        if (ebChart) { ebChart.dispose(); }
+        renderErrorBreakdownChart();
+    }
 }
 
 applyTheme();

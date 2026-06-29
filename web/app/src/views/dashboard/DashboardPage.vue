@@ -327,6 +327,7 @@ let sysHeapExpandedChart: echarts.ECharts | null = null
 let sysCpuExpandedChart: echarts.ECharts | null = null
 let sysTaskWaitExpandedChart: echarts.ECharts | null = null
 let sysQueueExpandedChart: echarts.ECharts | null = null
+let sysQueueMax = 0 // 记录队列历史最大值，防止 Y 轴归零后历史柱子不可见
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 let themeObserver: MutationObserver | null = null
@@ -490,6 +491,7 @@ const durationDisplay = computed(() => {
 function onSceneChange() {
   sysMetricsHistory.value = []
   sysMetricsTimeSeries.value = []
+  sysQueueMax = 0
   fetchOverview()
   userAdjustedZoom.value = false
 }
@@ -836,22 +838,22 @@ function gaugeAlert(metric: string): string {
 }
 
 const gaugeColors: Record<string, string> = {
-  goroutine: '#0891b2',
-  heap: '#8b5cf6',
-  cpu: '#d97706',
-  wait: '#dc2626',
-  queue: '#2563eb',
-  workers: '#16a34a',
+  goroutine: '#0d9488',
+  heap: '#58a6ff',
+  cpu: '#bf8700',
+  wait: '#cf222e',
+  queue: '#0969da',
+  workers: '#1a7f37',
 }
 
 function gaugeColor(metric: string): string {
-  return gaugeColors[metric] || '#94a3b8'
+  return gaugeColors[metric] || '#64748b'
 }
 
 function gaugeValueColor(metric: string): string {
   const status = gaugeStatus(metric)
-  if (status === 'status-danger') return 'var(--accent-danger, #dc2626)'
-  if (status === 'status-warning') return 'var(--accent-warning, #ca8a04)'
+  if (status === 'status-danger') return 'var(--accent-danger, #cf222e)'
+  if (status === 'status-warning') return 'var(--accent-warning, #bf8700)'
   return gaugeColor(metric)
 }
 
@@ -922,6 +924,7 @@ function renderSysExpandedChart(chartId: string) {
 
   const theme = getChartTheme()
   const isSmooth = chartTypes.value[chartId] === 'smooth'
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
   const labels = getSysTimeLabels()
 
   const baseGrid = { top: 50, right: 40, bottom: 50, left: 55 }
@@ -932,29 +935,31 @@ function renderSysExpandedChart(chartId: string) {
     const data = getSysData('goroutine_count')
     if (!data.length) return
     const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 11 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 11 } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(14,165,233,0.15)`, handleStyle: { color: '#0ea5e9' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysHeap') {
     const allocData = getSysData('heap_alloc_mb')
     const sysData = getSysData('heap_sys_mb')
     if (!allocData.length) return
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(14,165,233,0.15)`, handleStyle: { color: '#0ea5e9' }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysCpu') {
     const data = getSysData('cpu_percent')
     if (!data.length) return
-    const areaGrad = new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }])
-    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,6' : '234,179,8'}, 0.15)`, handleStyle: { color: theme.colors.warning }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    const areaGrad = new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.2)` }, { offset: 1, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.01)` }])
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.info }, label: { formatter: '70%', color: theme.colors.info, fontSize: 11, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysTaskWait') {
     const p50 = getSysData('task_wait_p50_ms')
     const p95 = getSysData('task_wait_p95_ms')
     const p99 = getSysData('task_wait_p99_ms')
     if (!p50.length) return
     const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(220,38,38,0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '248,81,73' : '207,34,46'}, 0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysQueue') {
     const data = getSysData('pending_queue_len')
     if (!data.length) return
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0 }, series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }], tooltip: getTooltipConfig(), legend: { data: ['Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(37,99,235,0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    const currentMax = Math.max(...data)
+    if (currentMax > sysQueueMax) sysQueueMax = currentMax
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }], tooltip: getTooltipConfig(), legend: { data: ['Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   }
 }
 
@@ -1016,7 +1021,7 @@ function renderSysCpuChart() {
     grid: { top: 30, right: 48, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
-    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.warning === '#ca8a04' ? '202,138,4' : '234,179,8'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.warning }, label: { formatter: '70%', color: theme.colors.warning, fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } }],
+    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.info === '#0969da' ? '9,105,218' : '88,166,255'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.info === '#0969da' ? '9,105,218' : '88,166,255'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.info }, label: { formatter: '70%', color: theme.colors.info, fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } }],
     tooltip: getTooltipConfig(),
     legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 },
   }, true)
@@ -1056,11 +1061,14 @@ function renderSysQueueChart() {
   const data = getSysData('pending_queue_len')
   const labels = getSysTimeLabels()
   if (!data.length) return
+  // 记录历史最大值，防止 Y 轴归零后历史柱子不可见
+  const currentMax = Math.max(...data)
+  if (currentMax > sysQueueMax) sysQueueMax = currentMax
   sysQueueChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 16, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', min: 0, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: Math.max(sysQueueMax, 10), axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }],
     tooltip: getTooltipConfig(),
   }, true)
@@ -1074,11 +1082,12 @@ function getChartTheme() {
       lineColor: '#30363d',
       bgColor: 'transparent',
       colors: {
-        primary: '#00E5FF',
-        success: '#4ade80',
-        warning: '#eab308',
-        danger: '#ef4444',
-        info: '#3b82f6',
+        primary: '#2dd4bf',   // 蓝绿 Teal — 主指标/QPS
+        success: '#3fb950',   // 绿色系 — 成功/P50
+        warning: '#e3b341',   // 黄色系 — 警告/P90
+        danger: '#f85149',    // 红色系 — 失败/错误/P99
+        info: '#58a6ff',      // 蓝色系 — 信息/辅助
+        accent: '#f0883e',    // 橙色系 — P95
       }
     }
   }
@@ -1087,11 +1096,12 @@ function getChartTheme() {
     lineColor: '#e2e8f0',
     bgColor: 'transparent',
     colors: {
-      primary: '#0891b2',
-      success: '#16a34a',
-      warning: '#ca8a04',
-      danger: '#dc2626',
-      info: '#2563eb',
+      primary: '#0d9488',   // 蓝绿 Teal
+      success: '#1a7f37',   // 绿色系
+      warning: '#bf8700',   // 黄色系
+      danger: '#cf222e',    // 红色系
+      info: '#0969da',      // 蓝色系
+      accent: '#bc4c00',    // 橙色系
     }
   }
 }
@@ -1191,10 +1201,10 @@ function renderQpsChart() {
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` }, { offset: 1, color: 'rgba(0,229,255,0)' }]) } }],
+    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` }, { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0)` }]) } }],
     tooltip: getTooltipConfig(),
   }, true)
   qpsChart.off('datazoom')
@@ -1224,13 +1234,13 @@ function renderLatencyChart() {
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
-    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
-      { name: 'P50', data: ts.p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
-      { name: 'P95', data: ts.p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
-      { name: 'P99', data: ts.p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
+      { name: 'P50', data: ts.p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success } },
+      { name: 'P95', data: ts.p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.accent, width: 2 }, itemStyle: { color: theme.colors.accent } },
+      { name: 'P99', data: ts.p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger } },
     ],
     tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
@@ -1264,7 +1274,7 @@ function renderErrorChart() {
   errorChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 16, right: 16, bottom: 44, left: 50 },
-    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(ts.timestamps.length / 8) }, splitLine: { show: false } },
     yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
     series: [{
@@ -1275,7 +1285,7 @@ function renderErrorChart() {
       step: isSmooth ? false : 'middle',
       symbol: 'none',
       lineStyle: { width: 2, color: theme.colors.danger },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.01)` }]) }
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.01)` }]) }
     }],
     tooltip: getTooltipConfig(),
   }, true)
@@ -1319,13 +1329,13 @@ function renderNodeDetailChart(nodeId: string) {
     
     const timestampsLength = node.timestamps?.length || 0
     const series: any[] = [
-      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info }, areaStyle: undefined },
-      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
-      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: undefined },
+      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
+      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: undefined },
+      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.accent, width: 2 }, itemStyle: { color: theme.colors.accent }, areaStyle: undefined },
       { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, areaStyle: undefined },
     ]
     if (tsQPS.length > 0) {
-      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined, animationDelay: () => 0 })
+      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined, animationDelay: () => 0 })
     }
 
     const hasQPS = series.length > 4
@@ -1333,7 +1343,7 @@ function renderNodeDetailChart(nodeId: string) {
       backgroundColor: 'transparent',
       legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
       grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
-      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: node.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor((node.timestamps!.length || 1) / 6) - 1 } },
       yAxis: hasQPS ? [
         { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -1367,7 +1377,7 @@ function renderNodeDetailChart(nodeId: string) {
           borderRadius: [3, 3, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: theme.colors.primary },
-            { offset: 1, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` },
+            { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` },
           ]),
         },
       }],
@@ -1755,6 +1765,10 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 11px;
   animation: blink 1.5s infinite;
+}
+
+[data-theme='light'] .live-indicator {
+  color: #65a30d;
 }
 
 .refresh-selector {
@@ -2284,7 +2298,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #0891b2, transparent);
+  background: linear-gradient(90deg, transparent, #0d9488, transparent);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -2302,9 +2316,9 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
-[data-theme='light'] .node-type.http { 
-  background: linear-gradient(135deg, rgba(217, 70, 239, 0.18) 0%, rgba(8, 145, 178, 0.08) 100%); 
-  color: #0891b2;
+[data-theme='light'] .node-type.http {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.18) 0%, rgba(9, 105, 218, 0.08) 100%);
+  color: #0d9488;
 }
 
 [data-theme='light'] .node-type.setup, 
@@ -2324,7 +2338,7 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .qps-value {
-  background: linear-gradient(135deg, #0891b2 0%, #d946ef 100%);
+  background: linear-gradient(135deg, #0d9488 0%, #0969da 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -2335,19 +2349,19 @@ onUnmounted(() => {
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
 
-[data-theme='light'] .bar-fill.p50 { 
-  background: linear-gradient(90deg, #d946ef 0%, #0891b2 100%); 
-  box-shadow: 0 1px 4px rgba(217, 70, 239, 0.4);
+[data-theme='light'] .bar-fill.p50 {
+  background: linear-gradient(90deg, #1a7f37 0%, #0d9488 100%);
+  box-shadow: 0 1px 4px rgba(26, 127, 55, 0.4);
 }
 
-[data-theme='light'] .bar-fill.p95 { 
-  background: linear-gradient(90deg, #ea580c 0%, #c2410c 100%); 
-  box-shadow: 0 1px 4px rgba(234, 88, 12, 0.4);
+[data-theme='light'] .bar-fill.p95 {
+  background: linear-gradient(90deg, #bc4c00 0%, #973604 100%);
+  box-shadow: 0 1px 4px rgba(188, 76, 0, 0.4);
 }
 
-[data-theme='light'] .bar-fill.p99 { 
-  background: linear-gradient(90deg, #be123c 0%, #e11d48 100%); 
-  box-shadow: 0 1px 4px rgba(225, 29, 72, 0.4);
+[data-theme='light'] .bar-fill.p99 {
+  background: linear-gradient(90deg, #cf222e 0%, #a40e26 100%);
+  box-shadow: 0 1px 4px rgba(207, 34, 46, 0.4);
 }
 
 [data-theme='light'] .node-qps {
@@ -2359,13 +2373,13 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .node-card:hover {
-  border-color: #0891b2;
-  box-shadow: 0 8px 24px rgba(8, 145, 178, 0.15);
+  border-color: #0d9488;
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.15);
 }
 
 [data-theme='light'] .node-card.expanded {
-  border-color: #0891b2;
-  box-shadow: 0 12px 40px rgba(8, 145, 178, 0.18);
+  border-color: #0d9488;
+  box-shadow: 0 12px 40px rgba(13, 148, 136, 0.18);
 }
 
 [data-theme='light'] .detail-item {
@@ -2461,9 +2475,9 @@ onUnmounted(() => {
   border-color: var(--accent-primary);
 }
 [data-theme='dark'] .type-btn.active {
-  background: rgba(0,229,255,0.15);
-  color: #00E5FF;
-  border-color: rgba(0,229,255,0.3);
+  background: rgba(45,212,191,0.15);
+  color: #2dd4bf;
+  border-color: rgba(45,212,191,0.3);
 }
 
 /* System Monitoring Section */
@@ -2555,13 +2569,13 @@ onUnmounted(() => {
 }
 
 .sys-gauge-card.status-warning {
-  border-color: var(--accent-warning, #ca8a04) !important;
-  background: rgba(202, 138, 4, 0.05);
+  border-color: var(--accent-warning, #bf8700) !important;
+  background: rgba(191, 135, 0, 0.05);
 }
 
 .sys-gauge-card.status-danger {
-  border-color: var(--accent-danger, #dc2626) !important;
-  background: rgba(220, 38, 38, 0.05);
+  border-color: var(--accent-danger, #cf222e) !important;
+  background: rgba(207, 34, 46, 0.05);
 }
 
 .sys-gauge-card .gauge-label {
@@ -2580,11 +2594,11 @@ onUnmounted(() => {
 }
 
 .sys-gauge-card.status-warning .gauge-value {
-  color: var(--accent-warning, #ca8a04);
+  color: var(--accent-warning, #bf8700);
 }
 
 .sys-gauge-card.status-danger .gauge-value {
-  color: var(--accent-danger, #dc2626);
+  color: var(--accent-danger, #cf222e);
 }
 
 .sys-gauge-card .gauge-unit {
@@ -2603,13 +2617,13 @@ onUnmounted(() => {
 }
 
 .status-warning .gauge-alert {
-  color: var(--accent-warning, #ca8a04);
-  background: rgba(202, 138, 4, 0.10);
+  color: var(--accent-warning, #bf8700);
+  background: rgba(191, 135, 0, 0.10);
 }
 
 .status-danger .gauge-alert {
-  color: var(--accent-danger, #dc2626);
-  background: rgba(220, 38, 38, 0.10);
+  color: var(--accent-danger, #cf222e);
+  background: rgba(207, 34, 46, 0.10);
 }
 
 .sys-gauge-row {
