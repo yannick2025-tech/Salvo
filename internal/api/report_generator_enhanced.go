@@ -1952,7 +1952,7 @@ function updateThemeIcon() {
         moonIcon.style.display = isDarkMode ? 'none' : 'block';
     }
     if (themeText) {
-        themeText.textContent = isDarkMode ? '深色' : '浅色';
+        themeText.textContent = isDarkMode ? '浅色' : '深色';
     }
 }
 
