@@ -843,7 +843,7 @@ const gaugeColors: Record<string, string> = {
   heap: '#58a6ff',
   cpu: '#bf8700',
   wait: '#cf222e',
-  queue: '#0969da',
+  queue: '#94a3b8',
   workers: '#1a7f37',
 }
 
@@ -960,7 +960,8 @@ function renderSysExpandedChart(chartId: string) {
     if (!data.length) return
     const currentMax = Math.max(...data)
     if (currentMax > sysQueueMax) sysQueueMax = currentMax
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }], tooltip: getTooltipConfig(), legend: { data: ['Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    const queueColor = isDark ? '#94a3b8' : '#64748b'
+    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Pending Queue', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: queueColor, width: 2 }, itemStyle: { color: queueColor }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' }, { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' }]) } }], tooltip: getTooltipConfig(), legend: { data: ['Pending Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '148,163,184' : '100,116,139'}, 0.15)`, handleStyle: { color: queueColor }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   }
 }
 
@@ -1062,15 +1063,31 @@ function renderSysQueueChart() {
   const data = getSysData('pending_queue_len')
   const labels = getSysTimeLabels()
   if (!data.length) return
-  // 记录历史最大值，防止 Y 轴归零后历史柱子不可见
+  // 记录历史最大值，防止 Y 轴归零后历史数据不可见
   const currentMax = Math.max(...data)
   if (currentMax > sysQueueMax) sysQueueMax = currentMax
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+  const queueColor = isDark ? '#94a3b8' : '#64748b'
   sysQueueChart.setOption({
     backgroundColor: theme.bgColor,
     grid: { top: 16, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: Math.max(sysQueueMax, 10), axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    series: [{ name: 'Queue', data, type: 'bar', itemStyle: { color: theme.colors.info, borderRadius: [2, 2, 0, 0] } }],
+    series: [{
+      name: 'Pending Queue',
+      data,
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { color: queueColor, width: 2 },
+      itemStyle: { color: queueColor },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' },
+          { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' },
+        ]),
+      },
+    }],
     tooltip: getTooltipConfig(),
   }, true)
 }
