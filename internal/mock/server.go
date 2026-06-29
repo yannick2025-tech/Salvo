@@ -112,6 +112,7 @@ func (m *MockServer) Start() error {
 	logHandler("/mock/api/products/", m.handleProductDetail)
 	logHandler("/mock/api/orders", m.handleOrders)
 	logHandler("/mock/api/orders/", m.handleOrderDetail)
+	logHandler("/mock/api/inventory/", m.handleInventory)
 	logHandler("/mock/api/auth/login", m.handleAuthLogin)
 	logHandler("/mock/api/payment", m.handlePayment)
 	logHandler("/mock/api/notify", m.handleNotify)
@@ -277,6 +278,21 @@ func (m *MockServer) handleNotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"notified": true, "timestamp": time.Now().Format(time.RFC3339)}})
+}
+
+func (m *MockServer) handleInventory(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/mock/api/inventory/")
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"product_id": id, "stock": 500, "warehouse": "WH-01", "last_updated": time.Now().Format(time.RFC3339)}})
+	case http.MethodPut:
+		body, _ := io.ReadAll(r.Body)
+		var req map[string]any
+		json.Unmarshal(body, &req)
+		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"product_id": id, "stock": req["stock"], "updated": true}})
+	default:
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+	}
 }
 
 func (m *MockServer) handleHealth(w http.ResponseWriter, r *http.Request) {
