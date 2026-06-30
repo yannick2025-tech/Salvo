@@ -889,7 +889,7 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	}
 
 	reportStatus := model.ReportStatusSuccess
-	if runRecord.Status == model.RunStatusFailed || runRecord.Status == model.RunStatusCancelled {
+	if runRecord.Status == model.RunStatusFailed {
 		reportStatus = model.ReportStatusFailed
 	} else if runRecord.TotalReqs > 0 && runRecord.SuccessReqs > 0 {
 		successRate := float64(runRecord.SuccessReqs) / float64(runRecord.TotalReqs) * 100
