@@ -1365,7 +1365,7 @@ function renderNodeCharts(tc: any) {
               return h
             }
           },
-          legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+          legend: { data: ['P50','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
           grid: { left: 50, right: 20, top: 30, bottom: 50 },
           dataZoom: [
             { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
@@ -1702,6 +1702,8 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   overflow: hidden;
 }
+.nodes-section .chart-card { margin-bottom: 16px; overflow: visible; }
+.nodes-section .chart-card:last-child { margin-bottom: 0; }
 .chart-card.wide { grid-column: span 2; }
 .chart-header { padding: 14px 16px 10px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
 .chart-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
@@ -1819,21 +1821,36 @@ onUnmounted(() => {
 .node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
 .node-chart-panel { position: relative; }
 .node-chart-panel-label {
-  position: absolute; top: 4px; left: 10px; z-index: 2;
   font-size: 11px; font-weight: 600; color: var(--text-secondary);
-  letter-spacing: 0.02em; pointer-events: none;
+  letter-spacing: 0.02em;
   display: inline-flex; align-items: center; gap: 4px;
+  margin-bottom: 2px;
+  padding-left: 12px;
 }
-.node-chart-panel-label .tooltip-wrapper { pointer-events: auto; cursor: help; }
 .node-chart-help {
   display: inline-flex; align-items: center; justify-content: center;
   width: 14px; height: 14px; font-size: 10px; font-weight: 700;
   border-radius: 50%; border: 1px solid var(--border-secondary);
   color: var(--text-tertiary); background: var(--bg-tertiary);
-  line-height: 1;
+  line-height: 1; cursor: help;
 }
-/* 悬浮注释继承 .tooltip-wrapper，覆盖 white-space 以支持多行 */
-.node-chart-help::before { white-space: normal; width: 220px; text-align: left; line-height: 1.5; }
+/* 悬浮注释：从 ? 右侧弹出，与标签同行，箭头朝左 */
+.node-chart-help::before {
+  white-space: normal !important; width: 240px !important;
+  text-align: left !important; line-height: 1.5 !important;
+  bottom: auto !important; top: 50% !important;
+  left: calc(100% + 10px) !important;
+  transform: translateY(-50%) translateX(-6px) !important;
+}
+.node-chart-help::after {
+  bottom: auto !important; top: 50% !important;
+  left: 100% !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-right-color: rgba(255, 255, 255, 0.96) !important;
+  transform: translateY(-50%) translateX(-2px) !important;
+}
+.node-chart-help:hover::before { transform: translateY(-50%) translateX(0) !important; }
 .node-qps-chart { height: 160px; }
 .node-latency-chart { height: 220px; }
 

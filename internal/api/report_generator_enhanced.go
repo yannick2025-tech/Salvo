@@ -225,6 +225,8 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             border-radius: var(--radius-md);
             overflow: hidden;
         }
+        .nodes-section .chart-card { margin-bottom: 16px; }
+        .nodes-section .chart-card:last-child { margin-bottom: 0; }
         .chart-card.wide {
             grid-column: span 2;
         }
@@ -448,9 +450,9 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         .node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
         .node-chart-panel { position: relative; }
         .node-chart-panel-label {
-            position: absolute; top: 4px; left: 10px; z-index: 2;
             font-size: 11px; font-weight: 600; color: var(--text-secondary);
-            letter-spacing: 0.02em; pointer-events: none;
+            letter-spacing: 0.02em; margin-bottom: 2px;
+            padding-left: 12px;
         }
         .node-band-legend { margin-top: 6px; line-height: 1.5; }
         .node-qps-chart { height: 160px; }
@@ -1901,7 +1903,7 @@ function renderNodeCharts() {
                         return h;
                     }
                 },
-                legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+                legend: { data: ['P50','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
                 grid: { left: 50, right: 20, top: 30, bottom: 50 },
                 dataZoom: [
                     { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
