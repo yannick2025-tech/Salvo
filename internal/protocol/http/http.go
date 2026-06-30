@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -136,7 +137,19 @@ func (p *Protocol) Execute(ctx context.Context, req protocol.Request) (protocol.
 		bodyReader = nil
 	}
 
-	goReq, err := http.NewRequestWithContext(ctx, string(httpReq.Method), httpReq.URL, bodyReader)
+	// Ensure query parameters are properly percent-encoded. Variable
+	// interpolation can inject raw values (e.g. "Widget B") into the query
+	// string; unencoded spaces break the HTTP request line and cause
+	// servers to return 400 Bad Request before any handler runs.
+	requestURL := httpReq.URL
+	if u, perr := url.Parse(httpReq.URL); perr == nil && u.RawQuery != "" {
+		if values, verr := url.ParseQuery(u.RawQuery); verr == nil {
+			u.RawQuery = values.Encode()
+			requestURL = u.String()
+		}
+	}
+
+	goReq, err := http.NewRequestWithContext(ctx, string(httpReq.Method), requestURL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("http: create request: %w", err)
 	}

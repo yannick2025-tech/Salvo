@@ -239,6 +239,7 @@ function formatDurationMs(ns: number): string {
 .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; min-width: auto; max-width: fit-content; }
 .st-ok { background: rgba(163,230,53,0.12); color: #65a30d; border: 1px solid rgba(163,230,53,0.2); }
 .st-error { background: rgba(225,29,72,0.12); color: #be123c; border: 1px solid rgba(225,29,72,0.2); }
+.st-canceled { background: rgba(255,193,7,0.12); color: #b45309; border: 1px solid rgba(255,193,7,0.2); }
 .st-skip { background: rgba(251,146,60,0.12); color: #ea580c; border: 1px solid rgba(251,146,60,0.2); }
 
 .empty { text-align: center; color: var(--text-tertiary); padding: 48px 0; }

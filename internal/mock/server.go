@@ -109,6 +109,7 @@ func (m *MockServer) Start() error {
 	logHandler("/mock/api/users", m.handleUsers)
 	logHandler("/mock/api/users/", m.handleUserDetail)
 	logHandler("/mock/api/products", m.handleProducts)
+	logHandler("/mock/api/products/search", m.handleProductSearch)
 	logHandler("/mock/api/products/", m.handleProductDetail)
 	logHandler("/mock/api/orders", m.handleOrders)
 	logHandler("/mock/api/orders/", m.handleOrderDetail)
@@ -209,6 +210,34 @@ func (m *MockServer) handleProducts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (m *MockServer) handleProductSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+		return
+	}
+	q := r.URL.Query().Get("q")
+	category := r.URL.Query().Get("category")
+	products := []map[string]any{
+		{"id": 1, "name": "Widget A", "price": 29.99, "stock": 100, "category": "electronics"},
+		{"id": 2, "name": "Widget B", "price": 49.99, "stock": 50, "category": "electronics"},
+		{"id": 3, "name": "Gadget C", "price": 99.99, "stock": 25, "category": "gadgets"},
+	}
+	var results []map[string]any
+	for _, p := range products {
+		if q != "" && !strings.Contains(strings.ToLower(p["name"].(string)), strings.ToLower(q)) {
+			continue
+		}
+		if category != "" && p["category"] != category {
+			continue
+		}
+		results = append(results, p)
+	}
+	if results == nil {
+		results = []map[string]any{}
+	}
+	writeJSON(w, 200, map[string]any{"code": 0, "data": results, "total": len(results), "query": q, "category": category})
+}
+
 func (m *MockServer) handleProductDetail(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/mock/api/products/")
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"id": id, "name": "Product" + id, "price": 29.99, "stock": 100}})
@@ -253,12 +282,11 @@ func (m *MockServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	json.Unmarshal(body, &req)
 	email, _ := req["email"].(string)
-	password, _ := req["password"].(string)
-	if email == "admin@example.com" && password == "admin123" {
-		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"token": "mock-jwt-token-xyz", "user": map[string]any{"id": 1, "email": email, "role": "admin"}}})
-	} else {
-		writeJSON(w, 401, map[string]any{"code": 401, "message": "invalid credentials"})
+	role := "user"
+	if email == "admin@example.com" {
+		role = "admin"
 	}
+	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"token": "mock-jwt-token-xyz", "user": map[string]any{"id": 1, "email": email, "role": role}}})
 }
 
 func (m *MockServer) handlePayment(w http.ResponseWriter, r *http.Request) {

@@ -15,10 +15,11 @@ type Sample struct {
 	Timestamp     time.Time `json:"t"`
 	WindowSeconds int       `json:"dur"`
 
-	QPS           float64 `json:"qps"`
-	TotalRequests int64   `json:"total"`
-	SuccessCount  int64   `json:"success"`
-	FailCount     int64   `json:"fail"`
+	QPS            float64 `json:"qps"`
+	TotalRequests  int64   `json:"total"`
+	SuccessCount   int64   `json:"success"`
+	FailCount      int64   `json:"fail"`
+	CanceledCount  int64   `json:"canceled"`
 
 	AvgLatencyMs float64 `json:"avg_ms"`
 	P50LatencyMs float64 `json:"p50_ms"`

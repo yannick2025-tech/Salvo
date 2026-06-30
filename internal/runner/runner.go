@@ -115,14 +115,29 @@ const (
 	StatusCanceled Status = "canceled"
 )
 
+// manualCancelKey is a context key used to propagate the manual-cancel flag
+// from the Runner down to sceneNode and the DAG executor. The value stored
+// is a *atomic.Bool that is set to true when the user manually stops the run.
+// The key type is defined in the dag package (dag.ManualCancelKey) to avoid
+// circular imports — both runner and dag reference it.
+
 type Stats struct {
-	TotalReqs   atomic.Int64
-	SuccessReqs atomic.Int64
-	FailedReqs  atomic.Int64
-	MinLatency  atomic.Int64
-	TTFB        atomic.Int64
-	latencies   sync.Mutex
-	latencyList []time.Duration
+	TotalReqs    atomic.Int64
+	SuccessReqs  atomic.Int64
+	FailedReqs   atomic.Int64
+	CanceledReqs atomic.Int64
+	MinLatency   atomic.Int64
+	TTFB         atomic.Int64
+	latencies    sync.Mutex
+	latencyList  []time.Duration
+}
+
+// RecordCanceled records a request that was aborted due to manual scene
+// cancellation. Canceled requests are NOT counted in TotalReqs (which
+// tracks requests that reached a server), keeping the error rate
+// (FailedReqs / TotalReqs) consistent with the configured error rate.
+func (s *Stats) RecordCanceled() {
+	s.CanceledReqs.Add(1)
 }
 
 func (s *Stats) RecordLatency(d time.Duration, success bool) {
@@ -212,6 +227,12 @@ type Runner struct {
 	done          chan struct{}
 	log           logger.Logger
 	runErr        atomic.Value // stores error for Error() method
+	// manualCanceled is set to true when the user manually stops the run
+	// via Stop(). It is propagated through the context so that sceneNode
+	// and the DAG executor can distinguish manual cancellation (→ "canceled"
+	// status, excluded from error rate) from request timeouts and other
+	// errors (→ "error" status, counted as failures).
+	manualCanceled atomic.Bool
 
 	scenes      repo.SceneRepo
 	nodes       repo.NodeRepo
@@ -289,6 +310,9 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	r.ctx, r.cancel = context.WithCancel(ctx)
+	// Propagate the manual-cancel flag through the context tree so that
+	// sceneNode and the DAG executor can detect manual stops.
+	r.ctx = context.WithValue(r.ctx, dag.ManualCancelKey{}, &r.manualCanceled)
 	r.status.Store(StatusRunning)
 	r.startedAt = time.Now().UTC()
 	r.mu.Unlock()
@@ -507,6 +531,10 @@ func (r *Runner) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.cancel != nil {
+		// Mark as manually canceled BEFORE calling cancel() so that
+		// in-flight requests can detect this via the context flag and
+		// record themselves as "canceled" instead of "failed".
+		r.manualCanceled.Store(true)
 		r.cancel()
 		r.status.Store(StatusCanceled)
 		r.stopWg.Add(1)
@@ -1468,6 +1496,28 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	proto := httpprotocol.NewProtocol()
 	resp, err := proto.Execute(ctx, req)
 	if err != nil {
+		// Manual scene cancellation: the user clicked Stop. These in-flight
+		// requests never reached the server, so they should be recorded as
+		// "canceled" (not "failed") to keep the error rate consistent with
+		// the configured value. Request-level timeouts (DeadlineExceeded)
+		// and other errors are still counted as failures.
+		if dag.IsManualCancel(ctx) {
+			nodeLog.Warn("HTTP request canceled by manual stop",
+				logger.F("method", method),
+				logger.F("url", url),
+			)
+			if n.stats != nil {
+				n.stats.RecordCanceled()
+			}
+			if n.httpOnlyStats != nil {
+				n.httpOnlyStats.RecordCanceled()
+			}
+			if n.nodeStats != nil {
+				n.nodeStats.RecordCanceled()
+			}
+			return &dag.Output{Error: err}, nil
+		}
+
 		nodeLog.Error("HTTP request failed",
 			logger.F("method", method),
 			logger.F("url", url),
@@ -1527,12 +1577,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("field", key),
 							logger.F("error", errMsg),
 						)
-						if n.stats != nil {
-							n.stats.RecordLatency(httpResp.Latency, false)
-						}
-						if n.httpOnlyStats != nil {
-							n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
-						}
+						// Stats already recorded above based on HTTP status; don't double-count.
 						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
 					}
 					// Compare numeric values (JSON numbers are float64)
@@ -1543,12 +1588,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("expected", expectedVal),
 							logger.F("actual", actualVal),
 						)
-						if n.stats != nil {
-							n.stats.RecordLatency(httpResp.Latency, false)
-						}
-						if n.httpOnlyStats != nil {
-							n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
-						}
+						// Stats already recorded above based on HTTP status; don't double-count.
 						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
 					}
 				}
@@ -2162,6 +2202,7 @@ func (r *Runner) GlobalSnapshot() *Sample {
 	totalReqs := r.stats.TotalReqs.Load()
 	successReqs := r.stats.SuccessReqs.Load()
 	failedReqs := r.stats.FailedReqs.Load()
+	canceledReqs := r.stats.CanceledReqs.Load()
 
 	avg, p50, p90, p95, p99 := r.stats.LatencyPercentiles()
 
@@ -2178,6 +2219,7 @@ func (r *Runner) GlobalSnapshot() *Sample {
 		TotalRequests: totalReqs,
 		SuccessCount:  successReqs,
 		FailCount:     failedReqs,
+		CanceledCount: canceledReqs,
 		AvgLatencyMs:  avg.Seconds() * 1000,
 		P50LatencyMs:  p50.Seconds() * 1000,
 		P90LatencyMs:  p90.Seconds() * 1000,
@@ -2192,6 +2234,7 @@ func (r *Runner) HttpOnlySnapshot() *Sample {
 	totalReqs := r.httpOnlyStats.TotalReqs.Load()
 	successReqs := r.httpOnlyStats.SuccessReqs.Load()
 	failedReqs := r.httpOnlyStats.FailedReqs.Load()
+	canceledReqs := r.httpOnlyStats.CanceledReqs.Load()
 
 	avg, p50, p90, p95, p99 := r.httpOnlyStats.LatencyPercentiles()
 
@@ -2208,6 +2251,7 @@ func (r *Runner) HttpOnlySnapshot() *Sample {
 		TotalRequests: totalReqs,
 		SuccessCount:  successReqs,
 		FailCount:     failedReqs,
+		CanceledCount: canceledReqs,
 		AvgLatencyMs:  avg.Seconds() * 1000,
 		P50LatencyMs:  p50.Seconds() * 1000,
 		P90LatencyMs:  p90.Seconds() * 1000,

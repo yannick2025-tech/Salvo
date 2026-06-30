@@ -35,9 +35,10 @@ import (
 type SpanStatus string
 
 const (
-	SpanStatusOK    SpanStatus = "ok"
-	SpanStatusError SpanStatus = "error"
-	SpanStatusSkip  SpanStatus = "skip"
+	SpanStatusOK       SpanStatus = "ok"
+	SpanStatusError    SpanStatus = "error"
+	SpanStatusSkip     SpanStatus = "skip"
+	SpanStatusCanceled SpanStatus = "canceled"
 )
 
 // Span records the execution details of a single DAG node.
@@ -129,6 +130,14 @@ func (c *Context) FinishWithError(err string) {
 	c.Finish()
 }
 
+// FinishWithCanceled marks the trace as canceled (manual stop) with a
+// reason message. Canceled traces are displayed as warnings, not errors.
+func (c *Context) FinishWithCanceled(reason string) {
+	c.trace.Status = SpanStatusCanceled
+	c.trace.Error = reason
+	c.Finish()
+}
+
 // SpanBuilder is a fluent builder for recording span details.
 type SpanBuilder struct {
 	span *Span
@@ -175,6 +184,19 @@ func (b *SpanBuilder) Skip(reason string) {
 	b.span.Duration = b.span.FinishedAt.Sub(b.span.StartedAt)
 	b.span.Status = SpanStatusSkip
 	b.span.Error = reason
+	b.ctx.trace.AddSpan(b.span)
+}
+
+// FinishCanceled completes the span with a "canceled" status, used when
+// the scene was manually stopped. The span is displayed as a warning.
+func (b *SpanBuilder) FinishCanceled(output string, err error) {
+	b.span.FinishedAt = time.Now().UTC()
+	b.span.Duration = b.span.FinishedAt.Sub(b.span.StartedAt)
+	b.span.Output = output
+	b.span.Status = SpanStatusCanceled
+	if err != nil {
+		b.span.Error = err.Error()
+	}
 	b.ctx.trace.AddSpan(b.span)
 }
 

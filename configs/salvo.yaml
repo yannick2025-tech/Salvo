@@ -14,7 +14,8 @@ log:
   level: "debug"
   format: "json"
   output: "logs/salvo.log"
-  max_size: 100
+  # Log file size in MB
+  max_size: 1000
   max_backups: 5
   max_age: 30
   time_format: "2006-01-02T15:04:05.000Z07:00"

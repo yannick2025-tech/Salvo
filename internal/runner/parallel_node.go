@@ -137,16 +137,8 @@ func (n *sceneNode) executeParallel(ctx context.Context, input *dag.Input, nodeL
 		}
 	}
 
-	// Record stats for successful steps.
-	if n.stats != nil {
-		n.stats.RecordLatency(0, firstErr == nil)
-	}
-	if n.httpOnlyStats != nil {
-		n.httpOnlyStats.RecordLatency(0, firstErr == nil)
-	}
-	if n.nodeStats != nil {
-		n.nodeStats.RecordLatency(0, firstErr == nil)
-	}
+	// Stats are already recorded per-step in executeParallelStepHTTP.
+	// No need to record again at the parallel node level to avoid double counting.
 
 	nodeLog.Info("parallel node completed",
 		logger.F("completed", completedCount),
@@ -187,12 +179,49 @@ func (n *sceneNode) executeParallelStepHTTP(ctx context.Context, step *stepConfi
 	proto := httpprotocol.NewProtocol()
 	resp, err := proto.Execute(ctx, req)
 	if err != nil {
+		// Manual scene cancellation: record as "canceled" instead of "failed".
+		if dag.IsManualCancel(ctx) {
+			if n.stats != nil {
+				n.stats.RecordCanceled()
+			}
+			if n.httpOnlyStats != nil {
+				n.httpOnlyStats.RecordCanceled()
+			}
+			if n.nodeStats != nil {
+				n.nodeStats.RecordCanceled()
+			}
+			return fmt.Errorf("step %q HTTP request canceled: %w", step.Name, err)
+		}
+		// Record failed request stats.
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
 		return fmt.Errorf("step %q HTTP request: %w", step.Name, err)
 	}
 
 	httpResp, ok := resp.(*httpprotocol.HTTPResponse)
 	if !ok {
 		return fmt.Errorf("step %q: unexpected response type %T", step.Name, resp)
+	}
+
+	// Record stats for this step (success or failure).
+	if n.stats != nil {
+		n.stats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+	}
+	if n.httpOnlyStats != nil {
+		n.httpOnlyStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+	}
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+		if !httpResp.IsSuccess() {
+			n.nodeStats.RecordError(fmt.Sprintf("HTTP-%d", httpResp.StatusCode))
+		}
 	}
 
 	if !httpResp.IsSuccess() {

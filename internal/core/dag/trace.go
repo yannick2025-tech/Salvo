@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -13,6 +14,19 @@ import (
 // ChainIDKey is the context key for the chain ID propagated through
 // a single DAG execution.
 const ChainIDKey = "salvo_chain_id"
+
+// ManualCancelKey is the context key for the manual-cancel flag.
+// The value stored is a *atomic.Bool that is set to true when the user
+// manually stops the run. Both the DAG executor and the runner use this
+// to distinguish manual cancellation from request timeouts.
+type ManualCancelKey struct{}
+
+// IsManualCancel checks whether the context carries a manual-cancel flag
+// that is set to true. Returns false if the flag is absent or not set.
+func IsManualCancel(ctx context.Context) bool {
+	flag, ok := ctx.Value(ManualCancelKey{}).(*atomic.Bool)
+	return ok && flag != nil && flag.Load()
+}
 
 // TraceHook is called by the executor when a node starts and finishes.
 // It decouples the executor from the concrete tracing implementation.
@@ -29,6 +43,8 @@ type TraceContext interface {
 	FinishTrace()
 	// FinishTraceWithError marks the trace as failed.
 	FinishTraceWithError(err string)
+	// FinishTraceWithCanceled marks the trace as canceled (manual stop).
+	FinishTraceWithCanceled(reason string)
 }
 
 // SpanContext records the outcome of a single node execution.
@@ -41,6 +57,8 @@ type SpanContext interface {
 	SetParentNodeID(parentNodeID string)
 	// Finish completes the span with output and error.
 	Finish(output string, err error)
+	// FinishCanceled marks the span as canceled (manual stop).
+	FinishCanceled(output string, err error)
 	// Skip marks the span as skipped.
 	Skip(reason string)
 }
@@ -81,6 +99,11 @@ func (c *contextAdapter) FinishTraceWithError(err string) {
 	c.tctx.FinishWithError(err)
 }
 
+// FinishTraceWithCanceled marks the trace as canceled (manual stop).
+func (c *contextAdapter) FinishTraceWithCanceled(reason string) {
+	c.tctx.FinishWithCanceled(reason)
+}
+
 // spanAdapter adapts tracelib.SpanBuilder to SpanContext.
 type spanAdapter struct {
 	builder *tracelib.SpanBuilder
@@ -104,6 +127,11 @@ func (s *spanAdapter) SetParentNodeID(parentNodeID string) {
 // Finish completes the span.
 func (s *spanAdapter) Finish(output string, err error) {
 	s.builder.Finish(output, err)
+}
+
+// FinishCanceled marks the span as canceled (manual stop).
+func (s *spanAdapter) FinishCanceled(output string, err error) {
+	s.builder.FinishCanceled(output, err)
 }
 
 // Skip marks the span as skipped.
@@ -142,7 +170,14 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, initialVars map[string]
 
 	out, err := e.executeTraced(ctx, tctx)
 	if err != nil {
-		tctx.FinishTraceWithError(err.Error())
+		// Distinguish manual cancellation from real errors: a manual stop
+		// (user clicked Stop) is not a failure — mark the trace as "canceled"
+		// so it shows as a warning instead of an error.
+		if IsManualCancel(ctx) {
+			tctx.FinishTraceWithCanceled(err.Error())
+		} else {
+			tctx.FinishTraceWithError(err.Error())
+		}
 	}
 	return out, err
 }
@@ -237,7 +272,13 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			for i := 0; i < loopCount; i++ {
 				select {
 				case <-ctx.Done():
-					span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
+					// Manual cancel → span shows as "canceled" (warn);
+					// other cancellations (timeout) → span shows as "error".
+					if IsManualCancel(ctx) {
+						span.FinishCanceled("", fmt.Errorf("node %s canceled: %w", n.ID(), ctx.Err()))
+					} else {
+						span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
+					}
 					errCh <- fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err())
 					if isSync {
 						close(sig)

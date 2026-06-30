@@ -141,4 +141,6 @@ onMounted(fetchTraces)
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.ok { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .status-badge.error { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+.status-badge.canceled { background: rgba(255,193,7,0.15); color: var(--accent-warning, #f0ad4e); }
+.status-badge.skip { background: rgba(108,117,125,0.15); color: var(--text-secondary, #6c757d); }
 </style>
