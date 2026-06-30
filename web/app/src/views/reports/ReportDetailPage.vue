@@ -236,7 +236,19 @@
               <span class="node-badge">TTFB {{ fmtLatencyMs(node.summary.ttfb_ms) }}</span>
             </div>
           </div>
-          <div :ref="el => setNodeChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body"></div>
+          <div class="node-chart-grid">
+            <div class="node-chart-panel">
+              <div class="node-chart-panel-label">QPS</div>
+              <div :ref="el => setNodeQpsChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body node-qps-chart"></div>
+            </div>
+            <div class="node-chart-panel">
+              <div class="node-chart-panel-label">
+                延迟百分位带
+                <span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。">?</span>
+              </div>
+              <div :ref="el => setNodeLatencyChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body node-latency-chart"></div>
+            </div>
+          </div>
           <div class="chart-type-toggle center">
             <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'smooth' }]" @click.stop="switchChartType(`node-${idx}`, 'smooth')">平滑</button>
             <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'step' }]" @click.stop="switchChartType(`node-${idx}`, 'step')">阶梯</button>
@@ -490,8 +502,10 @@ interface ErrorItem {
 }
 
 const nodeTimeSeries = ref<NodeTimeSeries[]>([])
-const nodeChartRefs = new Map<number, HTMLElement>()
-const nodeCharts = new Map<number, echarts.ECharts>()
+const nodeQpsChartRefs = new Map<number, HTMLElement>()
+const nodeLatencyChartRefs = new Map<number, HTMLElement>()
+const nodeQpsCharts = new Map<number, echarts.ECharts>()
+const nodeLatencyCharts = new Map<number, echarts.ECharts>()
 const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   errorRate: 'smooth',
   qpsTrend: 'smooth',
@@ -589,8 +603,12 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'sysQueue') renderSysQueueChart(tc)
 }
 
-function setNodeChartRef(idx: number, el: HTMLElement | null) {
-  if (el) nodeChartRefs.set(idx, el)
+function setNodeQpsChartRef(idx: number, el: HTMLElement | null) {
+  if (el) nodeQpsChartRefs.set(idx, el)
+}
+
+function setNodeLatencyChartRef(idx: number, el: HTMLElement | null) {
+  if (el) nodeLatencyChartRefs.set(idx, el)
 }
 
 function parseMetrics(r: ReportDTO): Record<string, any> {
@@ -1259,58 +1277,128 @@ function renderLatencyTrend(tc: any, m: any) {
 function renderNodeCharts(tc: any) {
   nodeTimeSeries.value.forEach((node, idx) => {
     const isSmooth = chartTypes.value[`node-${idx}`] === 'smooth'
-    const el = nodeChartRefs.get(idx)
-    if (!el) return
-    const oldChart = nodeCharts.get(idx)
-    if (oldChart) { oldChart.dispose(); nodeCharts.delete(idx) }
-    const chart = echarts.init(el)
-    nodeCharts.set(idx, chart)
-
     const timestamps = node.timestamps || []
     const timeLabels = timestamps.map((ts: string) => formatTimeShort(ts))
 
-    if (!timeLabels.length) {
-      chart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
-      return
+    // ===== QPS 面板 =====
+    const qpsEl = nodeQpsChartRefs.get(idx)
+    if (qpsEl) {
+      const oldQ = nodeQpsCharts.get(idx)
+      if (oldQ) { oldQ.dispose(); nodeQpsCharts.delete(idx) }
+      const qChart = echarts.init(qpsEl)
+      nodeQpsCharts.set(idx, qChart)
+
+      if (!timeLabels.length) {
+        qChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+      } else {
+        qChart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis' as const, confine: true,
+            backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1, borderRadius: 12, padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: (params: any) => {
+              if (!Array.isArray(params)) return ''
+              const i = params[0]?.dataIndex ?? 0
+              return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>${params[0].marker} QPS: <strong>${Number(params[0].value).toFixed(3)}</strong> req/s`
+            }
+          },
+          grid: { left: 50, right: 20, top: 16, bottom: 28 },
+          xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          yAxis: { type: 'value', name: 'req/s', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          series: [{
+            name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle' as const,
+            data: node.ts_qps || [],
+            lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, symbol: 'none',
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.35)` },
+              { offset: 1, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.03)` }
+            ]) }
+          }]
+        }, true)
+      }
     }
 
-    const lc = tc.latencyColors
-    chart.setOption({
-      backgroundColor: 'transparent',
-      tooltip: {
-        trigger: 'axis' as const,
-        confine: true,
-        backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
-        borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: [12, 16],
-        textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
-        extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
-        formatter: (params: any) => {
-          if (!Array.isArray(params)) return ''
-          const i = params[0]?.dataIndex ?? 0
-          let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
-          params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${typeof item.value === 'number' && item.seriesName === 'QPS' ? item.value.toFixed(3) : Number(item.value).toFixed(3)}</strong>${item.seriesName === 'QPS' ? '' : 'ms'}<br/>` })
-          return h
+    // ===== 延迟百分位带面板 =====
+    const latEl = nodeLatencyChartRefs.get(idx)
+    if (latEl) {
+      const oldL = nodeLatencyCharts.get(idx)
+      if (oldL) { oldL.dispose(); nodeLatencyCharts.delete(idx) }
+      const lChart = echarts.init(latEl)
+      nodeLatencyCharts.set(idx, lChart)
+
+      if (!timeLabels.length) {
+        lChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+      } else {
+        const lc = tc.latencyColors
+        const p50 = node.ts_p50 || []
+        const p90 = node.ts_p90 || []
+        const p95 = node.ts_p95 || []
+        const p99 = node.ts_p99 || []
+        // 阶梯模式对堆叠面积会产生错位，百分位带强制使用平滑/直线
+        const bandSmooth = isSmooth
+        lChart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis' as const, confine: true,
+            backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1, borderRadius: 12, padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: (params: any) => {
+              if (!Array.isArray(params)) return ''
+              const i = params[0]?.dataIndex ?? 0
+              let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
+              const rows = [
+                { name: 'P50', val: p50[i], color: lc[0] },
+                { name: 'P90', val: p90[i], color: lc[1] },
+                { name: 'P95', val: p95[i], color: lc[2] },
+                { name: 'P99', val: p99[i], color: lc[3] },
+              ]
+              rows.forEach(r => {
+                h += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:6px"></span>${r.name}: <strong>${Number(r.val).toFixed(3)} ms</strong><br/>`
+              })
+              return h
+            }
+          },
+          legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+          grid: { left: 50, right: 20, top: 30, bottom: 50 },
+          dataZoom: [
+            { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
+            { type: 'inside' }
+          ],
+          xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+          series: [
+            // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
+            { name: 'P95-P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(207,34,46,0.20)' : 'rgba(207,34,46,0.16)' }, z: 2 },
+            { name: 'P90-P95', type: 'line', smooth: bandSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(188,76,0,0.20)' : 'rgba(188,76,0,0.16)' }, z: 2 },
+            { name: 'P50-P90', type: 'line', smooth: bandSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(26,127,55,0.18)' : 'rgba(26,127,55,0.14)' }, z: 2 },
+            { name: 'P50', type: 'line', smooth: bandSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(26,127,55,0.06)' : 'rgba(26,127,55,0.04)' }, z: 3 },
+            // P99 顶层边界线（独立非堆叠）
+            { name: 'P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 },
+          ]
+        }, true)
+      }
+    }
+
+    // 同步 dataZoom：延迟面板是主控（有 slider），QPS 单向跟随避免循环
+    const qChart = nodeQpsCharts.get(idx)
+    const lChart = nodeLatencyCharts.get(idx)
+    if (qChart && lChart) {
+      lChart.off('dataZoom')
+      lChart.on('dataZoom', (params: any) => {
+        const start = params?.batch?.[0]?.start ?? params?.start
+        const end = params?.batch?.[0]?.end ?? params?.end
+        if (typeof start === 'number' && typeof end === 'number') {
+          qChart.dispatchAction({ type: 'dataZoom', start, end })
         }
-      },
-      legend: { data: ['QPS','P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
-      grid: { left: 50, right: 50, top: 30, bottom: 50 },
-      dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
-      xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-      yAxis: [
-        { type: 'value', name: 'req/s', position: 'left', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-        { type: 'value', name: 'ms', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
-      ],
-      series: [
-        { name:'QPS', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_qps||[], yAxisIndex:0, lineStyle:{width:1.5,color:`rgba(${isDark()?'45,212,191':'13,148,136'}, 0.6)`}, itemStyle:{color:tc.colors[0]}, areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:`rgba(${isDark()?'45,212,191':'13,148,136'}, 0.25)`},{offset:1,color:`rgba(${isDark()?'45,212,191':'13,148,136'}, 0.02)`}])}, symbol:'none' },
-        { name:'P50', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p50||[], yAxisIndex:1, lineStyle:{width:2,color:lc[0]}, itemStyle:{color:lc[0]}, symbol:'none' },
-        { name:'P90', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p90||[], yAxisIndex:1, lineStyle:{width:2,color:lc[1]}, itemStyle:{color:lc[1]}, symbol:'none' },
-        { name:'P95', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p95||[], yAxisIndex:1, lineStyle:{width:2,color:lc[2]}, itemStyle:{color:lc[2]}, symbol:'none' },
-        { name:'P99', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p99||[], yAxisIndex:1, lineStyle:{width:2,color:lc[3]}, itemStyle:{color:lc[3]}, symbol:'none' },
-      ]
-    }, true)
+      })
+    }
   })
 }
 
@@ -1521,7 +1609,8 @@ window.addEventListener('resize', () => {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
     qpsChart?.resize(); latTrendChart?.resize(); latChart?.resize(); ovChart?.resize(); errRateChart?.resize()
-    nodeCharts.forEach(c => c.resize())
+    nodeQpsCharts.forEach(c => c.resize())
+    nodeLatencyCharts.forEach(c => c.resize())
   }, 150)
 })
 
@@ -1534,8 +1623,10 @@ onMounted(() => {
     ovChart?.dispose(); ovChart = null
     errRateChart?.dispose(); errRateChart = null
     errBreakdownChart?.dispose(); errBreakdownChart = null
-    nodeCharts.forEach((c) => { c.dispose() })
-    nodeCharts.clear()
+    nodeQpsCharts.forEach((c) => { c.dispose() })
+    nodeQpsCharts.clear()
+    nodeLatencyCharts.forEach((c) => { c.dispose() })
+    nodeLatencyCharts.clear()
     requestAnimationFrame(() => renderAll())
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
@@ -1544,7 +1635,8 @@ onUnmounted(() => {
   themeObserver?.disconnect()
   qpsChart?.dispose(); latTrendChart?.dispose(); latChart?.dispose(); ovChart?.dispose(); errRateChart?.dispose()
   sysGoroutineChart?.dispose(); sysHeapChart?.dispose(); sysCpuChart?.dispose(); sysTaskWaitChart?.dispose(); sysQueueChart?.dispose()
-  nodeCharts.forEach(c => c.dispose())
+  nodeQpsCharts.forEach(c => c.dispose())
+  nodeLatencyCharts.forEach(c => c.dispose())
 })
 </script>
 
@@ -1723,7 +1815,27 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
-.node-chart-body { height: 280px; }
+.node-chart-body { height: 200px; }
+.node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
+.node-chart-panel { position: relative; }
+.node-chart-panel-label {
+  position: absolute; top: 4px; left: 10px; z-index: 2;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  letter-spacing: 0.02em; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.node-chart-panel-label .tooltip-wrapper { pointer-events: auto; cursor: help; }
+.node-chart-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; font-size: 10px; font-weight: 700;
+  border-radius: 50%; border: 1px solid var(--border-secondary);
+  color: var(--text-tertiary); background: var(--bg-tertiary);
+  line-height: 1;
+}
+/* 悬浮注释继承 .tooltip-wrapper，覆盖 white-space 以支持多行 */
+.node-chart-help::before { white-space: normal; width: 220px; text-align: left; line-height: 1.5; }
+.node-qps-chart { height: 160px; }
+.node-latency-chart { height: 220px; }
 
 /* ===== Empty State ===== */
 .empty-state {

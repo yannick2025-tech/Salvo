@@ -444,9 +444,17 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             background: var(--bg-tertiary);
             color: var(--text-secondary);
         }
-        .node-chart-body {
-            height: 280px;
+        .node-chart-body { height: 200px; }
+        .node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
+        .node-chart-panel { position: relative; }
+        .node-chart-panel-label {
+            position: absolute; top: 4px; left: 10px; z-index: 2;
+            font-size: 11px; font-weight: 600; color: var(--text-secondary);
+            letter-spacing: 0.02em; pointer-events: none;
         }
+        .node-band-legend { margin-top: 6px; line-height: 1.5; }
+        .node-qps-chart { height: 160px; }
+        .node-latency-chart { height: 220px; }
 
         /* Chart Type Toggle */
         .chart-type-toggle {
@@ -953,7 +961,19 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
                     <span class="node-badge">TTFB {{formatLatencyMs $node.Summary.TTFBMs}}</span>
                 </div>
             </div>
-            <div class="chart-body node-chart-body" id="nodeChart{{$idx}}"></div>
+            <div class="node-chart-grid">
+                <div class="node-chart-panel">
+                    <div class="node-chart-panel-label">QPS</div>
+                    <div class="chart-body node-chart-body node-qps-chart" id="nodeQpsChart{{$idx}}"></div>
+                </div>
+                <div class="node-chart-panel">
+                    <div class="node-chart-panel-label">延迟百分位带</div>
+                    <div class="chart-body node-chart-body node-latency-chart" id="nodeLatencyChart{{$idx}}"></div>
+                </div>
+            </div>
+            <div class="chart-tip node-band-legend">
+                色带含义：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大。
+            </div>
             <div class="chart-type-toggle">
                 <button class="type-btn active" onclick="switchChartType('node-{{$idx}}', 'smooth')">平滑</button>
                 <button class="type-btn" onclick="switchChartType('node-{{$idx}}', 'step')">阶梯</button>
@@ -1445,7 +1465,7 @@ function nextPage() {
 
 function updateNodeToggleButtons(chartId) {
     const idx = parseInt(chartId.slice(5));
-    const el = document.getElementById('nodeChart' + idx);
+    const el = document.getElementById('nodeQpsChart' + idx) || document.getElementById('nodeLatencyChart' + idx);
     if (!el) return;
     const card = el.closest('.chart-card');
     if (!card) return;
@@ -1808,55 +1828,109 @@ function renderNodeCharts() {
     const nodes = reportData.node_metrics || [];
     const isDark = document.documentElement.classList.contains('dark-theme');
     nodes.forEach(function(node, idx) {
-        const el = document.getElementById('nodeChart' + idx);
-        if (!el) return;
-        
         const timestamps = node.timestamps || [];
         const qpsData = node.ts_qps || [];
-        
-        if (!timestamps.length || !qpsData.length) return;
-        
         const timeLabels = timestamps.map(ts => ts.substring(11, 19));
         const isSmooth = chartTypes['node-' + idx] === 'smooth';
-        
-        const chart = echarts.init(el);
-        chart.setOption({
-            backgroundColor: tc.bg,
-            tooltip: {
-                trigger: 'axis',
-                confine: true,
-                backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
-                borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
-                borderWidth: 1,
-                borderRadius: 12,
-                padding: [12, 16],
-                textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
-                extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
-                formatter: function(params) {
-                    let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
-                    params.forEach(function(item) {
-                        h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong><br/>';
-                    });
-                    return h;
+
+        if (!timestamps.length) return;
+
+        // ===== QPS 面板 =====
+        const qpsEl = document.getElementById('nodeQpsChart' + idx);
+        let qChart = null;
+        if (qpsEl) {
+            qChart = echarts.init(qpsEl);
+            qChart.setOption({
+                backgroundColor: tc.bg,
+                tooltip: {
+                    trigger: 'axis', confine: true,
+                    backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+                    borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+                    borderWidth: 1, borderRadius: 12, padding: [12, 16],
+                    textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+                    extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+                    formatter: function(params) {
+                        return '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>' +
+                               params[0].marker + ' QPS: <strong>' + params[0].value.toFixed(3) + '</strong> req/s';
+                    }
+                },
+                grid: { left: 50, right: 20, top: 16, bottom: 28 },
+                xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                yAxis: { type: 'value', name: 'req/s', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                series: [{
+                    name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle',
+                    data: qpsData, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, symbol: 'none',
+                    areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(45,212,191, 0.35)' }, { offset: 1, color: 'rgba(45,212,191, 0.03)' }
+                    ]) }
+                }]
+            });
+        }
+
+        // ===== 延迟百分位带面板 =====
+        const latEl = document.getElementById('nodeLatencyChart' + idx);
+        let lChart = null;
+        if (latEl) {
+            const p50 = node.ts_p50 || [];
+            const p90 = node.ts_p90 || [];
+            const p95 = node.ts_p95 || [];
+            const p99 = node.ts_p99 || [];
+            const lc = tc.latencyColors;
+            lChart = echarts.init(latEl);
+            lChart.setOption({
+                backgroundColor: tc.bg,
+                tooltip: {
+                    trigger: 'axis', confine: true,
+                    backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+                    borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+                    borderWidth: 1, borderRadius: 12, padding: [12, 16],
+                    textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+                    extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+                    formatter: function(params) {
+                        const i = params[0].dataIndex;
+                        let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[i] + '</div>';
+                        var rows = [
+                            { name: 'P50', val: p50[i], color: lc[0] },
+                            { name: 'P90', val: p90[i], color: lc[1] },
+                            { name: 'P95', val: p95[i], color: lc[2] },
+                            { name: 'P99', val: p99[i], color: lc[3] }
+                        ];
+                        rows.forEach(function(r) {
+                            h += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + r.color + ';margin-right:6px"></span>' + r.name + ': <strong>' + Number(r.val).toFixed(3) + ' ms</strong><br/>';
+                        });
+                        return h;
+                    }
+                },
+                legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+                grid: { left: 50, right: 20, top: 30, bottom: 50 },
+                dataZoom: [
+                    { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
+                    { type: 'inside' }
+                ],
+                xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+                series: [
+                    // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
+                    { name: 'P95-P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(248,81,73,0.20)' : 'rgba(248,81,73,0.16)' }, z: 2 },
+                    { name: 'P90-P95', type: 'line', smooth: isSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(240,136,62,0.20)' : 'rgba(240,136,62,0.16)' }, z: 2 },
+                    { name: 'P50-P90', type: 'line', smooth: isSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(227,179,65,0.18)' : 'rgba(227,179,65,0.14)' }, z: 2 },
+                    { name: 'P50', type: 'line', smooth: isSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(63,185,80,0.06)' : 'rgba(63,185,80,0.04)' }, z: 3 },
+                    // P99 顶层边界线（独立非堆叠）
+                    { name: 'P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 }
+                ]
+            });
+        }
+
+        // 同步 dataZoom：延迟面板是主控（有 slider），QPS 单向跟随避免循环
+        if (qChart && lChart) {
+            lChart.on('dataZoom', function(params) {
+                var start = (params.batch && params.batch[0]) ? params.batch[0].start : params.start;
+                var end = (params.batch && params.batch[0]) ? params.batch[0].end : params.end;
+                if (typeof start === 'number' && typeof end === 'number') {
+                    qChart.dispatchAction({ type: 'dataZoom', start: start, end: end });
                 }
-            },
-            grid: { top: 28, right: 48, bottom: 36, left: 48 },
-            dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
-            xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
-            yAxis: [
-                { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
-                { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } } }
-            ],
-            series: [
-                { name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: qpsData, yAxisIndex: 0, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(45,212,191, 0.12)' }, { offset: 1, color: 'rgba(45,212,191, 0.01)' }
-                ])}, symbol: 'none' },
-                { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p50 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[0] }, itemStyle: { color: tc.latencyColors[0] }, symbol: 'none' },
-                { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p90 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[1] }, itemStyle: { color: tc.latencyColors[1] }, symbol: 'none' },
-                { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p95 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[2] }, itemStyle: { color: tc.latencyColors[2] }, symbol: 'none' },
-                { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: tc.latencyColors[3] }, itemStyle: { color: tc.latencyColors[3] }, symbol: 'none' }
-            ]
-        });
+            });
+        }
     });
 }
 
@@ -1921,7 +1995,8 @@ window.addEventListener('resize', function() {
     echarts.getInstanceByDom(document.getElementById('latencyTrendChart'))?.resize();
     if (reportData.node_metrics) {
         reportData.node_metrics.forEach(function(_, idx) {
-            echarts.getInstanceByDom(document.getElementById('nodeChart' + idx))?.resize();
+            echarts.getInstanceByDom(document.getElementById('nodeQpsChart' + idx))?.resize();
+            echarts.getInstanceByDom(document.getElementById('nodeLatencyChart' + idx))?.resize();
         });
     }
 });
@@ -1930,7 +2005,7 @@ window.addEventListener('beforeprint', function() {
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
                      'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
     if (reportData.node_metrics) {
-        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeChart' + idx); });
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeQpsChart' + idx); chartIds.push('nodeLatencyChart' + idx); });
     }
     chartIds.forEach(function(id) {
         var chart = echarts.getInstanceByDom(document.getElementById(id));
@@ -1966,7 +2041,7 @@ function applyDarkMode(isDark) {
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
                      'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart', 'sysQueueChart'];
     if (reportData.node_metrics) {
-        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeChart' + idx); });
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeQpsChart' + idx); chartIds.push('nodeLatencyChart' + idx); });
     }
 
     chartIds.forEach(function(id) {
