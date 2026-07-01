@@ -1381,10 +1381,12 @@ function renderNodeCharts(tc: any) {
           yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
           series: [
             // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
-            { name: 'P95-P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(207,34,46,0.20)' : 'rgba(207,34,46,0.16)' }, z: 2 },
-            { name: 'P90-P95', type: 'line', smooth: bandSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(188,76,0,0.20)' : 'rgba(188,76,0,0.16)' }, z: 2 },
-            { name: 'P50-P90', type: 'line', smooth: bandSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(26,127,55,0.18)' : 'rgba(26,127,55,0.14)' }, z: 2 },
-            { name: 'P50', type: 'line', smooth: bandSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(26,127,55,0.06)' : 'rgba(26,127,55,0.04)' }, z: 3 },
+            // 深色模式：alpha 递增 (0.22→0.30→0.38) + 更亮色相，避免层次模糊
+            // 浅色模式：保持原值不变
+            { name: 'P95-P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(248,81,73,0.38)' : 'rgba(207,34,46,0.16)' }, z: 2 },
+            { name: 'P90-P95', type: 'line', smooth: bandSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(227,179,65,0.30)' : 'rgba(188,76,0,0.16)' }, z: 2 },
+            { name: 'P50-P90', type: 'line', smooth: bandSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(63,185,80,0.22)' : 'rgba(26,127,55,0.14)' }, z: 2 },
+            { name: 'P50', type: 'line', smooth: bandSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(63,185,80,0.10)' : 'rgba(26,127,55,0.04)' }, z: 3 },
             // P99 顶层边界线（独立非堆叠）
             { name: 'P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 },
           ]
@@ -1996,6 +1998,36 @@ onUnmounted(() => {
 .tooltip-wrapper:hover::after {
   opacity: 1;
   visibility: visible;
+}
+
+/* ===== Tooltip Dark Mode ===== */
+/* Keep light theme unchanged; override only in dark mode to match ECharts dark tooltip. */
+[data-theme='dark'] .tooltip-wrapper::before {
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.5),
+    0 10px 24px -4px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .tooltip-wrapper::after {
+  border-top-color: rgba(22, 27, 34, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Latency band help tooltip (pops to the right) — keep light colors, override arrow + bg in dark */
+[data-theme='dark'] .tooltip-wrapper.node-chart-help::before {
+  background: rgba(22, 27, 34, 0.96) !important;
+  color: #e6edf3 !important;
+  border-color: rgba(48, 54, 61, 0.8) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme='dark'] .tooltip-wrapper.node-chart-help::after {
+  border-right-color: rgba(22, 27, 34, 0.96) !important;
 }
 
 /* ===== Responsive ===== */

@@ -2194,17 +2194,29 @@ onUnmounted(() => {
 
 /* Dark theme tooltip */
 [data-theme='dark'] .bar-tooltip::before {
-  background: rgba(30, 41, 59, 0.95);
-  color: #e2e8f0;
-  border-color: rgba(71, 85, 105, 0.3);
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 8px 24px rgba(0, 0, 0, 0.3);
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme='dark'] .bar-tooltip::after {
-  border-top-color: rgba(30, 41, 59, 0.95);
-  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.2));
+  border-top-color: rgba(22, 27, 34, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Dark theme tooltip for gauge cards */
+[data-theme='dark'] .sys-gauge-card[data-tooltip]::after {
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .sys-gauge-card[data-tooltip]::before {
+  border-top-color: rgba(22, 27, 34, 0.96);
 }
 
 .bar-fill {

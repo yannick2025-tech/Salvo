@@ -208,4 +208,22 @@ function getReportStatusTooltip(status: string): string {
   opacity: 1;
   visibility: visible;
 }
+
+/* ===== Tooltip Dark Mode ===== */
+/* Keep light theme unchanged; override only in dark mode to match ECharts dark tooltip. */
+[data-theme='dark'] .tooltip-wrapper::before {
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.5),
+    0 10px 24px -4px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .tooltip-wrapper::after {
+  border-bottom-color: rgba(22, 27, 34, 0.96);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
 </style>

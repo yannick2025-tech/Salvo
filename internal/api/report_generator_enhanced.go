@@ -1971,10 +1971,11 @@ function renderNodeCharts() {
                 yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
                 series: [
                     // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
-                    { name: 'P95-P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(248,81,73,0.20)' : 'rgba(248,81,73,0.16)' }, z: 2 },
-                    { name: 'P90-P95', type: 'line', smooth: isSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(240,136,62,0.20)' : 'rgba(240,136,62,0.16)' }, z: 2 },
-                    { name: 'P50-P90', type: 'line', smooth: isSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(227,179,65,0.18)' : 'rgba(227,179,65,0.14)' }, z: 2 },
-                    { name: 'P50', type: 'line', smooth: isSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(63,185,80,0.06)' : 'rgba(63,185,80,0.04)' }, z: 3 },
+                    // 深色模式：alpha 递增 (0.22→0.30→0.38) 避免层次模糊；浅色保持不变
+                    { name: 'P95-P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(248,81,73,0.38)' : 'rgba(248,81,73,0.16)' }, z: 2 },
+                    { name: 'P90-P95', type: 'line', smooth: isSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(240,136,62,0.30)' : 'rgba(240,136,62,0.16)' }, z: 2 },
+                    { name: 'P50-P90', type: 'line', smooth: isSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(227,179,65,0.22)' : 'rgba(227,179,65,0.14)' }, z: 2 },
+                    { name: 'P50', type: 'line', smooth: isSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(63,185,80,0.10)' : 'rgba(63,185,80,0.04)' }, z: 3 },
                     // P99 顶层边界线（独立非堆叠）
                     { name: 'P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 }
                 ]
