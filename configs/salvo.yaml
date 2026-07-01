@@ -3,6 +3,12 @@ server:
   port: 8766
   web_dir: "web/dist"
 
+# Frontend dev server (vite). Used by `make start/dev` and vite.config.ts
+# to keep frontend port/host in sync with backend proxy target.
+frontend:
+  host: "0.0.0.0"
+  port: 17073
+
 database:
   driver: "sqlite3"
   dsn: "salvo.db"

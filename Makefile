@@ -12,6 +12,17 @@ SHELL := /bin/bash
 # Auto-discover plugin directories (each must contain a main.go)
 PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d)
 
+# Extract a scalar value from a top-level YAML section in $(CONFIG).
+# Usage: $(call yaml_get,<section>,<key>)
+# NOTE: awk body intentionally avoids sub()/gsub() calls so that no stray ")"
+# leaks into Make's $(shell ...) parser.
+yaml_get = $(shell awk '/^$(1):/{f=1;next} /^[A-Za-z]/{f=0} f&&/^[[:space:]]+$(2):/{print $$2; exit}' $(CONFIG) | tr -d '"')
+
+BACKEND_HOST  := $(or $(call yaml_get,server,host),0.0.0.0)
+BACKEND_PORT  := $(or $(call yaml_get,server,port),8766)
+FRONTEND_HOST := $(or $(call yaml_get,frontend,host),localhost)
+FRONTEND_PORT := $(or $(call yaml_get,frontend,port),3000)
+
 all: build-all
 
 help:
@@ -92,8 +103,8 @@ rebuild: clean-so build-all
 start:
 	@mkdir -p logs
 	@# Start backend
-	@if lsof -i :8766 >/dev/null 2>&1; then \
-		echo "Backend already running on :8766"; \
+	@if lsof -i :$(BACKEND_PORT) >/dev/null 2>&1; then \
+		echo "Backend already running on :$(BACKEND_PORT)"; \
 	else \
 		nohup ./$(BIN) -config $(CONFIG) > logs/salvo-stdout.log 2> logs/salvo-stderr.log & \
 		echo "Backend started (PID $$!)"; \
@@ -101,24 +112,24 @@ start:
 	fi
 	@# Start frontend (disown so it survives the make shell exit; avoids SIGHUP killing vite cold start)
 	@# Verify with HTTP probe, not just lsof, to avoid being fooled by a dying process that still holds the port.
-	@if curl -s -o /dev/null --max-time 1 http://localhost:3000/ >/dev/null 2>&1; then \
-		echo "Frontend already running on :3000"; \
+	@if curl -s -o /dev/null --max-time 1 http://$(FRONTEND_HOST):$(FRONTEND_PORT)/ >/dev/null 2>&1; then \
+		echo "Frontend already running on :$(FRONTEND_PORT)"; \
 	else \
-		if lsof -i :3000 >/dev/null 2>&1; then \
-			echo "Port :3000 held by a non-responsive process, cleaning up..."; \
+		if lsof -i :$(FRONTEND_PORT) >/dev/null 2>&1; then \
+			echo "Port :$(FRONTEND_PORT) held by a non-responsive process, cleaning up..."; \
 			pkill -9 -f "node.*vite" 2>/dev/null || true; \
 			pkill -9 -f "vite" 2>/dev/null || true; \
 			sleep 1; \
 		fi; \
-		cd web/app && nohup npm run dev > ../../logs/frontend.log 2>&1 & \
+		cd web/app && SALVO_BACKEND_PORT=$(BACKEND_PORT) SALVO_FRONTEND_PORT=$(FRONTEND_PORT) SALVO_FRONTEND_HOST=$(FRONTEND_HOST) nohup npm run dev > ../../logs/frontend.log 2>&1 & \
 		echo "Frontend started (PID $$!)"; \
 		disown $$! 2>/dev/null || true; \
 	fi
 	@# Wait for ports to be ready (vite cold start after clean needs more time)
 	@echo "Waiting for services to be ready..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
-		b=$$(lsof -i :8766 >/dev/null 2>&1 && echo y || echo n); \
-		f=$$(curl -s -o /dev/null --max-time 1 http://localhost:3000/ >/dev/null 2>&1 && echo y || echo n); \
+		b=$$(lsof -i :$(BACKEND_PORT) >/dev/null 2>&1 && echo y || echo n); \
+		f=$$(curl -s -o /dev/null --max-time 1 http://$(FRONTEND_HOST):$(FRONTEND_PORT)/ >/dev/null 2>&1 && echo y || echo n); \
 		if [ "$$b" = "y" ] && [ "$$f" = "y" ]; then \
 			echo "  Both services ready"; break; \
 		fi; \
@@ -126,8 +137,8 @@ start:
 		sleep 1; \
 	done
 	@echo ""
-	@echo "  → Frontend: http://localhost:3000"
-	@echo "  → Backend:  http://localhost:8766"
+	@echo "  → Frontend: http://$(FRONTEND_HOST):$(FRONTEND_PORT)"
+	@echo "  → Backend:  http://$(BACKEND_HOST):$(BACKEND_PORT)"
 
 stop:
 	@# Send SIGTERM first to allow graceful shutdown
@@ -143,7 +154,7 @@ stop:
 	@-pkill -KILL -f "node.*vite" 2>/dev/null || true
 	@# Confirm ports are released
 	@for i in 1 2 3 4 5; do \
-		lsof -i :8766 >/dev/null 2>&1 || lsof -i :3000 >/dev/null 2>&1 || break; \
+		lsof -i :$(BACKEND_PORT) >/dev/null 2>&1 || lsof -i :$(FRONTEND_PORT) >/dev/null 2>&1 || break; \
 		sleep 1; \
 	done
 	@echo "All processes stopped."
