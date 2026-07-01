@@ -244,7 +244,13 @@
             <div class="node-chart-panel">
               <div class="node-chart-panel-label">
                 延迟百分位带
-                <span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。">?</span>
+                <span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。">
+                  <svg class="node-chart-help-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                    <circle cx="8" cy="4.6" r="0.9" fill="currentColor"/>
+                    <path d="M8 7v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  </svg>
+                </span>
               </div>
               <div :ref="el => setNodeLatencyChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body node-latency-chart"></div>
             </div>
@@ -1827,30 +1833,53 @@ onUnmounted(() => {
   margin-bottom: 2px;
   padding-left: 12px;
 }
-.node-chart-help {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 14px; height: 14px; font-size: 10px; font-weight: 700;
-  border-radius: 50%; border: 1px solid var(--border-secondary);
-  color: var(--text-tertiary); background: var(--bg-tertiary);
-  line-height: 1; cursor: help;
+.tooltip-wrapper.node-chart-help {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  line-height: 1;
+  cursor: help;
+}
+.node-chart-help-icon {
+  display: block;
+  flex: 0 0 auto;
+  transition: color 0.15s ease;
+}
+.tooltip-wrapper.node-chart-help:hover .node-chart-help-icon {
+  color: var(--accent-primary);
 }
 /* 悬浮注释：从 ? 右侧弹出，与标签同行，箭头朝左 */
-.node-chart-help::before {
-  white-space: normal !important; width: 240px !important;
-  text-align: left !important; line-height: 1.5 !important;
-  bottom: auto !important; top: 50% !important;
+.tooltip-wrapper.node-chart-help::before {
+  white-space: normal !important;
+  width: 240px !important;
+  text-align: left !important;
+  line-height: 1.5 !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  padding: 10px 14px !important;
+  letter-spacing: normal !important;
+  bottom: auto !important;
+  top: 50% !important;
   left: calc(100% + 10px) !important;
   transform: translateY(-50%) translateX(-6px) !important;
 }
-.node-chart-help::after {
-  bottom: auto !important; top: 50% !important;
+.tooltip-wrapper.node-chart-help::after {
+  bottom: auto !important;
+  top: 50% !important;
   left: 100% !important;
   border-top-color: transparent !important;
   border-bottom-color: transparent !important;
   border-right-color: rgba(255, 255, 255, 0.96) !important;
   transform: translateY(-50%) translateX(-2px) !important;
 }
-.node-chart-help:hover::before { transform: translateY(-50%) translateX(0) !important; }
+.tooltip-wrapper.node-chart-help:hover::before {
+  transform: translateY(-50%) translateX(0) !important;
+}
 .node-qps-chart { height: 160px; }
 .node-latency-chart { height: 220px; }
 

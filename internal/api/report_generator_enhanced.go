@@ -455,15 +455,22 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             padding-left: 12px;
             display: inline-flex; align-items: center; gap: 4px;
         }
-        .node-chart-help {
+        .tooltip-wrapper.node-chart-help {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 14px; height: 14px; font-size: 10px; font-weight: 700;
-            border-radius: 50%; border: 1px solid var(--border-secondary);
-            color: var(--text-tertiary); background: var(--bg-tertiary);
+            width: 16px; height: 16px;
+            color: var(--text-tertiary);
+            background: transparent; border: none;
             line-height: 1; cursor: help; position: relative;
         }
+        .node-chart-help-icon {
+            display: block; flex: 0 0 auto;
+            transition: color 0.15s ease;
+        }
+        .tooltip-wrapper.node-chart-help:hover .node-chart-help-icon {
+            color: var(--accent-primary);
+        }
         /* 悬浮注释：从 ? 右侧弹出，与标签同行，箭头朝左 */
-        .node-chart-help::before {
+        .tooltip-wrapper.node-chart-help::before {
             content: attr(data-tooltip);
             position: absolute; visibility: hidden; opacity: 0;
             white-space: normal; width: 240px; text-align: left; line-height: 1.5;
@@ -478,7 +485,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             transition: opacity 0.15s ease, transform 0.15s ease;
             z-index: 100; pointer-events: none;
         }
-        .node-chart-help::after {
+        .tooltip-wrapper.node-chart-help::after {
             content: ''; position: absolute; visibility: hidden; opacity: 0;
             width: 0; height: 0;
             border-style: solid; border-width: 6px;
@@ -492,11 +499,11 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             transition: opacity 0.15s ease;
             z-index: 101; pointer-events: none;
         }
-        .node-chart-help:hover::before,
-        .node-chart-help:hover::after {
+        .tooltip-wrapper.node-chart-help:hover::before,
+        .tooltip-wrapper.node-chart-help:hover::after {
             visibility: visible; opacity: 1;
         }
-        .node-chart-help:hover::before { transform: translateY(-50%) translateX(0); }
+        .tooltip-wrapper.node-chart-help:hover::before { transform: translateY(-50%) translateX(0); }
         .node-band-legend { margin-top: 6px; line-height: 1.5; }
         .node-qps-chart { height: 160px; }
         .node-latency-chart { height: 220px; }
@@ -747,14 +754,14 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         html.dark-theme .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
         html.dark-theme .banner-text strong { color: var(--text-primary); }
         html.dark-theme .banner-text p { color: var(--text-secondary); }
-        html.dark-theme .node-chart-help { color: var(--text-secondary); background: var(--bg-secondary); border-color: var(--border-color); }
-        html.dark-theme .node-chart-help::before {
+        html.dark-theme .tooltip-wrapper.node-chart-help { color: var(--text-secondary); }
+        html.dark-theme .tooltip-wrapper.node-chart-help::before {
             background: rgba(22, 27, 34, 0.96);
             border-color: rgba(48, 54, 61, 0.8);
             color: #e6edf3;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
         }
-        html.dark-theme .node-chart-help::after { border-right-color: rgba(22, 27, 34, 0.96); }
+        html.dark-theme .tooltip-wrapper.node-chart-help::after { border-right-color: rgba(22, 27, 34, 0.96); }
 
         @media print {
             body { background: white; color: black; }
@@ -1020,7 +1027,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
                     <div class="chart-body node-chart-body node-qps-chart" id="nodeQpsChart{{$idx}}"></div>
                 </div>
                 <div class="node-chart-panel">
-                    <div class="node-chart-panel-label">延迟百分位带<span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。">?</span></div>
+                    <div class="node-chart-panel-label">延迟百分位带<span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。"><svg class="node-chart-help-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="4.6" r="0.9" fill="currentColor"/><path d="M8 7v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></div>
                     <div class="chart-body node-chart-body node-latency-chart" id="nodeLatencyChart{{$idx}}"></div>
                 </div>
             </div>
