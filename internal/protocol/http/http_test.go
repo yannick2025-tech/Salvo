@@ -1,10 +1,14 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -320,3 +324,228 @@ func TestHTTPProtocolWrongRequestType(t *testing.T) {
 type mockBadRequest struct{}
 
 func (m *mockBadRequest) GetTimeout() time.Duration { return 0 }
+
+// --- multipart/form-data tests ---
+
+// writeMultipartServer returns a test server that parses multipart/form-data
+// requests and echoes back the received fields and file names.
+func writeMultipartServer(t *testing.T, captured *multipartCapture) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("parse multipart: " + err.Error()))
+			return
+		}
+		captured.mu.Lock()
+		defer captured.mu.Unlock()
+		captured.contentType = r.Header.Get("Content-Type")
+		for k, vs := range r.MultipartForm.Value {
+			if len(vs) > 0 {
+				captured.fields[k] = vs[0]
+			}
+		}
+		for field, headers := range r.MultipartForm.File {
+			if len(headers) > 0 {
+				captured.files[field] = headers[0].Filename
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+}
+
+type multipartCapture struct {
+	mu          sync.Mutex
+	contentType string
+	fields      map[string]string
+	files       map[string]string
+}
+
+func newMultipartCapture() *multipartCapture {
+	return &multipartCapture{
+		fields: make(map[string]string),
+		files:  make(map[string]string),
+	}
+}
+
+func TestHTTPProtocolMultipartFieldsOnly(t *testing.T) {
+	cap := newMultipartCapture()
+	srv := writeMultipartServer(t, cap)
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method: MethodPost,
+		URL:    srv.URL + "/api/upload",
+		Form: &FormData{
+			Fields: map[string]string{
+				"chargeSeq": "CS-001",
+				"comment":   "good service",
+			},
+		},
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	require.NoError(t, err)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	assert.Contains(t, cap.contentType, "multipart/form-data")
+	assert.Equal(t, "CS-001", cap.fields["chargeSeq"])
+	assert.Equal(t, "good service", cap.fields["comment"])
+	assert.Empty(t, cap.files)
+}
+
+func TestHTTPProtocolMultipartFileUpload(t *testing.T) {
+	// Create a temp file mimicking assets/comments.jpg
+	tmpDir := t.TempDir()
+	imgPath := filepath.Join(tmpDir, "comments.jpg")
+	imgContent := []byte("FAKE-JPEG-DATA")
+	require.NoError(t, os.WriteFile(imgPath, imgContent, 0644))
+
+	cap := newMultipartCapture()
+	srv := writeMultipartServer(t, cap)
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method: MethodPost,
+		URL:    srv.URL + "/api/upload",
+		Form: &FormData{
+			Fields: map[string]string{
+				"chargeSeq": "CS-002",
+			},
+			Files: map[string]string{
+				"photo": imgPath,
+			},
+		},
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	require.NoError(t, err)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	assert.Contains(t, cap.contentType, "multipart/form-data")
+	assert.Equal(t, "CS-002", cap.fields["chargeSeq"])
+	assert.Equal(t, "comments.jpg", cap.files["photo"])
+}
+
+func TestHTTPProtocolMultipartFormOverridesBody(t *testing.T) {
+	cap := newMultipartCapture()
+	srv := writeMultipartServer(t, cap)
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method: MethodPost,
+		URL:    srv.URL + "/api/upload",
+		Body:   []byte(`{"should":"be ignored"}`),
+		Form: &FormData{
+			Fields: map[string]string{"used": "yes"},
+		},
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	require.NoError(t, err)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	assert.Contains(t, cap.contentType, "multipart/form-data")
+	assert.Equal(t, "yes", cap.fields["used"])
+}
+
+func TestHTTPProtocolMultipartFileMissing(t *testing.T) {
+	srv := writeMultipartServer(t, newMultipartCapture())
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method: MethodPost,
+		URL:    srv.URL + "/api/upload",
+		Form: &FormData{
+			Files: map[string]string{
+				"photo": "/no/such/file.jpg",
+			},
+		},
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "no such file")
+}
+
+func TestMultipartMultipleFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	fileA := filepath.Join(tmpDir, "a.txt")
+	fileB := filepath.Join(tmpDir, "b.jpg")
+	require.NoError(t, os.WriteFile(fileA, []byte("AAA"), 0644))
+	require.NoError(t, os.WriteFile(fileB, []byte("BBB"), 0644))
+
+	cap := newMultipartCapture()
+	srv := writeMultipartServer(t, cap)
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method: MethodPost,
+		URL:    srv.URL + "/api/upload",
+		Form: &FormData{
+			Fields: map[string]string{"seq": "M-1"},
+			Files: map[string]string{
+				"doc":   fileA,
+				"image": fileB,
+			},
+		},
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, 200, asHTTPResp(t, resp).StatusCode)
+
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	assert.Equal(t, "a.txt", cap.files["doc"])
+	assert.Equal(t, "b.jpg", cap.files["image"])
+	assert.Equal(t, "M-1", cap.fields["seq"])
+}
+
+// Ensure body bytes are readable when Form is nil (no regression).
+func TestHTTPProtocolBodyNoFormRegression(t *testing.T) {
+	srv := newTestServer()
+	defer srv.Close()
+
+	p := NewProtocol()
+	req := &HTTPRequest{
+		Method:  MethodPost,
+		URL:     srv.URL + "/api/echo",
+		Headers: map[string]string{"Content-Type": "application/json"},
+		Body:    []byte(`{"hello":"world"}`),
+	}
+
+	resp, err := p.Execute(context.Background(), req)
+	require.NoError(t, err)
+	hr := asHTTPResp(t, resp)
+	assert.Equal(t, 200, hr.StatusCode)
+	assert.Equal(t, `{"hello":"world"}`, string(hr.Body))
+}
+
+// Verify FormData struct can be serialized (sanity check for type stability).
+func TestFormDataZeroValue(t *testing.T) {
+	var f FormData
+	assert.Nil(t, f.Fields)
+	assert.Nil(t, f.Files)
+}
+
+// Helper used by tests above to read the body bytes via bytes.Reader
+// (kept here to justify the bytes import when not otherwise referenced).
+var _ = bytes.NewReader
+

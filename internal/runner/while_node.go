@@ -58,6 +58,13 @@ type stepRequestConfig struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers,omitempty"`
 	Body    any               `json:"body,omitempty"`
+	Form    *stepFormConfig   `json:"form,omitempty"`
+}
+
+// stepFormConfig defines a multipart/form-data body for a step request.
+type stepFormConfig struct {
+	Fields map[string]string `json:"fields,omitempty"`
+	Files  map[string]string `json:"files,omitempty"`
 }
 
 // extractEntry maps a JSON path to a variable name.
@@ -480,6 +487,21 @@ func buildStepHTTPRequest(cfg *stepRequestConfig, vars map[string]any, nodeLog l
 				req.Body = []byte(bodyStr)
 			}
 		}
+	}
+
+	// multipart/form-data (Form) takes precedence over Body when both set.
+	if cfg.Form != nil {
+		form := &httpprotocol.FormData{
+			Fields: make(map[string]string, len(cfg.Form.Fields)),
+			Files:  make(map[string]string, len(cfg.Form.Files)),
+		}
+		for k, v := range cfg.Form.Fields {
+			form.Fields[k] = resolveWithVariables(v, vars)
+		}
+		for k, v := range cfg.Form.Files {
+			form.Files[k] = resolveWithVariables(v, vars)
+		}
+		req.Form = form
 	}
 
 	return req

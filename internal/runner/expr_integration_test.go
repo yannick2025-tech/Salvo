@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -994,4 +995,72 @@ func TestRunner_SOPlugin_LoaderBootstrap(t *testing.T) {
 	list := loader.List()
 	require.Len(t, list, 1)
 	assert.Equal(t, "shell-aes", list[0].Name())
+}
+
+// TestRunner_HTTPNode_MultipartUpload verifies the end-to-end flow:
+// YAML step config with `form` field → runner resolves variables → protocol
+// builds multipart body → server receives file + fields.
+func TestRunner_HTTPNode_MultipartUpload(t *testing.T) {
+	type capturedForm struct {
+		mu       sync.Mutex
+		fields   map[string]string
+		files    map[string]string
+	ContentType string
+	}
+	cap := &capturedForm{
+		fields: make(map[string]string),
+		files:  make(map[string]string),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		cap.mu.Lock()
+		defer cap.mu.Unlock()
+		cap.ContentType = r.Header.Get("Content-Type")
+		for k, vs := range r.MultipartForm.Value {
+			if len(vs) > 0 {
+				cap.fields[k] = vs[0]
+			}
+		}
+		for field, headers := range r.MultipartForm.File {
+			if len(headers) > 0 {
+				cap.files[field] = headers[0].Filename
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"code":0}`))
+	}))
+	defer srv.Close()
+
+	// Create a temp file to upload.
+	tmpDir := t.TempDir()
+	imgPath := tmpDir + "/comments.jpg"
+	require.NoError(t, os.WriteFile(imgPath, []byte("FAKE-IMG"), 0644))
+
+	// Node config uses ${var} placeholders in form fields and file paths.
+	node := newTestSceneNode()
+	node.config = fmt.Sprintf(`{
+		"method":"POST",
+		"url":"%s/api/upload",
+		"form":{
+			"fields":{"chargeSeq":"${seq}","comment":"good"},
+			"files":{"photo":"%s"}
+		}
+	}`, srv.URL, imgPath)
+
+	input := &dag.Input{Variables: map[string]any{"seq": "CS-999"}}
+	output, err := node.executeHTTP(t.Context(), input, node.log)
+	require.NoError(t, err)
+	require.NotNil(t, output)
+	require.Nil(t, output.Error)
+
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	assert.Contains(t, cap.ContentType, "multipart/form-data")
+	assert.Equal(t, "CS-999", cap.fields["chargeSeq"])
+	assert.Equal(t, "good", cap.fields["comment"])
+	assert.Equal(t, "comments.jpg", cap.files["photo"])
 }

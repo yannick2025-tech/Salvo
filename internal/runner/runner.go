@@ -1376,6 +1376,10 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		Body       string            `json:"body"`
 		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
 		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
+		Form       *struct {
+			Fields map[string]string `json:"fields"`
+			Files  map[string]string `json:"files"`
+		} `json:"form"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -1490,6 +1494,34 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		req.Body = []byte(body)
 		nodeLog.Debug("resolved body",
 			logger.F("body_preview", truncateString(body, 300)),
+		)
+	}
+
+	// multipart/form-data: takes precedence over Body when both present.
+	// File paths and field values are variable-resolved the same way as Body.
+	if cfg.Form != nil {
+		form := &httpprotocol.FormData{
+			Fields: make(map[string]string, len(cfg.Form.Fields)),
+			Files:  make(map[string]string, len(cfg.Form.Files)),
+		}
+		for k, v := range cfg.Form.Fields {
+			resolved := resolveGeneratorRefs(v, genReg, nodeLog)
+			if input != nil && input.Variables != nil {
+				resolved = resolveWithVariables(resolved, input.Variables)
+			}
+			form.Fields[k] = resolved
+		}
+		for k, v := range cfg.Form.Files {
+			resolved := resolveGeneratorRefs(v, genReg, nodeLog)
+			if input != nil && input.Variables != nil {
+				resolved = resolveWithVariables(resolved, input.Variables)
+			}
+			form.Files[k] = resolved
+		}
+		req.Form = form
+		nodeLog.Debug("resolved multipart form",
+			logger.F("field_count", len(form.Fields)),
+			logger.F("file_count", len(form.Files)),
 		)
 	}
 

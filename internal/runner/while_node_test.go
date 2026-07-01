@@ -726,6 +726,38 @@ func TestBuildStepHTTPRequest_NoBody(t *testing.T) {
 	assert.Empty(t, req.Body)
 }
 
+func TestBuildStepHTTPRequest_FormFieldsAndFiles(t *testing.T) {
+	cfg := &stepRequestConfig{
+		Method: "POST",
+		URL:    "http://example.com/upload",
+		Form: &stepFormConfig{
+			Fields: map[string]string{"seq": "S-${x}"},
+			Files:  map[string]string{"photo": "/tmp/${name}.jpg"},
+		},
+	}
+	vars := map[string]any{"x": "1", "name": "comments"}
+	req := buildStepHTTPRequest(cfg, vars, newTestLogger())
+	require.NotNil(t, req)
+	require.NotNil(t, req.Form)
+	assert.Equal(t, "S-1", req.Form.Fields["seq"])
+	assert.Equal(t, "/tmp/comments.jpg", req.Form.Files["photo"])
+}
+
+func TestBuildStepHTTPRequest_FormOverridesBody(t *testing.T) {
+	cfg := &stepRequestConfig{
+		Method: "POST",
+		URL:    "http://example.com",
+		Body:   `{"ignored":true}`,
+		Form: &stepFormConfig{
+			Fields: map[string]string{"used": "yes"},
+		},
+	}
+	req := buildStepHTTPRequest(cfg, nil, newTestLogger())
+	require.NotNil(t, req)
+	require.NotNil(t, req.Form)
+	assert.Equal(t, "yes", req.Form.Fields["used"])
+}
+
 func TestExecuteWhile_MultipleExitConditions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
