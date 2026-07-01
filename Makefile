@@ -36,6 +36,7 @@ help:
 	@echo "Other:"
 	@echo "  test           Run all Go tests"
 	@echo "  lint           Run Go linter"
+	@echo "  assets         Fetch go:embed assets (echarts.min.js) required for build"
 	@echo "  plugins-build  Build all SO plugins under plugins/"
 	@echo "  plugins-clean  Remove all compiled .so files (alias for clean-so)"
 
@@ -43,9 +44,32 @@ help:
 # Build
 # ============================================================
 
+# assets: ensure embedded assets required by go:embed exist.
+# - echarts.min.js is sourced from frontend node_modules if available,
+#   otherwise fetched from CDN matching the version pinned in
+#   web/app/package.json (so a fresh clone without npm install can still build).
+assets:
+	@mkdir -p internal/api
+	@if [ -f internal/api/echarts.min.js ]; then \
+		echo "echarts.min.js already present, skip."; \
+	elif [ -f web/app/node_modules/echarts/dist/echarts.min.js ]; then \
+		cp web/app/node_modules/echarts/dist/echarts.min.js internal/api/echarts.min.js; \
+		echo "Copied echarts.min.js from web/app/node_modules."; \
+	else \
+		echo "Fetching echarts.min.js from CDN (web/app/node_modules not available)..."; \
+		echarts_ver=$$(node -p "require('./web/app/package.json').dependencies.echarts" 2>/dev/null | sed 's/[\^~]//'); \
+		[ -z "$$echarts_ver" ] && echarts_ver="5"; \
+		echo "  using echarts@$$echarts_ver"; \
+		curl -fsSL "https://cdn.jsdelivr.net/npm/echarts@$$echarts_ver/dist/echarts.min.js" \
+			-o internal/api/echarts.min.js || { \
+				echo "ERROR: failed to fetch echarts.min.js, run 'cd web/app && npm install' first" >&2; exit 1; \
+			}; \
+		echo "Fetched echarts.min.js from CDN."; \
+	fi
+
 # Compile plugins and main binary in the same build session
 # to ensure identical build cache (required by Go plugin mechanism).
-build-all:
+build-all: assets
 	@echo "Building SO plugins + main binary..."
 	@for dir in $(PLUGIN_DIRS); do \
 		name=$$(basename $$dir); \
