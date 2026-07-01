@@ -29,6 +29,8 @@ salvo
 
 # go
 *.cover
+coverage.out
+coverage.html
 
 # docs
 docs/biz-migration/login.md

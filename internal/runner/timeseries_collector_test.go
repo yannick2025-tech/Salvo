@@ -202,6 +202,10 @@ func (m *mockStatsProvider) GlobalSnapshot() *Sample {
 
 	snap := m.globalSnapshots[m.index%len(m.globalSnapshots)]
 	m.index++
+	// Override timestamp with current time to simulate real stats provider
+	// behavior (prevents stale timestamps from breaking memory window cleanup
+	// when the mock cycles through its pre-generated samples).
+	snap.Timestamp = time.Now()
 	return &snap
 }
 

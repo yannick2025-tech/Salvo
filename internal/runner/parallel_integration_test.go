@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -316,8 +317,11 @@ func TestParallel_BuiltinFunctionInStepURL(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Len(t, capturedPaths, 2)
-	assert.Contains(t, capturedPaths[0], "/a?r=")
-	assert.Contains(t, capturedPaths[1], "/b?r=")
+	// Parallel steps execute concurrently, so the capture order is not
+	// guaranteed. Verify both paths are present regardless of order.
+	joined := strings.Join(capturedPaths, " ")
+	assert.Contains(t, joined, "/a?r=")
+	assert.Contains(t, joined, "/b?r=")
 }
 
 // ---------------------------------------------------------------------------

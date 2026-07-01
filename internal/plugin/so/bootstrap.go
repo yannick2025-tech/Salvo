@@ -30,7 +30,7 @@ func InitFromDB(ctx context.Context, soRepo repo.SOPluginRepo, reg *expr.Functio
 
 	var loadErrs error
 	for _, p := range plugins {
-		log.Printf("[so-bootstrap] loading plugin: name=%s, version=%s, filePath=%s, status=%d", p.Name, p.Version, p.FilePath, p.Status)
+		log.Printf("[so-bootstrap] loading plugin: name=%s, version=%s, filePath=%s, status=%s", p.Name, p.Version, p.FilePath, p.Status)
 		inst, err := loader.Load(p.FilePath)
 		if err != nil {
 			log.Printf("[so-bootstrap] FAILED to load plugin %q: %v", p.Name, err)

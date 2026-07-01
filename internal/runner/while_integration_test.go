@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -548,12 +548,18 @@ func TestWhile_ExpressionEngineInStepURL(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.NotEmpty(t, capturedPath)
-	assert.Contains(t, capturedPath, "/charge?token=abc123&timeout=")
+
+	// Parse the captured URL (use url.Parse for order-independent extraction —
+	// Go's url.Values.Encode() sorts keys alphabetically, so the parameter
+	// order may differ from the input).
+	parsedURL, err := url.Parse(capturedPath)
+	require.NoError(t, err)
+	query := parsedURL.Query()
+	assert.Equal(t, "abc123", query.Get("token"))
+	require.NotEmpty(t, query.Get("timeout"))
 
 	// Verify timeout is a number in [60, 600].
-	timeoutStart := strings.Index(capturedPath, "timeout=") + len("timeout=")
-	timeoutStr := capturedPath[timeoutStart:]
-	timeoutVal, err := strconv.Atoi(timeoutStr)
+	timeoutVal, err := strconv.Atoi(query.Get("timeout"))
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, timeoutVal, 60)
 	assert.LessOrEqual(t, timeoutVal, 600)

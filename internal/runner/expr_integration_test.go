@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -407,23 +408,21 @@ func TestRunner_HTTPNode_ExpressionEngine(t *testing.T) {
 	defer mu.Unlock()
 	require.NotEmpty(t, capturedURL)
 
-	// Extract min and max from the captured URL
-	assert.Contains(t, capturedURL, "min=")
-	assert.Contains(t, capturedURL, "max=")
+	// Extract min and max from the captured URL (use url.Parse for
+	// order-independent extraction — Go's url.Values.Encode() sorts keys
+	// alphabetically, so the parameter order may differ from the input).
+	parsedURL, err := url.Parse(capturedURL)
+	require.NoError(t, err)
+	query := parsedURL.Query()
+	require.NotEmpty(t, query.Get("min"))
+	require.NotEmpty(t, query.Get("max"))
 
-	// Parse min value
-	minParts := strings.SplitN(capturedURL, "min=", 2)
-	require.Len(t, minParts, 2)
-	minStr := strings.SplitN(minParts[1], "&", 2)[0]
-	minVal, err := strconv.Atoi(minStr)
+	minVal, err := strconv.Atoi(query.Get("min"))
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, minVal, 1)
 	assert.LessOrEqual(t, minVal, 10)
 
-	// Parse max value
-	maxParts := strings.SplitN(capturedURL, "max=", 2)
-	require.Len(t, maxParts, 2)
-	maxVal, err := strconv.Atoi(maxParts[1])
+	maxVal, err := strconv.Atoi(query.Get("max"))
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, maxVal, 100)
 	assert.LessOrEqual(t, maxVal, 200)
@@ -949,10 +948,12 @@ func TestRunner_SOPluginInHTTPContext(t *testing.T) {
 	require.NotEmpty(t, capturedURL)
 	assert.Contains(t, capturedURL, "/api/login?token=")
 
-	// Verify the token parameter is present and non-empty.
-	tokenStart := strings.Index(capturedURL, "token=") + len("token=")
-	require.Greater(t, tokenStart, len("token="))
-	token := capturedURL[tokenStart:]
+	// Parse the captured URL to properly extract the token (url.Values.Encode()
+	// percent-encodes base64 characters like +, /, =, so direct string slicing
+	// would yield invalid base64).
+	parsedURL, err := url.Parse(capturedURL)
+	require.NoError(t, err)
+	token := parsedURL.Query().Get("token")
 	require.NotEmpty(t, token)
 	// The token should be base64-encoded (it's the plugin's ciphertext output).
 	_, err = base64.StdEncoding.DecodeString(token)

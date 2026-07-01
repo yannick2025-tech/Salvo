@@ -1133,7 +1133,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     </section>
     {{end}}
 
-    {{if gt (len .SystemMetrics.TimeSeries) 0}}
+    {{if and .SystemMetrics (gt (len .SystemMetrics.TimeSeries) 0)}}
     <div class="sys-table-section">
         <div class="table-header-row">
             <h4>系统指标详细数据</h4>
