@@ -10,7 +10,7 @@ BIN ?= bin/salvo
 SHELL := /bin/bash
 
 # Auto-discover plugin directories (each must contain a main.go)
-PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d)
+PLUGIN_DIRS := $(shell find plugins -mindepth 1 -maxdepth 1 -type d ! -name shared)
 
 # Extract a scalar value from a top-level YAML section in $(CONFIG).
 # Usage: $(call yaml_get,<section>,<key>)
