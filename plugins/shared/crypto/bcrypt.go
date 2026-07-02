@@ -1,12 +1,9 @@
-// Package bcryptsalt is a modified version of golang.org/x/crypto/bcrypt
-// that supports passing a custom salt parameter.
+// Package crypto — bcrypt with custom salt support.
 //
-// Modified function signature:
-//
-//	GenerateFromPassword(password []byte, salt string, cost int) ([]byte, error)
-//
-// The salt parameter should be in format "$2a$10$saltstring..." (the full bcrypt salt string).
-package bcryptsalt
+// 业务背景：标准库 golang.org/x/crypto/bcrypt 使用随机 salt，
+// 无法满足业务系统（如登录、支付密码）"传入固定 salt 进行 hashpw" 的需求。
+// 此实现从 golang.org/x/crypto/bcrypt 修改而来，支持传入完整 salt 字符串。
+package crypto
 
 import (
 	"crypto/subtle"
@@ -19,22 +16,22 @@ import (
 )
 
 const (
-	MinCost     int = 4
-	MaxCost     int = 31
-	DefaultCost int = 10
+	bcryptMinCost     int = 4
+	bcryptMaxCost     int = 31
+	bcryptDefaultCost int = 10
 )
 
 const (
-	majorVersion       = '2'
-	minorVersion       = 'a'
-	maxSaltSize        = 16
-	maxCryptedHashSize = 23
-	encodedSaltSize    = 22
-	encodedHashSize    = 31
-	minHashSize        = 59
+	bcryptMajorVersion       = '2'
+	bcryptMinorVersion       = 'a'
+	bcryptMaxSaltSize        = 16
+	bcryptMaxCryptedHashSize = 23
+	bcryptEncodedSaltSize    = 22
+	bcryptEncodedHashSize    = 31
+	bcryptMinHashSize        = 59
 )
 
-var magicCipherData = []byte{
+var bcryptMagicCipherData = []byte{
 	0x4f, 0x72, 0x70, 0x68,
 	0x65, 0x61, 0x6e, 0x42,
 	0x65, 0x68, 0x6f, 0x6c,
@@ -43,7 +40,7 @@ var magicCipherData = []byte{
 	0x6f, 0x75, 0x62, 0x74,
 }
 
-type hashed struct {
+type bcryptHashed struct {
 	hash  []byte
 	salt  []byte
 	cost  int
@@ -56,18 +53,28 @@ const bcryptBase64Alphabet = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 
 var bcryptBase64 = base64.NewEncoding(bcryptBase64Alphabet).WithPadding(base64.NoPadding)
 
-func base64Encode(src []byte) []byte {
+func bcryptBase64Encode(src []byte) []byte {
 	return []byte(bcryptBase64.EncodeToString(src))
 }
 
-func base64Decode(src []byte) ([]byte, error) {
+func bcryptBase64Decode(src []byte) ([]byte, error) {
 	return bcryptBase64.DecodeString(string(src))
 }
+
+// Bcrypt constants exported for convenience.
+const (
+	BcryptMinCost     = bcryptMinCost
+	BcryptMaxCost     = bcryptMaxCost
+	BcryptDefaultCost = bcryptDefaultCost
+)
 
 // GenerateFromPassword generates bcrypt hash using the provided salt string.
 // salt can be in format "$2a$10$saltstring..." (full bcrypt salt including prefix)
 // or just the base64-encoded salt portion (e.g. "XXXXXXXXXXXXXXXXXXXXXX").
 // If salt contains "$", the last segment after "$" is used as the raw salt.
+//
+// 与标准库 bcrypt.GenerateFromPassword(password, cost) 的区别：
+// 标准库生成随机 salt，此函数使用传入的 salt（业务系统要求固定 salt）。
 func GenerateFromPassword(password []byte, salt string, cost int) ([]byte, error) {
 	if len(password) > 72 {
 		return nil, errors.New("bcrypt: password length exceeds 72 bytes")
@@ -80,12 +87,12 @@ func GenerateFromPassword(password []byte, salt string, cost int) ([]byte, error
 		rawSalt = parts[len(parts)-1]
 	}
 
-	p := new(hashed)
-	p.major = majorVersion
-	p.minor = minorVersion
+	p := new(bcryptHashed)
+	p.major = bcryptMajorVersion
+	p.minor = bcryptMinorVersion
 
-	if cost < MinCost {
-		cost = DefaultCost
+	if cost < bcryptMinCost {
+		cost = bcryptDefaultCost
 	}
 	p.cost = cost
 	p.salt = []byte(rawSalt)
@@ -99,10 +106,10 @@ func GenerateFromPassword(password []byte, salt string, cost int) ([]byte, error
 }
 
 func bcryptInternal(password []byte, cost int, salt []byte) ([]byte, error) {
-	cipherData := make([]byte, len(magicCipherData))
-	copy(cipherData, magicCipherData)
+	cipherData := make([]byte, len(bcryptMagicCipherData))
+	copy(cipherData, bcryptMagicCipherData)
 
-	c, err := expensiveBlowfishSetup(password, uint32(cost), salt)
+	c, err := bcryptExpensiveBlowfishSetup(password, uint32(cost), salt)
 	if err != nil {
 		return nil, err
 	}
@@ -113,11 +120,11 @@ func bcryptInternal(password []byte, cost int, salt []byte) ([]byte, error) {
 		}
 	}
 
-	return base64Encode(cipherData[:maxCryptedHashSize]), nil
+	return bcryptBase64Encode(cipherData[:bcryptMaxCryptedHashSize]), nil
 }
 
-func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cipher, error) {
-	csalt, err := base64Decode(salt)
+func bcryptExpensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cipher, error) {
+	csalt, err := bcryptBase64Decode(salt)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +146,7 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 	return c, nil
 }
 
-func (p *hashed) Hash() []byte {
+func (p *bcryptHashed) Hash() []byte {
 	arr := make([]byte, 60)
 	arr[0] = '$'
 	arr[1] = p.major
@@ -155,16 +162,16 @@ func (p *hashed) Hash() []byte {
 	arr[n] = '$'
 	n++
 	copy(arr[n:], p.salt)
-	n += encodedSaltSize
+	n += bcryptEncodedSaltSize
 	copy(arr[n:], p.hash)
-	n += encodedHashSize
+	n += bcryptEncodedHashSize
 	return arr[:n]
 }
 
-// CompareHashAndPassword compares a bcrypt hashed password with its possible
-// plaintext equivalent. Returns nil on success, or an error on failure.
-func CompareHashAndPassword(hashedPassword, password []byte) error {
-	p, err := newFromHash(hashedPassword)
+// BcryptCompareHashAndPassword compares a bcrypt hashed password with its
+// possible plaintext equivalent. Returns nil on success, or an error on failure.
+func BcryptCompareHashAndPassword(hashedPassword, password []byte) error {
+	p, err := bcryptNewFromHash(hashedPassword)
 	if err != nil {
 		return err
 	}
@@ -174,7 +181,7 @@ func CompareHashAndPassword(hashedPassword, password []byte) error {
 		return err
 	}
 
-	otherP := &hashed{otherHash, p.salt, p.cost, p.major, p.minor}
+	otherP := &bcryptHashed{otherHash, p.salt, p.cost, p.major, p.minor}
 	if subtle.ConstantTimeCompare(p.Hash(), otherP.Hash()) == 1 {
 		return nil
 	}
@@ -182,11 +189,11 @@ func CompareHashAndPassword(hashedPassword, password []byte) error {
 	return errors.New("crypto/bcrypt: hashedPassword is not the hash of the given password")
 }
 
-func newFromHash(hashedSecret []byte) (*hashed, error) {
-	if len(hashedSecret) < minHashSize {
+func bcryptNewFromHash(hashedSecret []byte) (*bcryptHashed, error) {
+	if len(hashedSecret) < bcryptMinHashSize {
 		return nil, errors.New("crypto/bcrypt: hashedSecret too short to be a bcrypted password")
 	}
-	p := new(hashed)
+	p := new(bcryptHashed)
 	n, err := p.decodeVersion(hashedSecret)
 	if err != nil {
 		return nil, err
@@ -198,22 +205,22 @@ func newFromHash(hashedSecret []byte) (*hashed, error) {
 	}
 	hashedSecret = hashedSecret[n:]
 
-	p.salt = make([]byte, encodedSaltSize, encodedSaltSize+2)
-	copy(p.salt, hashedSecret[:encodedSaltSize])
+	p.salt = make([]byte, bcryptEncodedSaltSize, bcryptEncodedSaltSize+2)
+	copy(p.salt, hashedSecret[:bcryptEncodedSaltSize])
 
-	hashedSecret = hashedSecret[encodedSaltSize:]
+	hashedSecret = hashedSecret[bcryptEncodedSaltSize:]
 	p.hash = make([]byte, len(hashedSecret))
 	copy(p.hash, hashedSecret)
 
 	return p, nil
 }
 
-func (p *hashed) decodeVersion(sbytes []byte) (int, error) {
+func (p *bcryptHashed) decodeVersion(sbytes []byte) (int, error) {
 	if sbytes[0] != '$' {
 		return -1, fmt.Errorf("crypto/bcrypt: bcrypt hashes must start with '$', but hashedSecret started with '%c'", sbytes[0])
 	}
-	if sbytes[1] > majorVersion {
-		return -1, fmt.Errorf("crypto/bcrypt: bcrypt algorithm version '%c' requested is newer than current version '%c'", sbytes[1], majorVersion)
+	if sbytes[1] > bcryptMajorVersion {
+		return -1, fmt.Errorf("crypto/bcrypt: bcrypt algorithm version '%c' requested is newer than current version '%c'", sbytes[1], bcryptMajorVersion)
 	}
 	p.major = sbytes[1]
 	n := 3
@@ -224,10 +231,10 @@ func (p *hashed) decodeVersion(sbytes []byte) (int, error) {
 	return n, nil
 }
 
-func (p *hashed) decodeCost(sbytes []byte) (int, error) {
+func (p *bcryptHashed) decodeCost(sbytes []byte) (int, error) {
 	cost := int((sbytes[0]-'0')*10 + (sbytes[1] - '0'))
-	if cost < MinCost || cost > MaxCost {
-		return -1, fmt.Errorf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", cost, MinCost, MaxCost)
+	if cost < bcryptMinCost || cost > bcryptMaxCost {
+		return -1, fmt.Errorf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", cost, bcryptMinCost, bcryptMaxCost)
 	}
 	p.cost = cost
 	return 3, nil

@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/plugin/so/contract"
-	"github.com/yannick2025-tech/Salvo/plugins/login/bcryptsalt"
+	"github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
 )
 
 const (
@@ -156,21 +156,7 @@ func (p *loginPlugin) encryptUsername(args []string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("decode iv: %w", err)
 	}
-	plaintext := []byte(args[2])
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("new cipher: %w", err)
-	}
-
-	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
-	if err != nil {
-		return "", fmt.Errorf("new gcm: %w", err)
-	}
-
-	// GCM: output = ciphertext || tag (tag appended by default).
-	ciphertext := gcm.Seal(nil, iv, plaintext, nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return crypto.GCMEncrypt(args[2], key, iv)
 }
 
 // --- Operation: get_salt ---
@@ -240,27 +226,7 @@ func (p *loginPlugin) decryptSalt(args []string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("decode iv: %w", err)
 	}
-	ciphertext, err := base64.StdEncoding.DecodeString(saltB64)
-	if err != nil {
-		return "", fmt.Errorf("decode salt_str: %w", err)
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("new cipher: %w", err)
-	}
-
-	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
-	if err != nil {
-		return "", fmt.Errorf("new gcm: %w", err)
-	}
-
-	plaintext, err := gcm.Open(nil, iv, ciphertext, nil)
-	if err != nil {
-		return "", fmt.Errorf("gcm decrypt: %w", err)
-	}
-
-	return string(plaintext), nil
+	return crypto.GCMDecrypt(saltB64, key, iv)
 }
 
 // --- Operation: bcrypt_hash ---
@@ -277,15 +243,15 @@ func (p *loginPlugin) bcryptHash(args []string) (string, error) {
 	saltStr := args[1]
 
 	// 从完整 salt 字符串中提取 rounds/cost.
-	cost := bcryptsalt.DefaultCost
+	cost := crypto.BcryptDefaultCost
 	parts := strings.Split(saltStr, "$")
 	if len(parts) >= 3 {
 		if n, err := fmt.Sscanf(parts[2], "%d", &cost); err != nil || n != 1 {
-			cost = bcryptsalt.DefaultCost
+			cost = crypto.BcryptDefaultCost
 		}
 	}
 
-	hashed, err := bcryptsalt.GenerateFromPassword(password, saltStr, cost)
+	hashed, err := crypto.GenerateFromPassword(password, saltStr, cost)
 	if err != nil {
 		return "", fmt.Errorf("bcrypt generate: %w", err)
 	}
@@ -317,19 +283,7 @@ func (p *loginPlugin) buildLoginInfo(args []string) (string, error) {
 	}
 
 	loginInfo := keyB64 + ":" + hashedPwd
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("new cipher: %w", err)
-	}
-
-	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
-	if err != nil {
-		return "", fmt.Errorf("new gcm: %w", err)
-	}
-
-	ciphertext := gcm.Seal(nil, iv, []byte(loginInfo), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return crypto.GCMEncrypt(loginInfo, key, iv)
 }
 
 // --- Operation: username_login ---
