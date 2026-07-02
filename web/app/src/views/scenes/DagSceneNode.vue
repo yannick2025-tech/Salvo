@@ -5,7 +5,7 @@
 
     <div class="node-body" @click.stop="toggleExpand">
       <div :class="['node-icon-wrap', data.nodeType]">
-        <span class="node-icon">{{ data.icon }}</span>
+        <span class="node-icon" v-html="data.icon"></span>
       </div>
       <div class="node-content">
         <span class="node-label">{{ data.label }}</span>
@@ -34,7 +34,7 @@
           @click.stop="selectChild(child)"
           @dblclick.stop="$emit('edit', child)"
         >
-          <span :class="['child-icon', child.type]">{{ getChildIcon(child.type) }}</span>
+          <span :class="['child-icon', child.type]" v-html="getChildIcon(child.type)"></span>
           <span class="child-name">{{ child.name }}</span>
           <span :class="['child-type-badge', child.type]">{{ getNodeTypeLabel(child.type) }}</span>
         </div>
@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { Handle, Position, useVueFlow } from '@vue-flow/core'
+import { getDagIcon } from './dagIcons'
 import type { NodeDTO, EdgeDTO } from '@/types'
 
 const props = defineProps<{
@@ -153,20 +154,7 @@ onUnmounted(() => {
 })
 
 function getChildIcon(type: string): string {
-  const icons: { [key: string]: string } = {}
-  icons['setup'] = '\u25B6'
-  icons['http'] = '\u21C4'
-  icons['delay'] = '\u23F1'
-  icons['condition'] = '\u25C7'
-  icons['if-else'] = 'Y'
-  icons['teardown'] = '\u25A0'
-  icons['group'] = '\u229E'
-  icons['timer'] = '\u23F2'
-  icons['while'] = '\u21BA'
-  icons['parallel'] = '\u2225'
-  icons['sub_flow'] = '\u229E'
-  icons['loop'] = '\u21BB'
-  return icons[type] || '?'
+  return getDagIcon(type)
 }
 
 function getNodeTypeLabel(type: string): string {
@@ -222,6 +210,7 @@ function getNodeTypeLabel(type: string): string {
 .scene-node.parallel { border-left: 3.5px solid #16a085; }
 .scene-node.sub_flow { border-left: 3.5px solid #2980b9; }
 .scene-node.loop { border-left: 3.5px solid #d35400; }
+.scene-node.generator { border-left: 3.5px solid #00bcd4; }
 
 .node-body {
   display: flex;
@@ -254,6 +243,7 @@ function getNodeTypeLabel(type: string): string {
 .node-icon-wrap.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
 .node-icon-wrap.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
 .node-icon-wrap.loop { background: rgba(211,84,0,0.12); color: #d35400; }
+.node-icon-wrap.generator { background: rgba(0,188,212,0.12); color: #00bcd4; }
 
 .node-icon { font-size: 15px; line-height: 1; }
 
@@ -301,6 +291,7 @@ function getNodeTypeLabel(type: string): string {
 .type-badge.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
 .type-badge.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
 .type-badge.loop { background: rgba(211,84,0,0.12); color: #d35400; }
+.type-badge.generator { background: rgba(0,188,212,0.12); color: #00bcd4; }
 
 .loop-badge {
   font-size: 9.5px;
@@ -480,6 +471,7 @@ function getNodeTypeLabel(type: string): string {
 .child-icon.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
 .child-icon.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
 .child-icon.loop { background: rgba(211,84,0,0.12); color: #d35400; }
+.child-icon.generator { background: rgba(0,188,212,0.12); color: #00bcd4; }
 
 .child-name {
   font-size: 11.5px;
@@ -513,6 +505,7 @@ function getNodeTypeLabel(type: string): string {
 .child-type-badge.parallel { background: rgba(22,160,133,0.12); color: #16a085; }
 .child-type-badge.sub_flow { background: rgba(41,128,185,0.12); color: #2980b9; }
 .child-type-badge.loop { background: rgba(211,84,0,0.12); color: #d35400; }
+.child-type-badge.generator { background: rgba(0,188,212,0.12); color: #00bcd4; }
 </style>
 
 <style>

@@ -67,6 +67,7 @@ import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge, Connection, NodeChange } from '@vue-flow/core'
 import dagre from 'dagre'
 import SceneNode from './DagSceneNode.vue'
+import { getDagIcon } from './dagIcons'
 import type { NodeDTO, EdgeDTO } from '@/types'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -107,8 +108,7 @@ function getNodeTypeLabel(type: string) {
 }
 
 function getNodeIcon(type: string) {
-  const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■', group: '⊞', timer: '⏲', while: '↺', parallel: '∥', sub_flow: '⊞', loop: '↻' }
-  return map[type] || '?'
+  return getDagIcon(type)
 }
 
 function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x: number; y: number }> {
