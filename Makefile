@@ -48,6 +48,7 @@ help:
 	@echo "  test           Run all Go tests"
 	@echo "  lint           Run Go linter"
 	@echo "  assets         Fetch go:embed assets (echarts.min.js) required for build"
+	@echo "  frontend-deps  Install frontend npm dependencies (web/app/node_modules)"
 	@echo "  plugins-build  Build all SO plugins under plugins/"
 	@echo "  plugins-clean  Remove all compiled .so files (alias for clean-so)"
 
@@ -55,11 +56,26 @@ help:
 # Build
 # ============================================================
 
+# frontend-deps: install npm dependencies for the Vite frontend.
+# Skips when web/app/node_modules/.bin/vite already present (fast no-op in CI
+# or re-runs).  This target is a prerequisite of `assets` (so it runs on
+# `make build-all`) and is also checked before `make start` launches the
+# frontend dev server — ensuring a fresh clone / new environment never
+# hits the "sh: 1: vite not found" error.
+.PHONY: frontend-deps
+frontend-deps:
+	@if [ ! -x web/app/node_modules/.bin/vite ]; then \
+		echo "Installing frontend dependencies (web/app/node_modules missing)..."; \
+		cd web/app && npm install || { echo "ERROR: npm install failed" >&2; exit 1; }; \
+	else \
+		echo "Frontend dependencies OK (vite found in node_modules)."; \
+	fi
+
 # assets: ensure embedded assets required by go:embed exist.
 # - echarts.min.js is sourced from frontend node_modules if available,
 #   otherwise fetched from CDN matching the version pinned in
 #   web/app/package.json (so a fresh clone without npm install can still build).
-assets:
+assets: frontend-deps
 	@mkdir -p internal/api
 	@if [ -f internal/api/echarts.min.js ]; then \
 		echo "echarts.min.js already present, skip."; \
@@ -100,7 +116,7 @@ rebuild: clean-so build-all
 # Start / Stop / Restart
 # ============================================================
 
-start:
+start: frontend-deps
 	@mkdir -p logs
 	@# Start backend
 	@if lsof -i :$(BACKEND_PORT) >/dev/null 2>&1; then \
