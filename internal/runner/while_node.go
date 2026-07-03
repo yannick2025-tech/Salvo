@@ -10,6 +10,7 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/core/dag"
 	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
 )
@@ -35,6 +36,8 @@ type exitCondition struct {
 // stepConfig defines a child step within a while node.
 type stepConfig struct {
 	Name         string                  `json:"name"`
+	Type         string                  `json:"type,omitempty"` // "http" (default) | "generator"
+	Config       map[string]any          `json:"config,omitempty"`
 	Condition    *stepConditionConfig    `json:"condition,omitempty"`
 	Request      *stepRequestConfig      `json:"request,omitempty"`
 	Extract      []extractEntry          `json:"extract,omitempty"`
@@ -295,67 +298,108 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 				continue
 			}
 
-			// Execute HTTP request (if any).
-			if step.Request != nil {
-				maxAttempts := 1
-				if step.Retry != nil && step.Retry.MaxAttempts > 0 {
-					maxAttempts = step.Retry.MaxAttempts
+			// Execute step based on type
+				stepType := step.Type
+				if stepType == "" {
+					stepType = "http" // default
 				}
 
-				var stepErr error
-				for attempt := 0; attempt < maxAttempts; attempt++ {
-					if attempt > 0 {
-						nodeLog.Debug("retrying step",
+				if stepType == "generator" {
+					// Execute generator step
+					varsMu.Lock()
+					stepErr := n.executeWhileStepGenerator(ctx, &step, loopVars, nodeLog)
+					varsMu.Unlock()
+
+					if stepErr != nil {
+						consecutiveFailures[stepIdx]++
+						nodeLog.Warn("while generator step failed",
 							logger.F("step", step.Name),
-							logger.F("attempt", attempt+1),
-							logger.F("max", maxAttempts))
+							logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+							logger.F("error", stepErr))
+
+						// Check fail_after_consecutive.
+						failThreshold := cfg.FailAfterConsecutive
+						if step.FailAfterConsecutive > 0 {
+							failThreshold = step.FailAfterConsecutive
+						}
+						if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+							msg := cfg.FailMessage
+							if msg == "" {
+								msg = step.FailMessage
+							}
+							if msg == "" {
+								msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+							}
+							nodeLog.Error("while node failed due to consecutive failures",
+								logger.F("step", step.Name),
+								logger.F("failures", consecutiveFailures[stepIdx]),
+								logger.F("message", msg))
+							return nil, fmt.Errorf("while node: %s", msg)
+						}
+					} else {
+						consecutiveFailures[stepIdx] = 0
+					}
+				} else if step.Request != nil {
+					// Execute HTTP request (if any).
+					maxAttempts := 1
+					if step.Retry != nil && step.Retry.MaxAttempts > 0 {
+						maxAttempts = step.Retry.MaxAttempts
 					}
 
-					varsMu.Lock()
-					stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
-					varsMu.Unlock()
-					if stepErr == nil {
+					var stepErr error
+					for attempt := 0; attempt < maxAttempts; attempt++ {
+						if attempt > 0 {
+							nodeLog.Debug("retrying step",
+								logger.F("step", step.Name),
+								logger.F("attempt", attempt+1),
+								logger.F("max", maxAttempts))
+						}
+
+						varsMu.Lock()
+						stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
+						varsMu.Unlock()
+						if stepErr == nil {
+							break
+						}
+
+						// Check for 429 retry.
+						if step.Retry != nil && step.Retry.On429 == "retry" && isHTTP429Error(stepErr) {
+							continue
+						}
 						break
 					}
 
-					// Check for 429 retry.
-					if step.Retry != nil && step.Retry.On429 == "retry" && isHTTP429Error(stepErr) {
-						continue
-					}
-					break
-				}
-
-				if stepErr != nil {
-					_ = stepErr // used for consecutive failure tracking below
-					consecutiveFailures[stepIdx]++
-					nodeLog.Warn("while step failed",
-						logger.F("step", step.Name),
-						logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
-						logger.F("error", stepErr))
-
-					// Check fail_after_consecutive.
-					failThreshold := cfg.FailAfterConsecutive
-					if step.FailAfterConsecutive > 0 {
-						failThreshold = step.FailAfterConsecutive
-					}
-					if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
-						msg := cfg.FailMessage
-						if msg == "" {
-							msg = step.FailMessage
-						}
-						if msg == "" {
-							msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
-						}
-						nodeLog.Error("while node failed due to consecutive failures",
+					if stepErr != nil {
+						_ = stepErr // used for consecutive failure tracking below
+						consecutiveFailures[stepIdx]++
+						nodeLog.Warn("while step failed",
 							logger.F("step", step.Name),
-							logger.F("failures", consecutiveFailures[stepIdx]),
-							logger.F("message", msg))
-						return nil, fmt.Errorf("while node: %s", msg)
+							logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+							logger.F("error", stepErr))
+
+						// Check fail_after_consecutive.
+						failThreshold := cfg.FailAfterConsecutive
+						if step.FailAfterConsecutive > 0 {
+							failThreshold = step.FailAfterConsecutive
+						}
+						if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+							msg := cfg.FailMessage
+							if msg == "" {
+								msg = step.FailMessage
+							}
+							if msg == "" {
+								msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+							}
+							nodeLog.Error("while node failed due to consecutive failures",
+								logger.F("step", step.Name),
+								logger.F("failures", consecutiveFailures[stepIdx]),
+								logger.F("message", msg))
+							return nil, fmt.Errorf("while node: %s", msg)
+						}
+					} else {
+						consecutiveFailures[stepIdx] = 0
 					}
-				} else {
-					consecutiveFailures[stepIdx] = 0
 				}
-			}
 
 			// Apply think_time (random delay).
 			if step.ThinkTime != nil && step.ThinkTime.Min > 0 && step.ThinkTime.Max > 0 {
@@ -409,6 +453,73 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			}
 		}
 	}
+}
+
+// executeWhileStepGenerator executes a generator step in the while loop.
+func (n *sceneNode) executeWhileStepGenerator(ctx context.Context, step *stepConfig, loopVars map[string]any, nodeLog logger.Logger) error {
+	if step.Config == nil {
+		return fmt.Errorf("step %q: generator step requires config", step.Name)
+	}
+
+	expression, _ := step.Config["expression"].(string)
+	variable, _ := step.Config["variable"].(string)
+
+	if expression == "" || variable == "" {
+		return fmt.Errorf("step %q: generator requires expression and variable", step.Name)
+	}
+
+	nodeLog.Debug("executing while step generator",
+		logger.F("step", step.Name),
+		logger.F("expression", expression),
+		logger.F("variable", variable))
+
+	// Resolve variables in the expression
+	exprStr := resolveWithVariables(expression, loopVars)
+
+	// Resolve generator refs (${generator.xxx} patterns)
+	genReg := builtin.DefaultRegistry()
+	result := resolveGeneratorRefs(exprStr, genReg, nodeLog)
+
+	// Resolve expression engine functions (${__so(...)}, ${__random(...)}, etc.)
+	if n.exprReg != nil && strings.Contains(result, "${__") {
+		resolved, err := expr.Resolve(result, nil, n.exprReg)
+		if err != nil {
+			return fmt.Errorf("step %q: generator expression resolve failed: %w", step.Name, err)
+		}
+		result = resolved
+	}
+
+	// Store result in loopVars
+	loopVars[variable] = result
+
+	nodeLog.Debug("while step generator completed",
+		logger.F("step", step.Name),
+		logger.F("variable", variable),
+		logger.F("value", result))
+
+	// Extract variables from result if configured
+	if len(step.Extract) > 0 {
+		// Try to parse result as JSON
+		var resultData map[string]any
+		if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+			nodeLog.Debug("generator result is not JSON, skipping extract",
+				logger.F("step", step.Name),
+				logger.F("error", err))
+		} else {
+			for _, ext := range step.Extract {
+				value := resolveJSONPath(resultData, ext.Path)
+				if value != nil {
+					loopVars[ext.Variable] = value
+					nodeLog.Debug("extracted variable from generator",
+						logger.F("step", step.Name),
+						logger.F("variable", ext.Variable),
+						logger.F("value", value))
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // executeWhileStepHTTP executes an HTTP request step in the while loop.

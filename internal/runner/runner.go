@@ -1323,35 +1323,54 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 
 	nodeLog.Info("node execution started")
 
+	// Parse retry and extract configs
+	retryCfg := n.parseRetryConfig()
+	extractCfg := n.parseExtractConfig()
+
+	// Determine max attempts
+	maxAttempts := 1
+	if retryCfg != nil && retryCfg.MaxAttempts > 1 {
+		maxAttempts = retryCfg.MaxAttempts
+	}
+
 	var out *dag.Output
 	var err error
 
-	switch n.nodeType {
-	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
-		out, err = n.executeHTTP(ctx, input, nodeLog)
-	case model.NodeTypeDelay:
-		out, err = n.executeDelay(ctx, nodeLog)
-	case model.NodeTypeCondition:
-		out, err = n.executeCondition(input, nodeLog)
-	case model.NodeTypeIfElse:
-		out, err = n.executeIfElse(input, nodeLog)
-	case model.NodeTypeGroup:
-		out, err = n.executeGroup(ctx, input, nodeLog)
-	case model.NodeTypeWhile:
-		out, err = n.executeWhile(ctx, input, nodeLog)
-	case model.NodeTypeParallel:
-		out, err = n.executeParallel(ctx, input, nodeLog)
-	case model.NodeTypeLoop:
-		out, err = n.executeLoop(ctx, input, nodeLog)
-	case model.NodeTypeSubFlow:
-		out, err = n.executeSubFlow(ctx, input, nodeLog)
-	case model.NodeTypeTimer:
-		out, err = n.executeTimer(ctx, input, nodeLog)
-	case model.NodeTypeGenerator:
-		out, err = n.executeGenerator(ctx, input, nodeLog)
-	default:
-		nodeLog.Warn("unknown node type, skipping")
-		out = &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}
+	// Execute with retry logic
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Apply backoff delay if retrying
+		if attempt > 0 && retryCfg != nil {
+			backoff := calculateBackoff(retryCfg, attempt-1)
+			nodeLog.Info("retry backoff",
+				logger.F("attempt", attempt+1),
+				logger.F("max_attempts", maxAttempts),
+				logger.F("backoff", backoff.String()),
+			)
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		// Execute node logic
+		out, err = n.executeNodeLogic(ctx, input, nodeLog)
+
+		// Check if we should retry
+		if err == nil || !shouldRetry(retryCfg, err) {
+			break
+		}
+
+		nodeLog.Warn("node execution failed, will retry",
+			logger.F("attempt", attempt+1),
+			logger.F("max_attempts", maxAttempts),
+			logger.F("error", err),
+		)
+	}
+
+	// Apply extract post-processing if successful
+	if err == nil && out != nil && len(extractCfg) > 0 {
+		n.applyExtract(out, extractCfg, input, nodeLog)
 	}
 
 	if err != nil {
@@ -1366,6 +1385,37 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 	}
 
 	return out, err
+}
+
+// executeNodeLogic executes the actual node logic based on node type
+func (n *sceneNode) executeNodeLogic(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	switch n.nodeType {
+	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
+		return n.executeHTTP(ctx, input, nodeLog)
+	case model.NodeTypeDelay:
+		return n.executeDelay(ctx, input, nodeLog)
+	case model.NodeTypeCondition:
+		return n.executeCondition(input, nodeLog)
+	case model.NodeTypeIfElse:
+		return n.executeIfElse(input, nodeLog)
+	case model.NodeTypeGroup:
+		return n.executeGroup(ctx, input, nodeLog)
+	case model.NodeTypeWhile:
+		return n.executeWhile(ctx, input, nodeLog)
+	case model.NodeTypeParallel:
+		return n.executeParallel(ctx, input, nodeLog)
+	case model.NodeTypeLoop:
+		return n.executeLoop(ctx, input, nodeLog)
+	case model.NodeTypeSubFlow:
+		return n.executeSubFlow(ctx, input, nodeLog)
+	case model.NodeTypeTimer:
+		return n.executeTimer(ctx, input, nodeLog)
+	case model.NodeTypeGenerator:
+		return n.executeGenerator(ctx, input, nodeLog)
+	default:
+		nodeLog.Warn("unknown node type, skipping")
+		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
+	}
 }
 
 func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
@@ -1726,9 +1776,9 @@ func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, node
 	}, nil
 }
 
-func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*dag.Output, error) {
+func (n *sceneNode) executeDelay(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
-		Ms int64 `json:"ms"`
+		Ms any `json:"ms"` // float64, int, or string (variable ref like ${delay_ms})
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		if n.nodeStats != nil {
@@ -1738,13 +1788,58 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 		return nil, fmt.Errorf("parse delay config: %w", err)
 	}
 
-	dur := time.Duration(cfg.Ms) * time.Millisecond
+	var ms int64
+	switch v := cfg.Ms.(type) {
+	case float64:
+		ms = int64(v)
+	case int:
+		ms = int64(v)
+	case int64:
+		ms = v
+	case string:
+		resolved := v
+		// Resolve variables first: ${var-a} → value
+		if input != nil && input.Variables != nil {
+			resolved = resolveWithVariables(resolved, input.Variables)
+		}
+		// Resolve expressions: ${__random(100, 200)} → value
+		if n.exprReg != nil && strings.Contains(resolved, "${__") {
+			exprResolved, err := expr.Resolve(resolved, nil, n.exprReg)
+			if err != nil {
+				nodeLog.Warn("expression resolve failed in delay ms",
+					logger.F("expression", resolved),
+					logger.F("err", err),
+				)
+			} else {
+				resolved = exprResolved
+			}
+		}
+		// Support math expressions: "600 * 0.25" → "150"
+		if mathResult, err := expr.EvalMath(resolved); err == nil {
+			resolved = mathResult
+		}
+		parsed, err := strconv.ParseInt(resolved, 10, 64)
+		if err != nil {
+			nodeLog.Warn("failed to parse delay ms value",
+				logger.F("raw", v),
+				logger.F("resolved", resolved),
+				logger.F("err", err),
+			)
+			ms = 100
+		} else {
+			ms = parsed
+		}
+	default:
+		ms = 100
+	}
+
+	dur := time.Duration(ms) * time.Millisecond
 	if dur <= 0 {
 		dur = 100 * time.Millisecond
 	}
 
 	nodeLog.Info("delay node started",
-		logger.F("duration_ms", cfg.Ms),
+		logger.F("duration_ms", ms),
 		logger.F("resolved_duration", dur.String()),
 	)
 
@@ -1754,10 +1849,10 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 			n.nodeStats.RecordLatency(dur, true)
 		}
 		nodeLog.Info("delay node completed",
-			logger.F("duration_ms", cfg.Ms),
+			logger.F("duration_ms", ms),
 			logger.F("actual_ms", dur.Milliseconds()),
 		)
-		return &dag.Output{Response: map[string]any{"delay_ms": cfg.Ms}}, nil
+		return &dag.Output{Response: map[string]any{"delay_ms": ms}}, nil
 	case <-ctx.Done():
 		if n.nodeStats != nil {
 			n.nodeStats.RecordLatency(0, false)

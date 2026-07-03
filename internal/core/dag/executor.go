@@ -60,6 +60,13 @@ type Executor struct {
 	logError      func(msg string, keysAndValues ...any)
 }
 
+// WithInitialVars sets the initial variables on the executor.
+func WithInitialVars(vars map[string]any) ExecutorOption {
+	return func(e *Executor) {
+		e.initialVars = vars
+	}
+}
+
 // NewExecutor creates a new Executor for the given DAG.
 func NewExecutor(d *DAG, opts ...ExecutorOption) *Executor {
 	e := &Executor{
@@ -327,6 +334,9 @@ func (e *Executor) buildInput(nodeID string) *Input {
 // making it available to subsequent nodes in the DAG.
 func (e *Executor) SetVariable(key string, value any) {
 	e.varsMu.Lock()
+	if e.initialVars == nil {
+		e.initialVars = make(map[string]any)
+	}
 	e.initialVars[key] = value
 	e.varsMu.Unlock()
 }
