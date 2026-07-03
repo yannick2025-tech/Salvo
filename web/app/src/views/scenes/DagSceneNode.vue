@@ -1,5 +1,5 @@
 <template>
-  <div :class="['scene-node', data.nodeType, { selected, expanded: isGroupExpanded }]" :style="groupNodeStyle">
+  <div :class="['scene-node', data.nodeType, { selected, expanded: isGroupExpanded || isWhileExpanded }]" :style="expandableNodeStyle">
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
 
@@ -12,10 +12,14 @@
         <div class="node-meta-row">
           <span :class="['type-badge', data.nodeType]">{{ data.typeLabel }}</span>
           <span v-if="data.loopCount && data.loopCount > 1" class="loop-badge">x{{ data.loopCount }}</span>
+          <span v-if="isWhileType && whileStepCount > 0 && !isWhileExpanded" class="steps-badge">{{ whileStepCount }}步</span>
         </div>
       </div>
-      <button v-if="isGroupType && hasChildren" class="action-btn expand-btn" @click.stop="toggleExpand" :title="isGroupExpanded ? '折叠' : '展开'">
+      <button v-if="isGroupType && hasChildren" class="action-btn expand-btn expand-btn-group" @click.stop="toggleExpand" :title="isGroupExpanded ? '折叠' : '展开'">
         {{ isGroupExpanded ? '−' : '+' }}
+      </button>
+      <button v-if="isWhileType && whileStepCount > 0" class="action-btn expand-btn expand-btn-while" @click.stop="toggleExpand" :title="isWhileExpanded ? '折叠' : '展开步骤'">
+        {{ isWhileExpanded ? '−' : '+' }}
       </button>
       <div class="node-actions">
         <button class="action-btn edit" @click.stop="$emit('edit', data.originalNode)" title="编辑">✎</button>
@@ -48,6 +52,26 @@
       <div class="resize-handle" @mousedown.prevent="startResize">↘</div>
     </div>
 
+    <div v-if="isWhileType && isWhileExpanded && whileStepCount > 0" class="while-steps" @click.stop>
+      <div class="while-loop-indicator">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e44ad" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        <span class="while-loop-label">循环体</span>
+      </div>
+      <div v-for="(step, idx) in whileStepsList" :key="idx" class="while-step-row">
+        <div class="while-step-node">
+          <span :class="['child-icon', step.type]" v-html="getChildIcon(step.type)"></span>
+          <span class="child-name">{{ step.name }}</span>
+          <span :class="['child-type-badge', step.type]">{{ getNodeTypeLabel(step.type) }}</span>
+        </div>
+        <div v-if="idx < whileStepCount - 1" class="edge-arrow-down">
+          <svg viewBox="0 0 20 24" xmlns="http://www.w3.org/2000/svg">
+            <line x1="10" y1="0" x2="10" y2="18" stroke="rgba(142,68,173,0.5)" stroke-width="1.5" />
+            <polyline points="5,14 10,20 15,14" fill="none" stroke="rgba(142,68,173,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+
     <Handle type="source" id="s-bottom" :position="Position.Bottom" class="handle-source handle-bottom" />
   </div>
 </template>
@@ -69,6 +93,7 @@ const props = defineProps<{
     originalNode: any
     childNodes?: NodeDTO[]
     internalEdges?: EdgeDTO[]
+    whileSteps?: { name: string; type: string }[]
   }
   selected?: boolean
 }>()
@@ -81,10 +106,12 @@ const emit = defineEmits<{
 const { updateNodeDimensions } = useVueFlow()
 
 const isGroupExpanded = ref(false)
+const isWhileExpanded = ref(false)
 const selectedChildId = ref<string | null>(null)
 const groupChildrenRef = ref<HTMLDivElement | null>(null)
 
 const isGroupType = computed(() => props.data.nodeType === 'group')
+const isWhileType = computed(() => props.data.nodeType === 'while')
 
 const hasChildren = computed(() =>
   isGroupType.value &&
@@ -92,11 +119,18 @@ const hasChildren = computed(() =>
   props.data.childNodes.length > 0
 )
 
+const whileStepsList = computed(() => props.data.whileSteps || [])
+const whileStepCount = computed(() => whileStepsList.value.length)
+
 function toggleExpand() {
-  if (!isGroupType.value || !hasChildren.value) return
-  isGroupExpanded.value = !isGroupExpanded.value
-  selectedChildId.value = null
-  nextTick(() => refreshDimensions())
+  if (isGroupType.value && hasChildren.value) {
+    isGroupExpanded.value = !isGroupExpanded.value
+    selectedChildId.value = null
+    nextTick(() => refreshDimensions())
+  } else if (isWhileType.value && whileStepCount.value > 0) {
+    isWhileExpanded.value = !isWhileExpanded.value
+    nextTick(() => refreshDimensions())
+  }
 }
 
 function selectChild(child: NodeDTO) {
@@ -105,14 +139,14 @@ function selectChild(child: NodeDTO) {
 
 const sortedChildNodes = computed(() => props.data.childNodes || [])
 
-const groupNodeStyle = computed(() => {
-  if (!isGroupType.value || !isGroupExpanded.value || !hasChildren.value) return {}
-  return {
-    minWidth: '320px',
-    maxWidth: '600px',
-    width: 'auto',
-    overflow: 'visible',
+const expandableNodeStyle = computed(() => {
+  if (isGroupType.value && isGroupExpanded.value && hasChildren.value) {
+    return { minWidth: '320px', maxWidth: '600px', width: 'auto', overflow: 'visible' }
   }
+  if (isWhileType.value && isWhileExpanded.value && whileStepCount.value > 0) {
+    return { minWidth: '300px', maxWidth: '500px', width: 'auto', overflow: 'visible' }
+  }
+  return {}
 })
 
 function refreshDimensions() {
@@ -207,6 +241,7 @@ function getNodeTypeLabel(type: string): string {
 .scene-node.group.expanded { border-style: solid; border-color: rgba(26,188,156,0.4); background: var(--bg-secondary); }
 .scene-node.timer { border-left: 3.5px solid #e84393; }
 .scene-node.while { border-left: 3.5px solid #8e44ad; }
+.scene-node.while.expanded { border-style: solid; border-color: rgba(142,68,173,0.4); background: var(--bg-secondary); }
 .scene-node.parallel { border-left: 3.5px solid #16a085; }
 .scene-node.sub_flow { border-left: 3.5px solid #2980b9; }
 .scene-node.loop { border-left: 3.5px solid #d35400; }
@@ -323,6 +358,80 @@ function getNodeTypeLabel(type: string): string {
   background: rgba(26,188,156,0.1);
   color: #1abc9c;
   border-color: #1abc9c;
+}
+
+.expand-btn-while:hover {
+  background: rgba(142,68,173,0.1);
+  color: #8e44ad;
+  border-color: #8e44ad;
+}
+
+.steps-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1.5px 6px;
+  border-radius: 6px;
+  background: rgba(142,68,173,0.12);
+  color: #8e44ad;
+  letter-spacing: 0.04em;
+}
+
+/* ====== While Steps Area ====== */
+.while-steps {
+  position: relative;
+  margin: 4px 12px 10px;
+  padding: 8px 12px 12px;
+  border-top: 1px dashed rgba(142,68,173,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-height: 60px;
+  overflow: visible;
+}
+
+.while-loop-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+
+.while-loop-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8e44ad;
+  letter-spacing: 0.06em;
+}
+
+.while-step-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+.while-step-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid rgba(142,68,173,0.2);
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(142,68,173,0.06);
+  min-width: 180px;
+  max-width: 260px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.while-step-node:hover {
+  border-color: #8e44ad;
+  box-shadow: 0 2px 8px rgba(142,68,173,0.12);
+  transform: translateY(-1px);
 }
 
 .node-actions {
@@ -521,6 +630,11 @@ function getNodeTypeLabel(type: string): string {
 }
 
 .vue-flow__node.expanded-group {
+  overflow: visible !important;
+  z-index: 10;
+}
+
+.vue-flow__node.expanded {
   overflow: visible !important;
   z-index: 10;
 }

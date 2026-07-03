@@ -166,6 +166,7 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
     const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
     let loopCount = 1
     let childNodes: NodeDTO[] = []
+    let whileSteps: { name: string; type: string }[] = []
     try {
       const cfg = JSON.parse(n.config || '{}')
       loopCount = cfg.loop_count || 1
@@ -173,6 +174,9 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
         const childIdSet = new Set(cfg.node_ids as string[])
         const childMap = new Map(newNodes.filter(cn => childIdSet.has(cn.id)).map(cn => [cn.id, cn]))
         childNodes = (cfg.node_ids as string[]).map(id => childMap.get(id)).filter(Boolean) as NodeDTO[]
+      }
+      if (n.type === 'while' && cfg.steps && Array.isArray(cfg.steps)) {
+        whileSteps = (cfg.steps as any[]).map(s => ({ name: s.name || '', type: s.type || 'http' }))
       }
     } catch { /* ignore */ }
 
@@ -187,6 +191,9 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
 
     if (n.type === 'group') {
       baseData.childNodes = childNodes
+    }
+    if (n.type === 'while') {
+      baseData.whileSteps = whileSteps
     }
 
     return {
