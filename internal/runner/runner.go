@@ -1242,6 +1242,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 			}
 			childSN := &sceneNode{
 				id:            childModel.ID.String(),
+				name:          childModel.Name,
 				nodeType:      childModel.Type,
 				config:        childModel.Config,
 				loopCount:     childModel.LoopCount,
@@ -1288,6 +1289,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 
 type sceneNode struct {
 	id            string
+	name          string
 	nodeType      string
 	config        string
 	timeout       time.Duration
@@ -1377,10 +1379,12 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 		nodeLog.Error("node execution failed",
 			logger.F("error", err),
 			logger.F("node_type", n.nodeType),
+			logger.F("node_name", n.name),
 		)
 	} else {
 		nodeLog.Info("node execution completed",
 			logger.F("node_type", n.nodeType),
+			logger.F("node_name", n.name),
 		)
 	}
 
@@ -2141,6 +2145,7 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, error) {
 	sn := &sceneNode{
 		id:            n.ID.String(),
+		name:          n.Name,
 		nodeType:      n.Type,
 		config:        n.Config,
 		loopCount:     n.LoopCount,
