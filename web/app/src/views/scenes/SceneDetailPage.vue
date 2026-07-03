@@ -530,11 +530,81 @@
             <input v-model="nodeForm.conditionExpr" placeholder='${order_id} != ""' />
           </div>
         </template>
-        <div class="form-group">
-          <label>循环次数</label>
-          <input v-model.number="nodeForm.loop_count" type="number" min="1" />
-          <span class="field-hint">节点执行的循环次数，默认 1 次</span>
-        </div>
+        <template v-if="nodeForm.type === 'generator'">
+          <div class="form-group">
+            <label>表达式</label>
+            <input v-model="nodeForm.generatorExpr" placeholder='${__random(1, 100)}' />
+          </div>
+          <div class="form-group">
+            <label>变量名</label>
+            <input v-model="nodeForm.generatorVar" placeholder="my_var" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'timer'">
+          <div class="form-group">
+            <label>模式</label>
+            <select v-model="nodeForm.timerMode">
+              <option value="delay">延迟执行（单次）</option>
+              <option value="interval">间隔执行（循环）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>{{ nodeForm.timerMode === 'delay' ? '延迟时间(秒)' : '间隔时间(秒)' }}</label>
+            <input v-model="nodeForm.timerSeconds" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'group'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'while'">
+          <div class="form-group">
+            <label>退出条件</label>
+            <div v-for="(cond, ci) in nodeForm.whileExitConditions" :key="ci" class="exit-condition-row">
+              <input v-model="cond.variable" placeholder="变量名" class="cond-input" />
+              <select v-model="cond.operator" class="cond-select">
+                <option value="equals">等于 (==)</option>
+                <option value="not_equals">不等于 (!=)</option>
+                <option value="greater_than">大于 (&gt;)</option>
+                <option value="less_than">小于 (&lt;)</option>
+                <option value="greater_than_or_equal">大于等于 (&gt;=)</option>
+                <option value="less_than_or_equal">小于等于 (&lt;=)</option>
+              </select>
+              <input v-model="cond.value" placeholder="值" class="cond-input" />
+              <button class="btn-icon" @click="nodeForm.whileExitConditions.splice(ci, 1)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <button class="btn-sm" @click="nodeForm.whileExitConditions.push({ variable: '', operator: 'equals', value: '' })">+ 添加条件</button>
+          </div>
+          <div class="form-group">
+            <label>循环间隔(秒)</label>
+            <input v-model="nodeForm.whileIntervalSeconds" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+          <div class="form-group">
+            <label>最大迭代次数</label>
+            <input v-model="nodeForm.whileMaxIterations" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+          <div class="form-group">
+            <label>最大持续时间(分钟)</label>
+            <input v-model="nodeForm.whileMaxDurationMinutes" type="text" placeholder="0 表示无限制" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'loop'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
+        <template v-if="nodeForm.type !== 'generator' && nodeForm.type !== 'timer' && nodeForm.type !== 'group' && nodeForm.type !== 'while' && nodeForm.type !== 'loop' && nodeForm.type !== 'http' && nodeForm.type !== 'setup' && nodeForm.type !== 'teardown' && nodeForm.type !== 'delay' && nodeForm.type !== 'condition' && nodeForm.type !== 'if-else'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeNodeEditor">取消</button>
           <button class="btn-primary" @click="handleSaveNode">{{ editingNode ? '保存' : '添加' }}</button>
@@ -701,10 +771,10 @@ const pagedRows = computed(() => {
 const groupConfig = reactive({ node_ids: [] as string[], loop_count: '1', async: false })
 // Timer node config
 const timerConfig = reactive({ mode: 'delay', seconds: '1' })
-const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==', value: '' }], interval_seconds: 1, max_iterations: 100, max_duration_minutes: 0, fail_after_consecutive: 0, fail_message: '' })
+const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==', value: '' }], interval_seconds: '1', max_iterations: '100', max_duration_minutes: '0', fail_after_consecutive: '0', fail_message: '' })
 const parallelConfig = reactive({ async: false })
 const subFlowConfig = reactive({ scene_id: '', async: false })
-const loopConfig = reactive({ loop_count: 3 })
+const loopConfig = reactive({ loop_count: '3' })
 
 function parseVariables(sceneVars: string): { key: string; value: string }[] {
   try {
@@ -942,7 +1012,15 @@ const nodeForm = reactive({
   conditionExpr: '',
   extract: '',
   parentId: '',
-  loop_count: 1,
+  loop_count: '1',
+  generatorExpr: '',
+  generatorVar: '',
+  timerMode: 'delay',
+  timerSeconds: '1',
+  whileExitConditions: [{ variable: '', operator: '==', value: '' }],
+  whileIntervalSeconds: '1',
+  whileMaxIterations: '100',
+  whileMaxDurationMinutes: '0',
 })
 
 const editingConfig = reactive({ name: '' })
@@ -1360,14 +1438,34 @@ function editNode(node: NodeDTO) {
     nodeForm.delayMs = cfg.ms != null ? String(cfg.ms) : '1000'
     nodeForm.conditionExpr = cfg.expr || ''
     nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
-    nodeForm.loop_count = cfg.loop_count || 1
+    nodeForm.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
+
+    // Generator
+    nodeForm.generatorExpr = cfg.expression || ''
+    nodeForm.generatorVar = cfg.variable || ''
+
+    // Timer
+    nodeForm.timerMode = cfg.mode || 'delay'
+    nodeForm.timerSeconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+
+    // While - operator names match backend directly (equals, not_equals, etc.)
+    nodeForm.whileExitConditions = cfg.exit_conditions && cfg.exit_conditions.length > 0
+      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: c.operator || 'equals', value: c.value != null ? String(c.value) : '' }))
+      : [{ variable: '', operator: 'equals', value: '' }]
+    nodeForm.whileIntervalSeconds = cfg.interval_seconds != null ? String(cfg.interval_seconds) : '1'
+    nodeForm.whileMaxIterations = cfg.max_iterations != null ? String(cfg.max_iterations) : '100'
+    nodeForm.whileMaxDurationMinutes = cfg.max_duration_minutes != null ? String(cfg.max_duration_minutes) : '0'
+
     if (node.type === 'group') {
       groupConfig.node_ids = cfg.node_ids || []
-      groupConfig.loop_count = cfg.loop_count || 1
+      groupConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
     }
     if (node.type === 'timer') {
       timerConfig.mode = cfg.mode || 'delay'
-      timerConfig.seconds = cfg.seconds || 1
+      timerConfig.seconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+    }
+    if (node.type === 'loop') {
+      loopConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '3'
     }
   } catch {
     nodeForm.httpMethod = 'GET'
@@ -1377,7 +1475,15 @@ function editNode(node: NodeDTO) {
     nodeForm.delayMs = '1000'
     nodeForm.conditionExpr = ''
     nodeForm.extract = ''
-    nodeForm.loop_count = 1
+    nodeForm.loop_count = '1'
+    nodeForm.generatorExpr = ''
+    nodeForm.generatorVar = ''
+    nodeForm.timerMode = 'delay'
+    nodeForm.timerSeconds = '1'
+    nodeForm.whileExitConditions = [{ variable: '', operator: '==', value: '' }]
+    nodeForm.whileIntervalSeconds = '1'
+    nodeForm.whileMaxIterations = '100'
+    nodeForm.whileMaxDurationMinutes = '0'
   }
   showNodeEditor.value = true
 }
@@ -1432,22 +1538,32 @@ async function handleSaveNode() {
   } else if (nodeForm.type === 'group') {
     config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: nodeForm.loop_count, async: false })
   } else if (nodeForm.type === 'timer') {
-    config = JSON.stringify({ mode: timerConfig.mode, seconds: timerConfig.seconds })
+    config = JSON.stringify({ mode: nodeForm.timerMode, seconds: nodeForm.timerSeconds })
+  } else if (nodeForm.type === 'generator') {
+    config = JSON.stringify({ expression: nodeForm.generatorExpr, variable: nodeForm.generatorVar })
   } else if (nodeForm.type === 'while') {
-    config = JSON.stringify(whileConfig)
+    const exitConditions = nodeForm.whileExitConditions
+      .filter(c => c.variable !== '')
+      .map(c => ({ variable: c.variable, operator: c.operator, value: c.value }))
+    config = JSON.stringify({
+      exit_conditions: exitConditions,
+      interval_seconds: nodeForm.whileIntervalSeconds,
+      max_iterations: nodeForm.whileMaxIterations,
+      max_duration_minutes: nodeForm.whileMaxDurationMinutes,
+    })
   } else if (nodeForm.type === 'parallel') {
     config = JSON.stringify(parallelConfig)
   } else if (nodeForm.type === 'sub_flow') {
     config = JSON.stringify(subFlowConfig)
   } else if (nodeForm.type === 'loop') {
-    config = JSON.stringify(loopConfig)
+    config = JSON.stringify({ loop_count: nodeForm.loop_count })
   }
 
-  // Add loop_count for all types except group/timer
-  if (config !== '{}' && nodeForm.type !== 'group' && nodeForm.type !== 'timer' && nodeForm.loop_count > 1) {
+  // Add loop_count for types that support it (except group/timer/while/loop which handle it themselves)
+  if (config !== '{}' && nodeForm.type !== 'group' && nodeForm.type !== 'timer' && nodeForm.type !== 'while' && nodeForm.type !== 'loop' && parseInt(nodeForm.loop_count) > 1) {
     try {
       const cfg = JSON.parse(config)
-      cfg.loop_count = nodeForm.loop_count
+      cfg.loop_count = parseInt(nodeForm.loop_count)
       config = JSON.stringify(cfg)
     } catch { /* ignore */ }
   }
