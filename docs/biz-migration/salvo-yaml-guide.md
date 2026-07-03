@@ -411,7 +411,7 @@ teardown:
 支持两种模式：延迟(delay)和间隔(interval)。
 
 ```yaml
-# 模式1: 延迟(等同于 delay 节点，但支持秒)
+# 模式1: 延迟(等同于  节点，但支持秒)
 - name: 支付后等待
   type: timer
   config:

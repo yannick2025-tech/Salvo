@@ -1,464 +1,1453 @@
-flow_name: personal_card_charge
+name: 个人卡充电流程(Salvo适配版)
 description: |
-  个人卡充电流程(TaskType=0)。
-  payType=1(CARD_PAY)，支持B2B用户、VIP、安行充、签名机制。
-  完整链路：模拟器准备→创建订单→支付→启动充电→轮询→充电曲线→强制停止→支付未付→评论→重置。
+  个人卡充电流程。
+  payType=1(个人卡), payChannel=概率选择(微信70%/支付宝30%), orderSource=0(微信小程序)
+  依赖 SO 插件: login(登录), sign(RSA签名), paypwd(支付密码生成)
+  数据来源: CSV上传(用户手机号+充电枪编号), 概率/随机/计算字段由generator节点运行时生成
 
-data_generation:
-  data_sources:
-    users:
-      type: csv
-      file: "${USER_DATA_SOURCE}"
-      columns: [phone, userid, cardnum, b2b_userid, b2b_cardnum, b2b_cardpwd, user_vip, safe_buy_flag]
-    chargers:
-      type: csv
-      file: "${CHARGER_DATA_SOURCE}"
-      columns: [charger, pointId, equipNo, connectorId, stationId, power, city_code]
+# =============================================================================
+# 场景变量
+# =============================================================================
+variables:
+  # --- 环境 ---
+  - key: env_type
+    value: "uat1"
+  - key: baseurl
+    value: "https://uat-manhattan.shell.com.cn"
+  - key: gatewayurl
+    value: "http://gateway.ev-shell.com.cn"
+  - key: simurl
+    value: "http://gateway.ev-shell.com.cn"
+  # --- 登录 ---
+  - key: username
+    value: "18936879143"
+  - key: password
+    value: "Abcd1234!@#$"
+  - key: salt_base_url
+    value: "${baseurl}/jv/tob-adapter/tob-adapter-application/crm/jv/auth/v1"
+  - key: login_base_url
+    value: "${baseurl}/jv/tob-adapter/jv/auth/v1"
+  # --- 模拟器 ---
+  - key: sim_connect_ip
+    value: "iot-netty-sever-for-device"
+  - key: sim_port
+    value: "15051"
+  # --- C端 API 路径 ---
+  - key: api_get_toc_user_token
+    value: "/ev-tools/session/toc-session/get"
+  - key: api_get_sign_request
+    value: "/ev/toc-adapter/dict/v1/api-config"
+  - key: api_query_order
+    value: "/ev/toc-adapter/order/v1/query-order-by-status"
+  - key: api_pay_order
+    value: "/ev/toc-adapter/order/v1/order-pay"
+  - key: api_query_occupy_order
+    value: "/ev/toc-adapter/order/occupy-order/v1/query-occupy-order-by-status"
+  - key: api_pay_occupy_order
+    value: "/ev/toc-adapter/order/occupy-order/v1/pay-occupy-order"
+  - key: api_start_charging_info
+    value: "/ev/toc-adapter/charge/startup-charging/v1/info"
+  - key: api_get_user_id
+    value: "/ev/toc-adapter/crm/customer/v1/self-info"
+  - key: api_get_vip_info
+    value: "/ev/toc-adapter/user-vip/v1/query-user-vip-package"
+  - key: api_query_activity
+    value: "/ev/toc-adapter/station-activity/v1/query-station-activity-preferential"
+  - key: api_safe_config
+    value: "/ev/toc-adapter/station/v1/query-station-point-fee-detail"
+  - key: api_create_order
+    value: "/ev/toc-adapter/order/v1/create-charge-order"
+  - key: api_charging_data
+    value: "/ev/toc-adapter/charging-process-data/v1/query-by-order-id"
+  - key: api_charging_curve
+    value: "/ev/toc-adapter/charging-process-data/v1/charge-curve"
+  - key: api_stop_charge
+    value: "/ev/toc-adapter/order/v1/stop-charge"
+  - key: api_order_detail
+    value: "/ev/toc-adapter/order/v1/orderDetail"
+  - key: api_user_order_coupon
+    value: "/ev/toc-adapter/marketing/user-coupon/v1/query-user-order-coupon-list"
+  - key: api_get_tag
+    value: "/ev/toc-adapter/toc-tag/v1/get-all-star-tag"
+  - key: api_save_comment
+    value: "/ev/toc-adapter/toc-comment/v1/save-comment"
+  - key: api_gen_token
+    value: "/common/file-trans/inner/v1/generate-token"
+  - key: api_upload_file
+    value: "/common/file-trans/outer/v1/upload-file"
+  # --- 模拟器 API ---
+  - key: sim_cmds
+    value: "/iot/simulator/shell/ev/v1/cmds"
+  - key: sim_update_point_status
+    value: "/iot/simulator/shell/ev/v1/device/update-point-status"
+  - key: sim_set_charge_data
+    value: "/iot/simulator/shell/ev/v1/charging-process-data-param/set/"
+  - key: sim_force_close
+    value: "/iot/simulator/shell/ev/v1/force-close/"
+  - key: sim_stop_charge_reason
+    value: "/iot/simulator/shell/ev/v1/stop-charge-by-stop-reason/"
+  # --- 运行时变量 ---
+  - key: jwt_token
+    value: ""
+  - key: token
+    value: ""
+  - key: rsa_pri_key
+    value: ""
+  - key: aes_key
+    value: ""
+  - key: sign_apis_json
+    value: "[]"
+  - key: post_id
+    value: ""
+  - key: point_id_int
+    value: ""
+  - key: account_id
+    value: ""
+  - key: tenant_id
+    value: ""
+  - key: station_id
+    value: ""
+  - key: user_id
+    value: ""
+  - key: order_id
+    value: ""
+  - key: order_id_int
+    value: ""
+  - key: charging_status
+    value: ""
+  - key: password_enc
+    value: ""
+  - key: vip_use
+    value: "0"
+  - key: sell_buy_flag
+    value: "0"
+  - key: api_sign
+    value: ""
+  - key: api_ts
+    value: ""
+  - key: unpaid_order_id
+    value: ""
+  - key: occupy_order_id
+    value: ""
+  - key: charge_start_time_ms
+    value: ""
+  - key: stop_sent
+    value: "false"
+  - key: img_path
+    value: ""
+  - key: comment_tag_id
+    value: ""
+  - key: comment_star
+    value: ""
+  # --- 运行时生成字段(generator节点产出) ---
+  - key: auto_pay
+    value: ""
+  - key: force_stop_charge
+    value: ""
+  - key: charge_post_offline
+    value: ""
+  - key: raise_error
+    value: ""
+  - key: force_pay
+    value: ""
+  - key: pay_channel
+    value: ""
+  - key: user_vip
+    value: "0"
+  - key: charge_time
+    value: ""
+  - key: pre_occupy_time
+    value: ""
+  - key: after_occupy_time
+    value: ""
+  - key: soc
+    value: ""
+  - key: pre_pay_amount
+    value: ""
+  - key: limit_strategy
+    value: ""
+  - key: charge_post_offline_time
+    value: ""
+  - key: charge_post_online_time
+    value: ""
+  - key: raise_error_time
+    value: ""
 
-  config_params:
-    subTaskId:
-      function: snowflakeId
-    ifPrepare:
-      values: [1, 2]
-    orderSource:
-      values: [0]
-    payType:
-      values: [1]  # 1=CARD_PAY(固定)
-    payChannel:
-      values: [2]  # 2=CARD(固定)
-    preOccupyTime:
-      range: { min: "${CHARGE_PREOCCUPY_MIN}", max: "${CHARGE_PREOCCUPY_MAX}" }
-    afterOccupyTime:
-      range: { min: "${CHARGE_AFTEROCCUPY_MIN}", max: "${CHARGE_AFTEROCCUPY_MAX}" }
-    chargeTime:
-      range: { min: "${CARD_CHARGE_TIME_MIN}", max: "${CARD_CHARGE_TIME_MAX}" }
-    autoPay:
-      weighted_choice: { probability: "${CARD_AUTO_PAY_PROBABILITY}", true_value: 1, false_value: 0 }
-    forceStopCharge:
-      weighted_choice: { probability: "${CARD_FORCE_STOP_PROBABILITY}", true_value: 1, false_value: 0 }
-    chargePostOffline:
-      weighted_choice: { probability: "${CARD_CHARGE_POST_OFFLINE_PROBABILITY}", true_value: 1, false_value: 0 }
-    raiseErrorCode:
-      weighted_choice: { probability: "${CARD_RAISE_ERROR_PROBABILITY}", true_value: 1, false_value: 0 }
-    minChargeTime:
-      range: { min: "${MIN_CHARGE_TIME_MIN}", max: "${MIN_CHARGE_TIME_MAX}" }
-    minChargePower:
-      range: { min: "${MIN_CHARGE_POWER_MIN}", max: "${MIN_CHARGE_POWER_MAX}" }
-    maxChargePower:
-      range: { min: "${MAX_CHARGE_POWER_MIN}", max: "${MAX_CHARGE_POWER_MAX}" }
-    maxChargePowerKw:
-      expression: "${maxChargePower} / 1000"
-    minSoc:
-      range: { min: "${MIN_SOC_MIN}", max: "${MIN_SOC_MAX}" }
-    maxSoc:
-      range: { min: "${MAX_SOC_MIN}", max: "${MAX_SOC_MAX}" }
-    singleMaxPower:
-      range: { min: "${SINGLE_MAX_POWER_MIN}", max: "${SINGLE_MAX_POWER_MAX}" }
-    meterSamplePeriod:
-      range: { min: "${METER_SAMPLE_PERIOD_MIN}", max: "${METER_SAMPLE_PERIOD_MAX}" }
-    raiseErrorCodeVal:
-      values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
-    safeBuyFlag:
-      values: [0, 1]
-    userVip:
-      values: [true, false]
+# =============================================================================
+# 配置参数
+# =============================================================================
+config_params:
+  # === 硬编码常量(不变) ===
+  order_source: "0"             # 订单来源: 0=微信小程序 (WebChatMINI)
+  pay_type: "1"                 # 支付方式: 1=个人卡 (CardPay)
+  # === 充电数据参数(模拟器) ===
+  output_voltage_max: "750"     # 输出充电电压最大值
+  output_voltage_min: "200"     # 输出充电电压最小值
+  output_current_max: "250"     # 输出充电电流最大值
+  output_current_min: "0"      # 输出充电电流最小值
+  demand_voltage_max: "750"     # 需求充电电压最大值
+  demand_voltage_min: "200"     # 需求充电电压最小值
+  demand_current_max: "250"     # 需求充电电流最大值
+  demand_current_min: "0"      # 需求充电电流最小值
+  # === 占位订单支付参数 ===
+  occupy_pay_type_before: "5"   # 前占位支付方式: 5=预付
+  occupy_pay_type_after: "1"    # 后占位支付方式: 1=个人卡
+  occupy_pay_channel: "1"       # 占位支付通道: 1=微信
+  # === 故障码停止原因 ===
+  stop_reason: "20"             # 故障码: 20=电流异常
+  # =================================================================
+  # 概率权重配置(供generator节点的__weightedChoice使用)
+  # 格式: "值1=权重1,值2=权重2" 权重自动归一化
+  # =================================================================
+  auto_pay_prob: "1=50,0=50"                # 自动支付: 50%概率
+  force_stop_prob: "1=65,0=35"              # 强制停止充电: 65%概率
+  charge_post_offline_prob: "1=95,0=5"      # 强制桩离线: 95%概率
+  raise_error_prob: "1=30,0=70"             # 强制故障码: 30%概率
+  force_pay_prob: "1=50,0=50"               # 强制支付: 50%概率
+  pay_channel_prob: "1=70,2=30"             # 支付通道: 1=微信(70%), 2=支付宝(30%)
+  user_vip_prob: "1=0,0=100"                # VIP用户: 0%概率(默认关闭)，预置数据时需要全部用户都开VIP，减少查询VIP逻辑
+  safe_buy_prob: "1=50,0=50"                # 安行充: 50%概率
+  # =================================================================
+  # 取值范围配置(供generator节点的__random/__oneOf使用)
+  # =================================================================
+  charge_time_min: "600"        # 充电时长下限(秒)，这里其实是整数，单位为秒，下面几个都是
+  charge_time_max: "1200"       # 充电时长上限(秒)
+  pre_occupy_min: "40"          # 前占位时长下限(秒)
+  pre_occupy_max: "60"          # 前占位时长上限(秒)
+  after_occupy_min: "60"        # 后占位时长下限(秒)
+  after_occupy_max: "600"       # 后占位时长上限(秒)
+  soc_min: "95"                 # SOC下限(%)
+  soc_max: "100"                # SOC上限(%)
+  pre_pay_min: "5"              # 预付金额下限(元)
+  pre_pay_max: "999"            # 预付金额上限(元)
+  # limit_strategy: __oneOf("0","1","2") → 0=AutoFull, 1=AmountLimit, 2=SOCLimit
+  # pay_channel: __weightedChoice("1=70,2=30") → 1=微信支付, 2=支付宝
 
-  derived_params:
-    - name: chargePostOfflineTimeRanking
-      range: { min: "${CHARGE_POST_OFFLINE_TIME_RANK_MIN}", max: "${CHARGE_POST_OFFLINE_TIME_RANK_MAX}" }
-    - name: chargePostOfflineTime
-      expression: "${chargeTime} * ${chargePostOfflineTimeRanking} / 100"
-    - name: chargePostOnlineTime
-      range: { min: "${chargePostOfflineTime}", max: "${chargePostOfflineTime + 300}" }
-    - name: raiseErrTimeRanking
-      range: { min: "${RAISE_ERR_TIME_RANK_MIN}", max: "${RAISE_ERR_TIME_RANK_MAX}" }
-    - name: raiseErrorTime
-      expression: "${chargeTime} * ${raiseErrTimeRanking} / 100"
-    - name: commentStar
-      values: [10, 20, 30, 40, 50]
-    - name: tags
-      function: pickMany
-      source: [1, 2, 3, 4, 5, 6, 7]
+# =============================================================================
+# CSV 数据源
+# =============================================================================
+data_sources:
+  # CSV 参考文件: user_charger.csv (大规模测试时可用外部CSV导入)
+  # pointId(充电枪编号) 去掉后2位 = postId(充电桩编号), 如 1100000001 → postId=11000000
+  - name: user_charger
+    columns:
+      - phone
+      - pointId
+    rows:
+      - phone: "15550000000"
+        pointId: "1100000001"
 
-steps:
-  # ---------- 1. 连接模拟器 ----------
+# =============================================================================
+# Setup: 登录 + 获取C端Token
+# =============================================================================
+setup:
+  - name: 登录获取JWT
+    type: generator
+    config:
+      expression: '${__so("login","login","${salt_base_url}","${login_base_url}","${username}","${password}")}'
+      variable: jwt_token
+
+  - name: 获取C端Token
+    type: http
+    config:
+      method: POST
+      url: "${gatewayurl}${api_get_toc_user_token}"
+      headers:
+        Content-Type: application/json
+      body: '{"envType":"${env_type}","phoneNo":"${user_charger.phone}","expireMinutes":1440}'
+      timeout: 10000
+      extract:
+        token: "$.data.token"
+        rsa_pri_key: "$.data.priKey"
+        aes_key: "$.data.aesKey"
+
+# =============================================================================
+# 主流程节点
+# =============================================================================
+nodes:
+  # --- 1. 连接模拟器 ---
+  - name: 计算postId
+    type: generator
+    config:
+      expression: '${user_charger.pointId} / 100'
+      variable: post_id
+
+  - name: 计算pointIdInt
+    type: generator
+    config:
+      expression: '${user_charger.pointId}'
+      variable: point_id_int
+
   - name: 连接模拟器
-    request:
-      url: "${SIM_URL}${API_CONNECT}"
+    type: http
+    config:
       method: POST
-      body:
-        equipNo: "${CHARGERS.equipNo}"
-        connectorId: "${CHARGERS.connectorId}"
-    extract:
-      - simAddr: $.result.simAddr
-      - simPort: $.result.simPort
-      - simConnId: $.result.simConnId
+      url: "${simurl}${sim_cmds}"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
+      timeout: 10000
+    think_time: "3s"
 
-  # ---------- 2-4. 模拟器状态设置 ----------
+  # --- 2. 空闲未插枪 (status=0) ---
   - name: 空闲未插枪
-    request:
-      url: "${SIM_URL}${API_SET_CONNECTOR_STATUS}"
+    type: http
+    config:
       method: POST
-      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", status: 1 }
-    think_time: { min: 1000, max: 3000 }
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":0}'
+      timeout: 10000
+    think_time: "3s"
 
+  # --- 3. 空闲已插枪 (status=11) ---
   - name: 空闲已插枪
-    request:
-      url: "${SIM_URL}${API_SET_CONNECTOR_STATUS}"
+    type: http
+    config:
       method: POST
-      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", status: 2 }
-    think_time: { min: 1000, max: 3000 }
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":11}'
+      timeout: 10000
+    think_time: "3s"
 
+  # --- 4. 配置充电数据 ---
   - name: 配置充电数据
-    request:
-      url: "${SIM_URL}${API_SET_CHARGE_DATA}"
+    type: http
+    config:
       method: POST
-      body:
-        simAddr: "${simAddr}"
-        simPort: "${simPort}"
-        simConnId: "${simConnId}"
-        minChargeTime: "${minChargeTime}"
-        minChargePower: "${minChargePower}"
-        maxChargePower: "${maxChargePowerKw}"
-        minSoc: "${minSoc}"
-        maxSoc: "${maxSoc}"
-        singleMaxPower: "${singleMaxPower}"
-        meterSamplePeriod: "${meterSamplePeriod}"
-    think_time: { min: 1000, max: 3000 }
+      url: "${simurl}${sim_set_charge_data}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"postId":${post_id},"outputChargingVoltageMax":${output_voltage_max},"outputChargingVoltageMin":${output_voltage_min},"outputChargingCurrentMax":${output_current_max},"outputChargingCurrentMin":${output_current_min},"demandChargingVoltageMax":${demand_voltage_max},"demandChargingVoltageMin":${demand_voltage_min},"demandChargingCurrentMax":${demand_current_max},"demandChargingCurrentMin":${demand_current_min}}'
+      timeout: 10000
+    think_time: "1s"
 
-  # ---------- 5. 前占位(概率性) ----------
+  # --- 5. 概率/随机/计算字段生成器 ---
+  # 以下 generator 节点在运行时动态生成各字段值，替代原先的硬编码配置
+
+  # -- 5a. 概率字段(0/1枚举值，使用__weightedChoice按权重随机) --
+  - name: 生成-自动支付标志
+    type: generator
+    config:
+      # autoPay: 1=自动支付, 0=不自动支付 (50%概率)
+      expression: '${__weightedChoice("${auto_pay_prob}")}'
+      variable: auto_pay
+
+  - name: 生成-强制停止标志
+    type: generator
+    config:
+      # forceStopCharge: 1=充电结束后再强制停一次, 0=不强制 (65%概率)
+      expression: '${__weightedChoice("${force_stop_prob}")}'
+      variable: force_stop_charge
+
+  - name: 生成-桩离线标志
+    type: generator
+    config:
+      # forceChargePostOffline: 1=模拟桩下线, 0=不下线 (95%概率)
+      expression: '${__weightedChoice("${charge_post_offline_prob}")}'
+      variable: charge_post_offline
+
+  - name: 生成-故障码标志
+    type: generator
+    config:
+      # forceRaiseError: 1=上报故障码, 0=不上报 (30%概率)
+      expression: '${__weightedChoice("${raise_error_prob}")}'
+      variable: raise_error
+
+  - name: 生成-强制支付标志
+    type: generator
+    config:
+      # forcePay: 1=强制执行支付, 0=不强制 (50%概率)
+      expression: '${__weightedChoice("${force_pay_prob}")}'
+      variable: force_pay
+
+  - name: 生成-支付通道选择
+    type: generator
+    config:
+      # payChannel: 1=微信支付(WebChatPay), 2=支付宝 (微信70%, 支付宝30%)
+      expression: '${__weightedChoice("${pay_channel_prob}")}'
+      variable: pay_channel
+
+  - name: 生成-VIP用户标志
+    type: generator
+    config:
+      # userVip: 1=VIP用户, 0=普通用户 (0%概率，默认关闭)
+      # 注意: 实际 vip_use 由后续“计算VIP使用标志”节点根据VIP状态决定
+      expression: '${__weightedChoice("${user_vip_prob}")}'
+      variable: user_vip
+
+  # -- 5b. 区间随机字段(使用__random在最大最小值之间随机生成) --
+  - name: 生成-充电时长
+    type: generator
+    config:
+      # chargeTime: 充电时长(秒), 范围[600, 1200]
+      expression: '${__random(${charge_time_min}, ${charge_time_max})}'
+      variable: charge_time
+
+  - name: 生成-前占位时长
+    type: generator
+    config:
+      # preOccupyTime: 充电前占位(秒), 范围[40, 60]
+      expression: '${__random(${pre_occupy_min}, ${pre_occupy_max})}'
+      variable: pre_occupy_time
+
+  - name: 生成-后占位时长
+    type: generator
+    config:
+      # afterOccupyTime: 充电后占位(秒), 范围[60, 600]
+      expression: '${__random(${after_occupy_min}, ${after_occupy_max})}'
+      variable: after_occupy_time
+
+  - name: 生成-SOC
+    type: generator
+    config:
+      # soc: 电池荷电状态(%), 范围[95, 100]
+      expression: '${__random(${soc_min}, ${soc_max})}'
+      variable: soc
+
+  - name: 生成-预付金额
+    type: generator
+    config:
+      # prePayAmount: 预付金额(元), 范围[5, 999]
+      expression: '${__random(${pre_pay_min}, ${pre_pay_max})}'
+      variable: pre_pay_amount
+
+  - name: 生成-充电策略选择
+    type: generator
+    config:
+      # limitStrategy: 充电策略枚举, 等概率随机
+      # 0=AutoFull(充满即停), 1=AmountLimit(按金额限制), 2=SOCLimit(按SOC限制)
+      expression: '${__oneOf("0","1","2")}'
+      variable: limit_strategy
+
+  # -- 5c. 由chargeTime数学计算得到的时间字段 --
+  - name: 计算-桩预计下线时间
+    type: generator
+    config:
+      # chargePostOfflineTime = chargeTime × 25%
+      expression: '${charge_time} * 0.25'
+      variable: charge_post_offline_time
+
+  - name: 计算-桩预计上线时间
+    type: generator
+    config:
+      # chargePostOnlineTime = chargeTime × 35%
+      # 注意: 若 (onlineTime - offlineTime) > 300s, 有上限保护
+      expression: '${charge_time} * 0.35'
+      variable: charge_post_online_time
+
+  - name: 计算-故障预计触发时间
+    type: generator
+    config:
+      # raiseErrorTime = chargeTime × 55%
+      expression: '${charge_time} * 0.55'
+      variable: raise_error_time
+
+  # --- 前占位 (delay) ---
   - name: 前占位
-    condition:
-      variable: preOccupyTime
-      operator: greater_than
-      value: 0
-    request:
-      url: "${SIM_URL}${API_OCCUPY}"
-      method: POST
-      body:
-        simAddr: "${simAddr}"
-        simPort: "${simPort}"
-        simConnId: "${simConnId}"
-        occupyTime: "${preOccupyTime}"
+    type: delay
+    config:
+      ms: "${pre_occupy_time}000"
 
-  # ---------- 6. 获取Token ----------
-  - name: 获取Token
-    request:
-      url: "${BASE_URL}${API_GET_TOKEN}"
-      method: POST
-      body:
-        phone: "${USERS.phone}"
-    extract:
-      - token: $.result.token
-
-  # ---------- 7. 获取签名API列表(可选) ----------
+  # --- 获取签名API列表 ---
   - name: 获取签名API列表
-    condition:
-      variable: signEnabled
-      operator: equals
-      value: true
-    request:
-      url: "${BASE_URL}${API_GET_SIGN_API_LIST}"
-      method: GET
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_get_sign_request}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-    extract:
-      - signApiList: $.result
+      body: '{}'
+      timeout: 10000
+      extract:
+        sign_apis_json: "$.data.signApiList"
 
-  # ---------- 8. 查询待支付订单 ----------
+  # --- 7. 查询待支付订单 ---
+  - name: 签名-查询待支付充电订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderClassification\":[3]}")}'
+      variable: sign_result_7
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 查询待支付订单
-    request:
-      url: "${BASE_URL}${API_QUERY_UNPAID}"
+    type: http
+    config:
       method: POST
+      url: "${baseurl}${api_query_order}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-      body:
-        cardNum: "${USERS.cardnum}"
-    extract:
-      - unpaidOrderId: $.result.orderId
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderClassification":[3]}'
+      timeout: 10000
+      extract:
+        unpaid_order_id: "$.data[0].orderId"
 
-  # ---------- 9. 支付待支付订单(条件性) ----------
+  # --- 8. 支付待支付订单 ---
+  - name: 判断-是否有待支付充电订单
+    type: if-else
+    config:
+      expr: '${unpaid_order_id} != ""'
+
+  - name: 查询待支付订单优惠券
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_user_order_coupon}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+      body: '{"orderId":"${unpaid_order_id}"}'
+      timeout: 10000
+      extract:
+        coupon_id: "$.data.availableUserCoupon[0].instId"
+
+  - name: 签名-支付待支付充电订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id},\"couponId\":${coupon_id}}")}'
+      variable: sign_result_8
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 支付待支付订单
-    condition:
-      variable: unpaidOrderId
-      operator: not_empty
-    request:
-      url: "${BASE_URL}${API_PAY_UNPAID}"
+    type: http
+    config:
       method: POST
+      url: "${baseurl}${api_pay_order}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-      body:
-        orderId: "${unpaidOrderId}"
-        payType: 1
-        payChannel: 2
-        payPwd: "${USERS.b2b_cardpwd}"
-    think_time: { min: 1000, max: 3000 }
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${unpaid_order_id},"couponId":${coupon_id}}'
+      timeout: 10000
+    think_time: "3s"
 
-  # ---------- 10. 获取AccountID ----------
+  # --- 9. 查询待支付占位订单 ---
+  - name: 签名-查询待支付占位订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"occupyOrderStatusList\":[2]}")}'
+      variable: sign_result_9
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 查询待支付占位订单
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_query_occupy_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"occupyOrderStatusList":[2]}'
+      timeout: 10000
+      extract:
+        occupy_order_id: "$.data[0].chargeOccupyOrderId"
+
+  # --- 10. 支付待支付占位订单 ---
+  - name: 判断-是否有待支付占位订单
+    type: if-else
+    config:
+      expr: '${occupy_order_id} != ""'
+
+  - name: 签名-支付待支付占位订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"chargeOccupyOrderId\":\"${occupy_order_id}\",\"payType\":${occupy_pay_type_before},\"payChannel\":${occupy_pay_channel}}")}'
+      variable: sign_result_10
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 支付待支付占位订单
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_pay_occupy_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_before},"payChannel":${occupy_pay_channel}}'
+      timeout: 10000
+    think_time: "3s"
+
+  # --- 11. 获取AccountID (POST startChargingInfo) ---
+  - name: 签名-获取账户ID
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"pointId\":\"${user_charger.pointId}\"}")}'
+      variable: sign_result_11
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 获取AccountID
-    request:
-      url: "${BASE_URL}${API_GET_ACCOUNT_ID}"
-      method: GET
-      headers:
-        Authorization: "${token}"
-    extract:
-      - accountId: $.result.accountId
-
-  # ---------- 11. 查询券包(条件性) ----------
-  - name: 查询券包
-    condition:
-      variable: cardVoucherPackageSwitch
-      operator: equals
-      value: true
-    request:
-      url: "${BASE_URL}${API_QUERY_COUPON}"
+    type: http
+    config:
       method: POST
+      url: "${baseurl}${api_start_charging_info}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-      body:
-        accountId: "${accountId}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"pointId":"${user_charger.pointId}"}'
+      timeout: 10000
+      extract:
+        account_id: "$.data.accountInfoRsp.accountId"
+        tenant_id: "$.data.tenantId"
+        station_id: "$.data.mgrStationRsp.stationId"
 
-  # ---------- 12. 查询安行充(条件性) ----------
+  # --- 12. 获取UserId ---
+  - name: 签名-获取用户ID
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{}")}'
+      variable: sign_result_12
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 获取UserId
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_get_user_id}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{}'
+      timeout: 10000
+      extract:
+        user_id: "$.data.userId"
+
+  # --- 13. 获取VIP状态 ---
+  - name: 签名-获取VIP状态
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"accountId\":\"${account_id}\",\"tenantId\":\"${tenant_id}\"}")}'
+      variable: sign_result_13
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 获取VIP状态
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_get_vip_info}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"accountId":"${account_id}","tenantId":"${tenant_id}"}'
+      timeout: 10000
+      extract:
+        vip_status: "$.data.userVipDetailRspVO.userVipStatus"
+        today_left_count: "$.data.userVipDetailRspVO.userVipPackageCycleInfo.toDayLeftCount"
+
+  # vip_use 使用__weightedChoice按概率生成 (默认0%概率，即始终为0)
+  # 精确逻辑: (user_vip==1 && vip_status==1 && today_left_count>0) ? 1 : 0
+  # 当前简化: 直接使用概率配置决定
+  - name: 计算VIP使用标志
+    type: generator
+    config:
+      # vip_use: 1=使用VIP权益, 0=不使用 (默认0%概率)
+      expression: '${__weightedChoice("${user_vip_prob}")}'
+      variable: vip_use
+
+  # --- 14. 查询券包活动 ---
+  - name: 签名-查询券包活动
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"pointId\":\"${user_charger.pointId}\",\"activityNeed\":[3]}")}'
+      variable: sign_result_14
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 查询券包活动
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_query_activity}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"pointId":"${user_charger.pointId}","activityNeed":[3]}'
+      timeout: 10000
+
+  # --- 15. 查询安行充 ---
+  - name: 签名-查询安行充配置
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"stationId\":\"${station_id}\"}")}'
+      variable: sign_result_15
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 查询安行充
-    condition:
-      variable: safeBuyFlag
-      operator: equals
-      value: 1
-    request:
-      url: "${BASE_URL}${API_QUERY_SAFE_BUY}"
+    type: http
+    config:
       method: POST
+      url: "${baseurl}${api_safe_config}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-      body:
-        accountId: "${accountId}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"stationId":"${station_id}"}'
+      timeout: 10000
+      extract:
+        sell_flag: "$.data.SellFlag"
 
-  # ---------- 13. 获取VIP(条件性) ----------
-  - name: 获取VIP
-    condition:
-      variable: userVip
-      operator: equals
-      value: true
-    request:
-      url: "${BASE_URL}${API_GET_VIP}"
-      method: GET
-      headers:
-        Authorization: "${token}"
+  - name: 计算安行充标志
+    type: generator
+    config:
+      # sellBuyFlag: 1=购买安行充, 0=不购买 (50%概率)
+      expression: '${__weightedChoice("${safe_buy_prob}")}'
+      variable: sell_buy_flag
 
-  # ---------- 14. 生成订单号 ----------
-  - name: 生成订单号
-    request:
-      url: "${SIM_URL}${API_GENERATE_ORDER_SEQ}"
-      method: POST
-      body:
-        simAddr: "${simAddr}"
-        simPort: "${simPort}"
-        simConnId: "${simConnId}"
-    extract:
-      - orderId: $.result.orderId
-    think_time: { min: 2000, max: 5000 }
+  # --- 16. 生成支付密码 ---
+  - name: 生成支付密码
+    type: generator
+    config:
+      expression: '${__so("paypwd","gen","${baseurl}","${token}","${aes_key}","${user_id}","123456")}'
+      variable: password_enc
 
-  # ---------- 15. 创建订单 ----------
+  # --- 17. 创建订单 ---
+  - name: 构造创建订单body
+    type: generator
+    config:
+      expression: '{"chargingPointId":"${user_charger.pointId}","autoPay":${auto_pay},"orderSource":${order_source},"limitStrategy":${limit_strategy},"soc":${soc},"prePayAmount":${pre_pay_amount},"payType":${pay_type},"payChannel":${pay_channel},"passWord":"${password_enc}","orderChargeType":1,"useVipInterest":${vip_use},"safeBuyFlag":${sell_buy_flag}}'
+      variable: create_order_body
+
+  - name: 签名-创建充电订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","${create_order_body}")}'
+      variable: sign_result_17
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 创建订单
-    request:
-      url: "${BASE_URL}${API_CREATE_ORDER}"
+    type: http
+    config:
       method: POST
+      url: "${baseurl}${api_create_order}"
       headers:
+        Content-Type: application/json
         Authorization: "${token}"
-      body:
-        orderId: "${orderId}"
-        pointId: "${CHARGERS.pointId}"
-        charger: "${CHARGERS.charger}"
-        cardNum: "${USERS.cardnum}"
-        payType: 1
-        payChannel: 2
-        orderSource: 0
-        chargeStrategy: 0
-    extract:
-      - startChargeSeq: $.result.startChargeSeq
-    think_time: { min: 2000, max: 5000 }
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '${create_order_body}'
+      timeout: 10000
+      extract:
+        order_id: "$.data.orderId"
+    think_time: "3s"
 
-  # ---------- 16. 启动充电 ----------
-  - name: 启动充电
-    request:
-      url: "${BASE_URL}${API_START_CHARGE}"
-      method: POST
-      headers:
-        Authorization: "${token}"
-      body:
-        startChargeSeq: "${startChargeSeq}"
+  - name: 记录充电开始时间
+    type: generator
+    config:
+      expression: '${__so("sign","now_ms")}'
+      variable: charge_start_time_ms
 
-  # ---------- 17. 轮询充电状态 ----------
+  # --- 18. 轮询充电状态 (30s间隔, status==6退出) ---
+  # 注意: while 步骤使用 Salvo step 语法(request/condition/timed_trigger)
+  # 查询充电状态使用 sign_post SO 插件(签名+HTTP一体化)
+  # 桩离线/上线使用 condition + timed_trigger
   - name: 轮询充电状态
     type: while
-    exit_conditions:
-      - variable: chargingStatus
-        operator: equals
-        value: "4"
-    interval_seconds: 30
-    steps:
-      - name: 查询充电状态
-        request:
-          url: "${BASE_URL}${API_CHARGE_STATUS}"
-          method: POST
-          headers:
-            Authorization: "${token}"
-          body:
-            startChargeSeq: "${startChargeSeq}"
-        extract:
-          - chargingStatus: $.result.status
-          - chargeKwh: $.result.chargeKwh
-          - chargeMoney: $.result.chargeMoney
-      - name: 启动超时检查
-        condition:
-          variable: chargingStatus
+    config:
+      exit_conditions:
+        - variable: charging_status
           operator: equals
-          value: "1"
-        fail_after_consecutive: 10
-        fail_message: "启动超时(连续10次启动中)"
-      - name: 桩离线(时间触发)
-        condition: { variable: chargePostOffline, operator: equals, value: 1 }
-        timed_trigger: { after_seconds: "${chargePostOfflineTime}", once: true }
-        request:
-          url: "${SIM_URL}${API_SET_STATION_STATUS}"
-          method: POST
-          body: { simAddr: "${simAddr}", simPort: "${simPort}", stationStatus: 2 }
-      - name: 桩上线(时间触发)
-        condition: { variable: chargePostOffline, operator: equals, value: 1 }
-        timed_trigger: { after_seconds: "${chargePostOnlineTime}", once: true }
-        request:
-          url: "${SIM_URL}${API_SET_STATION_STATUS}"
-          method: POST
-          body: { simAddr: "${simAddr}", simPort: "${simPort}", stationStatus: 0 }
-      - name: 设置故障码(时间触发)
-        condition: { variable: raiseErrorCode, operator: equals, value: 1 }
-        timed_trigger: { after_seconds: "${raiseErrorTime}", once: true }
-        request:
-          url: "${SIM_URL}${API_SET_FAULT}"
-          method: POST
-          body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}", raiseErrorCode: true }
-      - name: 充电时长到达后停止
-        condition:
-          variable: chargeTimeReached
-          operator: equals
-          value: true
-        request:
-          url: "${BASE_URL}${API_STOP_CHARGE}"
-          method: POST
-          headers: { Authorization: "${token}" }
-          body: { startChargeSeq: "${startChargeSeq}" }
-        retry: { max_attempts: 10, on_429: retry }
+          value: "6"
+      interval_seconds: 30
+      max_iterations: 200
+      steps:
+        # 18a. 查询充电状态 (sign_post SO 插件: 签名+HTTP POST 一体化)
+        # generator 返回响应 JSON，extract 从中提取 charging_status
+        - name: 查询充电状态
+          type: generator
+          config:
+            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_charging_data}","${token}","{\"orderId\":${order_id}}")}'
+            variable: charge_status_resp
+            extract:
+              charging_status: "$.data.chargingStatus"
 
-  # ---------- 18. 强制停止充电(概率性) ----------
+        # 18b. 桩离线 (条件: charge_post_offline==1)
+        - name: 桩离线
+          condition:
+            variable: charge_post_offline
+            operator: equals
+            value: "1"
+          request:
+            method: POST
+            url: "${simurl}${sim_force_close}"
+            headers:
+              Content-Type: application/json
+            body: '{"postId":${post_id}}'
+
+        # 18c. 桩上线 (条件: charge_post_offline==1, 延迟触发)
+        - name: 桩上线
+          condition:
+            variable: charge_post_offline
+            operator: equals
+            value: "1"
+          timed_trigger:
+            after_seconds: "${charge_post_online_time}"
+            once: true
+          request:
+            method: POST
+            url: "${simurl}${sim_cmds}"
+            headers:
+              Content-Type: application/json
+            body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
+
+        # 18d. 故障码上报停止充电 (条件: raise_error==1, 延迟触发)
+        - name: 故障码停止
+          condition:
+            variable: raise_error
+            operator: equals
+            value: "1"
+          timed_trigger:
+            after_seconds: "${raise_error_time}"
+            once: true
+          request:
+            method: POST
+            url: "${simurl}${sim_stop_charge_reason}"
+            headers:
+              Content-Type: application/json
+            body: '{"pointId":${point_id_int},"postId":${post_id},"stopReason":${stop_reason}}'
+
+        # 18e. 检查充电时长是否到达
+        - name: 检查充电时长
+          type: generator
+          config:
+            expression: '${__so("sign","check_charge_time","${charge_start_time_ms}","${charge_time}")}'
+            variable: charge_time_reached
+
+        # 18f. 停止充电 (条件: charge_time_reached=="true")
+        # 注意: charge_time_reached 由 sign.check_charge_time SO 插件计算
+        # 停止充电使用 sign_post 因为需要签名
+        - name: 停止充电
+          condition:
+            variable: charge_time_reached
+            operator: equals
+            value: "true"
+          type: generator
+          config:
+            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_stop_charge}","${token}","{\"orderId\":${order_id}}")}'
+            variable: stop_charge_resp
+          retry:
+            max_attempts: 10
+            on_429: retry
+
+  # --- 19. 强制停止充电 ---
+  # Go代码: ForceStopChargeStep → StopCharge() → DoPostSign (与正常停止充电使用同一个接口和签名方式)
+  - name: 判断-是否强制停止充电
+    type: if-else
+    config:
+      expr: '${force_stop_charge} == "1"'
+
   - name: 强制停止充电
-    condition: { variable: forceStopCharge, operator: equals, value: 1 }
-    request:
-      url: "${BASE_URL}${API_STOP_CHARGE}"
-      method: POST
-      headers: { Authorization: "${token}" }
-      body: { startChargeSeq: "${startChargeSeq}" }
+    type: generator
+    config:
+      expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_stop_charge}","${token}","{\"orderId\":${order_id}}")}'
+      variable: force_stop_charge_resp
+    retry:
+      max_attempts: 10
+      on_429: retry
 
-  # ---------- 22. 查询充电曲线 ----------
+  # --- 20. 查询充电曲线 (5%概率) ---
+  - name: 判断-是否查询充电曲线
+    type: if-else
+    config:
+      expr: '${__random(1, 20)} == 1'
+
+  - name: 签名-查询充电曲线
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${order_id}}")}'
+      variable: sign_result_20
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 查询充电曲线
-    request:
-      url: "${BASE_URL}${API_CHARGE_CURVE}"
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body: { startChargeSeq: "${startChargeSeq}" }
+      url: "${baseurl}${api_charging_curve}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${order_id}}'
+      timeout: 10000
 
-  # ---------- 23. 查询未支付订单 ----------
+  # --- 21. 查询未支付订单(充电后) ---
+  - name: 签名-查询未支付充电订单(后)
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderClassification\":[3]}")}'
+      variable: sign_result_21
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 查询未支付订单
-    request:
-      url: "${BASE_URL}${API_QUERY_UNPAID}"
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body: { cardNum: "${USERS.cardnum}" }
-    extract:
-      - finalUnpaidOrderId: $.result.orderId
+      url: "${baseurl}${api_query_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderClassification":[3]}'
+      timeout: 10000
+      extract:
+        unpaid_order_id_after: "$.data[0].orderId"
 
-  # ---------- 24. 支付未支付订单 ----------
+  # --- 22. 支付未支付订单(含优惠券) ---
+  - name: 判断-是否有未支付充电订单
+    type: if-else
+    config:
+      expr: '${unpaid_order_id_after} != ""'
+
+  - name: 查询未付订单优惠券
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_user_order_coupon}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+      body: '{"orderId":"${unpaid_order_id_after}"}'
+      timeout: 10000
+      extract:
+        coupon_id_after: "$.data.availableUserCoupon[0].instId"
+
+  - name: 签名-支付未支付充电订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id_after},\"couponId\":${coupon_id_after}}")}'
+      variable: sign_result_22
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
   - name: 支付未支付订单
-    condition:
-      variable: finalUnpaidOrderId
-      operator: not_empty
-    request:
-      url: "${BASE_URL}${API_PAY_UNPAID}"
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body:
-        orderId: "${finalUnpaidOrderId}"
-        payType: 1
-        payChannel: 2
-        payPwd: "${USERS.b2b_cardpwd}"
+      url: "${baseurl}${api_pay_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${unpaid_order_id_after},"couponId":${coupon_id_after}}'
+      timeout: 10000
+    think_time: "3s"
 
-  # ---------- 25. 强制支付(检查订单状态) ----------
-  - name: 查询订单状态
-    request:
-      url: "${BASE_URL}${API_QUERY_ORDER}"
-      method: POST
-      headers: { Authorization: "${token}" }
-      body: { orderId: "${orderId}" }
-    extract:
-      - orderStatus: $.result.orderStatus
+  # --- 23. 强制支付 ---
+  - name: 判断-是否强制支付
+    type: if-else
+    config:
+      expr: '${force_pay} == "1"'
+
+  - name: 签名-强制支付订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${order_id}}")}'
+      variable: sign_result_23
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
 
   - name: 强制支付
-    condition:
-      variable: orderStatus
-      operator: not_equals
-      value: "COMPLETED"
-    request:
-      url: "${BASE_URL}${API_FORCE_PAY}"
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body:
-        orderId: "${orderId}"
-        payType: 1
-        payChannel: 2
+      url: "${baseurl}${api_pay_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${order_id}}'
+      timeout: 10000
 
-  # ---------- 26. 评论+上传图片(概率性) ----------
-  - name: 获取评论标签
-    request:
-      url: "${BASE_URL}${API_GET_COMMENT_TAG}"
-      method: GET
-      headers: { Authorization: "${token}" }
-    extract:
-      - commentTags: $.result.tags
+  # --- 24. 检查订单是否已支付 ---
+  - name: 签名-检查订单支付状态
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":\"${order_id}\"}")}'
+      variable: sign_result_24
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
 
-  - name: 上传评论
-    request:
-      url: "${BASE_URL}${API_SAVE_COMMENT}"
+  - name: 检查订单已支付
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body:
-        orderId: "${orderId}"
-        commentStar: "${commentStar}"
-        tags: "${tags}"
-    extract:
-      - commentId: $.result.commentId
+      url: "${baseurl}${api_order_detail}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":"${order_id}"}'
+      timeout: 10000
+      extract:
+        pay_status: "$.data.payStatus"
+
+  # --- 25. 评论 (条件: payStatus==1) ---
+  - name: 判断-订单是否已支付可评论
+    type: if-else
+    config:
+      expr: '${pay_status} == 1'
+
+  - name: 签名-生成文件上传Token
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{}")}'
+      variable: sign_result_25a
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 生成文件上传token
+    type: http
+    config:
+      method: POST
+      url: "${gatewayurl}${api_gen_token}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+      body: '{"userId":${user_id},"tenantId":${tenant_id}}'
+      timeout: 10000
+      extract:
+        upload_token: "$.data"
 
   - name: 上传评论图片
-    request:
-      url: "${BASE_URL}${API_UPLOAD_COMMENT_PICTURE}"
+    type: http
+    config:
       method: POST
-      headers: { Authorization: "${token}" }
-      body:
-        commentId: "${commentId}"
-        pictures: ["${commentPicturePath}"]
+      url: "${gatewayurl}${api_upload_file}"
+      headers:
+        Authorization: "${token}"
+      multipart:
+        token: "${upload_token}"
+        file: "asserts/comments.jpg"
+      timeout: 10000
+      extract:
+        img_path: "$.data.filePath"
 
-  # ---------- 27. 后占位(概率性) ----------
+  - name: 签名-获取评论标签和星级
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{}")}'
+      variable: sign_result_25b
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 获取评论标签
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_get_tag}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{}'
+      timeout: 10000
+      extract:
+        comment_star: "$.data[0].star"
+        comment_tag_id: "$.data[0].tagId"
+
+  - name: 构造评论body
+    type: generator
+    config:
+      expression: '{"content":"用户:${user_charger.phone}, 订单号:${order_id}","imgList":["${img_path}"],"isAnonymous":0,"orderId":"${order_id}","orderUserId":"${user_id}","sourceType":2,"startLevel":${comment_star},"tagIdList":["${comment_tag_id}"]}'
+      variable: comment_body
+
+  - name: 签名-构造评论数据
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","${comment_body}")}'
+      variable: sign_result_25c
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 保存评论
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_save_comment}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '${comment_body}'
+      timeout: 10000
+
+  # --- 26. 后占位 (delay) ---
   - name: 后占位
-    condition: { variable: afterOccupyTime, operator: greater_than, value: 0 }
-    request:
-      url: "${SIM_URL}${API_OCCUPY}"
-      method: POST
-      body:
-        simAddr: "${simAddr}"
-        simPort: "${simPort}"
-        simConnId: "${simConnId}"
-        occupyTime: "${afterOccupyTime}"
+    type: delay
+    config:
+      ms: "${after_occupy_time}000"
 
-  # ---------- 28. 重置充电枪 ----------
-  - name: 重置充电枪
-    request:
-      url: "${SIM_URL}${API_RESET}"
+  # --- 27. 重置枪状态 (空闲未插枪 status=0) ---
+  - name: 重置枪状态
+    type: http
+    config:
       method: POST
-      body: { simAddr: "${simAddr}", simPort: "${simPort}", simConnId: "${simConnId}" }
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":0}'
+      timeout: 10000
+    think_time: "3s"
+
+  # --- 28. 轮询占位订单 (30s间隔, 5分钟超时=10次) ---
+  - name: 重置占位订单ID
+    type: generator
+    config:
+      expression: '""'
+      variable: occupy_order_id
+
+  - name: 轮询占位订单
+    type: while
+    config:
+      exit_conditions:
+        - variable: occupy_order_id
+          operator: not_equals
+          value: ""
+      interval_seconds: 30
+      max_iterations: 10
+      steps:
+        - name: 查询占位订单
+          type: generator
+          config:
+            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_query_occupy_order}","${token}","{\"occupyOrderStatusList\":[2]}")}'
+            variable: occupy_query_resp
+          extract:
+            occupy_order_id: "$.data[0].chargeOccupyOrderId"
+
+  # --- 29. 支付占位订单 ---
+  - name: 判断-是否有未支付占位订单
+    type: if-else
+    config:
+      expr: '${occupy_order_id} != ""'
+
+  - name: 签名-支付充电后占位订单
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"chargeOccupyOrderId\":\"${occupy_order_id}\",\"payType\":${occupy_pay_type_after},\"payChannel\":${occupy_pay_channel},\"passWord\":\"${password_enc}\"}")}'
+      variable: sign_result_29
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 支付占位订单
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_pay_occupy_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_after},"payChannel":${occupy_pay_channel},"passWord":"${password_enc}"}'
+      timeout: 10000
+    think_time: "3s"
+
+# =============================================================================
+# Teardown: 断开模拟器连接
+# =============================================================================
+teardown:
+  - name: 断开模拟器
+    type: http
+    config:
+      method: POST
+      url: "${simurl}${sim_force_close}"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id}}'
+      timeout: 10000
+
+# =============================================================================
+# DAG 边定义
+# =============================================================================
+edges:
+  # Setup → Nodes
+  - from: 获取C端Token
+    to: 计算postId
+
+  # 模拟器连接 + 状态设置
+  - from: 计算postId
+    to: 计算pointIdInt
+  - from: 计算pointIdInt
+    to: 连接模拟器
+  - from: 连接模拟器
+    to: 空闲未插枪
+  - from: 空闲未插枪
+    to: 空闲已插枪
+  - from: 空闲已插枪
+    to: 配置充电数据
+  - from: 配置充电数据
+    to: 生成-自动支付标志
+  # 概率字段生成器链路
+  - from: 生成-自动支付标志
+    to: 生成-强制停止标志
+  - from: 生成-强制停止标志
+    to: 生成-桩离线标志
+  - from: 生成-桩离线标志
+    to: 生成-故障码标志
+  - from: 生成-故障码标志
+    to: 生成-强制支付标志
+  - from: 生成-强制支付标志
+    to: 生成-支付通道选择
+  - from: 生成-支付通道选择
+    to: 生成-VIP用户标志
+  - from: 生成-VIP用户标志
+    to: 生成-充电时长
+  - from: 生成-充电时长
+    to: 生成-前占位时长
+  - from: 生成-前占位时长
+    to: 生成-后占位时长
+  - from: 生成-后占位时长
+    to: 生成-SOC
+  - from: 生成-SOC
+    to: 生成-预付金额
+  - from: 生成-预付金额
+    to: 生成-充电策略选择
+  # 计算字段链路(依赖charge_time)
+  - from: 生成-充电策略选择
+    to: 计算-桩预计下线时间
+  - from: 计算-桩预计下线时间
+    to: 计算-桩预计上线时间
+  - from: 计算-桩预计上线时间
+    to: 计算-故障预计触发时间
+  - from: 计算-故障预计触发时间
+    to: 前占位
+
+  # 前占位 → 签名API列表
+  - from: 前占位
+    to: 获取签名API列表
+
+  # 查询+支付待支付订单
+  - from: 获取签名API列表
+    to: 签名-查询待支付充电订单
+  - from: 签名-查询待支付充电订单
+    to: 查询待支付订单
+  - from: 查询待支付订单
+    to: 判断-是否有待支付充电订单
+  - from: 判断-是否有待支付充电订单
+    to: 查询待支付订单优惠券
+    condition: "__if_true__"
+  - from: 判断-是否有待支付充电订单
+    to: 签名-查询待支付占位订单
+    condition: "__if_false__"
+  - from: 查询待支付订单优惠券
+    to: 签名-支付待支付充电订单
+  - from: 签名-支付待支付充电订单
+    to: 支付待支付订单
+  - from: 支付待支付订单
+    to: 签名-查询待支付占位订单
+
+  # 查询+支付待支付占位订单
+  - from: 签名-查询待支付占位订单
+    to: 查询待支付占位订单
+  - from: 查询待支付占位订单
+    to: 判断-是否有待支付占位订单
+  - from: 判断-是否有待支付占位订单
+    to: 签名-支付待支付占位订单
+    condition: "__if_true__"
+  - from: 判断-是否有待支付占位订单
+    to: 签名-获取账户ID
+    condition: "__if_false__"
+  - from: 签名-支付待支付占位订单
+    to: 支付待支付占位订单
+  - from: 支付待支付占位订单
+    to: 签名-获取账户ID
+
+  # 获取账户信息
+  - from: 签名-获取账户ID
+    to: 获取AccountID
+  - from: 获取AccountID
+    to: 签名-获取用户ID
+  - from: 签名-获取用户ID
+    to: 获取UserId
+  - from: 获取UserId
+    to: 签名-获取VIP状态
+  - from: 签名-获取VIP状态
+    to: 获取VIP状态
+  - from: 获取VIP状态
+    to: 计算VIP使用标志
+  - from: 计算VIP使用标志
+    to: 签名-查询券包活动
+
+  # 查询券包 + 安行充
+  - from: 签名-查询券包活动
+    to: 查询券包活动
+  - from: 查询券包活动
+    to: 签名-查询安行充配置
+  - from: 签名-查询安行充配置
+    to: 查询安行充
+  - from: 查询安行充
+    to: 计算安行充标志
+
+  # 生成密码 + 创建订单
+  - from: 计算安行充标志
+    to: 生成支付密码
+  - from: 生成支付密码
+    to: 构造创建订单body
+  - from: 构造创建订单body
+    to: 签名-创建充电订单
+  - from: 签名-创建充电订单
+    to: 创建订单
+  - from: 创建订单
+    to: 记录充电开始时间
+  - from: 记录充电开始时间
+    to: 轮询充电状态
+
+  # 轮询后 → 强制停止 + 曲线
+  - from: 轮询充电状态
+    to: 判断-是否强制停止充电
+  - from: 判断-是否强制停止充电
+    to: 强制停止充电
+    condition: "__if_true__"
+  - from: 判断-是否强制停止充电
+    to: 判断-是否查询充电曲线
+    condition: "__if_false__"
+  - from: 强制停止充电
+    to: 判断-是否查询充电曲线
+
+  # 充电曲线
+  - from: 判断-是否查询充电曲线
+    to: 签名-查询充电曲线
+    condition: "__if_true__"
+  - from: 判断-是否查询充电曲线
+    to: 签名-查询未支付充电订单(后)
+    condition: "__if_false__"
+  - from: 签名-查询充电曲线
+    to: 查询充电曲线
+  - from: 查询充电曲线
+    to: 签名-查询未支付充电订单(后)
+
+  # 查询+支付未支付订单(充电后)
+  - from: 签名-查询未支付充电订单(后)
+    to: 查询未支付订单
+  - from: 查询未支付订单
+    to: 判断-是否有未支付充电订单
+  - from: 判断-是否有未支付充电订单
+    to: 查询未付订单优惠券
+    condition: "__if_true__"
+  - from: 判断-是否有未支付充电订单
+    to: 判断-是否强制支付
+    condition: "__if_false__"
+  - from: 查询未付订单优惠券
+    to: 签名-支付未支付充电订单
+  - from: 签名-支付未支付充电订单
+    to: 支付未支付订单
+  - from: 支付未支付订单
+    to: 判断-是否强制支付
+
+  # 强制支付
+  - from: 判断-是否强制支付
+    to: 签名-强制支付订单
+    condition: "__if_true__"
+  - from: 判断-是否强制支付
+    to: 签名-检查订单支付状态
+    condition: "__if_false__"
+  - from: 签名-强制支付订单
+    to: 强制支付
+  - from: 强制支付
+    to: 签名-检查订单支付状态
+
+  # 检查已支付 + 评论
+  - from: 签名-检查订单支付状态
+    to: 检查订单已支付
+  - from: 检查订单已支付
+    to: 判断-订单是否已支付可评论
+  - from: 判断-订单是否已支付可评论
+    to: 签名-生成文件上传Token
+    condition: "__if_true__"
+  - from: 判断-订单是否已支付可评论
+    to: 后占位
+    condition: "__if_false__"
+  - from: 签名-生成文件上传Token
+    to: 生成文件上传token
+  - from: 生成文件上传token
+    to: 上传评论图片
+  - from: 上传评论图片
+    to: 签名-获取评论标签和星级
+  - from: 签名-获取评论标签和星级
+    to: 获取评论标签
+  - from: 获取评论标签
+    to: 构造评论body
+  - from: 构造评论body
+    to: 签名-构造评论数据
+  - from: 签名-构造评论数据
+    to: 保存评论
+  - from: 保存评论
+    to: 后占位
+
+  # 后占位 → 重置枪 → 轮询占位
+  - from: 后占位
+    to: 重置枪状态
+  - from: 重置枪状态
+    to: 重置占位订单ID
+  - from: 重置占位订单ID
+    to: 轮询占位订单
+
+  # 轮询占位 → 支付占位
+  - from: 轮询占位订单
+    to: 判断-是否有未支付占位订单
+  - from: 判断-是否有未支付占位订单
+    to: 签名-支付充电后占位订单
+    condition: "__if_true__"
+  - from: 判断-是否有未支付占位订单
+    to: 断开模拟器
+    condition: "__if_false__"
+  - from: 签名-支付充电后占位订单
+    to: 支付占位订单
+  - from: 支付占位订单
+    to: 断开模拟器
