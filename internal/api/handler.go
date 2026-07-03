@@ -44,12 +44,13 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	}
 
 	scene := &model.Scene{
-		Name:        req.Name,
-		Description: req.Description,
-		DAGJSON:     req.DAGJSON,
-		Variables:   req.Variables,
-		Plugins:     req.Plugins,
-		Status:      status,
+		Name:           req.Name,
+		Description:    req.Description,
+		DAGJSON:        req.DAGJSON,
+		Variables:      req.Variables,
+		Plugins:        req.Plugins,
+		Status:         status,
+		DefaultTimeout: req.DefaultTimeout,
 	}
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
@@ -384,6 +385,9 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	}
 	if req.Status != "" {
 		scene.Status = req.Status
+	}
+	if req.DefaultTimeout != nil {
+		scene.DefaultTimeout = *req.DefaultTimeout
 	}
 
 	if err := h.scenes.Update(r.Context(), scene); err != nil {
@@ -1436,15 +1440,16 @@ func (h *Handler) GetRunRecord(r *http.Request) dto.Response {
 
 func toSceneDTO(s *model.Scene) dto.SceneDTO {
 	return dto.SceneDTO{
-		ID:          s.ID,
-		Name:        s.Name,
-		Description: s.Description,
-		DAGJSON:     s.DAGJSON,
-		Variables:   s.Variables,
-		Plugins:     s.Plugins,
-		Status:      s.Status,
-		CreatedAt:   s.CreatedAt,
-		UpdatedAt:   s.UpdatedAt,
+		ID:             s.ID,
+		Name:           s.Name,
+		Description:    s.Description,
+		DAGJSON:        s.DAGJSON,
+		Variables:      s.Variables,
+		Plugins:        s.Plugins,
+		Status:         s.Status,
+		DefaultTimeout: s.DefaultTimeout,
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      s.UpdatedAt,
 	}
 }
 

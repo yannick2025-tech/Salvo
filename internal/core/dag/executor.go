@@ -218,7 +218,18 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 
 				input := e.buildInput(n.ID())
 
-				output, err := n.Execute(ctx, input)
+				// Create a per-node context: if the node has a Timeout > 0,
+				// wrap the parent context with context.WithTimeout so the
+				// node fails independently without killing the whole scene.
+				nodeCtx := ctx
+				nodeTimeout := n.Timeout()
+				if nodeTimeout > 0 {
+					var nodeCancel context.CancelFunc
+					nodeCtx, nodeCancel = context.WithTimeout(ctx, nodeTimeout)
+					defer nodeCancel()
+				}
+
+				output, err := n.Execute(nodeCtx, input)
 				if err != nil {
 					errCh <- fmt.Errorf("node %s execute: %w", n.ID(), err)
 					if isSync {

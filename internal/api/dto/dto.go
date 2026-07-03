@@ -63,12 +63,13 @@ type ListResponse[T any] struct {
 
 // CreateSceneRequest is the request body for POST /api/v1/scenes/create.
 type CreateSceneRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	DAGJSON     string `json:"dag_json,omitempty"`
-	Variables   string `json:"variables,omitempty"`
-	Plugins     string `json:"plugins,omitempty"`
-	Status      string `json:"status,omitempty"`
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	DAGJSON        string `json:"dag_json,omitempty"`
+	Variables      string `json:"variables,omitempty"`
+	Plugins        string `json:"plugins,omitempty"`
+	Status         string `json:"status,omitempty"`
+	DefaultTimeout int    `json:"default_timeout,omitempty"`
 }
 
 // ImportYAMLRequest is the request body for POST /api/v1/scenes/import.
@@ -85,13 +86,14 @@ type ExportYAMLResponse struct {
 
 // UpdateSceneRequest is the request body for POST /api/v1/scenes/update.
 type UpdateSceneRequest struct {
-	ID          snowflake.ID `json:"id"`
-	Name        string       `json:"name,omitempty"`
-	Description string       `json:"description,omitempty"`
-	DAGJSON     string       `json:"dag_json,omitempty"`
-	Variables   string       `json:"variables,omitempty"`
-	Plugins     string       `json:"plugins,omitempty"`
-	Status      string       `json:"status,omitempty"`
+	ID             snowflake.ID `json:"id"`
+	Name           string       `json:"name,omitempty"`
+	Description    string       `json:"description,omitempty"`
+	DAGJSON        string       `json:"dag_json,omitempty"`
+	Variables      string       `json:"variables,omitempty"`
+	Plugins        string       `json:"plugins,omitempty"`
+	Status         string       `json:"status,omitempty"`
+	DefaultTimeout *int         `json:"default_timeout,omitempty"`
 }
 
 // ListScenesRequest is the request body for POST /api/v1/scenes/list.
@@ -103,15 +105,16 @@ type ListScenesRequest struct {
 
 // SceneDTO is the scene detail returned in API responses.
 type SceneDTO struct {
-	ID          snowflake.ID `json:"id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	DAGJSON     string       `json:"dag_json"`
-	Variables   string       `json:"variables"`
-	Plugins     string       `json:"plugins"`
-	Status      string       `json:"status"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	ID             snowflake.ID `json:"id"`
+	Name           string       `json:"name"`
+	Description    string       `json:"description"`
+	DAGJSON        string       `json:"dag_json"`
+	Variables      string       `json:"variables"`
+	Plugins        string       `json:"plugins"`
+	Status         string       `json:"status"`
+	DefaultTimeout int          `json:"default_timeout"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
 // --- Node ---

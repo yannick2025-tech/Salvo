@@ -43,6 +43,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE time_series_samples ADD COLUMN p90_latency_ms REAL DEFAULT 0`,
 		`ALTER TABLE run_records ADD COLUMN count INTEGER DEFAULT 0`,
 		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
+		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)
@@ -60,6 +61,7 @@ CREATE TABLE IF NOT EXISTS scenes (
 	variables       TEXT    DEFAULT '',
 	plugins         TEXT    DEFAULT '',
 	status          TEXT    NOT NULL DEFAULT 'draft',
+	default_timeout INTEGER DEFAULT 0,
 	created_at      DATETIME NOT NULL,
 	updated_at      DATETIME NOT NULL,
 	deleted_at      DATETIME DEFAULT NULL

@@ -8,6 +8,9 @@
 - **节点级 retry 支持**：在 sceneNode.Execute 层统一处理 retry，支持指数退避策略（initial_backoff、multiplier、max_backoff、jitter）
 - **While 步骤支持 generator 类型**：扩展 stepConfig 支持 `type: generator`，允许 while 循环内执行 generator 节点
 - **multipart 格式兼容**：支持扁平格式 `multipart: {token: xxx, file: xxx}` 和嵌套格式 `form: {fields: {}, files: {}}`
+- **节点级独立超时**：DAG executor 为每个节点创建独立的 timeout context，节点超时不影响其他节点
+- **场景默认超时配置**：Scene 模型添加 `default_timeout` 字段，支持通过 GUI 配置场景级超时
+- **前端全节点编辑**：所有节点类型（delay、timer、group、http）的数值字段支持变量引用（`${variable}`），导入 YAML 后可在 GUI 正确显示和编辑
 - **card.yaml 重构**：将所有 think_time 替换为 delay 节点，移除 think_time 依赖
 
 ## Capabilities

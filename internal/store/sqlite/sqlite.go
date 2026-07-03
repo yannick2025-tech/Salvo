@@ -68,23 +68,23 @@ func (r *SceneRepo) Create(ctx context.Context, scene *model.Scene) error {
 	scene.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO scenes (id, name, description, dag_json, variables, plugins, status, created_at, updated_at, deleted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		INSERT INTO scenes (id, name, description, dag_json, variables, plugins, status, default_timeout, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		scene.ID, scene.Name, scene.Description, scene.DAGJSON,
-		scene.Variables, scene.Plugins, scene.Status,
+		scene.Variables, scene.Plugins, scene.Status, scene.DefaultTimeout,
 		scene.CreatedAt, scene.UpdatedAt)
 	return err
 }
 
 func (r *SceneRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Scene, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, name, description, dag_json, variables, plugins, status, created_at, updated_at
+		SELECT id, name, description, dag_json, variables, plugins, status, default_timeout, created_at, updated_at
 		FROM scenes WHERE id = ? AND deleted_at IS NULL`, id)
 	return scanScene(row)
 }
 
 func (r *SceneRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Scene, error) {
-	query := `SELECT id, name, description, dag_json, variables, plugins, status, created_at, updated_at
+	query := `SELECT id, name, description, dag_json, variables, plugins, status, default_timeout, created_at, updated_at
 		FROM scenes WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -115,10 +115,10 @@ func (r *SceneRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Scen
 func (r *SceneRepo) Update(ctx context.Context, scene *model.Scene) error {
 	scene.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE scenes SET name=?, description=?, dag_json=?, variables=?, plugins=?, status=?, updated_at=?
+		UPDATE scenes SET name=?, description=?, dag_json=?, variables=?, plugins=?, status=?, default_timeout=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		scene.Name, scene.Description, scene.DAGJSON, scene.Variables,
-		scene.Plugins, scene.Status, scene.UpdatedAt, scene.ID)
+		scene.Plugins, scene.Status, scene.DefaultTimeout, scene.UpdatedAt, scene.ID)
 	return err
 }
 
@@ -142,7 +142,7 @@ func scanScene(row interface {
 }) (*model.Scene, error) {
 	s := &model.Scene{}
 	err := row.Scan(&s.ID, &s.Name, &s.Description, &s.DAGJSON,
-		&s.Variables, &s.Plugins, &s.Status, &s.CreatedAt, &s.UpdatedAt)
+		&s.Variables, &s.Plugins, &s.Status, &s.DefaultTimeout, &s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

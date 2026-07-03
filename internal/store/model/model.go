@@ -28,12 +28,13 @@ func (m *Model) IsDeleted() bool {
 // Scene represents a test scenario configuration.
 type Scene struct {
 	Model
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	DAGJSON     string `json:"dag_json"`
-	Variables   string `json:"variables,omitempty"`
-	Plugins     string `json:"plugins,omitempty"`
-	Status      string `json:"status"`
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	DAGJSON        string `json:"dag_json"`
+	Variables      string `json:"variables,omitempty"`
+	Plugins        string `json:"plugins,omitempty"`
+	Status         string `json:"status"`
+	DefaultTimeout int    `json:"default_timeout,omitempty"` // 场景默认超时(秒)，0 表示使用系统默认
 }
 
 const (
@@ -74,12 +75,12 @@ const (
 // DataSource represents a CSV data source attached to a scene.
 type DataSource struct {
 	Model
-	SceneID   snowflake.ID `json:"scene_id,string"`
-	Name      string       `json:"name"`
-	FileName  string       `json:"file_name"`
-	Columns   string       `json:"columns"`   // JSON array of column names
-	Rows      string       `json:"rows"`      // JSON array of row objects
-	RowCount  int          `json:"row_count"`
+	SceneID  snowflake.ID `json:"scene_id,string"`
+	Name     string       `json:"name"`
+	FileName string       `json:"file_name"`
+	Columns  string       `json:"columns"` // JSON array of column names
+	Rows     string       `json:"rows"`    // JSON array of row objects
+	RowCount int          `json:"row_count"`
 }
 
 // Edge represents a directed edge between two DAG nodes.
@@ -174,12 +175,12 @@ const (
 
 type User struct {
 	Model
-	Email        string     `json:"email"`
-	PasswordHash string     `json:"-"`
-	Nickname     string     `json:"nickname"`
+	Email        string       `json:"email"`
+	PasswordHash string       `json:"-"`
+	Nickname     string       `json:"nickname"`
 	RoleID       snowflake.ID `json:"role_id,string"`
-	Status       string     `json:"status"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+	Status       string       `json:"status"`
+	LastLoginAt  *time.Time   `json:"last_login_at,omitempty"`
 }
 
 const (
@@ -208,19 +209,19 @@ type RolePermission struct {
 
 // TimeSeriesSample represents a time-series metric sample for a run or node.
 type TimeSeriesSample struct {
-	ID            int64        `json:"id"`
-	RunID         snowflake.ID  `json:"run_id,string"`
-	NodeID        string       `json:"node_id"`
-	SampleTime    time.Time     `json:"sample_time"`
+	ID             int64        `json:"id"`
+	RunID          snowflake.ID `json:"run_id,string"`
+	NodeID         string       `json:"node_id"`
+	SampleTime     time.Time    `json:"sample_time"`
 	WindowDuration int          `json:"window_duration"`
-	QPS           float64      `json:"qps"`
-	TotalRequests int64         `json:"total_requests"`
-	SuccessCount  int64         `json:"success_count"`
-	FailCount     int64         `json:"fail_count"`
-	AvgLatencyMs  float64      `json:"avg_latency_ms"`
-	P50LatencyMs  float64      `json:"p50_latency_ms"`
-	P95LatencyMs  float64      `json:"p95_latency_ms"`
-	P99LatencyMs  float64      `json:"p99_latency_ms"`
-	MinLatencyMs  float64      `json:"min_latency_ms"`
-	MaxLatencyMs  float64      `json:"max_latency_ms"`
+	QPS            float64      `json:"qps"`
+	TotalRequests  int64        `json:"total_requests"`
+	SuccessCount   int64        `json:"success_count"`
+	FailCount      int64        `json:"fail_count"`
+	AvgLatencyMs   float64      `json:"avg_latency_ms"`
+	P50LatencyMs   float64      `json:"p50_latency_ms"`
+	P95LatencyMs   float64      `json:"p95_latency_ms"`
+	P99LatencyMs   float64      `json:"p99_latency_ms"`
+	MinLatencyMs   float64      `json:"min_latency_ms"`
+	MaxLatencyMs   float64      `json:"max_latency_ms"`
 }

@@ -33,10 +33,32 @@
 - [ ] 4.4 验证重构后的 YAML 语法正确性
 - [ ] 4.5 运行完整流程测试，确保重构后功能正常
 
-## 5. 集成测试与验证
+## 5. 节点级独立超时与场景默认超时配置
 
-- [ ] 5.1 使用 card.yaml 进行端到端测试，验证所有功能正常工作
-- [ ] 5.2 验证向后兼容性：确保现有的 while/parallel/loop step extract/retry 不受影响
-- [ ] 5.3 编写集成测试，覆盖统一后处理、while generator、multipart 兼容
-- [ ] 5.4 更新文档，说明新的 extract、retry 配置方式
-- [ ] 5.5 代码审查和性能测试
+- [ ] 5.1 在 DAG executor 中实现节点级独立超时：为每个节点创建独立的 timeout context
+- [ ] 5.2 在 Scene 模型中添加 `default_timeout` 字段（秒，0 表示使用系统默认）
+- [ ] 5.3 实现数据库迁移：为 scenes 表添加 default_timeout 列
+- [ ] 5.4 更新 Scene Repository 的 CRUD 方法，支持 default_timeout 字段
+- [ ] 5.5 更新 API DTO 和 Handler，支持创建/更新/查询场景时传递 default_timeout
+- [ ] 5.6 在 Runner 中使用场景的 default_timeout：如果为 0 则使用系统默认 600 秒
+- [ ] 5.7 在前端场景编辑页面添加"默认超时"输入框
+- [ ] 5.8 为节点级超时和场景默认超时编写单元测试
+
+## 6. 前端全节点编辑支持变量引用
+
+- [ ] 6.1 修改 delay 节点的 ms 字段：从 type="number" 改为 type="text"，支持变量引用
+- [ ] 6.2 修改 timer 节点的 seconds 字段：从 type="number" 改为 type="text"，支持变量引用
+- [ ] 6.3 修改 group 节点的 loop_count 字段：从 type="number" 改为 type="text"，支持变量引用
+- [ ] 6.4 修改 http 节点的 timeout 和 expect_status 字段：从 type="number" 改为 type="text"，支持变量引用
+- [ ] 6.5 更新 reactive 初始值：将数值类型改为字符串类型（如 '5000'、'200'）
+- [ ] 6.6 更新配置读取逻辑：使用 String() 转换，确保显示原始值
+- [ ] 6.7 验证保存逻辑：确保变量引用不被破坏
+- [ ] 6.8 为前端全节点编辑编写端到端测试
+
+## 7. 集成测试与验证
+
+- [ ] 7.1 使用 card.yaml 进行端到端测试，验证所有功能正常工作
+- [ ] 7.2 验证向后兼容性：确保现有的 while/parallel/loop step extract/retry 不受影响
+- [ ] 7.3 编写集成测试，覆盖统一后处理、while generator、multipart 兼容、节点级超时、场景默认超时
+- [ ] 7.4 更新文档，说明新的 extract、retry、超时配置方式
+- [ ] 7.5 代码审查和性能测试

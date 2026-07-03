@@ -96,11 +96,11 @@
         </div>
         <div class="form-row inline">
           <label>超时(ms)</label>
-          <input v-model.number="httpConfig.timeout" type="number" @change="saveNodeConfig" />
+          <input v-model="httpConfig.timeout" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
         </div>
         <div class="form-row inline">
           <label>期望状态码</label>
-          <input v-model.number="httpConfig.expect_status" type="number" @change="saveNodeConfig" />
+          <input v-model="httpConfig.expect_status" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
         </div>
         <div class="form-row">
           <label>变量提取 (JSON)</label>
@@ -132,7 +132,7 @@
         </div>
         <div class="form-row inline">
           <label>延迟时间(ms)</label>
-          <input v-model.number="delayConfig.ms" type="number" @change="saveNodeConfig" />
+          <input v-model="delayConfig.ms" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
         </div>
       </div>
 
@@ -204,7 +204,7 @@
         </div>
         <div class="form-row inline">
           <label>循环次数</label>
-          <input v-model.number="groupConfig.loop_count" type="number" min="1" @change="saveNodeConfig" />
+          <input v-model="groupConfig.loop_count" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
         </div>
       </div>
 
@@ -222,7 +222,7 @@
         </div>
         <div class="form-row inline">
           <label>{{ timerConfig.mode === 'delay' ? '延迟时间(秒)' : '间隔时间(秒)' }}</label>
-          <input v-model.number="timerConfig.seconds" type="number" min="1" @change="saveNodeConfig" />
+          <input v-model="timerConfig.seconds" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
         </div>
         <div class="form-row">
           <label class="hint-label">定时器节点始终异步执行</label>
@@ -357,6 +357,10 @@
             <div class="info-item"><span class="label">状态</span><span :class="['status-badge', scene.status]">{{ scene.status }}</span></div>
             <div class="info-item"><span class="label">描述</span><span class="value">{{ scene.description || '-' }}</span></div>
             <div class="info-item"><span class="label">创建时间</span><span class="value">{{ formatTime(scene.created_at) }}</span></div>
+            <div class="info-item">
+              <span class="label">默认超时(秒)</span>
+              <input v-model.number="scene.default_timeout" type="number" min="0" placeholder="0 表示使用系统默认" class="timeout-input" @change="saveSceneTimeout" />
+            </div>
           </div>
           </div>
         </div>
@@ -511,7 +515,7 @@
         <template v-if="nodeForm.type === 'delay'">
           <div class="form-group">
             <label>延迟时间(ms)</label>
-            <input v-model.number="nodeForm.delayMs" type="number" min="0" />
+            <input v-model="nodeForm.delayMs" type="text" placeholder="数值或 ${variable} 引用" />
           </div>
         </template>
         <template v-if="nodeForm.type === 'condition'">
@@ -694,9 +698,9 @@ const pagedRows = computed(() => {
 })
 
 // Group node config
-const groupConfig = reactive({ node_ids: [] as string[], loop_count: 1, async: false })
+const groupConfig = reactive({ node_ids: [] as string[], loop_count: '1', async: false })
 // Timer node config
-const timerConfig = reactive({ mode: 'delay', seconds: 1 })
+const timerConfig = reactive({ mode: 'delay', seconds: '1' })
 const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==', value: '' }], interval_seconds: 1, max_iterations: 100, max_duration_minutes: 0, fail_after_consecutive: 0, fail_message: '' })
 const parallelConfig = reactive({ async: false })
 const subFlowConfig = reactive({ scene_id: '', async: false })
@@ -934,7 +938,7 @@ const nodeForm = reactive({
   url: '',
   headers: '',
   body: '',
-  delayMs: 1000,
+  delayMs: '1000',
   conditionExpr: '',
   extract: '',
   parentId: '',
@@ -947,12 +951,12 @@ const httpConfig = reactive({
   url: '',
   headers: '',
   body: '',
-  timeout: 5000,
-  expect_status: 200,
+  timeout: '5000',
+  expect_status: '200',
   extract: '',
   generator: '',
 })
-const delayConfig = reactive({ ms: 1000 })
+const delayConfig = reactive({ ms: '1000' })
 const conditionConfig = reactive({ expr: '' })
 const ifElseConfig = reactive({ expr: '', trueTarget: '', falseTarget: '' })
 
@@ -1336,7 +1340,7 @@ function addNode(type: string) {
   nodeForm.url = ''
   nodeForm.headers = ''
   nodeForm.body = ''
-  nodeForm.delayMs = 1000
+  nodeForm.delayMs = '1000'
   nodeForm.conditionExpr = ''
   nodeForm.extract = ''
   nodeForm.parentId = ''
@@ -1353,7 +1357,7 @@ function editNode(node: NodeDTO) {
     nodeForm.url = cfg.url || ''
     nodeForm.headers = cfg.headers ? JSON.stringify(cfg.headers, null, 2) : ''
     nodeForm.body = cfg.body || ''
-    nodeForm.delayMs = cfg.ms || 1000
+    nodeForm.delayMs = cfg.ms != null ? String(cfg.ms) : '1000'
     nodeForm.conditionExpr = cfg.expr || ''
     nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
     nodeForm.loop_count = cfg.loop_count || 1
@@ -1370,7 +1374,7 @@ function editNode(node: NodeDTO) {
     nodeForm.url = ''
     nodeForm.headers = ''
     nodeForm.body = ''
-    nodeForm.delayMs = 1000
+    nodeForm.delayMs = '1000'
     nodeForm.conditionExpr = ''
     nodeForm.extract = ''
     nodeForm.loop_count = 1
@@ -1577,19 +1581,19 @@ function selectNode(node: NodeDTO | null) {
     httpConfig.url = cfg.url || ''
     httpConfig.headers = cfg.headers ? JSON.stringify(cfg.headers, null, 2) : ''
     httpConfig.body = cfg.body || ''
-    httpConfig.timeout = cfg.timeout || 5000
-    httpConfig.expect_status = cfg.expect_status || 200
+    httpConfig.timeout = cfg.timeout != null ? String(cfg.timeout) : '5000'
+    httpConfig.expect_status = cfg.expect_status != null ? String(cfg.expect_status) : '200'
     httpConfig.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
     httpConfig.generator = cfg.generator ? JSON.stringify(cfg.generator, null, 2) : ''
-    delayConfig.ms = cfg.ms || 1000
+    delayConfig.ms = cfg.ms != null ? String(cfg.ms) : '1000'
     conditionConfig.expr = cfg.expr || ''
     ifElseConfig.expr = cfg.expr || ''
 
     groupConfig.node_ids = cfg.node_ids || []
-    groupConfig.loop_count = cfg.loop_count || 1
+    groupConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
     groupConfig.async = cfg.async || false
     timerConfig.mode = cfg.mode || 'delay'
-    timerConfig.seconds = cfg.seconds || 1
+    timerConfig.seconds = cfg.seconds != null ? String(cfg.seconds) : '1'
     
     // Parse configs for new node types
     whileConfig.exit_conditions = cfg.exit_conditions || [{ variable: '', operator: '==', value: '' }]

@@ -265,7 +265,96 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 - 只支持一种格式 → 需要修改 card.yaml
 - 要求用户显式指定 fields/files → 增加配置复杂度
 
-### Decision 5: card.yaml 重构
+### Decision 5: 节点级独立超时
+
+**选择**：在 DAG executor 中为每个节点创建独立的 timeout context
+
+```go
+func (e *Executor) executeNode(ctx context.Context, node Node, input *Input) (*Output, error) {
+    // 获取节点配置的超时时间
+    nodeTimeout := node.Timeout()
+    if nodeTimeout > 0 {
+        // 创建节点级独立超时 context
+        nodeCtx, cancel := context.WithTimeout(ctx, nodeTimeout)
+        defer cancel()
+        ctx = nodeCtx
+    }
+    // 节点超时不影响其他节点，只影响当前节点
+    return node.Execute(ctx, input)
+}
+```
+
+**理由**：
+- 节点超时相互隔离，一个节点的超时不会导致整个场景失败
+- 支持长时运行的节点（如 delay 53秒）而不受场景默认超时限制
+- 与场景级超时形成两级保护：场景超时兜底，节点超时精细控制
+
+**替代方案**：
+- 仅使用场景级超时 → 无法精细控制单个节点的超时行为
+- 完全移除超时限制 → 失去保护机制，可能导致资源泄漏
+
+### Decision 6: 场景默认超时配置
+
+**选择**：在 Scene 模型中添加 `default_timeout` 字段，支持通过 GUI 配置
+
+```go
+// Scene 模型
+type Scene struct {
+    // ... 其他字段
+    DefaultTimeout int `json:"default_timeout"` // 秒，0 表示使用系统默认
+}
+
+// Runner 使用逻辑
+func (r *Runner) runScene(scene *Scene) error {
+    timeout := scene.DefaultTimeout
+    if timeout == 0 {
+        timeout = 600 // 系统默认 10 分钟
+    }
+    ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+    defer cancel()
+    // ...
+}
+```
+
+**理由**：
+- 不同场景有不同的超时需求（充电场景可能需要 10+ 分钟）
+- 通过 GUI 配置，无需修改代码或重启服务
+- 0 值表示使用系统默认，保持向后兼容
+
+### Decision 7: 前端全节点编辑支持变量引用
+
+**选择**：将所有节点类型的数值字段从 `type="number"` 改为 `type="text"`，支持变量引用
+
+**修改的字段**：
+- delay 节点：`ms` 字段
+- timer 节点：`seconds` 字段
+- group 节点：`loop_count` 字段
+- http 节点：`timeout` 和 `expect_status` 字段
+
+**实现方式**：
+```vue
+<!-- 旧实现 -->
+<input v-model.number="delayConfig.ms" type="number" />
+
+<!-- 新实现 -->
+<input v-model="delayConfig.ms" type="text" placeholder="数值或 ${variable} 引用" />
+```
+
+**配套修改**：
+- reactive 初始值从数字改为字符串（如 `'5000'`、`'200'`）
+- 读取配置时使用 `String()` 转换，确保显示原始值
+- 保存时直接序列化字符串，保持变量引用不被破坏
+
+**理由**：
+- 导入 YAML 后，GUI 能正确显示带变量引用的配置值
+- 用户可以在 GUI 中编辑变量引用，而不会被强制转为数字
+- 保持向后兼容：纯数字字符串仍可正常解析
+
+**替代方案**：
+- 仅修改 delay 节点 → 其他节点仍有同样问题
+- 添加专门的变量编辑器 → 过度设计，增加复杂度
+
+### Decision 8: card.yaml 重构
 
 **选择**：将所有 think_time 替换为 delay 节点
 

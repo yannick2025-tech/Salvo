@@ -443,7 +443,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.mu.Unlock()
 	runLog.Info("run started", logger.F("run_id", r.runID.String()))
 
-	err = r.execute(dagObj, scope)
+	err = r.execute(dagObj, scope, scene)
 
 	r.finishedAt = time.Now().UTC()
 	runRecord.Status = model.RunStatusCompleted
@@ -928,7 +928,7 @@ func (r *Runner) Duration() time.Duration {
 	return r.finishedAt.Sub(r.startedAt)
 }
 
-func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
+func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Scene) error {
 	execCtx := logger.ContextWithTraceID(r.ctx, r.runID.String())
 	execCtx = logger.ContextWithSceneID(execCtx, r.cfg.SceneID.String())
 	execLog := r.log.WithContext(execCtx)
@@ -982,10 +982,15 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		}()
 
 		sceneTimeout := r.cfg.Timeout
-		if sceneTimeout <= 0 {
-			sceneTimeout = 30 * time.Second
-		}
-		taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
+			if sceneTimeout <= 0 {
+				// 优先使用场景配置的默认超时
+				if scene.DefaultTimeout > 0 {
+					sceneTimeout = time.Duration(scene.DefaultTimeout) * time.Second
+				} else {
+					sceneTimeout = 600 * time.Second // 系统默认 10 分钟
+				}
+			}
+			taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
 		defer cancel()
 
 		chainID := r.nodeGen.Generate()
