@@ -121,7 +121,7 @@ onMounted(fetchTraces)
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); white-space: nowrap; }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
-.mono { font-family: monospace; font-size: 12px; cursor: default; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: var(--font-mono); font-size: 12px; cursor: default; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 

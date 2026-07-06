@@ -819,6 +819,7 @@ function renderSysGoroutineChart(tc: any) {
   const data = ts.map((s: any) => s.goroutine_count || s.GoroutineCount || 0)
   sysGoroutineChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
@@ -843,6 +844,7 @@ function renderSysHeapChart(tc: any) {
   const sysData = ts.map((s: any) => s.heap_sys_mb || s.HeapSysMB || 0)
   sysHeapChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}MB' } },
@@ -869,6 +871,7 @@ function renderSysCpuChart(tc: any) {
   const data = ts.map((s: any) => s.cpu_percent || s.CPUUsagePercent || 0)
   sysCpuChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
@@ -894,6 +897,7 @@ function renderSysTaskWaitChart(tc: any) {
   const p99 = ts.map((s: any) => s.task_wait_p99_ms || s.TaskWaitP99Ms || 0)
   sysTaskWaitChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
@@ -923,6 +927,7 @@ function renderSysQueueChart(tc: any) {
   const maxVal = Math.max(...queueData, 10)
   sysQueueChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: maxVal, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
@@ -954,6 +959,7 @@ function renderErrorRateChart(tc: any, m: any) {
     const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100)
     errRateChart.setOption({
       backgroundColor: tc.bg,
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const idx = p?.dataIndex ?? 0
@@ -995,6 +1001,7 @@ function renderAll() {
   ovChart = echarts.init(overviewChartRef.value)
   ovChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     color: [tc.colors[1], tc.colors[3]],
     tooltip: {
       trigger: 'item',
@@ -1004,7 +1011,7 @@ function renderAll() {
       borderWidth: 1,
       borderRadius: 10,
       padding: [12, 16],
-      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
       formatter: (p: any) => {
         const total = Number(m.total_reqs || 1)
@@ -1047,7 +1054,7 @@ function renderAll() {
         const pct = (val / total * 100).toFixed(3)
         return `{name|${name}}   {val|${pct}%}`
       },
-      textStyle: { rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif', rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
     },
     series: [{
       type: 'pie',
@@ -1089,6 +1096,7 @@ function renderAll() {
   latChart = echarts.init(latencyChartRef.value)
   latChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(45,212,191,0.05)' : 'rgba(13,148,136,0.04)' } },
       confine: true,
@@ -1105,7 +1113,7 @@ function renderAll() {
       borderWidth: 1,
       borderRadius: 10,
       padding: [12, 16],
-      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
@@ -1181,7 +1189,7 @@ function renderQPSTrend(tc: any, m: any) {
   const qpsData = (m.ts_qps as number[] | undefined) || []
 
   if (!timestamps?.length || !qpsData.length) {
-    qpsChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+    qpsChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
     return
   }
 
@@ -1189,6 +1197,7 @@ function renderQPSTrend(tc: any, m: any) {
 
   qpsChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     tooltip: {
       trigger: 'axis' as const,
       confine: true,
@@ -1197,7 +1206,7 @@ function renderQPSTrend(tc: any, m: any) {
       borderWidth: 1,
       borderRadius: 12,
       padding: [12, 16],
-      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
@@ -1239,7 +1248,7 @@ function renderLatencyTrend(tc: any, m: any) {
   const p99 = (m.ts_p99 as number[]|undefined)||[]
 
   if (!timestamps?.length) {
-    latTrendChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+    latTrendChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
     return
   }
 
@@ -1248,6 +1257,7 @@ function renderLatencyTrend(tc: any, m: any) {
 
   latTrendChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     tooltip: {
       trigger: 'axis' as const,
       confine: true,
@@ -1256,7 +1266,7 @@ function renderLatencyTrend(tc: any, m: any) {
       borderWidth: 1,
       borderRadius: 12,
       padding: [12, 16],
-      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
         if (!Array.isArray(params)) return ''
@@ -1295,16 +1305,17 @@ function renderNodeCharts(tc: any) {
       nodeQpsCharts.set(idx, qChart)
 
       if (!timeLabels.length) {
-        qChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+        qChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
       } else {
         qChart.setOption({
           backgroundColor: 'transparent',
+          textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
           tooltip: {
             trigger: 'axis' as const, confine: true,
             backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
             borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
             borderWidth: 1, borderRadius: 12, padding: [12, 16],
-            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
             extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
             formatter: (params: any) => {
               if (!Array.isArray(params)) return ''
@@ -1337,7 +1348,7 @@ function renderNodeCharts(tc: any) {
       nodeLatencyCharts.set(idx, lChart)
 
       if (!timeLabels.length) {
-        lChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+        lChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
       } else {
         const lc = tc.latencyColors
         const p50 = node.ts_p50 || []
@@ -1348,12 +1359,13 @@ function renderNodeCharts(tc: any) {
         const bandSmooth = isSmooth
         lChart.setOption({
           backgroundColor: 'transparent',
+          textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
           tooltip: {
             trigger: 'axis' as const, confine: true,
             backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
             borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
             borderWidth: 1, borderRadius: 12, padding: [12, 16],
-            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
             extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
             formatter: (params: any) => {
               if (!Array.isArray(params)) return ''
@@ -1417,7 +1429,7 @@ function renderErrorBreakdownChart(tc: any) {
 
   const items = errorBreakdown.value
   if (!items.length) {
-    errBreakdownChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+    errBreakdownChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
     return
   }
 
@@ -1429,6 +1441,7 @@ function renderErrorBreakdownChart(tc: any) {
 
   errBreakdownChart.setOption({
     backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(225,29,72,0.06)' : 'rgba(225,29,72,0.04)' } },
       confine: true,
@@ -1732,7 +1745,7 @@ onUnmounted(() => {
 .info-table td { padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .info-table tr:last-child td { border-bottom: none; }
 .info-label { color: var(--text-secondary); min-width: 110px; }
-.mono-sm { font-family: monospace; font-size: 12px; }
+.mono-sm { font-family: var(--font-mono); font-size: 12px; }
 
 .mode-tag {
   display: inline-block;
@@ -2073,7 +2086,7 @@ onUnmounted(() => {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
-  font-family: -apple-system, 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-family: var(--font-sans), var(--font-mono);
 }
 
 .sys-summary-sub {

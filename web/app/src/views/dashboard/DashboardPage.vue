@@ -936,32 +936,32 @@ function renderSysExpandedChart(chartId: string) {
     const data = getSysData('goroutine_count')
     if (!data.length) return
     const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 11 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 11 } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysHeap') {
     const allocData = getSysData('heap_alloc_mb')
     const sysData = getSysData('heap_sys_mb')
     if (!allocData.length) return
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysCpu') {
     const data = getSysData('cpu_percent')
     if (!data.length) return
     const areaGrad = new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.2)` }, { offset: 1, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.01)` }])
     const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.info }, label: { formatter: '70%', color: theme.colors.info, fontSize: 11, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysTaskWait') {
     const p50 = getSysData('task_wait_p50_ms')
     const p95 = getSysData('task_wait_p95_ms')
     const p99 = getSysData('task_wait_p99_ms')
     if (!p50.length) return
     const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
-    chart.setOption({ backgroundColor: theme.bgColor, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '248,81,73' : '207,34,46'}, 0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '248,81,73' : '207,34,46'}, 0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   } else if (chartId === 'sysQueue') {
     const data = getSysData('pending_queue_len')
     if (!data.length) return
     const currentMax = Math.max(...data)
     if (currentMax > sysQueueMax) sysQueueMax = currentMax
     const queueColor = isDark ? '#94a3b8' : '#64748b'
-    chart.setOption({ backgroundColor: theme.bgColor, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Pending Queue', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: queueColor, width: 2 }, itemStyle: { color: queueColor }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' }, { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' }]) } }], tooltip: getTooltipConfig(), legend: { data: ['Pending Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '148,163,184' : '100,116,139'}, 0.15)`, handleStyle: { color: queueColor }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Pending Queue', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: queueColor, width: 2 }, itemStyle: { color: queueColor }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' }, { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' }]) } }], tooltip: getTooltipConfig(), legend: { data: ['Pending Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '148,163,184' : '100,116,139'}, 0.15)`, handleStyle: { color: queueColor }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
   }
 }
 
@@ -976,6 +976,7 @@ function renderSysGoroutineChart() {
   if (!data.length) return
   sysGoroutineChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
@@ -997,6 +998,7 @@ function renderSysHeapChart() {
   if (!allocData.length) return
   sysHeapChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}MB' } },
@@ -1020,6 +1022,7 @@ function renderSysCpuChart() {
   if (!data.length) return
   sysCpuChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 48, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
@@ -1042,6 +1045,7 @@ function renderSysTaskWaitChart() {
   if (!p50.length) return
   sysTaskWaitChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 48, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
@@ -1070,6 +1074,7 @@ function renderSysQueueChart() {
   const queueColor = isDark ? '#94a3b8' : '#64748b'
   sysQueueChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 16, right: 20, bottom: 50, left: 50 },
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: Math.max(sysQueueMax, 10), axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
@@ -1163,7 +1168,7 @@ function getTooltipConfig() {
         else if (name.startsWith('P5') || name.startsWith('P9')) { val = rawVal.toFixed(1); unit = 'ms' }
         else if (name === 'Goroutines') { val = Math.round(rawVal).toLocaleString(); unit = '' }
         else { val = rawVal.toFixed(1); unit = 'ms' }
-        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${name}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
+        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${name}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif,'SF Mono','Monaco','Inconsolata','Menlo','Consolas','Courier New',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
       }
       return result
     }
@@ -1209,6 +1214,7 @@ function renderQpsChart() {
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     qpsChart.setOption({
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -1218,6 +1224,7 @@ function renderQpsChart() {
   }
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
@@ -1242,6 +1249,7 @@ function renderLatencyChart() {
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     latencyChart.setOption({
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -1251,6 +1259,7 @@ function renderLatencyChart() {
   }
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
@@ -1280,6 +1289,7 @@ function renderErrorChart() {
   if (!ts || !ts.timestamps.length) {
     errorChart.setOption({
       backgroundColor: theme.bgColor,
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -1291,6 +1301,7 @@ function renderErrorChart() {
   const maxErrRate = Math.max(...ts.error_rate, 0.01)
   errorChart.setOption({
     backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
     grid: { top: 16, right: 16, bottom: 44, left: 50 },
     dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(ts.timestamps.length / 8) }, splitLine: { show: false } },
@@ -1359,6 +1370,7 @@ function renderNodeDetailChart(nodeId: string) {
     const hasQPS = series.length > 4
     chart.setOption({
       backgroundColor: 'transparent',
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
       grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
       dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
@@ -1384,6 +1396,7 @@ function renderNodeDetailChart(nodeId: string) {
   } else {
     chart.setOption({
       backgroundColor: 'transparent',
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
       grid: { top: 16, right: 16, bottom: 36, left: 48 },
       xAxis: { type: 'category', data: ['P50', 'P95', 'P99', 'Avg'], axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
       yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -1878,7 +1891,7 @@ onUnmounted(() => {
 
 .time-value {
   color: var(--text-secondary);
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   word-break: break-all;
   line-height: 1.4;
@@ -2056,7 +2069,7 @@ onUnmounted(() => {
 }
 
 .node-id {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-tertiary);
   padding: 2px 6px;
@@ -2235,7 +2248,7 @@ onUnmounted(() => {
   width: 65px;
   text-align: right;
   flex-shrink: 0;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
 }
 
@@ -2249,7 +2262,7 @@ onUnmounted(() => {
 .time-range-label {
   font-size: 12px;
   color: var(--text-tertiary);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .node-card { 
@@ -2451,7 +2464,7 @@ onUnmounted(() => {
 
 .time-range-value {
   color: var(--accent-primary);
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
 }
@@ -2619,7 +2632,7 @@ onUnmounted(() => {
   font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
-  font-family: -apple-system, 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-family: var(--font-sans), var(--font-mono);
   transition: color 0.3s ease;
 }
 

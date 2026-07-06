@@ -401,7 +401,7 @@ onMounted(() => {
 }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
-.mono { font-family: monospace; font-size: 12px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
 .path { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; gap: 6px; }
 
@@ -430,7 +430,7 @@ onMounted(() => {
   border-radius: var(--radius-sm); background: var(--bg-input);
   color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box;
 }
-.form-group textarea { resize: vertical; font-family: monospace; }
+.form-group textarea { resize: vertical; font-family: var(--font-mono); }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--accent-primary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 

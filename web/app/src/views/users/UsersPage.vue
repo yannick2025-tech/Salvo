@@ -284,7 +284,7 @@ onMounted(() => {
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
-.mono { font-family: monospace; font-size: 12px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
 .actions { display: flex; gap: 6px; }
 .role-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }

@@ -490,7 +490,7 @@ onUnmounted(() => {
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); white-space: nowrap; }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
-.mono { font-family: monospace; font-size: 12px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }

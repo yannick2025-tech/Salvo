@@ -137,10 +137,10 @@ function getReportStatusTooltip(status: string): string {
 }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); white-space: nowrap; }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
-.mono { font-family: monospace; font-size: 12px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
-.duration-cell { font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.duration-cell { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
 
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
 .status-badge.success { background: rgba(63,185,80,0.15); color: #3fb950; }

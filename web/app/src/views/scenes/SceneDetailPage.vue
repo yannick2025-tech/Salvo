@@ -2152,7 +2152,7 @@ onMounted(() => {
 }
 .form-row textarea {
   resize: vertical; min-height: 64px;
-  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+  font-family: var(--font-mono); font-size: 12px;
   line-height: 1.5;
 }
 .panel-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-primary); }
@@ -2604,7 +2604,7 @@ onMounted(() => {
 }
 .form-group textarea {
   height: auto; min-height: 64px; padding: 10px 12px;
-  resize: vertical; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+  resize: vertical; font-family: var(--font-mono); font-size: 12px;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   border-color: var(--accent-primary);

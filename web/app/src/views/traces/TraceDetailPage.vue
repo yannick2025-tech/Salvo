@@ -234,7 +234,7 @@ function formatDurationMs(ns: number): string {
 .detail-row { display: contents; }
 .label { font-size: 13px; color: var(--text-secondary); }
 .value { font-size: 14px; color: var(--text-primary); }
-.mono { font-family: monospace; font-size: 12px; cursor: default; }
+.mono { font-family: var(--font-mono); font-size: 12px; cursor: default; }
 
 .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; min-width: auto; max-width: fit-content; }
 .st-ok { background: rgba(163,230,53,0.12); color: #65a30d; border: 1px solid rgba(163,230,53,0.2); }
@@ -269,8 +269,8 @@ function formatDurationMs(ns: number): string {
 .span-node-id { font-size: 11px; color: var(--text-tertiary); }
 
 .span-bar-wrapper { height: 24px; background: transparent; border-radius: 4px; position: relative; overflow: hidden; }
-.span-wait-bar { position: absolute; left: 0; top: 0; width: 100px; min-width: 100px; height: 100%; background: #8b949e; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 6px; color: #fff; font-size: 9px; font-weight: 600; font-family: 'Monaco', 'Menlo', monospace; white-space: nowrap; z-index: 2; box-sizing: border-box; }
-.span-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #fff; font-size: 9px; font-weight: 600; font-family: 'Monaco', 'Menlo', monospace; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; }
+.span-wait-bar { position: absolute; left: 0; top: 0; width: 100px; min-width: 100px; height: 100%; background: #8b949e; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 6px; color: #fff; font-size: 9px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; z-index: 2; box-sizing: border-box; }
+.span-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #fff; font-size: 9px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; }
 
 .span-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-top: 6px; align-items: center; flex-wrap: wrap; }
 .latency-text { font-weight: 600; }

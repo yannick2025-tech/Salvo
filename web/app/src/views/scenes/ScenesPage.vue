@@ -941,7 +941,7 @@ onMounted(() => {
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .data-table td { color: var(--text-primary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
-.mono { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
+.mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
 .desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
@@ -960,7 +960,7 @@ onMounted(() => {
 .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
 .form-group input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-group input:focus { border-color: var(--accent-primary); }
-.yaml-input { width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; outline: none; resize: vertical; line-height: 1.5; }
+.yaml-input { width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none; resize: vertical; line-height: 1.5; }
 .yaml-input:focus { border-color: var(--accent-primary); }
 .import-hint { font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; line-height: 1.5; }
 .form-error { font-size: 12px; color: var(--accent-danger, #e74c3c); background: rgba(248,81,73,0.1); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 8px; }
