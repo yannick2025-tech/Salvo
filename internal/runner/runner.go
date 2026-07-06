@@ -1031,10 +1031,11 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 				logger.F("row", fmt.Sprintf("%v", row)))
 		}
 
+		jsonResolvedVars, _ := json.Marshal(resolvedVars)
 		execLog.Info("resolved scene variables",
 			logger.F("chain_id", chainID.String()),
 			logger.F("variable_count", len(resolvedVars)),
-			logger.F("variables", fmt.Sprintf("%v", resolvedVars)),
+			logger.F("variables", string(jsonResolvedVars)),
 		)
 
 		_ = genRegistry
@@ -1141,6 +1142,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 
 	nodeMap := make(map[string]snowflake.ID)
 	var dagNodeNames []string // track which nodes end up in DAG for diagnostics
+	var dagNodeIDs []string // track corresponding node IDs for diagnostics
 	for _, n := range nodeList {
 		// Skip Group child nodes — they are executed by their parent Group, not by the DAG directly.
 		if groupChildIDs[n.Name] {
@@ -1152,6 +1154,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		}
 		nodeIDStr := n.ID.String()
 		dagNodeNames = append(dagNodeNames, n.Name)
+		dagNodeIDs = append(dagNodeIDs, nodeIDStr)
 		nodeMap[nodeIDStr] = n.ID
 
 		r.nodeStats[nodeIDStr] = NewNodeStats(10000)
@@ -1287,7 +1290,8 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	// Log final DAG composition for diagnostics
 	buildLog.Info("DAG built successfully",
 		logger.F("total_nodes_in_dag", len(dagNodeNames)),
-		logger.F("dag_nodes", dagNodeNames))
+		logger.F("dag_nodes", dagNodeNames),
+		logger.F("dag_node_ids", dagNodeIDs))
 
 	return dagObj, nil
 }
@@ -1328,7 +1332,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 	logCtx := logger.ContextWithNodeID(ctx, n.id)
 	nodeLog := n.log.WithContext(logCtx)
 
-	nodeLog.Info("node execution started")
+	nodeLog.Info("node execution started",
+		logger.F("node_name", n.name))
 
 	// Parse retry and extract configs
 	retryCfg := n.parseRetryConfig()
@@ -1741,9 +1746,10 @@ func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, node
 	result := resolveGeneratorRefs(exprStr, genReg, nodeLog)
 
 	// Resolve expression engine functions (${__so(...)}, ${__random(...)}, etc.)
-	// This is needed because the expression engine's FunctionRegistry handles __so()
-	// and other system functions, which resolveGeneratorRefs does not handle.
-	if n.exprReg != nil && (strings.Contains(result, "${__")) {
+	// and evaluate pure math expressions (e.g. "1100000001 / 100" after variable
+	// resolution). The expression engine's FunctionRegistry handles __so() and
+	// other system functions, which resolveGeneratorRefs does not handle.
+	if n.exprReg != nil {
 		resolved, err := expr.Resolve(result, nil, n.exprReg)
 		if err != nil {
 			nodeLog.Warn("expression engine resolve failed, using original",
@@ -2194,9 +2200,10 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 		for k, v := range vars {
 			globalScope.Set(k, v)
 		}
+		jsonVars, _ := json.Marshal(vars)
 		scopeLog.Debug("scene variables loaded",
 			logger.F("variable_count", len(vars)),
-			logger.F("variables", fmt.Sprintf("%v", vars)))
+			logger.F("variables", string(jsonVars)))
 	}
 
 	for k, v := range r.cfg.Variables {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/core/dag"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
 )
 
 // nodeRetryConfig 定义节点级重试配置（支持指数退避）
@@ -196,6 +197,8 @@ func (n *sceneNode) applyExtract(out *dag.Output, extracts []nodeExtractEntry, i
 		if data, err := json.Marshal(v); err == nil {
 			responseBody = data
 		}
+	case *httpprotocol.HTTPResponse:
+		responseBody = v.Body
 	default:
 		nodeLog.Debug("extract skipped: unsupported response type",
 			logger.F("type", fmt.Sprintf("%T", out.Response)),
