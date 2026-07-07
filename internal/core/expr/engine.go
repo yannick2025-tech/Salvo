@@ -38,6 +38,15 @@ func resolveDepth(input string, variables map[string]any, registry *FunctionRegi
 	// Find top-level ${...} spans using brace counting.
 	spans := findTopLevelBraces(input)
 	if len(spans) == 0 {
+		// No ${...} found, but still check if the entire input is a pure
+		// arithmetic expression (e.g. "1100000001 / 100" after variables
+		// have been resolved by the caller). If so, evaluate it as math.
+		if isPureMathExpression(input) {
+			result, err := EvalMath(input)
+			if err == nil {
+				return result, nil
+			}
+		}
 		return input, nil
 	}
 
@@ -78,6 +87,9 @@ func resolveDepth(input string, variables map[string]any, registry *FunctionRegi
 
 // findTopLevelBraces finds all top-level ${...} spans in the input string.
 // It uses brace counting to correctly handle nested ${} patterns.
+// A separate braceDepth counter tracks non-${} braces (e.g. JSON object
+// braces inside string arguments) so that } inside a JSON object does not
+// close the outer ${...} prematurely.
 func findTopLevelBraces(s string) []span {
 	var spans []span
 	n := len(s)
@@ -91,13 +103,22 @@ func findTopLevelBraces(s string) []span {
 		}
 		start := i + idx
 		depth := 1
+		braceDepth := 0
 		j := start + 2 // skip "${"
 
 		for j < n && depth > 0 {
-			if s[j] == '{' && j > 0 && s[j-1] == '$' {
-				depth++
+			if s[j] == '{' {
+				if j > 0 && s[j-1] == '$' {
+					depth++
+				} else {
+					braceDepth++
+				}
 			} else if s[j] == '}' {
-				depth--
+				if braceDepth > 0 {
+					braceDepth--
+				} else {
+					depth--
+				}
 			}
 			j++
 		}

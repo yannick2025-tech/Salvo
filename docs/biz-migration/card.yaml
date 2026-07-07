@@ -127,6 +127,12 @@ variables:
     value: ""
   - key: unpaid_order_id
     value: ""
+  - key: unpaid_order_id_after
+    value: ""
+  - key: coupon_id
+    value: "0"
+  - key: coupon_id_after
+    value: "0"
   - key: occupy_order_id
     value: ""
   - key: charge_start_time_ms
