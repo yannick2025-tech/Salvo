@@ -1,7 +1,8 @@
 .PHONY: all help build-all rebuild start restart dev stop \
         clean clean-so clean-db clean-logs \
         test lint \
-        plugins-build plugins-clean
+        plugins-build plugins-clean \
+        plugin-upload plugin-list plugin-delete plugin-status
 
 CONFIG ?= configs/salvo.yaml
 BIN ?= bin/salvo
@@ -45,12 +46,19 @@ help:
 	@echo "  clean          Remove all artifacts (logs, db, so, bin, frontend dist)"
 	@echo ""
 	@echo "Other:"
-	@echo "  test           Run all Go tests"
-	@echo "  lint           Run Go linter"
-	@echo "  assets         Fetch go:embed assets (echarts.min.js) required for build"
-	@echo "  frontend-deps  Install frontend npm dependencies (web/app/node_modules)"
-	@echo "  plugins-build  Build all SO plugins under plugins/"
-	@echo "  plugins-clean  Remove all compiled .so files (alias for clean-so)"
+	@echo "  test              Run all Go tests"
+	@echo "  lint              Run Go linter"
+	@echo "  assets            Fetch go:embed assets (echarts.min.js) required for build"
+	@echo "  frontend-deps     Install frontend npm dependencies (web/app/node_modules)"
+	@echo "  plugins-build     Build all SO plugins under plugins/"
+	@echo "  plugins-clean     Remove all compiled .so files (alias for clean-so)"
+	@echo ""
+	@echo "SO Plugin Management (remote):"
+	@echo "  plugin-upload     Upload .so file, register in DB, and hot-load (no restart)"
+	@echo "                    Usage: make plugin-upload PLUGIN_FILE=plugins/xxx.so PLUGIN_NAME=xxx PLUGIN_VERSION=1.0.0"
+	@echo "  plugin-list       List all registered SO plugins"
+	@echo "  plugin-delete     Delete a plugin by ID (usage: PLUGIN_ID=<id>)"
+	@echo "  plugin-status     Enable/disable a plugin (usage: PLUGIN_ID=<id> PLUGIN_STATUS=enabled|disabled)"
 
 # ============================================================
 # Build
@@ -231,3 +239,120 @@ lint:
 plugins-build: build-all
 
 plugins-clean: clean-so
+
+# ============================================================
+# SO Plugin Management (remote API)
+# ============================================================
+
+# Default admin credentials (override via env)
+ADMIN_EMAIL   ?= admin@salvo.local
+ADMIN_PASSWORD ?= admin
+
+# Helper: login and print JWT token to stdout.
+# Usage: $(call get_token)
+define get_token
+$(shell curl -s -X POST http://$(BACKEND_HOST):$(BACKEND_PORT)/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('token',''))" 2>/dev/null)
+endef
+
+# plugin-upload — upload .so file → register in DB → hot-load in one shot.
+#
+# Required variables:
+#   PLUGIN_FILE    — path to the .so file (e.g. plugins/myplugin.so)
+#   PLUGIN_NAME    — plugin name  (e.g. myplugin)
+#   PLUGIN_VERSION — plugin version (e.g. 1.0.0)
+#
+# The backend host/port are read from configs/salvo.yaml by default (BACKEND_HOST / BACKEND_PORT).
+plugin-upload:
+	@set -e; \
+	if [ -z "$(PLUGIN_FILE)" ]; then echo "ERROR: PLUGIN_FILE is required (e.g. PLUGIN_FILE=plugins/myplugin.so)"; exit 1; fi; \
+	if [ -z "$(PLUGIN_NAME)" ]; then echo "ERROR: PLUGIN_NAME is required (e.g. PLUGIN_NAME=myplugin)"; exit 1; fi; \
+	if [ -z "$(PLUGIN_VERSION)" ]; then echo "ERROR: PLUGIN_VERSION is required (e.g. PLUGIN_VERSION=1.0.0)"; exit 1; fi; \
+	if [ ! -f "$(PLUGIN_FILE)" ]; then echo "ERROR: file not found: $(PLUGIN_FILE)"; exit 1; fi; \
+	API="http://$(BACKEND_HOST):$(BACKEND_PORT)"; \
+	echo "Backend: $$API"; \
+	echo ""; \
+	echo "=== Step 1: Login ==="; \
+	TOKEN=$$(curl -s -X POST "$$API/api/v1/auth/login" \
+		-H "Content-Type: application/json" \
+		-d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('token',''))"); \
+	if [ -z "$$TOKEN" ]; then echo "ERROR: login failed (check ADMIN_EMAIL/ADMIN_PASSWORD)"; exit 1; fi; \
+	echo "  ✓ Token obtained"; \
+	echo ""; \
+	echo "=== Step 2: Upload .so file ==="; \
+	UPLOAD_RESULT=$$(curl -s -X POST "$$API/api/v1/so-plugins/upload-file" \
+		-H "Authorization: Bearer $$TOKEN" \
+		-F "file=@$(PLUGIN_FILE)"); \
+	FILE_PATH=$$(echo "$$UPLOAD_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('file_path',''))"); \
+	if [ -z "$$FILE_PATH" ]; then echo "ERROR: file upload failed"; echo "Response: $$UPLOAD_RESULT"; exit 1; fi; \
+	echo "  ✓ Uploaded to: $$FILE_PATH"; \
+	echo ""; \
+	echo "=== Step 3: Register in DB + Hot-load ==="; \
+	CREATE_RESULT=$$(curl -s -X POST "$$API/api/v1/so-plugins/create" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $$TOKEN" \
+		-d "{\"name\":\"$(PLUGIN_NAME)\",\"version\":\"$(PLUGIN_VERSION)\",\"file_path\":\"$$FILE_PATH\"}"); \
+	CREATE_CODE=$$(echo "$$CREATE_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code', -1))"); \
+	if [ "$$CREATE_CODE" != "0" ]; then \
+		MSG=$$(echo "$$CREATE_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))"); \
+		echo "ERROR: registration failed: $$MSG"; \
+		echo "Response: $$CREATE_RESULT"; \
+		exit 1; \
+	fi; \
+	echo "  ✓ Plugin '$(PLUGIN_NAME)@$(PLUGIN_VERSION)' registered and hot-loaded"; \
+	echo ""; \
+	echo "=== Done ==="; \
+	echo "$$CREATE_RESULT" | python3 -m json.tool
+
+# plugin-list — list all registered SO plugins.
+plugin-list:
+	@set -e; \
+	API="http://$(BACKEND_HOST):$(BACKEND_PORT)"; \
+	TOKEN=$$(curl -s -X POST "$$API/api/v1/auth/login" \
+		-H "Content-Type: application/json" \
+		-d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('token',''))"); \
+	if [ -z "$$TOKEN" ]; then echo "ERROR: login failed"; exit 1; fi; \
+	curl -s -X POST "$$API/api/v1/so-plugins/list" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $$TOKEN" \
+		-d '{"limit":100}' \
+		| python3 -m json.tool
+
+# plugin-delete — delete a plugin by ID (removes DB record + .so file).
+# Usage: make plugin-delete PLUGIN_ID=<snowflake-id>
+plugin-delete:
+	@set -e; \
+	if [ -z "$(PLUGIN_ID)" ]; then echo "ERROR: PLUGIN_ID is required (e.g. PLUGIN_ID=332367573066723328)"; exit 1; fi; \
+	API="http://$(BACKEND_HOST):$(BACKEND_PORT)"; \
+	TOKEN=$$(curl -s -X POST "$$API/api/v1/auth/login" \
+		-H "Content-Type: application/json" \
+		-d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('token',''))"); \
+	if [ -z "$$TOKEN" ]; then echo "ERROR: login failed"; exit 1; fi; \
+	RESULT=$$(curl -s -X POST "$$API/api/v1/so-plugins/delete" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $$TOKEN" \
+		-d "{\"id\":$(PLUGIN_ID)}"); \
+	echo "$$RESULT" | python3 -m json.tool
+
+# plugin-status — enable or disable a plugin.
+# Usage: make plugin-status PLUGIN_ID=<id> PLUGIN_STATUS=enabled|disabled
+plugin-status:
+	@set -e; \
+	if [ -z "$(PLUGIN_ID)" ]; then echo "ERROR: PLUGIN_ID is required"; exit 1; fi; \
+	if [ -z "$(PLUGIN_STATUS)" ]; then echo "ERROR: PLUGIN_STATUS is required (enabled or disabled)"; exit 1; fi; \
+	API="http://$(BACKEND_HOST):$(BACKEND_PORT)"; \
+	TOKEN=$$(curl -s -X POST "$$API/api/v1/auth/login" \
+		-H "Content-Type: application/json" \
+		-d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('token',''))"); \
+	if [ -z "$$TOKEN" ]; then echo "ERROR: login failed"; exit 1; fi; \
+	RESULT=$$(curl -s -X POST "$$API/api/v1/so-plugins/status" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $$TOKEN" \
+		-d "{\"id\":$(PLUGIN_ID),\"status\":\"$(PLUGIN_STATUS)\"}"); \
+	echo "$$RESULT" | python3 -m json.tool
