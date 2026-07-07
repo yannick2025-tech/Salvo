@@ -1141,8 +1141,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	}
 
 	nodeMap := make(map[string]snowflake.ID)
-	var dagNodeNames []string // track which nodes end up in DAG for diagnostics
-	var dagNodeIDs []string // track corresponding node IDs for diagnostics
+	dagNodeMap := make(map[string]string) // nodeID → nodeName, for diagnostics
 	for _, n := range nodeList {
 		// Skip Group child nodes — they are executed by their parent Group, not by the DAG directly.
 		if groupChildIDs[n.Name] {
@@ -1153,8 +1152,7 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 			continue
 		}
 		nodeIDStr := n.ID.String()
-		dagNodeNames = append(dagNodeNames, n.Name)
-		dagNodeIDs = append(dagNodeIDs, nodeIDStr)
+		dagNodeMap[nodeIDStr] = n.Name
 		nodeMap[nodeIDStr] = n.ID
 
 		r.nodeStats[nodeIDStr] = NewNodeStats(10000)
@@ -1289,9 +1287,8 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 
 	// Log final DAG composition for diagnostics
 	buildLog.Info("DAG built successfully",
-		logger.F("total_nodes_in_dag", len(dagNodeNames)),
-		logger.F("dag_nodes", dagNodeNames),
-		logger.F("dag_node_ids", dagNodeIDs))
+		logger.F("total_nodes_in_dag", len(dagNodeMap)),
+		logger.F("dag_nodes", dagNodeMap))
 
 	return dagObj, nil
 }
