@@ -24,17 +24,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so/contract"
 	"github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
 )
 
-// Run 是 Salvo SO 插件的标准入口
-func Run(operation string, args ...string) (string, error) {
+// paypwdPlugin implements the so.Plugin interface for payment password generation.
+type paypwdPlugin struct{}
+
+func (p *paypwdPlugin) Name() string    { return "paypwd" }
+func (p *paypwdPlugin) Version() string { return "1.0.0" }
+
+func (p *paypwdPlugin) Call(operation string, args []string) (string, error) {
 	switch operation {
 	case "gen":
 		return genPayPwd(args...)
 	default:
 		return "", fmt.Errorf("unknown operation: %s", operation)
 	}
+}
+
+// New is the factory function exported for the SO plugin loader.
+func New() (contract.Plugin, error) {
+	return &paypwdPlugin{}, nil
 }
 
 // genPayPwd 生成支付密码

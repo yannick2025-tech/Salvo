@@ -27,12 +27,17 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so/contract"
 )
 
-// Run 是 Salvo SO 插件的标准入口
-// operation: 操作名称
-// args: 参数列表
-func Run(operation string, args ...string) (string, error) {
+// signPlugin implements the so.Plugin interface for RSA signing.
+type signPlugin struct{}
+
+func (p *signPlugin) Name() string    { return "sign" }
+func (p *signPlugin) Version() string { return "1.0.0" }
+
+func (p *signPlugin) Call(operation string, args []string) (string, error) {
 	switch operation {
 	case "sign":
 		return sign(args...)
@@ -47,6 +52,11 @@ func Run(operation string, args ...string) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown operation: %s", operation)
 	}
+}
+
+// New is the factory function exported for the SO plugin loader.
+func New() (contract.Plugin, error) {
+	return &signPlugin{}, nil
 }
 
 // sign 执行 RSA 签名
