@@ -85,13 +85,14 @@ type yamlRetry struct {
 }
 
 type yamlNode struct {
-	Name         string         `yaml:"name"`
-	Type         string         `yaml:"type"`
-	Config       map[string]any `yaml:"config,omitempty"`
-	ThinkTime    string         `yaml:"think_time,omitempty"`
-	Retry        *yamlRetry     `yaml:"retry,omitempty"`
-	Condition    string         `yaml:"condition,omitempty"`
-	TimedTrigger string         `yaml:"timed_trigger,omitempty"`
+	Name           string         `yaml:"name"`
+	Type           string         `yaml:"type"`
+	Config         map[string]any `yaml:"config,omitempty"`
+	ThinkTime      string         `yaml:"think_time,omitempty"`
+	Retry          *yamlRetry     `yaml:"retry,omitempty"`
+	Condition      string         `yaml:"condition,omitempty"`
+	TimedTrigger   string         `yaml:"timed_trigger,omitempty"`
+	BlockOnError   bool           `yaml:"block_on_error,omitempty"`
 }
 
 type yamlEdge struct {
@@ -209,10 +210,11 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 
 		configBytes, _ := json.Marshal(yn.Config)
 		node := &model.Node{
-			SceneID: scene.ID,
-			Name:    yn.Name,
-			Type:    yn.Type,
-			Config:  string(configBytes),
+			SceneID:      scene.ID,
+			Name:         yn.Name,
+			Type:         yn.Type,
+			Config:       string(configBytes),
+			BlockOnError: yn.BlockOnError,
 		}
 		if err := h.nodes.Create(r.Context(), node); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
@@ -670,12 +672,13 @@ func (h *Handler) AddNode(r *http.Request) dto.Response {
 	}
 
 	node := &model.Node{
-		SceneID:   req.SceneID,
-		Name:      req.Name,
-		Type:      req.Type,
-		Config:    req.Config,
-		Position:  req.Position,
-		LoopCount: req.LoopCount,
+		SceneID:      req.SceneID,
+		Name:         req.Name,
+		Type:         req.Type,
+		Config:       req.Config,
+		Position:     req.Position,
+		LoopCount:    req.LoopCount,
+		BlockOnError: req.BlockOnError,
 	}
 
 	if err := h.nodes.Create(r.Context(), node); err != nil {
@@ -719,6 +722,9 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 	}
 	if req.LoopCount > 0 {
 		node.LoopCount = req.LoopCount
+	}
+	if req.BlockOnError != nil {
+		node.BlockOnError = *req.BlockOnError
 	}
 
 	if err := h.nodes.Update(r.Context(), node); err != nil {
@@ -1455,15 +1461,16 @@ func toSceneDTO(s *model.Scene) dto.SceneDTO {
 
 func toNodeDTO(n *model.Node) dto.NodeDTO {
 	return dto.NodeDTO{
-		ID:        n.ID,
-		SceneID:   n.SceneID,
-		Name:      n.Name,
-		Type:      n.Type,
-		Config:    n.Config,
-		Position:  n.Position,
-		LoopCount: n.LoopCount,
-		CreatedAt: n.CreatedAt,
-		UpdatedAt: n.UpdatedAt,
+		ID:           n.ID,
+		SceneID:      n.SceneID,
+		Name:         n.Name,
+		Type:         n.Type,
+		Config:       n.Config,
+		Position:     n.Position,
+		LoopCount:    n.LoopCount,
+		BlockOnError: n.BlockOnError,
+		CreatedAt:    n.CreatedAt,
+		UpdatedAt:    n.UpdatedAt,
 	}
 }
 

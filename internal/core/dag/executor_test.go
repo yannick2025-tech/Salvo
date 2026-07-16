@@ -28,6 +28,7 @@ func (n *recordingNode) ID() string             { return n.id }
 func (n *recordingNode) Timeout() time.Duration { return n.timeout }
 func (n *recordingNode) LoopCount() int         { return n.loopCount }
 func (n *recordingNode) Mode() ExecMode         { return n.mode }
+func (n *recordingNode) BlockOnError() bool     { return false }
 
 func (n *recordingNode) Execute(_ context.Context, input *Input) (*Output, error) {
 	n.executed.Add(1)
@@ -276,6 +277,7 @@ func (n *slowNode) ID() string             { return n.id }
 func (n *slowNode) Timeout() time.Duration { return n.delay * 2 }
 func (n *slowNode) LoopCount() int         { return 1 }
 func (n *slowNode) Mode() ExecMode         { return n.mode }
+func (n *slowNode) BlockOnError() bool     { return false }
 
 func (n *slowNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
 	select {

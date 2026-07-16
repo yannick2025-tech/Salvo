@@ -19,6 +19,7 @@ func (n *failingNode) ID() string             { return n.id }
 func (n *failingNode) Timeout() time.Duration { return 0 }
 func (n *failingNode) LoopCount() int         { return 1 }
 func (n *failingNode) Mode() ExecMode         { return ExecSync }
+func (n *failingNode) BlockOnError() bool     { return false }
 
 func (n *failingNode) Execute(_ context.Context, _ *Input) (*Output, error) {
 	return nil, fmt.Errorf("node %s failed", n.id)

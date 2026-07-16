@@ -44,6 +44,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE run_records ADD COLUMN count INTEGER DEFAULT 0`,
 		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
 		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
+		`ALTER TABLE nodes ADD COLUMN block_on_error BOOLEAN DEFAULT FALSE`,
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)

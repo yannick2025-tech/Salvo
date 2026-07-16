@@ -27,6 +27,7 @@ func (m *mockNode) ID() string                 { return m.id }
 func (m *mockNode) Timeout() time.Duration      { return 0 }
 func (m *mockNode) LoopCount() int              { return m.loopCount }
 func (m *mockNode) Mode() dag.ExecMode          { return m.mode }
+func (m *mockNode) BlockOnError() bool             { return false }
 func (m *mockNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
 	m.executed.Add(1)
 	return &dag.Output{Response: map[string]any{"id": m.id, "result": m.result}}, nil

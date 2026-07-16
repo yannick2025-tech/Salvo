@@ -209,6 +209,7 @@ body: '{"charger":"${chargers.charger}","pointId":"${chargers.pointId}"}'
 | `condition` | string | 节点执行条件表达式 |
 | `timed_trigger` | string | 定时触发，如 `"@every 10s"` |
 | `loop_count` | int | 节点循环次数(顶层字段) |
+| `block_on_error` | bool | 节点失败时是否中断整个链路执行（默认 `false`） |
 
 节点类型清单（共 13 种）：
 

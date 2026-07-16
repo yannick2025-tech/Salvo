@@ -58,6 +58,7 @@ type Executor struct {
 	varsMu        sync.Mutex // protects initialVars for cross-node variable writes
 	logWarn       func(msg string, keysAndValues ...any)
 	logError      func(msg string, keysAndValues ...any)
+	cancel        context.CancelFunc // cancel function for chain cancellation on block_on_error
 }
 
 // WithInitialVars sets the initial variables on the executor.
@@ -90,6 +91,11 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("executor context already cancelled: %w", err)
 	}
+
+	// Create a cancellable context for chain-wide cancellation on block_on_error
+	ctx, cancel := context.WithCancel(ctx)
+	e.cancel = cancel
+	defer cancel() // Ensure cleanup
 
 	order, err := e.dag.TopologicalSort()
 	if err != nil {
@@ -230,13 +236,24 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 				}
 
 				output, err := n.Execute(nodeCtx, input)
-				if err != nil {
-					errCh <- fmt.Errorf("node %s execute: %w", n.ID(), err)
-					if isSync {
-						close(sig)
+			if err != nil {
+				// Check if this node should block the entire chain on error
+				if n.BlockOnError() {
+					if e.logError != nil {
+						e.logError("chain cancelled due to block_on_error",
+							"node_id", n.ID(),
+							"error", err.Error(),
+						)
 					}
-					return
+					// Cancel the entire chain
+					cancel()
 				}
+				errCh <- fmt.Errorf("node %s execute: %w", n.ID(), err)
+				if isSync {
+					close(sig)
+				}
+				return
+			}
 				lastOutput = output
 			}
 

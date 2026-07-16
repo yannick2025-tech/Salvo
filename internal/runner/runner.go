@@ -1301,6 +1301,7 @@ type sceneNode struct {
 	timeout       time.Duration
 	loopCount     int
 	mode          dag.ExecMode
+	blockOnError  bool
 	stats         *Stats
 	httpOnlyStats *Stats
 	nodeStats     *NodeStats
@@ -1322,6 +1323,7 @@ func (n *sceneNode) ID() string             { return n.id }
 func (n *sceneNode) Timeout() time.Duration { return n.timeout }
 func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
+func (n *sceneNode) BlockOnError() bool     { return n.blockOnError }
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
 	// Use context-based logging so that trace_id, chain_id, node_id etc.
@@ -1330,7 +1332,8 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 	nodeLog := n.log.WithContext(logCtx)
 
 	nodeLog.Info("node execution started",
-		logger.F("node_name", n.name))
+		logger.F("node_name", n.name),
+		logger.F("block_on_error", n.blockOnError))
 
 	// Parse retry and extract configs
 	retryCfg := n.parseRetryConfig()
@@ -1387,12 +1390,14 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 			logger.F("error", err),
 			logger.F("node_type", n.nodeType),
 			logger.F("node_name", n.name),
+			logger.F("block_on_error", n.blockOnError),
 			logger.F("status", "failed"),
 		)
 	} else {
 		nodeLog.Info("node execution completed",
 			logger.F("node_type", n.nodeType),
 			logger.F("node_name", n.name),
+			logger.F("block_on_error", n.blockOnError),
 			logger.F("status", "success"),
 		)
 	}
@@ -1654,6 +1659,20 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 	}
 
+	// Check if HTTP response is non-2xx and block_on_error is enabled
+	if n.blockOnError {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
+			errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, truncateString(string(httpResp.Body), 200))
+			nodeLog.Error("HTTP request failed with non2xx status and block_on_error enabled",
+				logger.F("method", method),
+				logger.F("url", url),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("block_on_error", true),
+			)
+			return nil, fmt.Errorf("%s", errMsg)
+		}
+	}
+
 	// Validate expect_body assertions against the JSON response body
 	if len(cfg.ExpectBody) > 0 {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
@@ -1673,7 +1692,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("error", errMsg),
 						)
 						// Stats already recorded above based on HTTP status; don't double-count.
-						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
+						return nil, fmt.Errorf("%s", errMsg)
 					}
 					// Compare numeric values (JSON numbers are float64)
 					if fmt.Sprintf("%v", actualVal) != fmt.Sprintf("%v", expectedVal) {
@@ -1684,7 +1703,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("actual", actualVal),
 						)
 						// Stats already recorded above based on HTTP status; don't double-count.
-						return &dag.Output{Error: fmt.Errorf("%s", errMsg)}, nil
+						return nil, fmt.Errorf("%s", errMsg)
 					}
 				}
 				nodeLog.Info("expect_body validation passed",
@@ -2160,6 +2179,7 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		config:        n.Config,
 		loopCount:     n.LoopCount,
 		mode:          dag.ExecSync,
+		blockOnError:  n.BlockOnError,
 		stats:         r.stats,
 		httpOnlyStats: r.httpOnlyStats,
 		nodeStats:     nodeStat,

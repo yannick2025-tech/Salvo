@@ -48,12 +48,13 @@ const (
 // Node represents a DAG node within a scene.
 type Node struct {
 	Model
-	SceneID   snowflake.ID `json:"scene_id,string"`
-	Name      string       `json:"name"`
-	Type      string       `json:"type"`
-	Config    string       `json:"config,omitempty"`
-	Position  string       `json:"position,omitempty"`
-	LoopCount int          `json:"loop_count,omitempty"`
+	SceneID       snowflake.ID `json:"scene_id,string"`
+	Name          string       `json:"name"`
+	Type          string       `json:"type"`
+	Config        string       `json:"config,omitempty"`
+	Position      string       `json:"position,omitempty"`
+	LoopCount     int          `json:"loop_count,omitempty"`
+	BlockOnError  bool         `json:"block_on_error,omitempty"`
 }
 
 const (

@@ -121,22 +121,24 @@ type SceneDTO struct {
 
 // AddNodeRequest is the request body for POST /api/v1/scenes/nodes/add.
 type AddNodeRequest struct {
-	SceneID   snowflake.ID `json:"scene_id"`
-	Name      string       `json:"name"`
-	Type      string       `json:"type"`
-	Config    string       `json:"config,omitempty"`
-	Position  string       `json:"position,omitempty"`
-	LoopCount int          `json:"loop_count,omitempty"`
+	SceneID      snowflake.ID `json:"scene_id"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError bool         `json:"block_on_error,omitempty"`
 }
 
 // UpdateNodeRequest is the request body for POST /api/v1/scenes/nodes/update.
 type UpdateNodeRequest struct {
-	ID        snowflake.ID `json:"id"`
-	Name      string       `json:"name,omitempty"`
-	Type      string       `json:"type,omitempty"`
-	Config    string       `json:"config,omitempty"`
-	Position  string       `json:"position,omitempty"`
-	LoopCount int          `json:"loop_count,omitempty"`
+	ID           snowflake.ID `json:"id"`
+	Name         string       `json:"name,omitempty"`
+	Type         string       `json:"type,omitempty"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError *bool        `json:"block_on_error,omitempty"`
 }
 
 // DeleteNodeRequest is the request body for POST /api/v1/scenes/nodes/delete.
@@ -153,15 +155,16 @@ type ListNodesRequest struct {
 
 // NodeDTO is the node detail returned in API responses.
 type NodeDTO struct {
-	ID        snowflake.ID `json:"id"`
-	SceneID   snowflake.ID `json:"scene_id"`
-	Name      string       `json:"name"`
-	Type      string       `json:"type"`
-	Config    string       `json:"config"`
-	Position  string       `json:"position"`
-	LoopCount int          `json:"loop_count"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
+	ID           snowflake.ID `json:"id"`
+	SceneID      snowflake.ID `json:"scene_id"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config"`
+	Position     string       `json:"position"`
+	LoopCount    int          `json:"loop_count"`
+	BlockOnError bool         `json:"block_on_error"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 // --- Edge ---

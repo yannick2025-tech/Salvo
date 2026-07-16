@@ -46,6 +46,7 @@ type stepConfig struct {
 	Retry        *retryConfig            `json:"retry,omitempty"`
 	FailAfterConsecutive int             `json:"fail_after_consecutive,omitempty"`
 	FailMessage  string                  `json:"fail_message,omitempty"`
+	BlockOnError bool                    `json:"block_on_error,omitempty"`
 }
 
 // stepConditionConfig defines a condition for step execution.
@@ -311,6 +312,14 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 					varsMu.Unlock()
 
 					if stepErr != nil {
+						// Check block_on_error first - takes precedence
+						if step.BlockOnError {
+							nodeLog.Error("while step failed with block_on_error=true",
+								logger.F("step", step.Name),
+								logger.F("error", stepErr))
+							return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+						}
+
 						consecutiveFailures[stepIdx]++
 						nodeLog.Warn("while generator step failed",
 							logger.F("step", step.Name),
@@ -370,6 +379,14 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 					}
 
 					if stepErr != nil {
+						// Check block_on_error first - takes precedence
+						if step.BlockOnError {
+							nodeLog.Error("while step failed with block_on_error=true",
+								logger.F("step", step.Name),
+								logger.F("error", stepErr))
+							return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+						}
+
 						_ = stepErr // used for consecutive failure tracking below
 						consecutiveFailures[stepIdx]++
 						nodeLog.Warn("while step failed",

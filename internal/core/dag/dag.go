@@ -76,6 +76,10 @@ type Node interface {
 	// Mode returns whether this node blocks its dependants (sync) or not
 	// (async).
 	Mode() ExecMode
+	// BlockOnError returns whether this node should block the entire chain
+	// execution when it fails. If true, the chain will be cancelled on error.
+	// If false (default), errors are logged but execution continues.
+	BlockOnError() bool
 }
 
 // Edge represents a directed connection from one node to another.
