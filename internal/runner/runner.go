@@ -1387,11 +1387,13 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 			logger.F("error", err),
 			logger.F("node_type", n.nodeType),
 			logger.F("node_name", n.name),
+			logger.F("status", "failed"),
 		)
 	} else {
 		nodeLog.Info("node execution completed",
 			logger.F("node_type", n.nodeType),
 			logger.F("node_name", n.name),
+			logger.F("status", "success"),
 		)
 	}
 
