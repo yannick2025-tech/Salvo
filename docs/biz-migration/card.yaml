@@ -81,7 +81,7 @@ variables:
   - key: sim_update_point_status
     value: "/iot/simulator/shell/ev/v1/device/update-point-status"
   - key: sim_set_charge_data
-    value: "/iot/simulator/shell/ev/v1/charging-process-data-param/set/"
+    value: "/iot/simulator/shell/ev/v1/charging-process-data-param/set/abc"
   - key: sim_force_close
     value: "/iot/simulator/shell/ev/v1/force-close/"
   - key: sim_stop_charge_reason
