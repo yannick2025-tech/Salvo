@@ -16,6 +16,24 @@ type ReportDetail struct {
 	NodeMetrics              []NodeMetricDetail `json:"node_metrics"`
 	ErrorSummary             []ErrorItem        `json:"error_summary,omitempty"`
 	SystemMetrics            *SystemMetricsData `json:"system_metrics,omitempty"`
+	FailedNodes              []FailedNodeDetail `json:"failed_nodes,omitempty"`
+}
+
+// FailedNodeDetail represents detailed information about a failed node execution.
+// This is a universal format that works for all node types.
+type FailedNodeDetail struct {
+	NodeID       string            `json:"node_id"`
+	NodeName     string            `json:"node_name"`
+	NodeType     string            `json:"node_type"`
+	ErrorMessage string            `json:"error_message"`
+	Timestamp    time.Time         `json:"timestamp"`
+	RequestURL   string            `json:"request_url,omitempty"`
+	RequestMethod string           `json:"request_method,omitempty"`
+	RequestHeaders map[string]string `json:"request_headers,omitempty"`
+	RequestBody  string            `json:"request_body,omitempty"`
+	ResponseStatus int             `json:"response_status,omitempty"`
+	ResponseHeaders map[string][]string `json:"response_headers,omitempty"`
+	ResponseBody string            `json:"response_body,omitempty"`
 }
 
 // SystemMetricsData holds runtime and system performance metrics collected

@@ -1043,6 +1043,64 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     </section>
     {{end}}
 
+    {{if .FailedNodes}}
+    <!-- Failed Nodes Detail Section -->
+    <section class="nodes-section">
+        <h3>失败节点详情</h3>
+        {{range $idx, $fn := .FailedNodes}}
+        <div class="chart-card" style="margin-bottom: 16px; border-left: 3px solid #cf222e;">
+            <div class="chart-header">
+                <h3 style="color: #cf222e;">{{$fn.NodeName}}</h3>
+                <div class="node-badges">
+                    <span class="node-badge" style="background: rgba(207,34,46,0.15); color: #cf222e;">{{$fn.NodeType}}</span>
+                    <span class="node-badge">{{$fn.Timestamp.Format "15:04:05"}}</span>
+                </div>
+            </div>
+            <div style="padding: 12px 16px;">
+                <div style="margin-bottom: 8px;">
+                    <strong>错误信息:</strong> <span style="color: #cf222e;">{{$fn.ErrorMessage}}</span>
+                </div>
+                {{if $fn.RequestURL}}
+                <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #656d76; user-select: none;">请求详情</summary>
+                    <div style="margin-top: 8px; padding: 10px; background: var(--bg-secondary, #f6f8fa); border-radius: 6px; font-size: 13px; font-family: monospace;">
+                        <div><strong>Method:</strong> {{$fn.RequestMethod}}</div>
+                        <div><strong>URL:</strong> <code>{{$fn.RequestURL}}</code></div>
+                        {{if $fn.RequestHeaders}}
+                        <div style="margin-top: 6px;"><strong>Headers:</strong></div>
+                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{range $k, $v := $fn.RequestHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.RequestBody}}
+                        <div style="margin-top: 6px;"><strong>Body:</strong></div>
+                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{$fn.RequestBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+                {{if or $fn.ResponseBody $fn.ResponseStatus}}
+                <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #656d76; user-select: none;">响应详情</summary>
+                    <div style="margin-top: 8px; padding: 10px; background: var(--bg-secondary, #f6f8fa); border-radius: 6px; font-size: 13px; font-family: monospace;">
+                        <div><strong>Status:</strong> <span style="color: #cf222e; font-weight: 600;">{{$fn.ResponseStatus}}</span></div>
+                        {{if $fn.ResponseHeaders}}
+                        <div style="margin-top: 6px;"><strong>Headers:</strong></div>
+                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{range $k, $v := $fn.ResponseHeaders}}{{$k}}: {{range $i, $vv := $v}}{{if $i}}, {{end}}{{$vv}}{{end}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.ResponseBody}}
+                        <div style="margin-top: 6px;"><strong>Body:</strong></div>
+                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{$fn.ResponseBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </section>
+    {{end}}
+
     {{end}}
 
     {{if .SystemMetrics}}
@@ -2170,6 +2228,7 @@ type EnhancedReportContext struct {
 	ErrorBreakdown []map[string]interface{} `json:"error_breakdown"`
 	Metadata       *EnhancedMetadata        `json:"metadata"`
 	SystemMetrics  *EnhancedSystemMetrics   `json:"system_metrics,omitempty"`
+	FailedNodes    []runner.FailedNodeDetail `json:"failed_nodes,omitempty"`
 	JSONData       template.JS              `json:"-"`
 	EChartsJS      template.JS              `json:"-"`
 }

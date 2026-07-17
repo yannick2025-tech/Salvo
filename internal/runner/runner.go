@@ -260,6 +260,10 @@ type Runner struct {
 
 	// exprReg holds the expression engine registry with __so and builtins registered.
 	exprReg *expr.FunctionRegistry
+
+	// failedNodes stores detailed information about failed node executions
+	failedNodes   []FailedNodeDetail
+	failedNodesMu sync.Mutex
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
@@ -823,6 +827,7 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		HttpOnlyGlobalTimeSeries: collectorData.HttpOnlyGlobalSamples,
 		NodeMetrics:              []NodeMetricDetail{},
 		ErrorSummary:             collectorData.ErrorItems,
+		FailedNodes:              r.failedNodes,
 	}
 
 	nodeNameMap := make(map[string]string)
@@ -1317,6 +1322,9 @@ type sceneNode struct {
 	subFlowRunner func(ctx context.Context, sceneID string, variables map[string]any) (*dag.Output, error)
 	// exprReg holds the expression engine registry with __so and builtins registered.
 	exprReg *expr.FunctionRegistry
+	// failedNodes is a pointer to the Runner's failedNodes slice for recording failures
+	failedNodes   *[]FailedNodeDetail
+	failedNodesMu *sync.Mutex
 }
 
 func (n *sceneNode) ID() string             { return n.id }
@@ -1324,6 +1332,33 @@ func (n *sceneNode) Timeout() time.Duration { return n.timeout }
 func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 func (n *sceneNode) BlockOnError() bool     { return n.blockOnError }
+
+// recordFailedNode records detailed information about a failed node execution
+func (n *sceneNode) recordFailedNode(method, url string, reqHeaders map[string]string, reqBody string,
+	respStatus int, respHeaders map[string][]string, respBody string, errMsg string) {
+	if n.failedNodes == nil || n.failedNodesMu == nil {
+		return
+	}
+
+	detail := FailedNodeDetail{
+		NodeID:          n.id,
+		NodeName:        n.name,
+		NodeType:        n.nodeType,
+		ErrorMessage:    errMsg,
+		Timestamp:       time.Now(),
+		RequestURL:      url,
+		RequestMethod:   method,
+		RequestHeaders:  reqHeaders,
+		RequestBody:     reqBody,
+		ResponseStatus:  respStatus,
+		ResponseHeaders: respHeaders,
+		ResponseBody:    respBody,
+	}
+
+	n.failedNodesMu.Lock()
+	*n.failedNodes = append(*n.failedNodes, detail)
+	n.failedNodesMu.Unlock()
+}
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
 	// Use context-based logging so that trace_id, chain_id, node_id etc.
@@ -1629,6 +1664,10 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		if n.httpOnlyStats != nil {
 			n.httpOnlyStats.RecordLatency(0, false)
 		}
+		
+		// Record failed node details
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), 0, nil, "", err.Error())
+		
 		return &dag.Output{Error: err}, nil
 	}
 
@@ -1659,18 +1698,24 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 	}
 
-	// Check if HTTP response is non-2xx and block_on_error is enabled
-	if n.blockOnError {
-		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
-			errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, truncateString(string(httpResp.Body), 200))
+	// Check if HTTP response is non-2xx
+	if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
+		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, truncateString(string(httpResp.Body), 200))
+		
+		if n.blockOnError {
 			nodeLog.Error("HTTP request failed with non2xx status and block_on_error enabled",
 				logger.F("method", method),
 				logger.F("url", url),
 				logger.F("status", httpResp.StatusCode),
 				logger.F("block_on_error", true),
 			)
+			// Record failed node details
+			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
 			return nil, fmt.Errorf("%s", errMsg)
 		}
+		
+		// Record failed node details even without block_on_error
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
 	}
 
 	// Validate expect_body assertions against the JSON response body
@@ -2186,6 +2231,8 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		log:           r.log,
 		traceID:       r.runID.String(),
 		exprReg:       r.exprReg,
+		failedNodes:   &r.failedNodes,
+		failedNodesMu: &r.failedNodesMu,
 	}
 
 	if n.LoopCount <= 0 {

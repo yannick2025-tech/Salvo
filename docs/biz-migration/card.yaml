@@ -778,6 +778,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '${create_order_body}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
       extract:
         order_id: "$.data.orderId"
     think_time: "3s"
