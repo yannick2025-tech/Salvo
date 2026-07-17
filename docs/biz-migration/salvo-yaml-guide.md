@@ -50,7 +50,9 @@
     - [6.4 混合使用](#64-混合使用)
     - [6.5 引号规则](#65-引号规则)
   - [7. 节点通用字段](#7-节点通用字段)
-  - [8. 完整示例](#8-完整示例)
+    - [7.1 block\_on\_error 错误阻断](#71-block_on_error-错误阻断)
+  - [8. 变量默认值与 Payload 类型匹配](#8-变量默认值与-payload-类型匹配)
+  - [9. 完整示例](#9-完整示例)
   - [附：节点类型速查表](#附节点类型速查表)
 
 ---
@@ -1144,9 +1146,178 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 
 参考实现：[handler.go#L485-L525]($PROJECT_HOME/salvo/internal/api/handler.go#L485-L525)
 
+### 7.1 block_on_error 错误阻断
+
+默认情况下，节点执行失败（HTTP 非 2xx、`expect_body` 断言失败等）不会中断整个链路，后续节点继续执行。通过设置 `block_on_error: true`，可以让该节点失败时**立即取消整个 chain 的执行**。
+
+```yaml
+# 示例：启动充电是关键步骤，失败后无需继续后续流程
+- name: 启动充电
+  type: http
+  block_on_error: true              # 失败时中断整个链路
+  config:
+    method: POST
+    url: "${baseurl}${api_start_charge}"
+    headers:
+      Content-Type: application/json
+      Authorization: "${token}"
+    body: '{"orderId":${order_id}}'
+    expect_body:                    # 业务断言：errorCode 必须为 0
+      errorCode: 0
+
+# 示例：普通查询节点，失败不阻断（默认行为）
+- name: 查询订单状态
+  type: http
+  # block_on_error 默认为 false，无需显式设置
+  config:
+    method: POST
+    url: "${baseurl}${api_query_order}"
+    body: '{"orderId":${order_id}}'
+```
+
+**触发阻断的两种场景**：
+
+| 场景 | 触发条件 | 说明 |
+|------|----------|------|
+| HTTP 错误 | 响应状态码非 2xx（如 404、500） | 网络层/网关层错误 |
+| 业务断言失败 | `expect_body` 中定义的字段值不匹配 | 业务层错误，如 `errorCode != 0` |
+
+**与 while 循环的交互**：
+
+while 循环内部的 steps 也支持 `block_on_error`，且**优先级高于 `fail_after_consecutive`**：
+
+```yaml
+- name: 轮询充电状态
+  type: while
+  config:
+    exit_conditions:
+      - variable: charging_status
+        operator: equals
+        value: "4"
+    interval_seconds: 30
+    max_iterations: 100
+    fail_after_consecutive: 10      # 连续失败 10 次才退出
+    steps:
+      - name: 查询充电状态
+        block_on_error: true        # 此步骤失败立即中断 while 循环
+        request:
+          method: POST
+          url: "${baseurl}${api_query_status}"
+          body: '{"orderId":${order_id}}'
+        extract:
+          - variable: charging_status
+            path: "$.data.status"
+```
+
+**执行链路**：
+1. step 失败 → 检查 `block_on_error: true` → 立即返回错误，中断 while 循环
+2. while 节点返回错误 → DAG Executor 检查 while 节点自身的 `block_on_error`
+3. 如果 while 节点也有 `block_on_error: true` → 取消整个 chain
+
+**日志特征**：
+
+节点执行日志会记录 `block_on_error` 状态，方便排查：
+
+```json
+{"msg":"node execution started","node_name":"启动充电","block_on_error":true}
+{"msg":"chain cancelled due to block_on_error","node_id":"xxx","error":"HTTP 500: ..."}
+{"msg":"node execution failed","node_name":"启动充电","block_on_error":true,"error":"..."}
+```
+
+参考实现：
+- DAG 接口：[dag.go#L79-L82]($PROJECT_HOME/salvo/internal/core/dag/dag.go#L79-L82)
+- Executor 链取消：[executor.go#L239-L250]($PROJECT_HOME/salvo/internal/runner/runner.go#L239-L250)
+- HTTP 错误阻断：[runner.go#L1596-L1612]($PROJECT_HOME/salvo/internal/runner/runner.go#L1596-L1612)
+- while 步骤阻断：[while_node.go#L314-L321]($PROJECT_HOME/salvo/internal/runner/while_node.go#L314-L321)
+
 ---
 
-## 8. 完整示例
+## 8. 变量默认值与 Payload 类型匹配
+
+变量替换机制（`resolveWithVariables`）使用 `fmt.Sprintf("%v", v)` 将变量值直接替换到 body 模板中。因此，**变量的默认值必须与 body 模板中该字段的 JSON 类型匹配**，否则会产生无效 JSON。
+
+### 8.1 字符串字段（后端需要 `"value"`）
+
+当后端 payload 中字段为字符串类型时，body 模板中用**双引号包裹**变量引用，默认值设为 `""`。
+
+```yaml
+variables:
+  - key: order_no
+    value: ""                       # 字符串字段默认空字符串
+
+# body 模板：双引号包裹
+body: '{"orderNo":"${order_no}"}'
+
+# IF-ELSE 条件判断
+expr: '${order_no} != ""'
+```
+
+**替换结果**：
+
+| 变量值 | 替换后 body | 是否有效 JSON |
+|--------|------------|--------------|
+| `order_no = "ORD123"` | `{"orderNo":"ORD123"}` | ✓ |
+| `order_no = ""` | `{"orderNo":""}` | ✓ |
+
+### 8.2 整数字段（后端需要 `123`）
+
+当后端 payload 中字段为整数类型时，body 模板中**不加引号**直接引用变量，默认值必须设为 `"0"`（字符串形式的数字）。
+
+```yaml
+variables:
+  - key: order_id
+    value: "0"                      # 整数字段默认 "0"，不能是 ""
+
+# body 模板：不加引号
+body: '{"orderId":${order_id}}'
+
+# IF-ELSE 条件判断
+expr: '${order_id} != "0"'
+```
+
+**替换结果**：
+
+| 变量值 | 替换后 body | 是否有效 JSON |
+|--------|------------|--------------|
+| `order_id = "12345"` | `{"orderId":12345}` | ✓ |
+| `order_id = "0"` | `{"orderId":0}` | ✓ |
+| `order_id = ""` | `{"orderId":}` | ✗ **无效 JSON！** |
+
+### 8.3 常见错误与排查
+
+**错误现象**：日志中出现 `body_preview: {"orderId":,"couponId":0}`，后端 JSON 反序列化失败。
+
+**原因**：整数字段的默认值设为了 `""`，变量替换后 `${order_id}` 变成空字符串，导致 body 中出现 `orderId:` 后无值的无效 JSON。
+
+**修复方法**：
+
+```yaml
+# ❌ 错误配置
+variables:
+  - key: order_id
+    value: ""                       # 整数字段不能用空字符串
+body: '{"orderId":${order_id}}'     # 替换后 → {"orderId":}
+
+# ✅ 正确配置
+variables:
+  - key: order_id
+    value: "0"                      # 整数字段默认 "0"
+body: '{"orderId":${order_id}}'     # 替换后 → {"orderId":0}
+```
+
+### 8.4 速查表
+
+| 后端字段类型 | Go struct 示例 | 默认值 | body 模板 | IF-ELSE 条件 |
+|-------------|---------------|--------|-----------|-------------|
+| `string` | `OrderNo string` | `""` | `'{"no":"${order_no}"}'` | `${order_no} != ""` |
+| `int64` | `OrderId int64` | `"0"` | `'{"id":${order_id}}'` | `${order_id} != "0"` |
+| `int64 omitempty` | `CouponId int64,omitempty` | `"0"` | `'{"cid":${coupon_id}}'` | `${coupon_id} != "0"` |
+
+> **规则**：body 模板中变量**被引号包裹** → 默认 `""`；变量**不被引号包裹** → 默认 `"0"`。
+
+---
+
+## 9. 完整示例
 
 以下是一个综合示例，涵盖主要节点类型：
 

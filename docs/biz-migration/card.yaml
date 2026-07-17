@@ -125,10 +125,14 @@ variables:
     value: ""
   - key: api_ts
     value: ""
+  # 待支付订单ID：整数字段，默认值必须是 "0" 而非 ""
+  # 原因：body 模板 {"orderId":${unpaid_order_id}} 需要有效 JSON
+  # 如果默认 ""，替换后变成 {"orderId":} 导致 JSON 解析失败
   - key: unpaid_order_id
-    value: ""
+    value: "0"
+  # 待支付占位订单ID：整数字段，默认值必须是 "0"
   - key: unpaid_order_id_after
-    value: ""
+    value: "0"
   - key: coupon_id
     value: "0"
   - key: coupon_id_after
@@ -498,10 +502,12 @@ nodes:
         unpaid_order_id: "$.data[0].orderId"
 
   # --- 8. 支付待支付订单 ---
+  # 判断条件：unpaid_order_id 不为 "0" 表示有订单
+  # 注意：整数字段判断用 != "0"，字符串字段判断用 != ""
   - name: 判断-是否有待支付充电订单
     type: if-else
     config:
-      expr: '${unpaid_order_id} != ""'
+      expr: '${unpaid_order_id} != "0"'
 
   - name: 查询待支付订单优惠券
     type: http
