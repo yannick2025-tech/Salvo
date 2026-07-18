@@ -12,8 +12,9 @@ func TestRegisterAll(t *testing.T) {
 	r := expr.NewFunctionRegistry()
 	RegisterAll(r)
 
-	// All 5 functions should be registered
+	// All 6 functions should be registered
 	expected := []string{
+		"__email",
 		"__manOf",
 		"__oneOf",
 		"__random",
@@ -62,6 +63,22 @@ func TestRegisterAll(t *testing.T) {
 		res, err := handler([]string{"A", "B"})
 		require.NoError(t, err)
 		assert.NotEmpty(t, res)
+	})
+
+	t.Run("__email is callable", func(t *testing.T) {
+		handler, ok := r.Get("__email")
+		require.True(t, ok)
+		res, err := handler(nil)
+		require.NoError(t, err)
+		assert.Contains(t, res, "@")
+	})
+
+	t.Run("__email with custom domain", func(t *testing.T) {
+		handler, ok := r.Get("__email")
+		require.True(t, ok)
+		res, err := handler([]string{"gmail.com"})
+		require.NoError(t, err)
+		assert.Contains(t, res, "@gmail.com")
 	})
 }
 

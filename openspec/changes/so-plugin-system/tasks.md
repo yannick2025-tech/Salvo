@@ -50,8 +50,8 @@
 ### 重构 + 覆盖率
 
 - [x] 1.8 运行 `go test -race -cover ./internal/core/expr/`，验证覆盖率 ≥ 80% (86.6%)
-- [ ] 1.9 迁移现有 `generator.email` → `__email()` 格式，更新调用方
-- [ ] 1.10 集成到 runner.go：HTTP 节点的 URL/Body/Header 字段使用新引擎解析
+- [x] 1.9 迁移现有 `generator.email` → `__email()` 格式，更新调用方
+- [x] 1.10 集成到 runner.go：HTTP 节点的 URL/Body/Header 字段使用新引擎解析
 
 ---
 

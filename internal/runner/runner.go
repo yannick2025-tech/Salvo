@@ -1360,6 +1360,43 @@ func (n *sceneNode) recordFailedNode(method, url string, reqHeaders map[string]s
 	n.failedNodesMu.Unlock()
 }
 
+// variablesOrNil returns the variables map from input, or nil if input is nil
+// or has no variables. This avoids verbose nil-checking at every call site.
+func variablesOrNil(input *dag.Input) map[string]any {
+	if input == nil {
+		return nil
+	}
+	return input.Variables
+}
+
+// resolveAllExpressions resolves all expression patterns (variable references,
+// function calls, math) in str using the unified expr.Resolve engine.
+// Falls back to the legacy two-step resolveGeneratorRefs + resolveWithVariables
+// when the expr registry is unavailable or resolution fails.
+func (n *sceneNode) resolveAllExpressions(str string, vars map[string]any, nodeLog logger.Logger) string {
+	if str == "" {
+		return str
+	}
+	if n.exprReg != nil {
+		result, err := expr.Resolve(str, vars, n.exprReg)
+		if err == nil {
+			return result
+		}
+		nodeLog.Warn("expression resolution failed, falling back to legacy resolution",
+			logger.F("error", err),
+			logger.F("input_preview", truncateString(str, 100)),
+		)
+	}
+	// Fallback: legacy two-step resolution
+	genReg := builtin.DefaultRegistry()
+	genReg.SetLogger(&genLogAdapter{nodeLog})
+	result := resolveGeneratorRefs(str, genReg, nodeLog)
+	if vars != nil {
+		result = resolveWithVariables(result, vars)
+	}
+	return result
+}
+
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
 	// Use context-based logging so that trace_id, chain_id, node_id etc.
 	// are automatically injected by logger.WithContext.
@@ -1479,10 +1516,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		Body       string            `json:"body"`
 		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
 		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
-		Form       *struct {
-			Fields map[string]string `json:"fields"`
-			Files  map[string]string `json:"files"`
-		} `json:"form"`
+		Form       json.RawMessage   `json:"form"`
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -1492,28 +1526,8 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		return nil, fmt.Errorf("parse http config: %w", err)
 	}
 
-	url := cfg.URL
-
-	genReg := builtin.DefaultRegistry()
-	genReg.SetLogger(&genLogAdapter{nodeLog})
-	url = resolveGeneratorRefs(url, genReg, nodeLog)
-	nodeLog.Info("resolved generator references in URL", logger.F("url", url))
-
-	if input != nil && input.Variables != nil {
-		nodeLog.Info("resolving variables in URL",
-			logger.F("original_url", url),
-			logger.F("variable_count", len(input.Variables)),
-		)
-		url = resolveWithVariables(url, input.Variables)
-		nodeLog.Info("URL after variable resolution",
-			logger.F("resolved_url", url),
-		)
-	} else {
-		nodeLog.Warn("no variables available for URL resolution",
-			logger.F("input_nil", input == nil),
-			logger.F("variables_nil", input != nil && input.Variables == nil),
-		)
-	}
+	url := n.resolveAllExpressions(cfg.URL, variablesOrNil(input), nodeLog)
+	nodeLog.Info("resolved URL", logger.F("url", url))
 
 	method := cfg.Method
 	if method == "" {
@@ -1530,10 +1544,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			}
 		case string:
 			// Resolve variable reference, e.g. ${timeout_ms} → "5000"
-			resolved := v
-			if input != nil && input.Variables != nil {
-				resolved = resolveWithVariables(resolved, input.Variables)
-			}
+			resolved := n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
 			if sec, err := strconv.ParseFloat(resolved, 64); err == nil && sec > 0 {
 				timeout = time.Duration(sec * float64(time.Second))
 			} else if ms, err := strconv.ParseFloat(resolved, 64); err == nil && ms > 0 {
@@ -1576,11 +1587,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	for k, v := range req.Headers {
-		resolved := resolveGeneratorRefs(v, genReg, nodeLog)
-		if input != nil && input.Variables != nil {
-			resolved = resolveWithVariables(resolved, input.Variables)
-		}
-		req.Headers[k] = resolved
+		req.Headers[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
 	}
 
 	if len(req.Headers) > 0 {
@@ -1590,10 +1597,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	if cfg.Body != "" {
-		body := resolveGeneratorRefs(cfg.Body, genReg, nodeLog)
-		if input != nil && input.Variables != nil {
-			body = resolveWithVariables(body, input.Variables)
-		}
+		body := n.resolveAllExpressions(cfg.Body, variablesOrNil(input), nodeLog)
 		req.Body = []byte(body)
 		nodeLog.Debug("resolved body",
 			logger.F("body_preview", truncateString(body, 300)),
@@ -1602,24 +1606,50 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 	// multipart/form-data: takes precedence over Body when both present.
 	// File paths and field values are variable-resolved the same way as Body.
-	if cfg.Form != nil {
+	// Supports two JSON formats:
+	//   Nested: {"fields": {"k":"v"}, "files": {"k":"/path"}}
+	//   Flat:   {"username":"admin", "avatar":"/path/to/avatar.jpg"}
+	// When flat, each value is auto-classified as field or file by isLikelyFilePath.
+	if len(cfg.Form) > 0 {
+		var fields, files map[string]string
+
+		// Try nested format first: {"fields": {...}, "files": {...}}
+		var nested struct {
+			Fields map[string]string `json:"fields"`
+			Files  map[string]string `json:"files"`
+		}
+		if err := json.Unmarshal(cfg.Form, &nested); err == nil && (len(nested.Fields) > 0 || len(nested.Files) > 0) {
+			fields = nested.Fields
+			files = nested.Files
+		} else {
+			// Fall back to flat format: {"username":"admin", "avatar":"/path/to/avatar.jpg"}
+			var flat map[string]string
+			if err := json.Unmarshal(cfg.Form, &flat); err != nil {
+				nodeLog.Error("failed to parse form, expected nested or flat format",
+					logger.F("error", err),
+				)
+				return nil, fmt.Errorf("parse form: %w", err)
+			}
+			fields = make(map[string]string)
+			files = make(map[string]string)
+			for k, v := range flat {
+				if isLikelyFilePath(v) {
+					files[k] = v
+				} else {
+					fields[k] = v
+				}
+			}
+		}
+
 		form := &httpprotocol.FormData{
-			Fields: make(map[string]string, len(cfg.Form.Fields)),
-			Files:  make(map[string]string, len(cfg.Form.Files)),
+			Fields: make(map[string]string, len(fields)),
+			Files:  make(map[string]string, len(files)),
 		}
-		for k, v := range cfg.Form.Fields {
-			resolved := resolveGeneratorRefs(v, genReg, nodeLog)
-			if input != nil && input.Variables != nil {
-				resolved = resolveWithVariables(resolved, input.Variables)
-			}
-			form.Fields[k] = resolved
+		for k, v := range fields {
+			form.Fields[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
 		}
-		for k, v := range cfg.Form.Files {
-			resolved := resolveGeneratorRefs(v, genReg, nodeLog)
-			if input != nil && input.Variables != nil {
-				resolved = resolveWithVariables(resolved, input.Variables)
-			}
-			form.Files[k] = resolved
+		for k, v := range files {
+			form.Files[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
 		}
 		req.Form = form
 		nodeLog.Debug("resolved multipart form",
@@ -1875,23 +1905,7 @@ func (n *sceneNode) executeDelay(ctx context.Context, input *dag.Input, nodeLog 
 	case int64:
 		ms = v
 	case string:
-		resolved := v
-		// Resolve variables first: ${var-a} → value
-		if input != nil && input.Variables != nil {
-			resolved = resolveWithVariables(resolved, input.Variables)
-		}
-		// Resolve expressions: ${__random(100, 200)} → value
-		if n.exprReg != nil && strings.Contains(resolved, "${__") {
-			exprResolved, err := expr.Resolve(resolved, nil, n.exprReg)
-			if err != nil {
-				nodeLog.Warn("expression resolve failed in delay ms",
-					logger.F("expression", resolved),
-					logger.F("err", err),
-				)
-			} else {
-				resolved = exprResolved
-			}
-		}
+		resolved := n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
 		// Support math expressions: "600 * 0.25" → "150"
 		if mathResult, err := expr.EvalMath(resolved); err == nil {
 			resolved = mathResult
@@ -2524,6 +2538,25 @@ func (r *Runner) NodeSnapshots() map[string]*Sample {
 	)
 
 	return result
+}
+
+// fileExtRe matches common file extensions that indicate a file path value.
+var fileExtRe = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|bmp|svg|pdf|doc|docx|xls|xlsx|zip|tar|gz|rar|7z|mp4|mp3|wav|avi|mov|txt|csv|json|xml|yaml|yml|toml|ini|conf|log|bak|bin|exe|dmg|iso|ppt|pptx|md|rtf|odt|ods|odp)$`)
+
+// isLikelyFilePath returns true when the value looks like a file path rather
+// than a plain string field. A value is classified as a file when:
+//   - it has a recognised file extension, OR
+//   - it contains a path separator (/ or \) and does not start with "${" (a
+//     variable reference such as ${upload_dir}/file.txt is still a file, but
+//     we only trigger on the path-separator heuristic for non-variable values).
+func isLikelyFilePath(v string) bool {
+	if fileExtRe.MatchString(v) {
+		return true
+	}
+	if strings.ContainsAny(v, "/\\") && !strings.HasPrefix(v, "${") {
+		return true
+	}
+	return false
 }
 
 // truncateString returns a truncated version of s, limited to maxLen characters.

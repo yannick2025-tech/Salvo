@@ -297,7 +297,11 @@ nodes:
         Content-Type: application/json
       body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 连接模拟器_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 2. 空闲未插枪 (status=0) ---
   - name: 空闲未插枪
@@ -309,7 +313,11 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":0}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 空闲未插枪_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 3. 空闲已插枪 (status=11) ---
   - name: 空闲已插枪
@@ -321,7 +329,11 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":11}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 空闲已插枪_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 4. 配置充电数据 ---
   - name: 配置充电数据
@@ -333,7 +345,11 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"postId":${post_id},"outputChargingVoltageMax":${output_voltage_max},"outputChargingVoltageMin":${output_voltage_min},"outputChargingCurrentMax":${output_current_max},"outputChargingCurrentMin":${output_current_min},"demandChargingVoltageMax":${demand_voltage_max},"demandChargingVoltageMin":${demand_voltage_min},"demandChargingCurrentMax":${demand_current_max},"demandChargingCurrentMin":${demand_current_min}}'
       timeout: 10000
-    think_time: "1s"
+
+  - name: 配置充电数据_delay
+    type: delay
+    config:
+      ms: "1000"
 
   # --- 5. 概率/随机/计算字段生成器 ---
   # 以下 generator 节点在运行时动态生成各字段值，替代原先的硬编码配置
@@ -543,7 +559,11 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id},"couponId":${coupon_id}}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 支付待支付订单_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 9. 查询待支付占位订单 ---
   - name: 签名-查询待支付占位订单
@@ -597,7 +617,11 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_before},"payChannel":${occupy_pay_channel}}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 支付待支付占位订单_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 11. 获取AccountID (POST startChargingInfo) ---
   - name: 签名-获取账户ID
@@ -782,7 +806,11 @@ nodes:
         errorCode: 0
       extract:
         order_id: "$.data.orderId"
-    think_time: "3s"
+
+  - name: 创建订单_delay
+    type: delay
+    config:
+      ms: "3000"
 
   - name: 记录充电开始时间
     type: generator
@@ -991,7 +1019,11 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id_after},"couponId":${coupon_id_after}}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 支付未支付订单_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 23. 强制支付 ---
   - name: 判断-是否强制支付
@@ -1157,7 +1189,11 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":0}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 重置枪状态_delay
+    type: delay
+    config:
+      ms: "3000"
 
   # --- 28. 轮询占位订单 (30s间隔, 5分钟超时=10次) ---
   - name: 重置占位订单ID
@@ -1211,7 +1247,11 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_after},"payChannel":${occupy_pay_channel},"passWord":"${password_enc}"}'
       timeout: 10000
-    think_time: "3s"
+
+  - name: 支付占位订单_delay
+    type: delay
+    config:
+      ms: "3000"
 
 # =============================================================================
 # Teardown: 断开模拟器连接
@@ -1241,12 +1281,20 @@ edges:
   - from: 计算pointIdInt
     to: 连接模拟器
   - from: 连接模拟器
+    to: 连接模拟器_delay
+  - from: 连接模拟器_delay
     to: 空闲未插枪
   - from: 空闲未插枪
+    to: 空闲未插枪_delay
+  - from: 空闲未插枪_delay
     to: 空闲已插枪
   - from: 空闲已插枪
+    to: 空闲已插枪_delay
+  - from: 空闲已插枪_delay
     to: 配置充电数据
   - from: 配置充电数据
+    to: 配置充电数据_delay
+  - from: 配置充电数据_delay
     to: 生成-自动支付标志
   # 概率字段生成器链路
   - from: 生成-自动支付标志
@@ -1305,6 +1353,8 @@ edges:
   - from: 签名-支付待支付充电订单
     to: 支付待支付订单
   - from: 支付待支付订单
+    to: 支付待支付订单_delay
+  - from: 支付待支付订单_delay
     to: 签名-查询待支付占位订单
 
   # 查询+支付待支付占位订单
@@ -1321,6 +1371,8 @@ edges:
   - from: 签名-支付待支付占位订单
     to: 支付待支付占位订单
   - from: 支付待支付占位订单
+    to: 支付待支付占位订单_delay
+  - from: 支付待支付占位订单_delay
     to: 签名-获取账户ID
 
   # 获取账户信息
@@ -1359,6 +1411,8 @@ edges:
   - from: 签名-创建充电订单
     to: 创建订单
   - from: 创建订单
+    to: 创建订单_delay
+  - from: 创建订单_delay
     to: 记录充电开始时间
   - from: 记录充电开始时间
     to: 轮询充电状态
@@ -1403,6 +1457,8 @@ edges:
   - from: 签名-支付未支付充电订单
     to: 支付未支付订单
   - from: 支付未支付订单
+    to: 支付未支付订单_delay
+  - from: 支付未支付订单_delay
     to: 判断-是否强制支付
 
   # 强制支付
@@ -1449,6 +1505,8 @@ edges:
   - from: 后占位
     to: 重置枪状态
   - from: 重置枪状态
+    to: 重置枪状态_delay
+  - from: 重置枪状态_delay
     to: 重置占位订单ID
   - from: 重置占位订单ID
     to: 轮询占位订单
@@ -1465,4 +1523,6 @@ edges:
   - from: 签名-支付充电后占位订单
     to: 支付占位订单
   - from: 支付占位订单
+    to: 支付占位订单_delay
+  - from: 支付占位订单_delay
     to: 断开模拟器

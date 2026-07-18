@@ -14,6 +14,7 @@ func RegisterAll(r *expr.FunctionRegistry) {
 		"__manOf":          manOfAdapter,
 		"__random":         Random, // Random already matches FunctionHandler signature
 		"__snowflakeId":    snowflakeIdAdapter,
+		"__email":          emailAdapter,
 	}
 	for name, handler := range funcs {
 		// Registration should not fail on first call. Panic if it does.
@@ -45,4 +46,15 @@ func manOfAdapter(args []string) (string, error) {
 // snowflakeIdAdapter adapts SnowflakeId to FunctionHandler.
 func snowflakeIdAdapter(_ []string) (string, error) {
 	return SnowflakeId()
+}
+
+// emailAdapter adapts EmailGenerator.Generate to FunctionHandler.
+// Accepts 0 arguments (default domains) or domain arguments (e.g. __email("gmail.com")).
+func emailAdapter(args []string) (string, error) {
+	gen := NewEmailGenerator(args...)
+	result, err := gen.Generate(nil)
+	if err != nil {
+		return "", fmt.Errorf("__email: %w", err)
+	}
+	return result.(string), nil
 }

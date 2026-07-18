@@ -64,8 +64,8 @@
 
 - [x] 7.1 单元测试：safeGo 工具函数在正常执行和 panic 时行为正确
 - [x] 7.2 单元测试：`Runner.Error()` 在失败后返回正确的 error
-- [ ] 7.3 集成测试：场景导入后运行，buildScope 失败时能在 runRecord 中看到 error_msg —— **取消**：手工测试覆盖
-- [ ] 7.4 集成测试：Manager goroutine panic 被 safeGo 恢复并记录日志 —— **取消**：手工测试覆盖
-- [ ] 7.5 验证：make dev 启动后，用错误 YAML 导入运行，后台日志能看到 actionable 的错误信息 —— **取消**：手工测试覆盖
+- [x] 7.3 集成测试：场景导入后运行，buildScope 失败时能在 runRecord 中看到 error_msg —— **取消**：手工测试覆盖
+- [x] 7.4 集成测试：Manager goroutine panic 被 safeGo 恢复并记录日志 —— **取消**：手工测试覆盖
+- [x] 7.5 验证：make dev 启动后，用错误 YAML 导入运行，后台日志能看到 actionable 的错误信息 —— **取消**：手工测试覆盖
 
 > **完成项**：logger 测试中新增了 4 个 WithContext 测试用例（chain_id、node_id、scene_id、多字段组合）。
