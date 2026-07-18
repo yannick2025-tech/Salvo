@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/dashboard/DashboardPage.vue') },
         { path: 'scenes', name: 'Scenes', component: () => import('@/views/scenes/ScenesPage.vue') },
         { path: 'scenes/:id', name: 'SceneDetail', component: () => import('@/views/scenes/SceneDetailPage.vue'), props: true },
+        { path: 'scenes/:id/settings', name: 'SceneSettings', component: () => import('@/views/scenes/SceneSettingsPage.vue'), props: true },
         { path: 'runner', name: 'Runner', component: () => import('@/views/runner/RunnerPage.vue') },
         { path: 'reports', name: 'Reports', component: () => import('@/views/reports/ReportsPage.vue') },
         { path: 'reports/:id', name: 'ReportDetail', component: () => import('@/views/reports/ReportDetailPage.vue'), props: true },
@@ -59,3 +60,10 @@ router.beforeEach(async (to, _from, next) => {
 })
 
 export default router
+
+// 路由变更时 HMR 无法自动更新已注册的路由表，需要完整刷新
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate()
+  })
+}

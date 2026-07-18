@@ -1,5 +1,5 @@
 <template>
-  <div class="scene-detail" :class="{ 'settings-open': showSettings }">
+  <div class="scene-detail">
     <!-- ===== 紧凑工具栏 ===== -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -8,7 +8,7 @@
         <span v-if="scene" :class="['status-badge', scene.status]">{{ scene.status }}</span>
       </div>
       <div class="toolbar-right">
-        <button class="btn-sm toolbar-btn" :disabled="!canWriteScene" :title="canWriteScene ? '场景设置（变量 / 数据源）' : '您当前的角色没有编辑权限'" @click="showSettings = !showSettings" :class="{ active: showSettings }">
+        <button class="btn-sm toolbar-btn" :disabled="!canWriteScene" :title="canWriteScene ? '场景设置（变量 / 数据源）' : '您当前的角色没有编辑权限'" @click="$router.push(`/scenes/${$route.params.id}/settings`)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           设置
         </button>
@@ -336,73 +336,6 @@
       </div>
     </div>
     </div>
-    </div>
-
-    <!-- ===== 设置抽屉（变量 + 数据源） ===== -->
-    <div v-if="showSettings" class="drawer-overlay" @click.self="showSettings = false">
-      <div class="drawer-panel">
-        <div class="drawer-header">
-          <h3>场景设置</h3>
-          <button class="btn-icon btn-close" @click="showSettings = false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        </div>
-
-        <!-- 场景信息 -->
-        <div v-if="scene" class="drawer-card">
-          <h4 class="drawer-section-title" @click="toggleCard('basic')">
-            <span>基本信息</span>
-            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.basic }">▸</span>
-          </h4>
-          <div v-show="!collapsedCards.basic" class="card-body">
-          <div class="info-grid">
-            <div class="info-item"><span class="label">状态</span><span :class="['status-badge', scene.status]">{{ scene.status }}</span></div>
-            <div class="info-item"><span class="label">描述</span><span class="value">{{ scene.description || '-' }}</span></div>
-            <div class="info-item"><span class="label">创建时间</span><span class="value">{{ formatTime(scene.created_at) }}</span></div>
-            <div class="info-item">
-              <span class="label">默认超时(秒)</span>
-              <input v-model.number="scene.default_timeout" type="number" min="0" placeholder="0 表示使用系统默认" class="timeout-input" @change="saveSceneTimeout" />
-            </div>
-          </div>
-          </div>
-        </div>
-
-        <!-- 场景变量 -->
-        <div class="drawer-card">
-          <h4 class="drawer-section-title" @click="toggleCard('variables')">
-            <span>场景变量</span>
-            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.variables }">▸</span>
-          </h4>
-          <div v-show="!collapsedCards.variables" class="card-body">
-          <div v-if="varEntries.length === 0" class="var-empty">暂无变量</div>
-          <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
-            <input v-model="entry.key" placeholder="变量名" class="var-input var-key" @blur="saveVariables" />
-            <span class="var-eq">=</span>
-            <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input var-value" @blur="saveVariables" />
-            <button class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-          <button class="btn-sm drawer-add-btn" @click="addVariableRow">+ 添加变量</button>
-          </div>
-        </div>
-
-        <!-- 数据源 (CSV) -->
-        <div class="drawer-card">
-          <h4 class="drawer-section-title" @click="toggleCard('datasource')">
-            <span>数据源 (CSV)</span>
-            <span class="card-collapse-icon" :class="{ collapsed: collapsedCards.datasource }">▸</span>
-          </h4>
-          <div v-show="!collapsedCards.datasource" class="card-body">
-          <label class="btn-sm ds-upload-btn">
-            上传 CSV
-            <input type="file" accept=".csv" style="display:none" @change="onDsFileChange" />
-          </label>
-          <div v-if="dataSources.length === 0" class="var-empty" style="margin-top: 8px;">暂无数据源</div>
-          <div v-for="ds in dataSources" :key="ds.id" class="ds-row" @click="handleDsPreview(ds)" title="点击编辑数据">
-            <span class="ds-name">{{ ds.file_name }}</span>
-            <span class="ds-meta">{{ ds.columns?.length ?? 0 }} 列 · {{ ds.row_count ?? 0 }} 行</span>
-            <button class="btn-icon btn-del-var" @click.stop="handleDsDelete(ds.id)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div v-if="showRunConfig" class="modal-overlay" @click.self="showRunConfig = false">
@@ -749,15 +682,6 @@ const varEntries = ref<{ key: string; value: string }[]>([])
 // Data source state
 const dataSources = ref<DataSourceDTO[]>([])
 const dsUploading = ref(false)
-const showSettings = ref(false)
-
-// 抽屉卡片收缩状态：'basic' | 'variables' | 'datasource'
-const collapsedCards = reactive<Record<string, boolean>>({
-  basic: false,
-  variables: false,
-  datasource: false,
-})
-function toggleCard(key: string) { collapsedCards[key] = !collapsedCards[key] }
 // CSV editor pagination
 const dsPage = ref(1)
 const dsPageSize = ref(50)
@@ -1959,9 +1883,6 @@ onMounted(() => {
   background: var(--bg-primary);
 }
 
-/* 设置打开时隐藏 DAG 悬浮工具栏 */
-.settings-open :deep(.dag-toolbar) { opacity: 0; pointer-events: none; }
-
 /* ---- 工具栏 ---- */
 .toolbar {
   display: flex; align-items: center; justify-content: space-between;
@@ -2158,124 +2079,7 @@ onMounted(() => {
 .panel-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-primary); }
 .btn-save-panel { width: 100%; padding: 10px; font-size: 13px; }
 
-/* ---- 设置抽屉 ---- */
-.drawer-overlay {
-  position: fixed; inset: 0; z-index: 60;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  display: flex; justify-content: flex-end;
-  animation: drawerOverlayFadeIn 0.2s ease;
-}
-@keyframes drawerOverlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.drawer-panel {
-  width: 440px; max-width: 92vw; height: 100%;
-  background: var(--bg-card);
-  border-left: 1px solid var(--border-primary);
-  display: flex; flex-direction: column;
-  animation: drawerSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
-}
-@keyframes drawerSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-
-.drawer-header {
-  display: flex; justify-content: space-between; align-items: center;
-  /* ← [可调参数] 左边距：5px，右边距：40px */
-  padding: 12px 40px 0 5px;
-  /* 去掉 border-bottom，改用 padding 控制间距 */
-  flex-shrink: 0; background: var(--bg-secondary);
-}
-.drawer-header h3 {
-  font-size: 16px; font-weight: 700; margin: 0;
-  color: var(--text-primary);
-}
-.drawer-body {
-  flex: 1; overflow-y: auto;
-  /* ← [可调参数] 左边距：5px，右边距：40px，标题与卡片间距：2px */
-  padding: 2px 40px 24px 5px;
-}
-/* ---- 抽屉卡片（参考 SettingsPage .card 立体效果） ---- */
-.drawer-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-md);
-  padding: 18px 20px 20px;
-  /* [可调参数] 卡片之间间距：2px */
-  margin-bottom: 2px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s ease;
-}
-.drawer-card:hover {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.1),
-    0 8px 24px rgba(0, 0, 0, 0.06);
-}
-
-.drawer-section-title {
-  font-size: 13px; font-weight: 600; color: var(--text-primary);
-  margin: 0 0 14px;
-  display: flex; align-items: center; gap: 8px;
-  cursor: pointer;
-  user-select: none;
-}
-.drawer-section-title::before {
-  content: ''; width: 3px; height: 14px;
-  border-radius: 2px; background: var(--accent-primary);
-  flex-shrink: 0;
-}
-
-/* 卡片收缩图标 */
-.card-collapse-icon {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-.card-collapse-icon.collapsed {
-  transform: rotate(-90deg);
-}
-
-/* 卡片内容区 — 收缩时平滑过渡 */
-.card-body {
-  overflow: hidden;
-  transition: all 0.25s ease;
-}
-
-/* 场景信息 */
-.info-grid { display: flex; flex-direction: column; gap: 10px; }
-.info-item {
-  display: flex; align-items: center; gap: 12px; font-size: 13px;
-}
-.info-item .label {
-  font-size: 12px; color: var(--text-tertiary); min-width: 60px; flex-shrink: 0;
-}
-.info-item .value { color: var(--text-primary); word-break: break-all; }
-
-/* ---- 变量编辑 ---- */
-.var-empty {
-  font-size: 12px; color: var(--text-tertiary); padding: 14px;
-  text-align: center; background: var(--bg-tertiary);
-  border-radius: var(--radius-sm); margin-bottom: 8px;
-}
-.var-row {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-}
-.var-input {
-  height: 34px; padding: 0 12px; border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md); font-size: 13px;
-  background: var(--bg-input); color: var(--text-primary);
-  outline: none; transition: all 0.2s ease; box-sizing: border-box;
-}
-.var-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(0,229,255,0.08); }
-.var-input::placeholder { color: var(--text-tertiary); font-size: 12px; }
-.var-key { width: 130px; flex-shrink: 0; }
-.var-value { flex: 1; min-width: 0; }
-.var-eq { color: var(--text-tertiary); font-size: 14px; flex-shrink: 0; user-select: none; }
+/* ---- 删除按钮 & 添加按钮（while条件等复用） ---- */
 .btn-del-var {
   background: none; border: 1px solid transparent; color: var(--text-tertiary); cursor: pointer;
   font-size: 12px; padding: 3px 8px; border-radius: var(--radius-md);
@@ -2294,25 +2098,6 @@ onMounted(() => {
 .drawer-add-btn:hover {
   background: rgba(0,229,255,0.06) !important;
 }
-
-/* ---- 数据源列表 ---- */
-.ds-upload-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  cursor: pointer; transition: all 0.2s ease;
-  border-color: var(--accent-primary) !important;
-  color: var(--accent-primary) !important;
-}
-.ds-upload-btn:hover { background: rgba(0,229,255,0.06) !important; }
-
-.ds-row {
-  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
-  cursor: pointer; transition: all 0.2s ease; background: var(--bg-secondary);
-  margin-top: 8px;
-}
-.ds-row:hover { border-color: var(--accent-primary); background: var(--bg-hover); }
-.ds-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
-.ds-meta { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* ---- 全屏 CSV 编辑器 ---- */
 .csv-editor-overlay {

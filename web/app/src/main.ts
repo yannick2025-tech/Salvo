@@ -23,6 +23,7 @@ const router = createRouter({
         { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/dashboard/DashboardPage.vue') },
         { path: 'scenes', name: 'Scenes', component: () => import('@/views/scenes/ScenesPage.vue') },
         { path: 'scenes/:id', name: 'SceneDetail', component: () => import('@/views/scenes/SceneDetailPage.vue'), props: true },
+        { path: 'scenes/:id/settings', name: 'SceneSettings', component: () => import('@/views/scenes/SceneSettingsPage.vue'), props: true },
         { path: 'runner', name: 'Runner', component: () => import('@/views/runner/RunnerPage.vue') },
         { path: 'reports', name: 'Reports', component: () => import('@/views/reports/ReportsPage.vue') },
         { path: 'reports/:id', name: 'ReportDetail', component: () => import('@/views/reports/ReportDetailPage.vue'), props: true },

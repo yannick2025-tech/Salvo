@@ -377,11 +377,11 @@
 
 ### 端到端测试（10%）
 
-- [ ] 13.6 E2E：完整 Shell 登录流程 — get-app-salt → AES 解密 → BCrypt 哈希 → username-login（使用 SO 插件）
-- [ ] 13.7 E2E：card.yaml 场景导入 + 执行 — 验证 while 轮询充电状态、parallel 首页初始化
-- [ ] 13.8 E2E：SO 插件管理全流程 — 上传 → 列表 → 配置 → 废弃 → 重启 → 验证未加载 → 删除
-- [ ] 13.9 E2E：管理员/普通用户权限 — admin 可访问 /plugins，普通用户 403
-- [ ] 13.10 E2E：YAML 导入导出往返 — while/parallel/sub_flow 节点完整保留
+- [x] 13.6 E2E：完整 Shell 登录流程 — get-app-salt → AES 解密 → BCrypt 哈希 → username-login（使用 SO 插件）
+- [x] 13.7 E2E：card.yaml 场景导入 + 执行 — 验证 while 轮询充电状态、parallel 首页初始化
+- [x] 13.8 E2E：SO 插件管理全流程 — 上传 → 列表 → 配置 → 废弃 → 重启 → 验证未加载 → 删除
+- [x] 13.9 E2E：管理员/普通用户权限 — admin 可访问 /plugins，普通用户 403
+- [x] 13.10 E2E：YAML 导入导出往返 — while/parallel/sub_flow 节点完整保留
 
 ### 覆盖率验证
 
