@@ -135,16 +135,37 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 			// Wait for all parent nodes to signal readiness.
 			inEdges := e.dag.InEdges(n.ID())
 			parentFailed := false
+			if e.logWarn != nil {
+				e.logWarn("node waiting for parents",
+					"node_id", n.ID(),
+					"in_edge_count", len(inEdges),
+				)
+			}
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
 					// Check if parent actually succeeded by checking results map.
 					e.mu.RLock()
-					_, parentSucceeded := e.results[edge.From]
+					parentOutput, parentSucceeded := e.results[edge.From]
 					e.mu.RUnlock()
 					if !parentSucceeded {
 						parentFailed = true
+					}
+					if e.logWarn != nil {
+						outputDebug := "<no result>"
+						if parentSucceeded && parentOutput != nil {
+							outputDebug = fmt.Sprintf("%v", parentOutput.Response)
+						}
+						e.logWarn("parent signal received",
+							"node_id", n.ID(),
+							"parent_id", edge.From,
+							"edge_type", edge.Type,
+							"condition", edge.Condition,
+							"parent_succeeded", parentSucceeded,
+							"parent_failed_so_far", parentFailed,
+							"parent_output", outputDebug,
+						)
 					}
 				case <-ctx.Done():
 					errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
@@ -158,6 +179,21 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 					e.mu.RLock()
 					parentOutput := e.results[edge.From]
 					e.mu.RUnlock()
+
+					if e.logWarn != nil {
+						outputDebug := "<nil>"
+						if parentOutput != nil {
+							outputDebug = fmt.Sprintf("%v", parentOutput.Response)
+						}
+						e.logWarn("evaluating conditional edge",
+							"condition", edge.Condition,
+							"edge_from", edge.From,
+							"edge_to", edge.To,
+							"current_node", n.ID(),
+							"parent_output_nil", parentOutput == nil,
+							"parent_output_response", outputDebug,
+						)
+					}
 
 					conditionMet := true
 					func() {
@@ -194,6 +230,11 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 
 			// Skip this node if any parent failed.
 			if parentFailed {
+				if e.logWarn != nil {
+					e.logWarn("skipping node due to parent failure",
+						"node_id", n.ID(),
+					)
+				}
 				close(sig)
 				return
 			}

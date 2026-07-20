@@ -2196,14 +2196,37 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 		return true
 	}
 
+	// Debug log: condition evaluation details
+	chainID, _ := ctx.Value(dag.ChainIDKey).(string)
+	outputDebug := "<nil>"
+	if output != nil {
+		outputDebug = fmt.Sprintf("%v", output.Response)
+	}
+	r.log.Debug("evalCondition called",
+		logger.F("chain_id", chainID),
+		logger.F("condition", condition),
+		logger.F("output_nil", output == nil),
+		logger.F("output_response", outputDebug),
+	)
+
 	if condition == "__if_true__" {
 		if output != nil {
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
-					return result == true
+					evalResult := result == true
+					r.log.Debug("evalCondition __if_true__ resolved",
+						logger.F("chain_id", chainID),
+						logger.F("if_else_result", result),
+						logger.F("eval_result", evalResult),
+					)
+					return evalResult
 				}
 			}
 		}
+		r.log.Warn("evalCondition __if_true__ fallback: if_else_result not found, defaulting to true",
+			logger.F("chain_id", chainID),
+			logger.F("output_nil", output == nil),
+		)
 		return true
 	}
 
@@ -2211,10 +2234,20 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 		if output != nil {
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
-					return result != true
+					evalResult := result != true
+					r.log.Debug("evalCondition __if_false__ resolved",
+						logger.F("chain_id", chainID),
+						logger.F("if_else_result", result),
+						logger.F("eval_result", evalResult),
+					)
+					return evalResult
 				}
 			}
 		}
+		r.log.Warn("evalCondition __if_false__ fallback: if_else_result not found, defaulting to false",
+			logger.F("chain_id", chainID),
+			logger.F("output_nil", output == nil),
+		)
 		return false
 	}
 
