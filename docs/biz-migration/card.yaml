@@ -46,15 +46,15 @@ variables:
   - key: api_pay_occupy_order
     value: "/ev/toc-adapter/order/occupy-order/v1/pay-occupy-order"
   - key: api_start_charging_info
-    value: "/ev/toc-adapter/charge/startup-charging/v1/info"
+    value: "/ev/toc-adapter/charge/startup-charging/v2/info"
   - key: api_get_user_id
     value: "/ev/toc-adapter/crm/customer/v1/self-info"
   - key: api_get_vip_info
-    value: "/ev/toc-adapter/user-vip/v1/query-user-vip-package"
+    value: "/ev/toc-adapter/account/v1/get-personal-card-and-vip"
   - key: api_query_activity
-    value: "/ev/toc-adapter/station-activity/v1/query-station-activity-preferential"
+    value: "/ev/toc-adapter/activity/v1/query-activity"
   - key: api_safe_config
-    value: "/ev/toc-adapter/station/v1/query-station-point-fee-detail"
+    value: "/ev/toc-adapter/charge/v1/query-safe-config"
   - key: api_create_order
     value: "/ev/toc-adapter/order/v1/create-charge-order"
   - key: api_charging_data
@@ -176,6 +176,8 @@ variables:
     value: ""
   - key: limit_strategy
     value: ""
+  - key: limit_value
+    value: ""
   - key: charge_post_offline_time
     value: ""
   - key: charge_post_online_time
@@ -230,6 +232,7 @@ config_params:
   soc_max: "100"                # SOC上限(%)
   pre_pay_min: "5"              # 预付金额下限(元)
   pre_pay_max: "999"            # 预付金额上限(元)
+  limit_value_amount_ratio: "0.75"  # 按金额限制时: limitValue = prePayAmount × 此比例
   # limit_strategy: __oneOf("0","1","2") → 0=AutoFull, 1=AmountLimit, 2=SOCLimit
   # pay_channel: __weightedChoice("1=70,2=30") → 1=微信支付, 2=支付宝
 
@@ -253,12 +256,14 @@ data_sources:
 setup:
   - name: 登录获取JWT
     type: generator
+    block_on_error: true
     config:
       expression: '${__so("login","login","${salt_base_url}","${login_base_url}","${username}","${password}")}'
       variable: jwt_token
 
   - name: 获取C端Token
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${gatewayurl}${api_get_toc_user_token}"
@@ -270,6 +275,8 @@ setup:
         token: "$.data.token"
         rsa_pri_key: "$.data.priKey"
         aes_key: "$.data.aesKey"
+      expect_body:
+        errorCode: 0
 
 # =============================================================================
 # 主流程节点
@@ -290,6 +297,7 @@ nodes:
 
   - name: 连接模拟器
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${simurl}${sim_cmds}"
@@ -297,6 +305,8 @@ nodes:
         Content-Type: application/json
       body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 连接模拟器_delay
     type: delay
@@ -306,6 +316,7 @@ nodes:
   # --- 2. 空闲未插枪 (status=0) ---
   - name: 空闲未插枪
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${simurl}${sim_update_point_status}"
@@ -313,6 +324,8 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":0}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 空闲未插枪_delay
     type: delay
@@ -322,6 +335,7 @@ nodes:
   # --- 3. 空闲已插枪 (status=11) ---
   - name: 空闲已插枪
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${simurl}${sim_update_point_status}"
@@ -329,6 +343,8 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":11}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 空闲已插枪_delay
     type: delay
@@ -345,6 +361,8 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"postId":${post_id},"outputChargingVoltageMax":${output_voltage_max},"outputChargingVoltageMin":${output_voltage_min},"outputChargingCurrentMax":${output_current_max},"outputChargingCurrentMin":${output_current_min},"demandChargingVoltageMax":${demand_voltage_max},"demandChargingVoltageMin":${demand_voltage_min},"demandChargingCurrentMax":${demand_current_max},"demandChargingCurrentMin":${demand_current_min}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 配置充电数据_delay
     type: delay
@@ -449,6 +467,41 @@ nodes:
       expression: '${__oneOf("0","1","2")}'
       variable: limit_strategy
 
+  # -- 充电策略→限额值分支计算 --
+  # limitStrategy=0(AutoFull): limitValue=0(不使用)
+  # limitStrategy=1(AmountLimit): limitValue=prePayAmount × 0.75
+  # limitStrategy=2(SOCLimit): limitValue=soc
+  - name: 判断-充电策略类型
+    type: if-else
+    config:
+      expr: '${limit_strategy} == "0"'
+
+  - name: 计算-充满即停限额值
+    type: generator
+    config:
+      # strategy=0 (AutoFull): 充满即停, limitValue不使用, 设为0
+      expression: '0'
+      variable: limit_value
+
+  - name: 判断-充电策略1或2
+    type: if-else
+    config:
+      expr: '${limit_strategy} == "1"'
+
+  - name: 计算-按金额限制值
+    type: generator
+    config:
+      # strategy=1 (AmountLimit): limitValue = prePayAmount × limit_value_amount_ratio
+      expression: '${pre_pay_amount} * ${limit_value_amount_ratio}'
+      variable: limit_value
+
+  - name: 计算-按SOC限制值
+    type: generator
+    config:
+      # strategy=2 (SOCLimit): limitValue = soc值(%)
+      expression: '${soc}'
+      variable: limit_value
+
   # -- 5c. 由chargeTime数学计算得到的时间字段 --
   - name: 计算-桩预计下线时间
     type: generator
@@ -481,6 +534,7 @@ nodes:
   # --- 获取签名API列表 ---
   - name: 获取签名API列表
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_get_sign_request}"
@@ -491,6 +545,8 @@ nodes:
       timeout: 10000
       extract:
         sign_apis_json: "$.data.signApiList"
+      expect_body:
+        errorCode: 0
 
   # --- 7. 查询待支付订单 ---
   - name: 签名-查询待支付充电订单
@@ -504,6 +560,7 @@ nodes:
 
   - name: 查询待支付订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_query_order}"
@@ -516,6 +573,8 @@ nodes:
       timeout: 10000
       extract:
         unpaid_order_id: "$.data[0].orderId"
+      expect_body:
+        errorCode: 0
 
   # --- 8. 支付待支付订单 ---
   # 判断条件：unpaid_order_id 不为 "0" 表示有订单
@@ -535,6 +594,8 @@ nodes:
         Authorization: "${token}"
       body: '{"orderId":"${unpaid_order_id}"}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
       extract:
         coupon_id: "$.data.availableUserCoupon[0].instId"
 
@@ -549,6 +610,7 @@ nodes:
 
   - name: 支付待支付订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_pay_order}"
@@ -559,6 +621,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id},"couponId":${coupon_id}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 支付待支付订单_delay
     type: delay
@@ -577,6 +641,7 @@ nodes:
 
   - name: 查询待支付占位订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_query_occupy_order}"
@@ -589,6 +654,8 @@ nodes:
       timeout: 10000
       extract:
         occupy_order_id: "$.data[0].chargeOccupyOrderId"
+      expect_body:
+        errorCode: 0
 
   # --- 10. 支付待支付占位订单 ---
   - name: 判断-是否有待支付占位订单
@@ -607,6 +674,7 @@ nodes:
 
   - name: 支付待支付占位订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_pay_occupy_order}"
@@ -617,6 +685,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_before},"payChannel":${occupy_pay_channel}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 支付待支付占位订单_delay
     type: delay
@@ -635,6 +705,7 @@ nodes:
 
   - name: 获取AccountID
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_start_charging_info}"
@@ -649,6 +720,8 @@ nodes:
         account_id: "$.data.accountInfoRsp.accountId"
         tenant_id: "$.data.tenantId"
         station_id: "$.data.mgrStationRsp.stationId"
+      expect_body:
+        errorCode: 0
 
   # --- 12. 获取UserId ---
   - name: 签名-获取用户ID
@@ -662,6 +735,7 @@ nodes:
 
   - name: 获取UserId
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_get_user_id}"
@@ -674,6 +748,8 @@ nodes:
       timeout: 10000
       extract:
         user_id: "$.data.userId"
+      expect_body:
+        errorCode: 0
 
   # --- 13. 获取VIP状态 ---
   - name: 签名-获取VIP状态
@@ -700,6 +776,8 @@ nodes:
       extract:
         vip_status: "$.data.userVipDetailRspVO.userVipStatus"
         today_left_count: "$.data.userVipDetailRspVO.userVipPackageCycleInfo.toDayLeftCount"
+      expect_body:
+        errorCode: 0
 
   # vip_use 使用__weightedChoice按概率生成 (默认0%概率，即始终为0)
   # 精确逻辑: (user_vip==1 && vip_status==1 && today_left_count>0) ? 1 : 0
@@ -733,6 +811,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"pointId":"${user_charger.pointId}","activityNeed":[3]}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   # --- 15. 查询安行充 ---
   - name: 签名-查询安行充配置
@@ -758,6 +838,8 @@ nodes:
       timeout: 10000
       extract:
         sell_flag: "$.data.SellFlag"
+      expect_body:
+        errorCode: 0
 
   - name: 计算安行充标志
     type: generator
@@ -769,6 +851,7 @@ nodes:
   # --- 16. 生成支付密码 ---
   - name: 生成支付密码
     type: generator
+    block_on_error: true
     config:
       expression: '${__so("paypwd","gen","${baseurl}","${token}","${aes_key}","${user_id}","123456")}'
       variable: password_enc
@@ -777,7 +860,7 @@ nodes:
   - name: 构造创建订单body
     type: generator
     config:
-      expression: '{"chargingPointId":"${user_charger.pointId}","autoPay":${auto_pay},"orderSource":${order_source},"limitStrategy":${limit_strategy},"soc":${soc},"prePayAmount":${pre_pay_amount},"payType":${pay_type},"payChannel":${pay_channel},"passWord":"${password_enc}","orderChargeType":1,"useVipInterest":${vip_use},"safeBuyFlag":${sell_buy_flag}}'
+      expression: '{"chargingPointId":"${user_charger.pointId}","autoPay":${auto_pay},"orderSource":${order_source},"limitStrategy":${limit_strategy},"limitValue":${limit_value},"soc":${soc},"prePayAmount":${pre_pay_amount},"payType":${pay_type},"payChannel":${pay_channel},"passWord":"${password_enc}","orderChargeType":1,"useVipInterest":${vip_use},"safeBuyFlag":${sell_buy_flag}}'
       variable: create_order_body
 
   - name: 签名-创建充电订单
@@ -824,6 +907,7 @@ nodes:
   # 桩离线/上线使用 condition + timed_trigger
   - name: 轮询充电状态
     type: while
+    block_on_error: true
     config:
       exit_conditions:
         - variable: charging_status
@@ -836,6 +920,7 @@ nodes:
         # generator 返回响应 JSON，extract 从中提取 charging_status
         - name: 查询充电状态
           type: generator
+          block_on_error: true
           config:
             expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_charging_data}","${token}","{\"orderId\":${order_id}}")}'
             variable: charge_status_resp
@@ -903,6 +988,7 @@ nodes:
             operator: equals
             value: "true"
           type: generator
+          block_on_error: true
           config:
             expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_stop_charge}","${token}","{\"orderId\":${order_id}}")}'
             variable: stop_charge_resp
@@ -953,6 +1039,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${order_id}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   # --- 21. 查询未支付订单(充电后) ---
   - name: 签名-查询未支付充电订单(后)
@@ -966,6 +1054,7 @@ nodes:
 
   - name: 查询未支付订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_query_order}"
@@ -978,6 +1067,8 @@ nodes:
       timeout: 10000
       extract:
         unpaid_order_id_after: "$.data[0].orderId"
+      expect_body:
+        errorCode: 0
 
   # --- 22. 支付未支付订单(含优惠券) ---
   - name: 判断-是否有未支付充电订单
@@ -997,6 +1088,8 @@ nodes:
       timeout: 10000
       extract:
         coupon_id_after: "$.data.availableUserCoupon[0].instId"
+      expect_body:
+        errorCode: 0
 
   - name: 签名-支付未支付充电订单
     type: generator
@@ -1009,6 +1102,7 @@ nodes:
 
   - name: 支付未支付订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_pay_order}"
@@ -1019,6 +1113,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id_after},"couponId":${coupon_id_after}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 支付未支付订单_delay
     type: delay
@@ -1052,6 +1148,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${order_id}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   # --- 24. 检查订单是否已支付 ---
   - name: 签名-检查订单支付状态
@@ -1077,6 +1175,8 @@ nodes:
       timeout: 10000
       extract:
         pay_status: "$.data.payStatus"
+      expect_body:
+        errorCode: 0
 
   # --- 25. 评论 (条件: payStatus==1) ---
   - name: 判断-订单是否已支付可评论
@@ -1105,6 +1205,8 @@ nodes:
       timeout: 10000
       extract:
         upload_token: "$.data"
+      expect_body:
+        errorCode: 0
 
   - name: 上传评论图片
     type: http
@@ -1119,6 +1221,8 @@ nodes:
       timeout: 10000
       extract:
         img_path: "$.data.filePath"
+      expect_body:
+        errorCode: 0
 
   - name: 签名-获取评论标签和星级
     type: generator
@@ -1144,6 +1248,8 @@ nodes:
       extract:
         comment_star: "$.data[0].star"
         comment_tag_id: "$.data[0].tagId"
+      expect_body:
+        errorCode: 0
 
   - name: 构造评论body
     type: generator
@@ -1162,6 +1268,7 @@ nodes:
 
   - name: 保存评论
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_save_comment}"
@@ -1172,6 +1279,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '${comment_body}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   # --- 26. 后占位 (delay) ---
   - name: 后占位
@@ -1189,6 +1298,8 @@ nodes:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"status":0}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 重置枪状态_delay
     type: delay
@@ -1204,6 +1315,7 @@ nodes:
 
   - name: 轮询占位订单
     type: while
+    block_on_error: true
     config:
       exit_conditions:
         - variable: occupy_order_id
@@ -1214,6 +1326,7 @@ nodes:
       steps:
         - name: 查询占位订单
           type: generator
+          block_on_error: true
           config:
             expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_query_occupy_order}","${token}","{\"occupyOrderStatusList\":[2]}")}'
             variable: occupy_query_resp
@@ -1237,6 +1350,7 @@ nodes:
 
   - name: 支付占位订单
     type: http
+    block_on_error: true
     config:
       method: POST
       url: "${baseurl}${api_pay_occupy_order}"
@@ -1247,6 +1361,8 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_after},"payChannel":${occupy_pay_channel},"passWord":"${password_enc}"}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
   - name: 支付占位订单_delay
     type: delay
@@ -1266,6 +1382,8 @@ teardown:
         Content-Type: application/json
       body: '{"postId":${post_id}}'
       timeout: 10000
+      expect_body:
+        errorCode: 0
 
 # =============================================================================
 # DAG 边定义
@@ -1321,9 +1439,33 @@ edges:
     to: 生成-预付金额
   - from: 生成-预付金额
     to: 生成-充电策略选择
-  # 计算字段链路(依赖charge_time)
+  # 充电策略→限额值三分支(strategy=0/1/2各走一条路径, 汇合到计算-桩预计下线时间)
   - from: 生成-充电策略选择
+    to: 判断-充电策略类型
+  # 分支1: strategy=="0" → AutoFull, limitValue=0
+  - from: 判断-充电策略类型
+    to: 计算-充满即停限额值
+    condition: "__if_true__"
+  # 非0 → 继续判断1还是2
+  - from: 判断-充电策略类型
+    to: 判断-充电策略1或2
+    condition: "__if_false__"
+  # 分支2: strategy=="1" → AmountLimit, limitValue=prePayAmount×0.75
+  - from: 判断-充电策略1或2
+    to: 计算-按金额限制值
+    condition: "__if_true__"
+  # 分支3: strategy=="2" → SOCLimit, limitValue=soc
+  - from: 判断-充电策略1或2
+    to: 计算-按SOC限制值
+    condition: "__if_false__"
+  # 三路汇合
+  - from: 计算-充满即停限额值
     to: 计算-桩预计下线时间
+  - from: 计算-按金额限制值
+    to: 计算-桩预计下线时间
+  - from: 计算-按SOC限制值
+    to: 计算-桩预计下线时间
+  # 计算字段链路(依赖charge_time)
   - from: 计算-桩预计下线时间
     to: 计算-桩预计上线时间
   - from: 计算-桩预计上线时间

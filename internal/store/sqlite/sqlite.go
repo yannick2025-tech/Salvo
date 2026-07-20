@@ -172,20 +172,20 @@ func (r *NodeRepo) Create(ctx context.Context, node *model.Node) error {
 	node.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, created_at, updated_at, deleted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, block_on_error, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		node.ID, node.SceneID, node.Name, node.Type, node.Config,
-		node.Position, node.LoopCount, node.CreatedAt, node.UpdatedAt)
+		node.Position, node.LoopCount, node.BlockOnError, node.CreatedAt, node.UpdatedAt)
 	return err
 }
 
 func (r *NodeRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Node, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, name, type, config, position, loop_count, created_at, updated_at
+		SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, created_at, updated_at
 		FROM nodes WHERE id=? AND deleted_at IS NULL`, id)
 	n := &model.Node{}
 	err := row.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
-		&n.Position, &n.LoopCount, &n.CreatedAt, &n.UpdatedAt)
+		&n.Position, &n.LoopCount, &n.BlockOnError, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (r *NodeRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Node, e
 }
 
 func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node, error) {
-	query := `SELECT id, scene_id, name, type, config, position, loop_count, created_at, updated_at
+	query := `SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, created_at, updated_at
 		FROM nodes WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -214,7 +214,7 @@ func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node,
 	for rows.Next() {
 		n := &model.Node{}
 		if err := rows.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
-			&n.Position, &n.LoopCount, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			&n.Position, &n.LoopCount, &n.BlockOnError, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, n)
@@ -225,10 +225,10 @@ func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node,
 func (r *NodeRepo) Update(ctx context.Context, node *model.Node) error {
 	node.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE nodes SET name=?, type=?, config=?, position=?, loop_count=?, updated_at=?
+		UPDATE nodes SET name=?, type=?, config=?, position=?, loop_count=?, block_on_error=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		node.Name, node.Type, node.Config, node.Position, node.LoopCount,
-		node.UpdatedAt, node.ID)
+		node.BlockOnError, node.UpdatedAt, node.ID)
 	return err
 }
 
