@@ -987,15 +987,15 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 		}()
 
 		sceneTimeout := r.cfg.Timeout
-			if sceneTimeout <= 0 {
-				// 优先使用场景配置的默认超时
-				if scene.DefaultTimeout > 0 {
-					sceneTimeout = time.Duration(scene.DefaultTimeout) * time.Second
-				} else {
-					sceneTimeout = 600 * time.Second // 系统默认 10 分钟
-				}
+		if sceneTimeout <= 0 {
+			// 优先使用场景配置的默认超时
+			if scene.DefaultTimeout > 0 {
+				sceneTimeout = time.Duration(scene.DefaultTimeout) * time.Second
+			} else {
+				sceneTimeout = 600 * time.Second // 系统默认 10 分钟
 			}
-			taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
+		}
+		taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
 		defer cancel()
 
 		chainID := r.nodeGen.Generate()
@@ -1694,10 +1694,10 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		if n.httpOnlyStats != nil {
 			n.httpOnlyStats.RecordLatency(0, false)
 		}
-		
+
 		// Record failed node details
 		n.recordFailedNode(method, url, req.Headers, string(req.Body), 0, nil, "", err.Error())
-		
+
 		return &dag.Output{Error: err}, nil
 	}
 
@@ -1731,7 +1731,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	// Check if HTTP response is non-2xx
 	if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
 		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, truncateString(string(httpResp.Body), 200))
-		
+
 		if n.blockOnError {
 			nodeLog.Error("HTTP request failed with non2xx status and block_on_error enabled",
 				logger.F("method", method),
@@ -1743,7 +1743,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
 			return nil, fmt.Errorf("%s", errMsg)
 		}
-		
+
 		// Record failed node details even without block_on_error
 		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
 	}
@@ -2197,36 +2197,45 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 	}
 
 	// Debug log: condition evaluation details
-	chainID, _ := ctx.Value(dag.ChainIDKey).(string)
-	outputDebug := "<nil>"
-	if output != nil {
-		outputDebug = fmt.Sprintf("%v", output.Response)
+	var chainID string
+	if ctx != nil {
+		chainID, _ = ctx.Value(dag.ChainIDKey).(string)
 	}
-	r.log.Debug("evalCondition called",
-		logger.F("chain_id", chainID),
-		logger.F("condition", condition),
-		logger.F("output_nil", output == nil),
-		logger.F("output_response", outputDebug),
-	)
+	if r.log != nil {
+		outputDebug := "<nil>"
+		if output != nil {
+			outputDebug = fmt.Sprintf("%v", output.Response)
+		}
+		r.log.Debug("evalCondition called",
+			logger.F("chain_id", chainID),
+			logger.F("condition", condition),
+			logger.F("output_nil", output == nil),
+			logger.F("output_response", outputDebug),
+		)
+	}
 
 	if condition == "__if_true__" {
 		if output != nil {
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
 					evalResult := result == true
-					r.log.Debug("evalCondition __if_true__ resolved",
-						logger.F("chain_id", chainID),
-						logger.F("if_else_result", result),
-						logger.F("eval_result", evalResult),
-					)
+					if r.log != nil {
+						r.log.Debug("evalCondition __if_true__ resolved",
+							logger.F("chain_id", chainID),
+							logger.F("if_else_result", result),
+							logger.F("eval_result", evalResult),
+						)
+					}
 					return evalResult
 				}
 			}
 		}
-		r.log.Warn("evalCondition __if_true__ fallback: if_else_result not found, defaulting to true",
-			logger.F("chain_id", chainID),
-			logger.F("output_nil", output == nil),
-		)
+		if r.log != nil {
+			r.log.Warn("evalCondition __if_true__ fallback: if_else_result not found, defaulting to true",
+				logger.F("chain_id", chainID),
+				logger.F("output_nil", output == nil),
+			)
+		}
 		return true
 	}
 
@@ -2235,19 +2244,23 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
 					evalResult := result != true
-					r.log.Debug("evalCondition __if_false__ resolved",
-						logger.F("chain_id", chainID),
-						logger.F("if_else_result", result),
-						logger.F("eval_result", evalResult),
-					)
+					if r.log != nil {
+						r.log.Debug("evalCondition __if_false__ resolved",
+							logger.F("chain_id", chainID),
+							logger.F("if_else_result", result),
+							logger.F("eval_result", evalResult),
+						)
+					}
 					return evalResult
 				}
 			}
 		}
-		r.log.Warn("evalCondition __if_false__ fallback: if_else_result not found, defaulting to false",
-			logger.F("chain_id", chainID),
-			logger.F("output_nil", output == nil),
-		)
+		if r.log != nil {
+			r.log.Warn("evalCondition __if_false__ fallback: if_else_result not found, defaulting to false",
+				logger.F("chain_id", chainID),
+				logger.F("output_nil", output == nil),
+			)
+		}
 		return false
 	}
 

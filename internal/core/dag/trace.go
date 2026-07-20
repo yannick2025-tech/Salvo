@@ -225,10 +225,20 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 				parentNodeID = inEdges[0].From
 			}
 
+			parentFailed := false
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
+					// Check if parent actually succeeded by checking results map.
+					// When a parent is skipped (condition not met) it closes its
+					// signal without writing to results — we must propagate this.
+					e.mu.RLock()
+					_, parentSucceeded := e.results[edge.From]
+					e.mu.RUnlock()
+					if !parentSucceeded {
+						parentFailed = true
+					}
 				case <-ctx.Done():
 					span := tctx.StartSpan(n.ID())
 					span.SetChainID(chainID)
@@ -253,6 +263,16 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 						return
 					}
 				}
+			}
+
+			// Skip this node if any parent was skipped or failed.
+			if parentFailed {
+				span := tctx.StartSpan(n.ID())
+				span.SetChainID(chainID)
+				span.SetParentNodeID(parentNodeID)
+				span.Skip("parent failed or skipped")
+				close(sig)
+				return
 			}
 
 			if !isSync {
