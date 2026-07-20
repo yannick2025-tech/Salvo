@@ -282,3 +282,91 @@ fmt.Printf("panic: %v\n", r)
 - 不要只记录日志就返回 nil
 - 使用 `r.setError(err)` 存储错误 ×
 - 从 `Manager.Runners()` 返回 runner 实例，调用方通过 `rn.Error()` 获取错误
+
+---
+
+## Lesson 4: DAG AND-join 阻塞导致 if-else 分支后流程永久停顿 (2026-07-20)
+
+### 现象
+运行 if-else 分支场景时，仅执行部分步骤即停止（如 22 步停止，预期 60+ 步），状态为 `completed`（0 失败），但流程未到达终点。汇合点之后的节点均未执行。
+
+### 根因分析（3 层叠加）
+
+| # | 问题层 | 影响 | 修复 |
+|---|--------|------|------|
+| **1** | **trace.go 缺少 parentFailed 检测** | `ExecuteWithTrace` 是实际运行路径（runner 调用它而非 `Execute`），但 trace.go 没有检查父节点是否被跳过，导致被跳过的父节点的子节点仍然执行 | 在 trace.go 的 inEdges 循环中添加 `parentFailed` / `hasActiveParent` 检测逻辑 |
+| **2** | **条件边不满足时立即 return** | 当条件边评估为 false 时，代码立即 `close(sig) + return`，不考虑其他入边。多入边汇合节点只因为一条条件边不满足就被整体跳过 | 条件边不满足时仅标记该边为非活跃，继续处理其他边；所有边处理完后统一判断 |
+| **3** | **普通边不区分"跳过"和"失败"** | 当父节点被条件跳过（正常行为，非失败），其下游的普通边子节点误将父节点无结果视为"失败"。实际上父节点是"条件跳过"而非"执行失败" | 引入 `skipped` map 记录被条件跳过的节点，普通边检查时跳过 skipped 父节点 |
+
+### OR-join 语义设计
+
+修复后 DAG 引擎采用隐式 OR-join 语义：
+
+| 入边类型 | 父节点状态 | 处理方式 |
+|---------|-----------|---------|
+| 条件边 (`EdgeCondition`) | 父节点被跳过（无结果） | 豁免：该边非活跃，不算失败 |
+| 条件边 (`EdgeCondition`) | 父节点成功，条件满足 | `hasActiveParent = true` |
+| 条件边 (`EdgeCondition`) | 父节点成功，条件不满足 | 该边非活跃，不算失败 |
+| 普通边 (`EdgeNormal`) | 父节点成功 | `hasActiveParent = true` |
+| 普通边 (`EdgeNormal`) | 父节点被跳过（在 skipped map 中） | 豁免：该边非活跃，不算失败 |
+| 普通边 (`EdgeNormal`) | 父节点执行失败 | `parentFailed = true` |
+
+**汇合节点判定**：`len(inEdges) > 0 && (parentFailed || !hasActiveParent)` → 跳过
+
+这等同于 OR-join：只要有至少一条活跃路径到达，汇合节点就执行。
+
+### 排查方法
+
+```bash
+# 1. 检查条件边评估结果
+grep "evalCondition" salvo-stdout.log
+
+# 2. 检查节点跳过原因
+grep "skipping node\|no active parent path\|condition not met" salvo.log
+
+# 3. 检查执行路径是否完整
+grep "node execution" salvo.log | grep -v "started" | head -30
+```
+
+### 最终修复方案
+
+1. **trace.go**: 重写 inEdges 循环，条件边评估移入信号接收分支，条件不满足时不立即 return
+2. **executor.go**: 同步相同逻辑，增加 `skipped` map 和 `hasActiveParent` 判断
+3. **Executor.skipped map**: 新增字段，记录被条件跳过的节点 ID
+4. **单元测试**: 添加 4 个 OR-join 测试覆盖双边/三边/全跳过场景
+
+### 效果对比
+
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| if-else 双边汇合 | AND-join 阻塞，流程停止 | OR-join，活跃路径到达即执行 |
+| if-else 三边汇合 | 同上 | 同上 |
+| 条件跳过的子节点级联 | 子节点仍执行（trace.go 无检测） | 子节点被正确跳过 |
+| 被跳过父节点的普通边子节点 | 误判为失败 | 正确识别为条件跳过 |
+
+### Lessons Learned
+
+#### 1. 两条代码路径必须保持同步
+- `Execute()` 和 `executeTraced()` 是独立的两条执行路径
+- runner 调用的是 `ExecuteWithTrace()` → `executeTraced()`，不是 `Execute()`
+- **任何逻辑变更必须同时修改两处**
+
+#### 2. 条件边评估不应阻断其他入边的处理
+- 旧逻辑：条件边不满足 → 立即 `return`（跳过整个节点）
+- 新逻辑：条件边不满足 → 标记该边非活跃，继续处理其他边
+- **多入边节点的任何一条边不满足，都不应阻止其他边的评估**
+
+#### 3. "跳过"和"失败"是不同的语义
+- 节点因条件边不满足被跳过 → 预期行为，不应阻塞下游
+- 节点因执行错误而失败 → 异常行为，应阻塞下游普通边
+- **必须用独立的数据结构（如 skipped map）区分这两种状态**
+
+#### 4. 调试日志要加在实际执行的代码路径上
+- 首次调试时将日志加在 `executor.go` 的 `Execute()` 方法中
+- 但实际运行走的是 `trace.go` 的 `executeTraced()`
+- **添加调试日志前先确认实际代码路径**
+
+#### 5. OR-join 是 if-else DAG 的必要语义
+- 所有 if-else 分支后汇合的场景都需要 OR-join
+- AND-join 在 if-else 场景下必然阻塞（非活跃分支永不执行）
+- **YAML 编排灵活性依赖于 OR-join 支持**

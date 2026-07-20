@@ -154,7 +154,7 @@ func WithTraceHook(hook TraceHook, sceneID, runID snowflake.ID) ExecutorOption {
 // node, and finishes the trace when done. Returns all node outputs.
 func (e *Executor) ExecuteWithTrace(ctx context.Context, initialVars map[string]any) (map[string]*Output, error) {
 	e.initialVars = initialVars
-	
+
 	if e.traceHook == nil {
 		out, err := e.Execute(ctx)
 		if out != nil {
@@ -226,18 +226,52 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			}
 
 			parentFailed := false
+			hasActiveParent := false
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
-					// Check if parent actually succeeded by checking results map.
-					// When a parent is skipped (condition not met) it closes its
-					// signal without writing to results — we must propagate this.
 					e.mu.RLock()
 					_, parentSucceeded := e.results[edge.From]
 					e.mu.RUnlock()
-					if !parentSucceeded {
-						parentFailed = true
+
+					if edge.Type == EdgeCondition {
+						// For conditional edges, a skipped parent is expected
+						// when the condition is not met. This is OR-join
+						// semantics: a skipped conditional parent does NOT
+						// block the child. If the parent was skipped (no
+						// result in map), this edge is inactive.
+						if !parentSucceeded {
+							continue
+						}
+						// Parent executed — evaluate the condition.
+						e.mu.RLock()
+						parentOutput := e.results[edge.From]
+						e.mu.RUnlock()
+						if e.evalCondition(ctx, edge.Condition, parentOutput) {
+							hasActiveParent = true
+						}
+						// Condition not met → this edge is inactive, but
+						// don't skip the node yet; other edges may provide
+						// an active path (OR-join).
+					} else {
+						// Normal edge: parent must succeed.
+						// If the parent was skipped (due to conditional edge
+						// upstream), treat this edge as inactive rather than
+						// failed — OR-join semantics.
+						if !parentSucceeded {
+							e.mu.RLock()
+							isSkipped := e.skipped[edge.From]
+							e.mu.RUnlock()
+							if isSkipped {
+								// Parent was conditionally skipped, not failed.
+								// This edge is inactive, don't set parentFailed.
+							} else {
+								parentFailed = true
+							}
+						} else {
+							hasActiveParent = true
+						}
 					}
 				case <-ctx.Done():
 					span := tctx.StartSpan(n.ID())
@@ -248,29 +282,26 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 					close(sig)
 					return
 				}
-
-				if edge.Type == EdgeCondition {
-					e.mu.RLock()
-					parentOutput := e.results[edge.From]
-					e.mu.RUnlock()
-
-					if !e.evalCondition(ctx, edge.Condition, parentOutput) {
-						span := tctx.StartSpan(n.ID())
-						span.SetChainID(chainID)
-						span.SetParentNodeID(parentNodeID)
-						span.Skip(fmt.Sprintf("condition not met: %s", edge.Condition))
-						close(sig)
-						return
-					}
-				}
 			}
 
-			// Skip this node if any parent was skipped or failed.
-			if parentFailed {
+			// Skip this node if any normal-edge parent failed.
+			// If the node has parents but none are active (all conditional
+			// edges were not met or parents skipped), also skip — no path
+			// leads here. Nodes with zero parents (entry nodes) always execute.
+			if len(inEdges) > 0 && (parentFailed || !hasActiveParent) {
 				span := tctx.StartSpan(n.ID())
 				span.SetChainID(chainID)
 				span.SetParentNodeID(parentNodeID)
-				span.Skip("parent failed or skipped")
+				reason := "parent failed"
+				if !hasActiveParent && !parentFailed {
+					reason = "no active parent path"
+				}
+				span.Skip(reason)
+				// Record this node as skipped so downstream merge nodes
+				// can distinguish conditional skips from actual failures.
+				e.mu.Lock()
+				e.skipped[n.ID()] = true
+				e.mu.Unlock()
 				close(sig)
 				return
 			}

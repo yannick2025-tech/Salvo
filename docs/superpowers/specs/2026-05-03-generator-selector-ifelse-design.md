@@ -208,6 +208,8 @@ Add a new `if-else` node type that explicitly models dual-branch routing. The ex
 
 **DAG executor behavior**: When the executor encounters an if-else node, it evaluates `expr` and only traverses the matching branch edge. This is identical to how `EdgeCondition` works today, but the condition values are standardized.
 
+**OR-join merge semantics**: When if-else branches merge back into a common downstream node, the DAG executor uses OR-join semantics — a merge node executes if **at least one** active path reaches it. Conditionally skipped parents do NOT block the merge node. This supports both two-way and multi-way (3+) merges natively without requiring special YAML configuration.
+
 **YAML example**:
 ```yaml
 nodes:

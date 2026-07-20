@@ -23,6 +23,7 @@ tags: [debugging, troubleshooting, performance, layout, workflow]
 | **性能/加载慢** | "卡顿"、"慢"、"延迟"、"加载时间"、"首屏"、"白屏" | Lesson 1: Runtime 图表优化 |
 | **CSS/布局异常** | "溢出"、"超出边界"、"色块"、"定位错位"、"被遮挡" | Lesson 2: 链路跟踪溢出 |
 | **ECharts 图表问题** | "图表不显示"、"颜色变化"、"曲线异常" | Lesson 1 + ECharts 配置规范 |
+| **DAG/条件边问题** | "流程停顿"、"汇合阻塞"、"节点不应执行"、"OR-join" | Lesson 4: DAG AND-join 阻塞 |
 | **异步/时序问题** | "数据没到"、"顺序错误"、"竞态"、"依赖" | Lesson 1: 异步依赖链 |
 
 ## 排查顺序（强制执行）

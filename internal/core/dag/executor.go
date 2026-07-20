@@ -50,6 +50,7 @@ type Executor struct {
 	dag           *DAG
 	evalCondition ConditionEvaluator
 	results       map[string]*Output
+	skipped       map[string]bool // nodes skipped due to conditional edge (not failed)
 	mu            sync.RWMutex
 	traceHook     TraceHook
 	traceSceneID  snowflake.ID
@@ -73,6 +74,7 @@ func NewExecutor(d *DAG, opts ...ExecutorOption) *Executor {
 	e := &Executor{
 		dag:     d,
 		results: make(map[string]*Output),
+		skipped: make(map[string]bool),
 		evalCondition: func(_ context.Context, _ string, _ *Output) bool {
 			return true
 		},
@@ -135,6 +137,7 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 			// Wait for all parent nodes to signal readiness.
 			inEdges := e.dag.InEdges(n.ID())
 			parentFailed := false
+			hasActiveParent := false
 			if e.logWarn != nil {
 				e.logWarn("node waiting for parents",
 					"node_id", n.ID(),
@@ -145,27 +148,100 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 				parentSig := signals[edge.From]
 				select {
 				case <-parentSig:
-					// Check if parent actually succeeded by checking results map.
 					e.mu.RLock()
 					parentOutput, parentSucceeded := e.results[edge.From]
 					e.mu.RUnlock()
-					if !parentSucceeded {
-						parentFailed = true
-					}
-					if e.logWarn != nil {
-						outputDebug := "<no result>"
-						if parentSucceeded && parentOutput != nil {
-							outputDebug = fmt.Sprintf("%v", parentOutput.Response)
+
+					if edge.Type == EdgeCondition {
+						// For conditional edges, a skipped parent is expected
+						// when the condition is not met. This is OR-join
+						// semantics: a skipped conditional parent does NOT
+						// block the child. If the parent was skipped (no
+						// result in map), this edge is inactive.
+						if !parentSucceeded {
+							if e.logWarn != nil {
+								e.logWarn("conditional parent skipped (expected)",
+									"node_id", n.ID(),
+									"parent_id", edge.From,
+									"condition", edge.Condition,
+								)
+							}
+							continue
 						}
-						e.logWarn("parent signal received",
-							"node_id", n.ID(),
-							"parent_id", edge.From,
-							"edge_type", edge.Type,
-							"condition", edge.Condition,
-							"parent_succeeded", parentSucceeded,
-							"parent_failed_so_far", parentFailed,
-							"parent_output", outputDebug,
-						)
+						// Parent executed — evaluate the condition.
+						if e.logWarn != nil {
+							outputDebug := "<nil>"
+							if parentOutput != nil {
+								outputDebug = fmt.Sprintf("%v", parentOutput.Response)
+							}
+							e.logWarn("evaluating conditional edge",
+								"condition", edge.Condition,
+								"edge_from", edge.From,
+								"edge_to", edge.To,
+								"current_node", n.ID(),
+								"parent_output_nil", parentOutput == nil,
+								"parent_output_response", outputDebug,
+							)
+						}
+
+						conditionMet := true
+						func() {
+							defer func() {
+								if r := recover(); r != nil {
+									if e.logError != nil {
+										e.logError("condition evaluation panicked",
+											"condition", edge.Condition,
+											"edge_from", edge.From,
+											"edge_to", edge.To,
+											"panic", fmt.Sprintf("%v", r),
+											"stacktrace", string(debug.Stack()),
+										)
+									}
+									conditionMet = false
+								}
+							}()
+							conditionMet = e.evalCondition(ctx, edge.Condition, parentOutput)
+						}()
+
+						if conditionMet {
+							hasActiveParent = true
+						}
+						// Condition not met → this edge is inactive, but
+						// don't skip the node yet; other edges may provide
+						// an active path (OR-join).
+					} else {
+						// Normal edge: parent must succeed.
+						// If the parent was skipped (due to conditional edge
+						// upstream), treat this edge as inactive rather than
+						// failed — OR-join semantics.
+						if !parentSucceeded {
+							e.mu.RLock()
+							isSkipped := e.skipped[edge.From]
+							e.mu.RUnlock()
+							if isSkipped {
+								// Parent was conditionally skipped, not failed.
+								// This edge is inactive, don't set parentFailed.
+							} else {
+								parentFailed = true
+							}
+						} else {
+							hasActiveParent = true
+						}
+						if e.logWarn != nil {
+							outputDebug := "<no result>"
+							if parentSucceeded && parentOutput != nil {
+								outputDebug = fmt.Sprintf("%v", parentOutput.Response)
+							}
+							e.logWarn("parent signal received",
+								"node_id", n.ID(),
+								"parent_id", edge.From,
+								"edge_type", edge.Type,
+								"condition", edge.Condition,
+								"parent_succeeded", parentSucceeded,
+								"parent_failed_so_far", parentFailed,
+								"parent_output", outputDebug,
+							)
+						}
 					}
 				case <-ctx.Done():
 					errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
@@ -173,68 +249,29 @@ func (e *Executor) Execute(ctx context.Context) (*Output, error) {
 					close(sig)
 					return
 				}
-
-				// For conditional edges, evaluate the condition.
-				if edge.Type == EdgeCondition {
-					e.mu.RLock()
-					parentOutput := e.results[edge.From]
-					e.mu.RUnlock()
-
-					if e.logWarn != nil {
-						outputDebug := "<nil>"
-						if parentOutput != nil {
-							outputDebug = fmt.Sprintf("%v", parentOutput.Response)
-						}
-						e.logWarn("evaluating conditional edge",
-							"condition", edge.Condition,
-							"edge_from", edge.From,
-							"edge_to", edge.To,
-							"current_node", n.ID(),
-							"parent_output_nil", parentOutput == nil,
-							"parent_output_response", outputDebug,
-						)
-					}
-
-					conditionMet := true
-					func() {
-						defer func() {
-							if r := recover(); r != nil {
-								if e.logError != nil {
-									e.logError("condition evaluation panicked",
-										"condition", edge.Condition,
-										"edge_from", edge.From,
-										"edge_to", edge.To,
-										"panic", fmt.Sprintf("%v", r),
-										"stacktrace", string(debug.Stack()),
-									)
-								}
-								conditionMet = false
-							}
-						}()
-						conditionMet = e.evalCondition(ctx, edge.Condition, parentOutput)
-					}()
-
-					if !conditionMet {
-						if e.logWarn != nil {
-							e.logWarn("condition not met, skipping node",
-								"condition", edge.Condition,
-								"edge_from", edge.From,
-								"edge_to", edge.To,
-							)
-						}
-						close(sig)
-						return
-					}
-				}
 			}
 
-			// Skip this node if any parent failed.
-			if parentFailed {
+			// Skip this node if any normal-edge parent failed.
+			// If the node has parents but none are active (all conditional
+			// edges were not met or parents skipped), also skip — no path
+			// leads here. Nodes with zero parents (entry nodes) always execute.
+			if len(inEdges) > 0 && (parentFailed || !hasActiveParent) {
 				if e.logWarn != nil {
-					e.logWarn("skipping node due to parent failure",
+					reason := "parent failed"
+					if !hasActiveParent && !parentFailed {
+						reason = "no active parent path"
+					}
+					e.logWarn("skipping node: "+reason,
 						"node_id", n.ID(),
+						"parent_failed", parentFailed,
+						"has_active_parent", hasActiveParent,
 					)
 				}
+				// Record this node as skipped so downstream merge nodes
+				// can distinguish conditional skips from actual failures.
+				e.mu.Lock()
+				e.skipped[n.ID()] = true
+				e.mu.Unlock()
 				close(sig)
 				return
 			}
