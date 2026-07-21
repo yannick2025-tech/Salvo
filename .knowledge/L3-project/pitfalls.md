@@ -370,3 +370,57 @@ grep "node execution" salvo.log | grep -v "started" | head -30
 - 所有 if-else 分支后汇合的场景都需要 OR-join
 - AND-join 在 if-else 场景下必然阻塞（非活跃分支永不执行）
 - **YAML 编排灵活性依赖于 OR-join 支持**
+
+---
+
+## Lesson 5: dagre 固定节点尺寸导致 DAG 一键美化后重叠 (2026-07-21)
+
+### 现象
+DAG 编辑器一键美化后，展开的 group/while 节点与周围节点和连线重叠，放大后仍需手动拖动才能看清。
+
+### 根因分析
+dagre 布局引擎不支持变长节点尺寸。所有节点统一使用 300×90 的固定尺寸计算布局，但展开的 group 节点（含子节点）和 while 节点（含步骤）实际渲染高度远超 90px，导致布局计算出的位置与实际渲染冲突。
+
+### 修复方案
+替换 dagre 为 ELK (Eclipse Layout Kernel)：
+- ELK 原生支持变长节点尺寸，每个节点传入实际 width/height
+- 展开的 group 节点根据子节点数量动态计算高度
+- 展开的 while 节点根据步骤数量动态计算高度
+- ELK 的 layered 算法 + BRANDES_KOEPF 策略减少边交叉
+
+### Lessons Learned
+
+#### 1. 布局引擎必须支持变长节点
+- DAG 中节点尺寸不统一时（尤其是可展开/折叠节点），固定尺寸布局引擎必然产生重叠
+- ELK 和 dagre 的 API 模式不同：ELK 是 async（返回 Promise），dagre 是 sync
+
+#### 2. 异步布局需要调整调用方式
+- `buildLayout()` 从同步变为异步（`async/await`）
+- `applyLayout()` 和 `autoLayout()` 也需要 await
+- VueFlow 的 watch 回调中调用 async 函数不会阻塞，无需特殊处理
+
+---
+
+## Lesson 6: WebSocket 实时状态推送注意事项 (2026-07-21)
+
+### 注意事项
+
+#### 1. gorilla/websocket 的 ReadPump/WritePump 必须分离 goroutine
+- 每个连接需要独立的 ReadPump 和 WritePump goroutine
+- WritePump 负责 ticker 心跳（30s），ReadPump 负责 pong 检测
+- 不能在同一个 goroutine 中同时读写
+
+#### 2. Hub 必须通过 channel 管理 Client 生命周期
+- Register/Unregister 通过 channel 传递，避免 map 并发访问
+- Client 断连时必须在 Hub 中清理订阅，否则内存泄漏
+- maxClients 限制防止连接风暴
+
+#### 3. 广播消息格式要统一
+- span_update 事件格式：`{ type, run_id, chain_id, node_id, status, duration_ns, error, loop_index }`
+- 循环节点的中间事件（status=running + loop_index）需要在每次迭代开始时广播
+- 前端需要同时处理 running 中间事件和最终 completion 事件
+
+#### 4. 前端 WS 重连要指数退避
+- 断线后 1s → 2s → 4s → ... → 最大 30s
+- 重连后必须重新发送 subscribe 消息
+- onUnmounted 时断开连接，防止内存泄漏

@@ -24,6 +24,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
 	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
+	"github.com/yannick2025-tech/Salvo/internal/ws"
 )
 
 type Server struct {
@@ -36,6 +37,7 @@ type Server struct {
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker
 	webDir     string
+	wsHub      *ws.Hub
 }
 
 type Config struct {
@@ -49,6 +51,9 @@ type Config struct {
 }
 
 func New(cfg Config) *Server {
+	// Create the WebSocket Hub early so it can be wired into the tracer.
+	wsHub := ws.NewHub()
+
 	h := &Handler{
 		log:        cfg.Logger,
 		scenes:     sqlite.NewSceneRepo(cfg.DB),
@@ -75,6 +80,18 @@ func New(cfg Config) *Server {
 	tracer, err := tracelib.NewTracer(tracelib.Config{
 		BufferSize: 1000,
 		Persister:  h.traceStore,
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			wsHub.BroadcastToRun(runID, ws.Message{
+				Type:       "span_update",
+				RunID:      runID,
+				ChainID:    chainID,
+				NodeID:     nodeID,
+				Status:     status,
+				DurationNs: durationNs,
+				Error:      errMsg,
+				LoopIndex:  loopIndex,
+			})
+		},
 	})
 	if err != nil {
 		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
@@ -114,7 +131,10 @@ func New(cfg Config) *Server {
 		jwt:     cfg.JWT,
 		rbac:    cfg.RBAC,
 		webDir:  cfg.WebDir,
+		wsHub:   wsHub,
 	}
+
+	go s.wsHub.Run()
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
@@ -276,6 +296,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/roles/create", s.handleAuth(s.handler.CreateRole))
 	mux.HandleFunc("POST /api/v1/roles/update", s.handleAuth(s.handler.UpdateRole))
 	mux.HandleFunc("POST /api/v1/roles/delete", s.handleAuth(s.handler.DeleteRole))
+
+	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
+		ws.ServeWs(s.wsHub, w, r)
+	})
 
 	if s.webDir != "" {
 		s.registerSPA(mux)

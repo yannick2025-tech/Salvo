@@ -257,3 +257,149 @@ func TestTraceConcurrentSpans(t *testing.T) {
 	tr, _ := tracer.Get(tctx.TraceID())
 	assert.Len(t, tr.Spans, 10)
 }
+
+type broadcastCall struct {
+	runID      string
+	chainID    string
+	nodeID     string
+	status     string
+	durationNs int64
+	errMsg     string
+	loopIndex  int
+}
+
+func TestTracer_BroadcastOnFinish(t *testing.T) {
+	var calls []broadcastCall
+	tracer, err := NewTracer(Config{
+		BufferSize: 100,
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			calls = append(calls, broadcastCall{
+				runID:      runID,
+				chainID:    chainID,
+				nodeID:     nodeID,
+				status:     status,
+				durationNs: durationNs,
+				errMsg:     errMsg,
+				loopIndex:  loopIndex,
+			})
+		},
+	})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	span := tctx.StartSpan("node-X")
+	span.SetChainID("chain-1")
+	span.Finish(`{"status":200}`, nil)
+	tctx.Finish()
+
+	require.Len(t, calls, 1)
+	assert.Equal(t, runID.String(), calls[0].runID)
+	assert.Equal(t, "chain-1", calls[0].chainID)
+	assert.Equal(t, "node-X", calls[0].nodeID)
+	assert.Equal(t, "ok", calls[0].status)
+	assert.Equal(t, "", calls[0].errMsg)
+	assert.Equal(t, 0, calls[0].loopIndex)
+}
+
+func TestTracer_BroadcastOnFinishWithError(t *testing.T) {
+	var calls []broadcastCall
+	tracer, err := NewTracer(Config{
+		BufferSize: 100,
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			calls = append(calls, broadcastCall{
+				runID:      runID,
+				chainID:    chainID,
+				nodeID:     nodeID,
+				status:     status,
+				durationNs: durationNs,
+				errMsg:     errMsg,
+				loopIndex:  loopIndex,
+			})
+		},
+	})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	span := tctx.StartSpan("node-err")
+	span.SetChainID("chain-2")
+	span.Finish("", errors.New("timeout"))
+	tctx.Finish()
+
+	require.Len(t, calls, 1)
+	assert.Equal(t, runID.String(), calls[0].runID)
+	assert.Equal(t, "chain-2", calls[0].chainID)
+	assert.Equal(t, "node-err", calls[0].nodeID)
+	assert.Equal(t, "error", calls[0].status)
+	assert.Equal(t, "timeout", calls[0].errMsg)
+	assert.Equal(t, 0, calls[0].loopIndex)
+}
+
+func TestTracer_BroadcastOnSkip(t *testing.T) {
+	var calls []broadcastCall
+	tracer, err := NewTracer(Config{
+		BufferSize: 100,
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			calls = append(calls, broadcastCall{
+				runID:      runID,
+				chainID:    chainID,
+				nodeID:     nodeID,
+				status:     status,
+				durationNs: durationNs,
+				errMsg:     errMsg,
+				loopIndex:  loopIndex,
+			})
+		},
+	})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	span := tctx.StartSpan("node-skip")
+	span.SetChainID("chain-3")
+	span.Skip("condition not met")
+	tctx.Finish()
+
+	require.Len(t, calls, 1)
+	assert.Equal(t, runID.String(), calls[0].runID)
+	assert.Equal(t, "chain-3", calls[0].chainID)
+	assert.Equal(t, "node-skip", calls[0].nodeID)
+	assert.Equal(t, "skip", calls[0].status)
+	assert.Equal(t, "condition not met", calls[0].errMsg)
+	assert.Equal(t, 0, calls[0].loopIndex)
+}
+
+func TestTracer_BroadcastOnCanceled(t *testing.T) {
+	var calls []broadcastCall
+	tracer, err := NewTracer(Config{
+		BufferSize: 100,
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			calls = append(calls, broadcastCall{
+				runID:      runID,
+				chainID:    chainID,
+				nodeID:     nodeID,
+				status:     status,
+				durationNs: durationNs,
+				errMsg:     errMsg,
+				loopIndex:  loopIndex,
+			})
+		},
+	})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	span := tctx.StartSpan("node-cancel")
+	span.SetChainID("chain-4")
+	span.FinishCanceled("", errors.New("manual stop"))
+	tctx.Finish()
+
+	require.Len(t, calls, 1)
+	assert.Equal(t, runID.String(), calls[0].runID)
+	assert.Equal(t, "chain-4", calls[0].chainID)
+	assert.Equal(t, "node-cancel", calls[0].nodeID)
+	assert.Equal(t, "canceled", calls[0].status)
+	assert.Equal(t, "manual stop", calls[0].errMsg)
+	assert.Equal(t, 0, calls[0].loopIndex)
+}

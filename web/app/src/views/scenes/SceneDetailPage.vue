@@ -48,6 +48,8 @@
             v-else
             :nodes="nodes"
             :edges="edges"
+            :is-running="isSceneRunning"
+            :run-id="currentRunId"
             @edit="editNode"
             @delete-node="handleDeleteNode"
             @add-edge="onDagAddEdge"
@@ -649,7 +651,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene, batchSetVariables, listScenes } from '@/api/scene'
+import { getScene, createScene, startScene, batchSetVariables, listScenes, sceneStatus } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
 import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
@@ -669,6 +671,12 @@ const scene = ref<SceneDTO | null>(null)
 const nodes = ref<NodeDTO[]>([])
 const edges = ref<EdgeDTO[]>([])
 const selectedNode = ref<NodeDTO | null>(null)
+const currentRunId = ref('')
+
+const isSceneRunning = computed(() => {
+  if (route.query.mode === 'exec') return true
+  return scene.value?.status === 'running'
+})
 
 const showRunConfig = ref(false)
 const showCopyModal = ref(false)
@@ -1302,6 +1310,23 @@ async function fetchScene() {
       if (resp.data.variables) {
         varEntries.value = parseVariables(resp.data.variables)
       }
+      // If scene is running and we don't have a runId, fetch status to get it
+      if (resp.data.status === 'running' && !currentRunId.value) {
+        fetchRunId(id)
+      }
+      // Clear runId if scene is no longer running
+      if (resp.data.status !== 'running' && currentRunId.value) {
+        currentRunId.value = ''
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+async function fetchRunId(sceneId: string) {
+  try {
+    const resp = await sceneStatus(sceneId)
+    if (resp.code === 0 && resp.data?.run_id) {
+      currentRunId.value = resp.data.run_id
     }
   } catch { /* ignore */ }
 }
@@ -1776,6 +1801,12 @@ async function handleStart() {
       duration: runConfig.duration,
     })
     if (resp.code === 0) {
+      // Store run_id for execution status tracking
+      if (resp.data?.run_id) {
+        currentRunId.value = resp.data.run_id
+      }
+      // Refresh scene to get updated status
+      fetchScene()
       showToast('测试已启动')
       showRunConfig.value = false
       router.push('/runner')

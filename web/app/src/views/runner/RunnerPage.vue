@@ -65,6 +65,7 @@
                     @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
               {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
             </button>
+            <button class="btn-sm progress" @click="viewProgress(run.scene_id)">实时进度</button>
           </div>
         </div>
         
@@ -150,11 +151,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
 import { useAuthStore } from '@/stores/auth'
 import type { SceneDTO, RunRecordDTO } from '@/types'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const canRunScene = computed(() => authStore.canAccess(['scene:run']))
 
@@ -324,6 +327,10 @@ function getSceneName(sceneId: string): string {
   return scene?.name || `Scene #${sceneId}`
 }
 
+function viewProgress(sceneId: string) {
+  router.push(`/scenes/${sceneId}?mode=exec`)
+}
+
 onMounted(() => {
   fetchScenes()
   fetchRuns()
@@ -376,6 +383,16 @@ onUnmounted(() => {
 
 .btn-sm.danger:hover {
   background: var(--accent-danger);
+  color: #fff;
+}
+
+.btn-sm.progress {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-sm.progress:hover {
+  background: var(--accent-primary);
   color: #fff;
 }
 

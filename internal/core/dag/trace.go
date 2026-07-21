@@ -61,6 +61,8 @@ type SpanContext interface {
 	FinishCanceled(output string, err error)
 	// Skip marks the span as skipped.
 	Skip(reason string)
+	// Running broadcasts a "running" event for the given loop iteration.
+	Running(nodeID string, loopIndex int)
 }
 
 // --- Adapters for the trace package ---
@@ -137,6 +139,11 @@ func (s *spanAdapter) FinishCanceled(output string, err error) {
 // Skip marks the span as skipped.
 func (s *spanAdapter) Skip(reason string) {
 	s.builder.Skip(reason)
+}
+
+// Running broadcasts a "running" event for the given loop iteration.
+func (s *spanAdapter) Running(nodeID string, loopIndex int) {
+	s.builder.BroadcastRunning(loopIndex)
 }
 
 // WithTraceHook adds a trace hook to the executor. When set, the executor
@@ -321,6 +328,8 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 			var lastOutput *Output
 			for i := 0; i < loopCount; i++ {
+				span.Running(n.ID(), i)
+
 				select {
 				case <-ctx.Done():
 					// Manual cancel → span shows as "canceled" (warn);

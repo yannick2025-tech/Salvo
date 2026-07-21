@@ -38,6 +38,7 @@
             <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
             <td class="actions">
               <button class="btn-sm" :class="{ disabled: isSceneRunning(s) || !canWriteScene }" :disabled="isSceneRunning(s) || !canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="editScene(s)">编辑</button>
+              <button class="btn-sm progress" :class="{ disabled: !isSceneRunning(s) }" :disabled="!isSceneRunning(s)" @click="viewProgress(s)">实时进度</button>
               <button class="btn-sm danger" :class="{ disabled: !canWriteScene }" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有删除权限'" @click="handleDelete(s.id)">删除</button>
             </td>
           </tr>
@@ -736,6 +737,10 @@ function editScene(s: SceneDTO) {
   router.push(`/scenes/${s.id}`)
 }
 
+function viewProgress(s: SceneDTO) {
+  router.push(`/scenes/${s.id}?mode=exec`)
+}
+
 function loadExample() {
   importForm.yaml = exampleYAML
   importForm.name = ''
@@ -904,6 +909,22 @@ onMounted(() => {
 .btn-sm.danger {
   color: var(--accent-danger);
   border-color: var(--accent-danger);
+}
+
+.btn-sm.progress {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-sm.progress:hover:not(.disabled) {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.btn-sm.progress.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-sm.danger:hover {

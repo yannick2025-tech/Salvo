@@ -31,6 +31,10 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 )
 
+// BroadcastFunc is called after a span is recorded to broadcast the
+// event to external subscribers (e.g. via WebSocket).
+type BroadcastFunc func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int)
+
 // SpanStatus represents the outcome of a span execution.
 type SpanStatus string
 
@@ -176,6 +180,7 @@ func (b *SpanBuilder) Finish(output string, err error) {
 	}
 
 	b.ctx.trace.AddSpan(b.span)
+	b.emitBroadcast(string(b.span.Status), 0)
 }
 
 // Skip marks the span as skipped (e.g. conditional edge not taken).
@@ -185,6 +190,7 @@ func (b *SpanBuilder) Skip(reason string) {
 	b.span.Status = SpanStatusSkip
 	b.span.Error = reason
 	b.ctx.trace.AddSpan(b.span)
+	b.emitBroadcast(string(b.span.Status), 0)
 }
 
 // FinishCanceled completes the span with a "canceled" status, used when
@@ -198,6 +204,24 @@ func (b *SpanBuilder) FinishCanceled(output string, err error) {
 		b.span.Error = err.Error()
 	}
 	b.ctx.trace.AddSpan(b.span)
+	b.emitBroadcast(string(b.span.Status), 0)
+}
+
+// BroadcastRunning emits a "running" event for a span that is about to
+// start a loop iteration. This allows subscribers to see intermediate
+// progress during multi-iteration node execution.
+func (b *SpanBuilder) BroadcastRunning(loopIndex int) {
+	b.emitBroadcast("running", loopIndex)
+}
+
+// emitBroadcast calls the tracer's broadcast function if set.
+func (b *SpanBuilder) emitBroadcast(status string, loopIndex int) {
+	fn := b.ctx.tracer.broadcast
+	if fn == nil {
+		return
+	}
+	runID := b.ctx.trace.RunID.String()
+	fn(runID, b.span.ChainID, b.span.NodeID, status, int64(b.span.Duration), b.span.Error, loopIndex)
 }
 
 // Config holds the configuration for a Tracer.
@@ -209,6 +233,10 @@ type Config struct {
 	// Persister is an optional hook for persisting traces to long-term
 	// storage (e.g. SQLite). Called after each trace is recorded.
 	Persister TracePersister
+
+	// Broadcast is an optional hook called after each span is recorded
+	// to push the event to external subscribers (e.g. WebSocket clients).
+	Broadcast BroadcastFunc
 }
 
 // TracePersister is the interface for persisting traces to long-term storage.
@@ -223,6 +251,7 @@ type Tracer struct {
 	mu        sync.RWMutex
 	node      *snowflake.Node
 	persister TracePersister
+	broadcast BroadcastFunc
 }
 
 // NewTracer creates a new Tracer with the given configuration.
@@ -241,6 +270,7 @@ func NewTracer(cfg Config) (*Tracer, error) {
 		buffer:    make([]*Trace, 0, cfg.BufferSize),
 		node:      n,
 		persister: cfg.Persister,
+		broadcast: cfg.Broadcast,
 	}, nil
 }
 

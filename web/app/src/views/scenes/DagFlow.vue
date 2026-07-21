@@ -12,10 +12,10 @@
       :fit-view-options="{ padding: 0.25 }"
       :min-zoom="0.1"
       :max-zoom="2"
-      :nodes-draggable="true"
-      :nodes-connectable="true"
+      :nodes-draggable="!isRunning"
+      :nodes-connectable="!isRunning"
       :elements-selectable="true"
-      :edges-updatable="true"
+      :edges-updatable="!isRunning"
       class="vue-flow-canvas"
       ref="vueFlowRef"
       @node-click="onNodeClick"
@@ -29,10 +29,30 @@
       <Controls position="bottom-left" :show-interactive="false" />
       <MiniMap :node-stroke-color="minimapNodeStroke as any" :node-color="minimapNodeColor as any" pannable zoomable />
 
-      <template #node-scene-node="props">
-        <SceneNode v-bind="props" @edit="$emit('edit', $event)" @delete="$emit('deleteNode', $event)" />
+      <template #node-scene-node="nodeProps">
+        <SceneNode
+          v-bind="nodeProps"
+          :execution-status="getNodeExecStatus(nodeProps.id)"
+          :chain-status="getNodeChainStatus(nodeProps.id)"
+          :loop-progress="getNodeLoopProgress(nodeProps.id)"
+          :view-mode="execViewMode"
+          @edit="$emit('edit', $event)"
+          @delete="$emit('deleteNode', $event)"
+        />
       </template>
     </VueFlow>
+
+    <!-- Execution view mode toolbar (shown when running) -->
+    <div v-if="isRunning" class="exec-toolbar">
+      <button :class="['exec-tab', { active: execViewMode === 'aggregate' }]" @click="switchView('aggregate')">聚合视图</button>
+      <button :class="['exec-tab', { active: execViewMode === 'chain' }]" @click="switchView('chain')">单链路视图</button>
+      <select v-if="execViewMode === 'chain'" class="chain-select" :value="selectedChainId || ''" @change="onChainSelect">
+        <option value="" disabled>选择链路</option>
+        <option v-for="cid in chainIds" :key="cid" :value="cid">{{ cid }}</option>
+      </select>
+      <div v-if="wsConnected" class="ws-indicator connected" title="WebSocket 已连接">●</div>
+      <div v-else class="ws-indicator disconnected" title="WebSocket 已断开">●</div>
+    </div>
 
     <div class="dag-toolbar">
       <button class="toolbar-btn" title="自动美化布局" @click="autoLayout">
@@ -65,10 +85,12 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge, Connection, NodeChange } from '@vue-flow/core'
-import dagre from 'dagre'
+import ELK from 'elkjs/lib/elk.bundled.js'
 import SceneNode from './DagSceneNode.vue'
 import { getDagIcon } from './dagIcons'
 import type { NodeDTO, EdgeDTO } from '@/types'
+import { useExecutionWs } from '@/composables/useExecutionWs'
+import { useExecutionStatus, type ViewMode } from '@/composables/useExecutionStatus'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -78,6 +100,8 @@ const props = defineProps<{
   nodes: NodeDTO[]
   edges: EdgeDTO[]
   dataSources?: { name: string; columns: string[]; rows: Record<string, string>[] }[]
+  isRunning?: boolean
+  runId?: string
 }>()
 
 const emit = defineEmits<{
@@ -96,6 +120,94 @@ const nodeTypes: Record<string, any> = {
 
 const { fitView } = useVueFlow()
 
+// ===== Execution status composables =====
+const { spanUpdates, isConnected: wsConnected, connect: wsConnect, disconnect: wsDisconnect } = useExecutionWs()
+const {
+  aggregateStatus,
+  chainStatuses,
+  loopProgress,
+  viewMode: execViewMode,
+  selectedChainId,
+  computeAggregateStatus,
+  switchView,
+  selectChain,
+} = useExecutionStatus(spanUpdates)
+
+const chainIds = computed(() => Array.from(chainStatuses.value.keys()))
+
+function onChainSelect(e: Event) {
+  const val = (e.target as HTMLSelectElement).value
+  if (val) selectChain(val)
+}
+
+// Compute node badges for current nodes
+const nodeBadges = computed(() => computeAggregateStatus(props.nodes))
+
+function getNodeExecStatus(nodeId: string) {
+  if (!props.isRunning) return undefined
+  return aggregateStatus.value.get(nodeId) || undefined
+}
+
+function getNodeChainStatus(nodeId: string) {
+  if (!props.isRunning || execViewMode.value !== 'chain' || !selectedChainId.value) return undefined
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (!chainMap) return undefined
+  return chainMap.get(nodeId) ?? null
+}
+
+function getNodeLoopProgress(nodeId: string) {
+  if (!props.isRunning || !selectedChainId.value) return undefined
+  const chainLoopMap = loopProgress.value.get(selectedChainId.value)
+  if (!chainLoopMap) return undefined
+  return chainLoopMap.get(nodeId) || undefined
+}
+
+// Connect/disconnect WS based on runId
+watch(() => props.runId, (newRunId) => {
+  if (newRunId) {
+    wsConnect(newRunId)
+  } else {
+    wsDisconnect()
+  }
+}, { immediate: true })
+
+// Active chain edges for single chain view edge styling
+const activeChainEdgeIds = computed(() => {
+  if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
+  // In chain mode, all edges connected to nodes in the selected chain are "active"
+  const chainNodeIds = new Set<string>()
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (chainMap) {
+    for (const nodeId of chainMap.keys()) {
+      chainNodeIds.add(nodeId)
+    }
+  }
+  const activeIds = new Set<string>()
+  for (const e of props.edges) {
+    if (chainNodeIds.has(e.from_node) && chainNodeIds.has(e.to_node)) {
+      activeIds.add(e.id)
+    }
+  }
+  return activeIds
+})
+
+const runningChainEdgeIds = computed(() => {
+  if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (!chainMap) return new Set<string>()
+  const runningNodeIds = new Set<string>()
+  for (const [nodeId, status] of chainMap) {
+    if (status === 'running') runningNodeIds.add(nodeId)
+  }
+  const runningIds = new Set<string>()
+  for (const e of props.edges) {
+    if (runningNodeIds.has(e.from_node) || runningNodeIds.has(e.to_node)) {
+      runningIds.add(e.id)
+    }
+  }
+  return runningIds
+})
+
 const defaultEdgeOptions = computed(() => ({
   type: 'smoothstep',
   style: { stroke: 'var(--text-tertiary)', strokeWidth: 2 },
@@ -111,45 +223,66 @@ function getNodeIcon(type: string) {
   return getDagIcon(type)
 }
 
-function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x: number; y: number }> {
+const elk = new ELK()
+
+function getNodeDimensions(n: NodeDTO): { width: number; height: number } {
+  const DEFAULT_W = 280
+  const DEFAULT_H = 56
+  try {
+    const cfg = JSON.parse(n.config || '{}')
+    if (n.type === 'group' && cfg.node_ids && Array.isArray(cfg.node_ids)) {
+      const childCount = cfg.node_ids.length
+      // header (56) + children area (each child ~40px + 22px arrow) + padding
+      return { width: 320, height: DEFAULT_H + childCount * 62 + 24 }
+    }
+    if (n.type === 'while' && cfg.steps && Array.isArray(cfg.steps)) {
+      const stepCount = cfg.steps.length
+      // header (56) + loop indicator (30) + steps (each step ~40px + 22px arrow) + padding
+      return { width: 300, height: DEFAULT_H + stepCount * 62 + 54 }
+    }
+  } catch { /* ignore */ }
+  return { width: DEFAULT_W, height: DEFAULT_H }
+}
+
+async function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Promise<Map<string, { x: number; y: number }>> {
   const positions = new Map<string, { x: number; y: number }>()
   if (newNodes.length === 0) return positions
 
-  const g = new dagre.graphlib.Graph()
-  g.setGraph({
-    rankdir: 'TB',
-    nodesep: 60,
-    ranksep: 100,
-    edgesep: 30,
-    marginx: 20,
-    marginy: 20,
+  const elkNodes = newNodes.map(n => {
+    const dims = getNodeDimensions(n)
+    return { id: n.id, width: dims.width, height: dims.height }
   })
-  g.setDefaultEdgeLabel(() => ({}))
-
-  const NODE_W = 300
-  const NODE_H = 90
-
-  for (const n of newNodes) {
-    g.setNode(n.id, { width: NODE_W, height: NODE_H })
-  }
 
   const nodeIds = new Set(newNodes.map(n => n.id))
-  for (const e of newEdges) {
-    if (nodeIds.has(e.from_node) && nodeIds.has(e.to_node)) {
-      g.setEdge(e.from_node, e.to_node)
-    }
+  const elkEdges = newEdges
+    .filter(e => nodeIds.has(e.from_node) && nodeIds.has(e.to_node))
+    .map(e => ({ id: e.id, sources: [e.from_node], targets: [e.to_node] }))
+
+  const graph = {
+    id: 'root',
+    layoutOptions: {
+      'org.eclipse.elk.algorithm': 'layered',
+      'org.eclipse.elk.direction': 'DOWN',
+      'org.eclipse.elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+      'org.eclipse.elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'org.eclipse.elk.spacing.nodeNode': '70',
+      'org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers': '110',
+      'org.eclipse.elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'org.eclipse.elk.edgeRouting': 'ORTHOGONAL',
+      'org.eclipse.elk.layered.nodePlacement.favorStraightEdges': 'true',
+      'org.eclipse.elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+    },
+    children: elkNodes,
+    edges: elkEdges,
   }
 
-  dagre.layout(g)
+  const result = await elk.layout(graph)
 
-  for (const n of newNodes) {
-    const node = g.node(n.id)
-    if (node) {
-      positions.set(n.id, {
-        x: node.x - NODE_W / 2,
-        y: node.y - NODE_H / 2,
-      })
-    }
+  for (const child of result.children || []) {
+    positions.set(child.id, {
+      x: child.x || 0,
+      y: child.y || 0,
+    })
   }
 
   return positions
@@ -159,8 +292,8 @@ const vfNodes = ref<Node[]>([])
 const vfEdges = ref<Edge[]>([])
 const handleOverrides = ref<Map<string, { sourceHandle: string; targetHandle: string }>>(new Map())
 
-function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
-  const layoutPositions = buildLayout(newNodes, newEdges)
+async function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
+  const layoutPositions = await buildLayout(newNodes, newEdges)
 
   vfNodes.value = newNodes.map(n => {
     const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
@@ -208,6 +341,8 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
     let markerEnd: string | { type: MarkerType; color: string } = MarkerType.ArrowClosed
     let strokeColor = 'var(--text-tertiary)'
     let edgeType = 'smoothstep'
+    let animated = false
+    let edgeOpacity: number | undefined = undefined
 
     if (e.condition === '__if_true__') {
       markerEnd = { type: MarkerType.ArrowClosed, color: '#2ecc71' }
@@ -215,6 +350,19 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
     } else if (e.condition === '__if_false__') {
       markerEnd = { type: MarkerType.ArrowClosed, color: '#e74c3c' }
       strokeColor = '#e74c3c'
+    }
+
+    // Single chain view edge styling
+    if (props.isRunning && execViewMode.value === 'chain' && selectedChainId.value) {
+      const isActive = activeChainEdgeIds.value.has(e.id)
+      const isRunningEdge = runningChainEdgeIds.value.has(e.id)
+      if (isRunningEdge) {
+        animated = true
+        strokeColor = 'var(--accent-primary)'
+        markerEnd = { type: MarkerType.ArrowClosed, color: 'var(--accent-primary)' }
+      } else if (!isActive) {
+        edgeOpacity = 0.15
+      }
     }
 
     const override = handleOverrides.value.get(e.id)
@@ -237,8 +385,8 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       labelBgStyle: { fill: 'var(--bg-secondary)' },
       labelBgPadding: [4, 8] as [number, number],
       labelBgBorderRadius: 6,
-      animated: false,
-      style: { stroke: strokeColor, strokeWidth: 2 },
+      animated,
+      style: { stroke: strokeColor, strokeWidth: 2, ...(edgeOpacity !== undefined ? { opacity: edgeOpacity } : {}) },
       markerEnd,
     } as Edge
   })
@@ -248,8 +396,15 @@ watch([() => props.nodes, () => props.edges], ([newNodes, newEdges]) => {
   applyLayout(newNodes, newEdges)
 }, { immediate: true })
 
-function autoLayout() {
-  applyLayout(props.nodes, props.edges)
+// Re-apply layout when execution status changes (for edge styling updates)
+watch([activeChainEdgeIds, runningChainEdgeIds, execViewMode, selectedChainId], () => {
+  if (props.isRunning) {
+    applyLayout(props.nodes, props.edges)
+  }
+})
+
+async function autoLayout() {
+  await applyLayout(props.nodes, props.edges)
   setTimeout(() => fitView({ padding: 0.2 }), 50)
   showToast('布局已重新排列', 'success')
 }
@@ -563,6 +718,83 @@ function minimapNodeColor(node: any) {
   height: 20px;
   background: var(--border-primary);
   margin: 0 2px;
+}
+
+/* ===== Execution toolbar ===== */
+.exec-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+}
+
+.exec-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.exec-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.exec-tab.active {
+  background: rgba(0,229,255,0.1);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.chain-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+  max-width: 160px;
+}
+
+.chain-select:focus {
+  border-color: var(--accent-primary);
+}
+
+.ws-indicator {
+  font-size: 10px;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.ws-indicator.connected {
+  color: var(--accent-success);
+}
+
+.ws-indicator.disconnected {
+  color: var(--accent-danger);
+  animation: exec-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes exec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .dag-toast {

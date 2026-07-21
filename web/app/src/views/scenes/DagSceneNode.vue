@@ -1,7 +1,24 @@
 <template>
-  <div :class="['scene-node', data.nodeType, { selected, expanded: isGroupExpanded || isWhileExpanded }]" :style="expandableNodeStyle">
+  <div :class="['scene-node', data.nodeType, chainStatusClass, { selected, expanded: isGroupExpanded || isWhileExpanded }]" :style="expandableNodeStyle">
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
+
+    <!-- Aggregated view badges (top-right) -->
+    <div v-if="executionStatus && viewMode === 'aggregate'" class="exec-badges">
+      <span v-if="executionStatus.pass > 0" class="exec-badge pass">✓{{ executionStatus.pass }}</span>
+      <span v-if="executionStatus.fail > 0" class="exec-badge fail">✗{{ executionStatus.fail }}</span>
+      <span v-if="executionStatus.skip > 0" class="exec-badge skip">⊘{{ executionStatus.skip }}</span>
+      <span v-if="executionStatus.running > 0" class="exec-badge running">⟳{{ executionStatus.running }}</span>
+      <span v-if="executionStatus.idle > 0" class="exec-badge idle">◦{{ executionStatus.idle }}</span>
+    </div>
+
+    <!-- Single chain status indicator (top-right) -->
+    <div v-if="chainStatus && viewMode === 'chain'" :class="['exec-status-dot', chainStatus]">
+      <span v-if="chainStatus === 'pass'">✓</span>
+      <span v-else-if="chainStatus === 'fail'">✗</span>
+      <span v-else-if="chainStatus === 'skip'">⊘</span>
+      <span v-else-if="chainStatus === 'running'">⟳</span>
+    </div>
 
     <div class="node-body" @click.stop="toggleExpand">
       <div :class="['node-icon-wrap', data.nodeType]">
@@ -26,6 +43,9 @@
         <button class="action-btn del" @click.stop="$emit('delete', id)" title="删除">✕</button>
       </div>
     </div>
+
+    <!-- Loop progress badge (bottom-right) -->
+    <div v-if="loopProgress" class="loop-progress-badge">L{{ loopProgress.current }}/{{ loopProgress.total }}</div>
 
     <div v-if="isGroupType && isGroupExpanded && hasChildren" ref="groupChildrenRef" class="group-children" @click.stop>
       <div
@@ -81,6 +101,7 @@ import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { Handle, Position, useVueFlow } from '@vue-flow/core'
 import { getDagIcon } from './dagIcons'
 import type { NodeDTO, EdgeDTO } from '@/types'
+import type { AggregateCounts, NodeStatus, LoopProgress, ViewMode } from '@/composables/useExecutionStatus'
 
 const props = defineProps<{
   id: string
@@ -96,6 +117,10 @@ const props = defineProps<{
     whileSteps?: { name: string; type: string }[]
   }
   selected?: boolean
+  executionStatus?: AggregateCounts
+  chainStatus?: NodeStatus | null
+  loopProgress?: LoopProgress
+  viewMode?: ViewMode
 }>()
 
 const emit = defineEmits<{
@@ -112,6 +137,11 @@ const groupChildrenRef = ref<HTMLDivElement | null>(null)
 
 const isGroupType = computed(() => props.data.nodeType === 'group')
 const isWhileType = computed(() => props.data.nodeType === 'while')
+
+const chainStatusClass = computed(() => {
+  if (!props.chainStatus || props.viewMode !== 'chain') return ''
+  return `exec-chain-${props.chainStatus}`
+})
 
 const hasChildren = computed(() =>
   isGroupType.value &&
@@ -219,6 +249,7 @@ function getNodeTypeLabel(type: string): string {
   box-shadow: var(--shadow-sm);
   transition: all 0.25s ease;
   font-family: inherit;
+  position: relative;
 }
 
 .scene-node:hover {
@@ -246,6 +277,96 @@ function getNodeTypeLabel(type: string): string {
 .scene-node.sub_flow { border-left: 3.5px solid #2980b9; }
 .scene-node.loop { border-left: 3.5px solid #d35400; }
 .scene-node.generator { border-left: 3.5px solid #00bcd4; }
+
+/* ====== Execution Status Overlays ====== */
+/* Aggregated view badges */
+.exec-badges {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 3px;
+  z-index: 10;
+}
+.exec-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.exec-badge.pass { background: rgba(46,204,113,0.18); color: #2ecc71; }
+.exec-badge.fail { background: rgba(231,76,60,0.16); color: #e74c3c; }
+.exec-badge.skip { background: rgba(241,196,15,0.16); color: #f1c40f; }
+.exec-badge.running { background: rgba(0,229,255,0.14); color: var(--accent-primary); animation: exec-pulse 1.5s ease-in-out infinite; }
+.exec-badge.idle { background: rgba(139,148,158,0.12); color: var(--text-tertiary); }
+
+@keyframes exec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Single chain status indicator dot */
+.exec-status-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  z-index: 10;
+}
+.exec-status-dot.pass { background: rgba(46,204,113,0.2); color: #2ecc71; }
+.exec-status-dot.fail { background: rgba(231,76,60,0.2); color: #e74c3c; }
+.exec-status-dot.skip { background: rgba(241,196,15,0.2); color: #f1c40f; }
+.exec-status-dot.running { background: rgba(0,229,255,0.18); color: var(--accent-primary); animation: exec-pulse 1.5s ease-in-out infinite; }
+
+/* Single chain view: node style overrides */
+.scene-node.exec-chain-pass {
+  border-left-color: #2ecc71 !important;
+  background: rgba(46,204,113,0.06) !important;
+}
+.scene-node.exec-chain-fail {
+  border-left-color: #e74c3c !important;
+  background: rgba(231,76,60,0.06) !important;
+}
+.scene-node.exec-chain-skip {
+  border-left-color: #f1c40f !important;
+  opacity: 0.7;
+}
+.scene-node.exec-chain-running {
+  animation: exec-border-pulse 1.5s ease-in-out infinite;
+  border-left-color: var(--accent-primary) !important;
+}
+.scene-node.exec-chain-idle {
+  opacity: 0.35;
+}
+
+@keyframes exec-border-pulse {
+  0%, 100% { border-color: var(--accent-primary); box-shadow: 0 0 0 0 rgba(0,229,255,0); }
+  50% { border-color: var(--accent-primary); box-shadow: 0 0 8px 2px rgba(0,229,255,0.3); }
+}
+
+/* Loop progress badge */
+.loop-progress-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(142,68,173,0.18);
+  color: #8e44ad;
+  letter-spacing: 0.03em;
+  z-index: 10;
+}
 
 .node-body {
   display: flex;
