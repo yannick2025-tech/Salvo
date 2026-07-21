@@ -352,10 +352,10 @@
         </div>
         <div class="form-group">
           <label>运行模式</label>
-          <select v-model="runConfig.run_mode">
-            <option value="count">按次数</option>
-            <option value="duration">按时间</option>
-          </select>
+          <CustomSelect
+            v-model="runConfig.run_mode"
+            :options="runModeOptions"
+          />
         </div>
         <div v-if="runConfig.run_mode === 'count'" class="form-group">
           <label>总次数</label>
@@ -660,6 +660,7 @@ import type { DataSourceDTO, DataSourcePreviewDTO } from '@/api/datasource'
 import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import DagFlow from './DagFlow.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -932,6 +933,11 @@ const runConfig = reactive({
   count: 100,
   duration: 60,
 })
+
+const runModeOptions = [
+  { value: 'count', label: '按次数' },
+  { value: 'duration', label: '按时间' },
+]
 
 const nodeForm = reactive({
   name: '',

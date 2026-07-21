@@ -9,10 +9,11 @@
         <h3>启动场景</h3>
         <div class="form-group">
           <label>场景</label>
-          <select v-model="form.scene_id">
-            <option value="">选择场景</option>
-            <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
+          <CustomSelect
+            v-model="form.scene_id"
+            :options="sceneOptions"
+            placeholder="选择场景"
+          />
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -26,10 +27,10 @@
         </div>
         <div class="form-group">
           <label>运行模式</label>
-          <select v-model="form.run_mode">
-            <option value="duration">持续时间</option>
-            <option value="count">请求数</option>
-          </select>
+          <CustomSelect
+            v-model="form.run_mode"
+            :options="runModeOptions"
+          />
         </div>
         <div class="form-group" v-if="form.run_mode === 'count'">
           <label>总请求数</label>
@@ -156,6 +157,7 @@ import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
 import { useAuthStore } from '@/stores/auth'
 import type { SceneDTO, RunRecordDTO } from '@/types'
+import CustomSelect from '@/components/CustomSelect.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -164,6 +166,18 @@ const canRunScene = computed(() => authStore.canAccess(['scene:run']))
 const scenes = ref<SceneDTO[]>([])
 const runs = ref<RunRecordDTO[]>([])
 const activeRuns = ref<RunRecordDTO[]>([])
+
+const sceneOptions = computed(() => {
+  return scenes.value.map(s => ({
+    value: s.id,
+    label: s.name,
+  }))
+})
+
+const runModeOptions = [
+  { value: 'duration', label: '持续时间' },
+  { value: 'count', label: '请求数' },
+]
 const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
 const toastMsg = ref('')

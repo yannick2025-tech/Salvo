@@ -46,10 +46,14 @@
     <div v-if="isRunning" class="exec-toolbar">
       <button :class="['exec-tab', { active: execViewMode === 'aggregate' }]" @click="switchView('aggregate')">聚合视图</button>
       <button :class="['exec-tab', { active: execViewMode === 'chain' }]" @click="switchView('chain')">单链路视图</button>
-      <select v-show="execViewMode === 'chain'" class="chain-select" :value="localSelectedChain" @change="onChainSelectChange">
-        <option value="" disabled>选择链路</option>
-        <option v-for="cid in debouncedChainIds" :key="cid" :value="cid">{{ chainLabelMap.get(cid) || cid }}</option>
-      </select>
+      <CustomSelect
+        v-show="execViewMode === 'chain'"
+        v-model="localSelectedChain"
+        :options="chainOptions"
+        placeholder="选择链路"
+        font-size="11px"
+        @update:modelValue="onChainSelect"
+      />
       <div v-if="wsConnected" class="ws-indicator connected" title="WebSocket 已连接">●</div>
       <div v-else class="ws-indicator disconnected" title="WebSocket 已断开">●</div>
     </div>
@@ -92,6 +96,7 @@ import type { NodeDTO, EdgeDTO } from '@/types'
 import { useExecutionWs } from '@/composables/useExecutionWs'
 import { useExecutionStatus, type ViewMode } from '@/composables/useExecutionStatus'
 import { getTraceByRun } from '@/api/trace'
+import CustomSelect from '@/components/CustomSelect.vue'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -153,6 +158,14 @@ const chainLabelMap = computed(() => {
   return map
 })
 
+// Options for CustomSelect
+const chainOptions = computed(() => {
+  return debouncedChainIds.value.map(cid => ({
+    value: cid,
+    label: chainLabelMap.value.get(cid) || cid,
+  }))
+})
+
 // Debounced chainIds: only update when user is not actively selecting
 // or when the list genuinely changes (new chain added)
 const debouncedChainIds = ref<string[]>([])
@@ -179,10 +192,9 @@ watch(selectedChainId, (val) => {
   localSelectedChain.value = val || ''
 }, { immediate: true })
 
-function onChainSelectChange(e: Event) {
-  const val = (e.target as HTMLSelectElement).value
-  if (val) {
-    selectChain(val)
+function onChainSelect(value: string | number) {
+  if (value) {
+    selectChain(String(value))
   }
 }
 
@@ -843,20 +855,7 @@ function minimapNodeColor(node: any) {
   font-weight: 600;
 }
 
-.chain-select {
-  padding: 5px 8px;
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 11px;
-  outline: none;
-  max-width: 160px;
-}
 
-.chain-select:focus {
-  border-color: var(--accent-primary);
-}
 
 .ws-indicator {
   font-size: 10px;

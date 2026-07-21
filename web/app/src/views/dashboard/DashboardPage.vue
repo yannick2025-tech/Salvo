@@ -3,18 +3,13 @@
     <div class="scene-selector">
       <div class="selector-header">
         <h3>场景选择</h3>
-        <select v-model="selectedSceneId" @change="onSceneChange" class="scene-select">
-          <option 
-            v-for="scene in allScenes" 
-            :key="scene.scene_id" 
-            :value="String(scene.scene_id)"
-          >
-            {{ `场景-${String(scene.scene_id).slice(-8)}` }}
-            {{ scene.status === 'running' ? '(运行中)' : `(已结束)` }}
-          </option>
-          <option v-if="allScenes.length === 0 && loading" value="" disabled>加载中...</option>
-          <option v-else-if="allScenes.length === 0" value="" disabled>暂无场景</option>
-        </select>
+        <CustomSelect
+          v-model="selectedSceneId"
+          :options="sceneOptions"
+          placeholder="暂无场景"
+          @update:modelValue="onSceneChange"
+          style="min-width: 250px;"
+        />
       </div>
       <div v-if="selectedSceneId" class="time-window-row">
         <div class="time-window-info">
@@ -25,9 +20,11 @@
         </div>
         <div v-if="showRefreshSelector" class="refresh-selector">
           <span class="refresh-label">刷新:</span>
-          <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="refresh-select">
-            <option v-for="sec in refreshOptions" :key="sec" :value="sec">{{ sec }}秒</option>
-          </select>
+          <CustomSelect
+            v-model="refreshInterval"
+            :options="refreshOptions.map(s => ({ value: String(s), label: s + '秒' }))"
+            @update:modelValue="onRefreshIntervalChange"
+          />
         </div>
       </div>
     </div>
@@ -299,6 +296,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { DashboardOverviewDTO, RunHistoryDTO, RuntimeMetricsDTO } from '@/types'
+import CustomSelect from '@/components/CustomSelect.vue'
 
 const qpsChartRef = ref<HTMLElement>()
 const latencyChartRef = ref<HTMLElement>()
@@ -433,6 +431,16 @@ const historyScenes = computed<SceneInfo[]>(() => {
 
 const allScenes = computed<SceneInfo[]>(() => {
   return [...runningScenes.value, ...historyScenes.value]
+})
+
+const sceneOptions = computed(() => {
+  if (allScenes.value.length === 0) {
+    return []
+  }
+  return allScenes.value.map(scene => ({
+    value: String(scene.scene_id),
+    label: `场景-${String(scene.scene_id).slice(-8)} ${scene.status === 'running' ? '(运行中)' : '(已结束)'}`,
+  }))
 })
 
 const isSceneRunning = computed(() => {
@@ -1657,28 +1665,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.scene-select {
-  padding: 8px 12px;
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 13px;
-  cursor: pointer;
-  min-width: 250px;
-  transition: all 0.2s;
-}
-
-.scene-select:hover {
-  border-color: var(--accent-primary);
-}
-
-.scene-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(0,229,255,0.1);
-}
-
 .scene-tabs {
   display: flex;
   gap: 8px;
@@ -1807,7 +1793,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   border-radius: var(--radius-sm);
   font-size: 12px;
 }
@@ -1819,13 +1805,33 @@ onUnmounted(() => {
 }
 
 .refresh-select {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-secondary);
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 4px 22px 4px 8px;
   cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b949e' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+[data-theme='light'] .refresh-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23656d76' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.refresh-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.refresh-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.15);
 }
 
 @keyframes blink {
