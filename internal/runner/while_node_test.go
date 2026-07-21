@@ -18,6 +18,16 @@ import (
 
 func newTestSceneNode() *sceneNode {
 	return &sceneNode{
+		id:            "test-while-node",
+		log:           newTestLogger(),
+		stats:         &Stats{},
+		httpOnlyStats: &Stats{},
+		nodeStats:     NewNodeStats(10000),
+	}
+}
+
+func newTestSceneNodeMinimal() *sceneNode {
+	return &sceneNode{
 		id:   "test-while-node",
 		log:  newTestLogger(),
 		stats: &Stats{},
@@ -1004,4 +1014,144 @@ func TestExecuteWhile_WithInitialVariables(t *testing.T) {
 	output, err := node.executeWhile(ctx, input, node.log)
 	require.NoError(t, err)
 	require.NotNil(t, output)
+}
+
+func TestExecuteWhile_SuccessRequestsCounted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Server returns success, exit condition met after 1 iteration.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"done"}`))
+	}))
+	defer server.Close()
+
+	cfg := whileConfig{
+		ExitConditions: []exitCondition{
+			{Variable: "status", Operator: "equals", Value: "done"},
+		},
+		IntervalSeconds: 1,
+		Steps: []stepConfig{
+			{
+				Name:    "query",
+				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
+				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+			},
+		},
+	}
+	cfgBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	node := newTestSceneNode()
+	node.config = string(cfgBytes)
+
+	_, err = node.executeWhile(ctx, &dag.Input{}, node.log)
+	require.NoError(t, err)
+
+	// 1 successful HTTP request should be counted in all 3 stats objects.
+	assert.Equal(t, int64(1), node.stats.TotalReqs.Load(), "global stats should count 1 total request")
+	assert.Equal(t, int64(1), node.stats.SuccessReqs.Load(), "global stats should count 1 success")
+	assert.Equal(t, int64(0), node.stats.FailedReqs.Load(), "global stats should count 0 failures")
+
+	assert.Equal(t, int64(1), node.httpOnlyStats.TotalReqs.Load(), "httpOnlyStats should count 1 total request")
+	assert.Equal(t, int64(1), node.httpOnlyStats.SuccessReqs.Load(), "httpOnlyStats should count 1 success")
+
+	nodeSnap := node.nodeStats.Snapshot()
+	assert.Equal(t, int64(1), nodeSnap.TotalReqs, "nodeStats should count 1 total request")
+	assert.Equal(t, int64(1), nodeSnap.SuccessReqs, "nodeStats should count 1 success")
+}
+
+func TestExecuteWhile_FailedRequestsCounted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Server always returns 500.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cfg := whileConfig{
+		ExitConditions: []exitCondition{
+			{Variable: "x", Operator: "equals", Value: "done"},
+		},
+		MaxIterations:      3,
+		FailAfterConsecutive: 3,
+		IntervalSeconds:     1,
+		Steps: []stepConfig{
+			{
+				Name:    "failing step",
+				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/fail"},
+			},
+		},
+	}
+	cfgBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	node := newTestSceneNode()
+	node.config = string(cfgBytes)
+
+	_, err = node.executeWhile(ctx, &dag.Input{}, node.log)
+	require.Error(t, err)
+
+	// 3 failed HTTP requests should be counted.
+	assert.Equal(t, int64(3), node.stats.TotalReqs.Load(), "global stats should count 3 total requests")
+	assert.Equal(t, int64(3), node.stats.FailedReqs.Load(), "global stats should count 3 failures")
+	assert.Equal(t, int64(0), node.stats.SuccessReqs.Load(), "global stats should count 0 successes")
+
+	assert.Equal(t, int64(3), node.httpOnlyStats.TotalReqs.Load(), "httpOnlyStats should count 3 total requests")
+	assert.Equal(t, int64(3), node.httpOnlyStats.FailedReqs.Load(), "httpOnlyStats should count 3 failures")
+
+	nodeSnap := node.nodeStats.Snapshot()
+	assert.Equal(t, int64(3), nodeSnap.TotalReqs, "nodeStats should count 3 total requests")
+	assert.Equal(t, int64(3), nodeSnap.FailedReqs, "nodeStats should count 3 failures")
+}
+
+func TestExecuteWhile_MultipleIterationsCounted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Server returns status=1 for first 2 calls, then status=4.
+	callCount := 0
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callCount++
+		status := "1"
+		if callCount >= 3 {
+			status = "4"
+		}
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"%s"}`, status)))
+	}))
+	defer server.Close()
+
+	cfg := whileConfig{
+		ExitConditions: []exitCondition{
+			{Variable: "status", Operator: "equals", Value: "4"},
+		},
+		IntervalSeconds: 1,
+		Steps: []stepConfig{
+			{
+				Name:    "query",
+				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
+				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+			},
+		},
+	}
+	cfgBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	node := newTestSceneNode()
+	node.config = string(cfgBytes)
+
+	_, err = node.executeWhile(ctx, &dag.Input{}, node.log)
+	require.NoError(t, err)
+
+	// 3 successful HTTP requests across 3 iterations.
+	assert.Equal(t, int64(3), node.stats.TotalReqs.Load(), "global stats should count 3 total requests from 3 iterations")
+	assert.Equal(t, int64(3), node.stats.SuccessReqs.Load(), "global stats should count 3 successes")
+	assert.Equal(t, int64(0), node.stats.FailedReqs.Load(), "global stats should count 0 failures")
 }

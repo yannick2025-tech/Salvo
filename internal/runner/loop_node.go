@@ -84,6 +84,22 @@ func (n *sceneNode) executeLoop(ctx context.Context, input *dag.Input, nodeLog l
 				proto := httpprotocol.NewProtocol()
 				resp, err := proto.Execute(ctx, req)
 				if err != nil {
+					// Connection/protocol error — record as failed request.
+					if n.stats != nil {
+						n.stats.RecordLatency(0, false)
+					}
+					if n.httpOnlyStats != nil {
+						n.httpOnlyStats.RecordLatency(0, false)
+					}
+					if n.nodeStats != nil {
+						n.nodeStats.RecordLatency(0, false)
+					}
+					nodeLog.Debug("loop step stats recorded",
+						logger.F("step", step.Name),
+						logger.F("iteration", i+1),
+						logger.F("success", false),
+						logger.F("latency_ms", 0),
+						logger.F("reason", "connection_error"))
 					nodeLog.Error("loop step request failed",
 						logger.F("step", step.Name),
 						logger.F("iteration", i+1),
@@ -91,9 +107,46 @@ func (n *sceneNode) executeLoop(ctx context.Context, input *dag.Input, nodeLog l
 					return nil, fmt.Errorf("loop iteration %d step %s: %w", i+1, step.Name, err)
 				}
 
-				// Extract variables from response.
-				if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(step.Extract) > 0 {
-					extractVarsFromResponse(httpResp.Body, step.Extract, mergedVars)
+				httpResp, ok := resp.(*httpprotocol.HTTPResponse)
+				if ok {
+					if httpResp.IsSuccess() {
+						if n.stats != nil {
+							n.stats.RecordLatency(httpResp.Latency, true)
+						}
+						if n.httpOnlyStats != nil {
+							n.httpOnlyStats.RecordLatency(httpResp.Latency, true)
+						}
+						if n.nodeStats != nil {
+							n.nodeStats.RecordLatency(httpResp.Latency, true)
+						}
+						nodeLog.Debug("loop step stats recorded",
+							logger.F("step", step.Name),
+							logger.F("iteration", i+1),
+							logger.F("success", true),
+							logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+							logger.F("status_code", httpResp.StatusCode))
+					} else {
+						if n.stats != nil {
+							n.stats.RecordLatency(httpResp.Latency, false)
+						}
+						if n.httpOnlyStats != nil {
+							n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
+						}
+						if n.nodeStats != nil {
+							n.nodeStats.RecordLatency(httpResp.Latency, false)
+						}
+						nodeLog.Debug("loop step stats recorded",
+							logger.F("step", step.Name),
+							logger.F("iteration", i+1),
+							logger.F("success", false),
+							logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+							logger.F("status_code", httpResp.StatusCode),
+							logger.F("reason", "http_error"))
+					}
+					// Extract variables from response.
+					if len(step.Extract) > 0 {
+						extractVarsFromResponse(httpResp.Body, step.Extract, mergedVars)
+					}
 				}
 			}
 		}

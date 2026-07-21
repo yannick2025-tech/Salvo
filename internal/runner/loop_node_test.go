@@ -313,3 +313,93 @@ func TestExecuteLoop_ThinkTime(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 2, resp["iterations"])
 }
+
+func TestExecuteLoop_SuccessRequestsCounted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	cfg := loopConfig{
+		LoopCount: 3,
+		Steps: []stepConfig{
+			{Name: "step1", Request: &stepRequestConfig{Method: "GET", URL: server.URL}},
+		},
+	}
+	cfgBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	node := &sceneNode{
+		id:            "test-loop-node",
+		log:           newTestLogger(),
+		stats:         &Stats{},
+		httpOnlyStats: &Stats{},
+		nodeStats:     NewNodeStats(10000),
+	}
+	node.config = string(cfgBytes)
+
+	_, err = node.executeLoop(ctx, &dag.Input{}, node.log)
+	require.NoError(t, err)
+
+	// 3 successful HTTP requests should be counted in all 3 stats objects.
+	assert.Equal(t, int64(3), node.stats.TotalReqs.Load(), "global stats should count 3 total requests")
+	assert.Equal(t, int64(3), node.stats.SuccessReqs.Load(), "global stats should count 3 successes")
+	assert.Equal(t, int64(0), node.stats.FailedReqs.Load(), "global stats should count 0 failures")
+
+	assert.Equal(t, int64(3), node.httpOnlyStats.TotalReqs.Load(), "httpOnlyStats should count 3 total requests")
+	assert.Equal(t, int64(3), node.httpOnlyStats.SuccessReqs.Load(), "httpOnlyStats should count 3 successes")
+
+	nodeSnap := node.nodeStats.Snapshot()
+	assert.Equal(t, int64(3), nodeSnap.TotalReqs, "nodeStats should count 3 total requests")
+	assert.Equal(t, int64(3), nodeSnap.SuccessReqs, "nodeStats should count 3 successes")
+}
+
+func TestExecuteLoop_FailedRequestsCounted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Server always returns 500.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cfg := loopConfig{
+		LoopCount: 2,
+		Steps: []stepConfig{
+			{Name: "fail-step", Request: &stepRequestConfig{Method: "GET", URL: server.URL}},
+		},
+	}
+	cfgBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	node := &sceneNode{
+		id:            "test-loop-node",
+		log:           newTestLogger(),
+		stats:         &Stats{},
+		httpOnlyStats: &Stats{},
+		nodeStats:     NewNodeStats(10000),
+	}
+	node.config = string(cfgBytes)
+
+	// Loop does NOT stop on HTTP 500 (unlike WHILE), it continues.
+	output, err := node.executeLoop(ctx, &dag.Input{}, node.log)
+	require.NoError(t, err)
+	require.NotNil(t, output)
+
+	// 2 failed HTTP requests (2 iterations * 1 step each) should be counted.
+	assert.Equal(t, int64(2), node.stats.TotalReqs.Load(), "global stats should count 2 total requests")
+	assert.Equal(t, int64(2), node.stats.FailedReqs.Load(), "global stats should count 2 failures")
+	assert.Equal(t, int64(0), node.stats.SuccessReqs.Load(), "global stats should count 0 successes")
+
+	assert.Equal(t, int64(2), node.httpOnlyStats.TotalReqs.Load(), "httpOnlyStats should count 2 total requests")
+	assert.Equal(t, int64(2), node.httpOnlyStats.FailedReqs.Load(), "httpOnlyStats should count 2 failures")
+
+	nodeSnap := node.nodeStats.Snapshot()
+	assert.Equal(t, int64(2), nodeSnap.TotalReqs, "nodeStats should count 2 total requests")
+	assert.Equal(t, int64(2), nodeSnap.FailedReqs, "nodeStats should count 2 failures")
+}

@@ -545,15 +545,60 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 	proto := httpprotocol.NewProtocol()
 	resp, err := proto.Execute(ctx, req)
 	if err != nil {
+		// Connection/protocol error — record as failed request.
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", 0),
+			logger.F("reason", "connection_error"))
 		return fmt.Errorf("step %q HTTP request: %w", step.Name, err)
 	}
 
 	httpResp, ok := resp.(*httpprotocol.HTTPResponse)
 	if !ok {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", 0),
+			logger.F("reason", "unexpected_response_type"))
 		return fmt.Errorf("step %q: unexpected response type %T", step.Name, resp)
 	}
 
 	if !httpResp.IsSuccess() {
+		// HTTP response with non-success status code — record as failed request.
+		if n.stats != nil {
+			n.stats.RecordLatency(httpResp.Latency, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(httpResp.Latency, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("status_code", httpResp.StatusCode),
+			logger.F("reason", "http_error"))
 		return fmt.Errorf("step %q HTTP %d", step.Name, httpResp.StatusCode)
 	}
 
