@@ -46,9 +46,9 @@
     <div v-if="isRunning" class="exec-toolbar">
       <button :class="['exec-tab', { active: execViewMode === 'aggregate' }]" @click="switchView('aggregate')">聚合视图</button>
       <button :class="['exec-tab', { active: execViewMode === 'chain' }]" @click="switchView('chain')">单链路视图</button>
-      <select v-if="execViewMode === 'chain'" class="chain-select" :value="selectedChainId || ''" @change="onChainSelect">
+      <select v-show="execViewMode === 'chain'" class="chain-select" :value="localSelectedChain" @change="onChainSelectChange">
         <option value="" disabled>选择链路</option>
-        <option v-for="cid in chainIds" :key="cid" :value="cid">{{ cid }}</option>
+        <option v-for="cid in debouncedChainIds" :key="cid" :value="cid">{{ chainLabelMap.get(cid) || cid }}</option>
       </select>
       <div v-if="wsConnected" class="ws-indicator connected" title="WebSocket 已连接">●</div>
       <div v-else class="ws-indicator disconnected" title="WebSocket 已断开">●</div>
@@ -91,6 +91,7 @@ import { getDagIcon } from './dagIcons'
 import type { NodeDTO, EdgeDTO } from '@/types'
 import { useExecutionWs } from '@/composables/useExecutionWs'
 import { useExecutionStatus, type ViewMode } from '@/composables/useExecutionStatus'
+import { getTraceByRun } from '@/api/trace'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -131,25 +132,75 @@ const {
   computeAggregateStatus,
   switchView,
   selectChain,
+  initFromSpans,
+  version: execVersion,
 } = useExecutionStatus(spanUpdates)
 
-const chainIds = computed(() => Array.from(chainStatuses.value.keys()))
+const chainIds = computed(() => {
+  // Depend on version to react to shallowRef changes
+  void execVersion.value
+  return Array.from(chainStatuses.value.keys())
+})
 
-function onChainSelect(e: Event) {
+// Map chain_id to a readable label (Chain #1, Chain #2, etc.)
+const chainLabelMap = computed(() => {
+  void execVersion.value
+  const map = new Map<string, string>()
+  const ids = Array.from(chainStatuses.value.keys())
+  ids.forEach((id, index) => {
+    map.set(id, `Chain #${index + 1}`)
+  })
+  return map
+})
+
+// Debounced chainIds: only update when user is not actively selecting
+// or when the list genuinely changes (new chain added)
+const debouncedChainIds = ref<string[]>([])
+let chainIdsTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(chainIds, (newIds) => {
+  // Always update immediately if the list size changed (new chain added)
+  if (newIds.length !== debouncedChainIds.value.length) {
+    debouncedChainIds.value = newIds
+    return
+  }
+  // Otherwise debounce to avoid frequent re-renders during WS event bursts
+  if (chainIdsTimer) clearTimeout(chainIdsTimer)
+  chainIdsTimer = setTimeout(() => {
+    debouncedChainIds.value = newIds
+  }, 300)
+}, { immediate: true })
+
+// Local ref for select binding, synced with composable's selectedChainId
+const localSelectedChain = ref('')
+
+// Sync: when composable's selectedChainId changes, update local
+watch(selectedChainId, (val) => {
+  localSelectedChain.value = val || ''
+}, { immediate: true })
+
+function onChainSelectChange(e: Event) {
   const val = (e.target as HTMLSelectElement).value
-  if (val) selectChain(val)
+  if (val) {
+    selectChain(val)
+  }
 }
 
 // Compute node badges for current nodes
-const nodeBadges = computed(() => computeAggregateStatus(props.nodes))
+const nodeBadges = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
+  return computeAggregateStatus(props.nodes)
+})
 
 function getNodeExecStatus(nodeId: string) {
   if (!props.isRunning) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
   return aggregateStatus.value.get(nodeId) || undefined
 }
 
 function getNodeChainStatus(nodeId: string) {
   if (!props.isRunning || execViewMode.value !== 'chain' || !selectedChainId.value) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
   const chainMap = chainStatuses.value.get(selectedChainId.value)
   if (!chainMap) return undefined
   return chainMap.get(nodeId) ?? null
@@ -157,15 +208,23 @@ function getNodeChainStatus(nodeId: string) {
 
 function getNodeLoopProgress(nodeId: string) {
   if (!props.isRunning || !selectedChainId.value) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
   const chainLoopMap = loopProgress.value.get(selectedChainId.value)
   if (!chainLoopMap) return undefined
   return chainLoopMap.get(nodeId) || undefined
 }
 
-// Connect/disconnect WS based on runId
-watch(() => props.runId, (newRunId) => {
+// Connect/disconnect WS based on runId, and load initial trace data
+watch(() => props.runId, async (newRunId) => {
   if (newRunId) {
     wsConnect(newRunId)
+    // Load existing trace data to initialize status
+    try {
+      const resp = await getTraceByRun(newRunId)
+      if (resp.code === 0 && resp.data?.spans) {
+        initFromSpans(resp.data.spans)
+      }
+    } catch { /* trace may not exist yet */ }
   } else {
     wsDisconnect()
   }
@@ -173,6 +232,7 @@ watch(() => props.runId, (newRunId) => {
 
 // Active chain edges for single chain view edge styling
 const activeChainEdgeIds = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
   if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
   // In chain mode, all edges connected to nodes in the selected chain are "active"
   const chainNodeIds = new Set<string>()
@@ -192,6 +252,7 @@ const activeChainEdgeIds = computed(() => {
 })
 
 const runningChainEdgeIds = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
   if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
   const chainMap = chainStatuses.value.get(selectedChainId.value)
   if (!chainMap) return new Set<string>()
@@ -396,10 +457,30 @@ watch([() => props.nodes, () => props.edges], ([newNodes, newEdges]) => {
   applyLayout(newNodes, newEdges)
 }, { immediate: true })
 
-// Re-apply layout when execution status changes (for edge styling updates)
-watch([activeChainEdgeIds, runningChainEdgeIds, execViewMode, selectedChainId], () => {
-  if (props.isRunning) {
-    applyLayout(props.nodes, props.edges)
+// Update edge styles when view mode or selected chain changes
+watch([execViewMode, selectedChainId], () => {
+  if (!props.isRunning) return
+  // Update edge styles in-place without re-running layout
+  void execVersion.value // read current version to get latest data
+  for (const edge of vfEdges.value) {
+    if (execViewMode.value === 'chain' && selectedChainId.value) {
+      const isActive = activeChainEdgeIds.value.has(edge.id)
+      const isRunning = runningChainEdgeIds.value.has(edge.id)
+      if (isRunning) {
+        edge.style = { stroke: 'var(--accent-primary)', strokeWidth: 2, strokeDasharray: '8 4', animation: 'dash-flow 0.8s linear infinite' }
+        edge.animated = true
+      } else if (isActive) {
+        edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2 }
+        edge.animated = false
+      } else {
+        edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2, opacity: 0.15 }
+        edge.animated = false
+      }
+    } else {
+      // Reset to default style
+      edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2 }
+      edge.animated = false
+    }
   }
 })
 

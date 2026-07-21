@@ -1,5 +1,6 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, watch, shallowRef, type Ref } from 'vue'
 import type { SpanUpdateEvent } from './useExecutionWs'
+import type { SpanDTO } from '@/types'
 
 export type NodeStatus = 'pass' | 'fail' | 'skip' | 'running' | 'idle'
 
@@ -31,12 +32,19 @@ export interface NodeBadge {
 export type ViewMode = 'aggregate' | 'chain'
 
 export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
-  const aggregateStatus = ref<Map<string, AggregateCounts>>(new Map())
-  const chainStatuses = ref<Map<string, Map<string, NodeStatus | null>>>(new Map())
-  const loopProgress = ref<Map<string, Map<string, LoopProgress>>>(new Map())
+  const aggregateStatus = shallowRef<Map<string, AggregateCounts>>(new Map())
+  const chainStatuses = shallowRef<Map<string, Map<string, NodeStatus | null>>>(new Map())
+  const loopProgress = shallowRef<Map<string, Map<string, LoopProgress>>>(new Map())
 
   const viewMode = ref<ViewMode>('aggregate')
   const selectedChainId = ref<string | null>(null)
+
+  // Version counter to trigger dependent computeds without replacing Map objects
+  const version = ref(0)
+
+  function bumpVersion() {
+    version.value++
+  }
 
   function statusFromEvent(event: SpanUpdateEvent): NodeStatus {
     switch (event.status) {
@@ -69,18 +77,7 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
     }
     chainMap.set(nodeId, status)
 
-    // Trigger reactivity by reassigning
-    chainStatuses.value = new Map(chainStatuses.value)
-
-    // Update aggregate counts
-    let agg = aggregateStatus.value.get(nodeId)
-    if (!agg) {
-      agg = { pass: 0, fail: 0, skip: 0, running: 0, idle: 0 }
-    }
-
-    // When a chain transitions status for this node, we need to decrement
-    // the previous status for that chain. We track by scanning all chains.
-    // For simplicity, recompute aggregate from chainStatuses.
+    // Recompute aggregate from chainStatuses
     const counts: AggregateCounts = { pass: 0, fail: 0, skip: 0, running: 0, idle: 0 }
     for (const [, nodes] of chainStatuses.value) {
       const s = nodes.get(nodeId)
@@ -91,7 +88,6 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
       else counts.idle++
     }
     aggregateStatus.value.set(nodeId, counts)
-    aggregateStatus.value = new Map(aggregateStatus.value)
 
     // Update loop progress
     if (event.loop_index !== undefined && event.loop_index !== null) {
@@ -108,8 +104,10 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
         existing.current = Math.max(existing.current, currentIndex)
         existing.total = Math.max(existing.total, currentIndex)
       }
-      loopProgress.value = new Map(loopProgress.value)
     }
+
+    // Trigger reactivity for shallowRef
+    bumpVersion()
   }
 
   // Watch for new span updates and process them
@@ -193,6 +191,65 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
     viewMode.value = 'chain'
   }
 
+  function initFromSpans(spans: SpanDTO[]) {
+    for (const span of spans) {
+      const chainId = span.chain_id || 'default'
+      const nodeId = span.node_id
+      const status = spanStatusFromSpan(span.status)
+
+      // Update chain status
+      let chainMap = chainStatuses.value.get(chainId)
+      if (!chainMap) {
+        chainMap = new Map()
+        chainStatuses.value.set(chainId, chainMap)
+      }
+      chainMap.set(nodeId, status)
+    }
+
+    // Recompute aggregate
+    const allNodeIds = new Set<string>()
+    for (const [, nodes] of chainStatuses.value) {
+      for (const nodeId of nodes.keys()) {
+        allNodeIds.add(nodeId)
+      }
+    }
+    for (const nodeId of allNodeIds) {
+      const counts: AggregateCounts = { pass: 0, fail: 0, skip: 0, running: 0, idle: 0 }
+      for (const [, nodes] of chainStatuses.value) {
+        const s = nodes.get(nodeId)
+        if (s === 'pass') counts.pass++
+        else if (s === 'fail') counts.fail++
+        else if (s === 'skip') counts.skip++
+        else if (s === 'running') counts.running++
+        else counts.idle++
+      }
+      aggregateStatus.value.set(nodeId, counts)
+    }
+
+    // Trigger reactivity for shallowRef
+    bumpVersion()
+  }
+
+  function spanStatusFromSpan(status: string): NodeStatus {
+    switch (status) {
+      case 'ok':
+      case 'success':
+        return 'pass'
+      case 'error':
+      case 'fail':
+      case 'failed':
+        return 'fail'
+      case 'skip':
+      case 'skipped':
+      case 'canceled':
+        return 'skip'
+      case 'running':
+        return 'running'
+      default:
+        return 'idle'
+    }
+  }
+
   return {
     aggregateStatus,
     chainStatuses,
@@ -202,5 +259,7 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
     computeAggregateStatus,
     switchView,
     selectChain,
+    initFromSpans,
+    version,
   }
 }

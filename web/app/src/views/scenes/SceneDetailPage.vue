@@ -651,7 +651,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene, batchSetVariables, listScenes, sceneStatus } from '@/api/scene'
+import { getScene, createScene, startScene, batchSetVariables, listScenes, sceneStatus, listRuns } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
 import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
@@ -1314,8 +1314,13 @@ async function fetchScene() {
       if (resp.data.status === 'running' && !currentRunId.value) {
         fetchRunId(id)
       }
-      // Clear runId if scene is no longer running
-      if (resp.data.status !== 'running' && currentRunId.value) {
+      // If entered via mode=exec but scene is not running in DB, still try to get runId
+      // (scene may have just finished, we want to show final status)
+      if (route.query.mode === 'exec' && !currentRunId.value) {
+        fetchRunId(id)
+      }
+      // Clear runId if scene is no longer running and not in exec mode
+      if (resp.data.status !== 'running' && !route.query.mode && currentRunId.value) {
         currentRunId.value = ''
       }
     }
@@ -1327,6 +1332,18 @@ async function fetchRunId(sceneId: string) {
     const resp = await sceneStatus(sceneId)
     if (resp.code === 0 && resp.data?.run_id) {
       currentRunId.value = resp.data.run_id
+      return
+    }
+  } catch { /* scene may not be running */ }
+
+  // Fallback: get most recent run from run history
+  try {
+    const resp = await listRuns({ scene_id: sceneId, limit: 1 })
+    if (resp.code === 0 && resp.data?.items?.length) {
+      const latestRun = resp.data.items[0]
+      if (latestRun.run_id) {
+        currentRunId.value = latestRun.run_id
+      }
     }
   } catch { /* ignore */ }
 }

@@ -81,7 +81,7 @@ variables:
   - key: sim_update_point_status
     value: "/iot/simulator/shell/ev/v1/device/update-point-status"
   - key: sim_set_charge_data
-    value: "/iot/simulator/shell/ev/v1/charging-process-data-param/set/abc"
+    value: "/iot/simulator/shell/ev/v1/charging-process-data-param/set/"
   - key: sim_force_close
     value: "/iot/simulator/shell/ev/v1/force-close/"
   - key: sim_stop_charge_reason
@@ -98,9 +98,9 @@ variables:
   - key: sign_apis_json
     value: "[]"
   - key: post_id
-    value: ""
+    value: "0"
   - key: point_id_int
-    value: ""
+    value: "0"
   - key: account_id
     value: ""
   - key: tenant_id
@@ -138,7 +138,7 @@ variables:
   - key: coupon_id_after
     value: "0"
   - key: occupy_order_id
-    value: ""
+    value: "0"
   - key: charge_start_time_ms
     value: ""
   - key: stop_sent
@@ -222,12 +222,12 @@ config_params:
   # =================================================================
   # 取值范围配置(供generator节点的__random/__oneOf使用)
   # =================================================================
-  charge_time_min: "600"        # 充电时长下限(秒)，这里其实是整数，单位为秒，下面几个都是
-  charge_time_max: "1200"       # 充电时长上限(秒)
+  charge_time_min: "300"        # 充电时长下限(秒)，这里其实是整数，单位为秒，下面几个都是
+  charge_time_max: "600"       # 充电时长上限(秒)
   pre_occupy_min: "40"          # 前占位时长下限(秒)
   pre_occupy_max: "60"          # 前占位时长上限(秒)
   after_occupy_min: "60"        # 后占位时长下限(秒)
-  after_occupy_max: "600"       # 后占位时长上限(秒)
+  after_occupy_max: "120"       # 后占位时长上限(秒)
   soc_min: "95"                 # SOC下限(%)
   soc_max: "100"                # SOC上限(%)
   pre_pay_min: "5"              # 预付金额下限(元)
@@ -242,13 +242,16 @@ config_params:
 data_sources:
   # CSV 参考文件: user_charger.csv (大规模测试时可用外部CSV导入)
   # pointId(充电枪编号) 去掉后2位 = postId(充电桩编号), 如 1100000001 → postId=11000000
+  # postId 在数据源中预计算(整数), 避免表达式除法产生浮点数
   - name: user_charger
     columns:
       - phone
       - pointId
+      - postId
     rows:
       - phone: "15550000000"
         pointId: "1100000001"
+        postId: "11000000"
 
 # =============================================================================
 # Setup: 登录 + 获取C端Token
@@ -283,10 +286,11 @@ setup:
 # =============================================================================
 nodes:
   # --- 1. 连接模拟器 ---
+  # postId 直接从数据源获取(已预计算为整数), 避免表达式除法产生浮点数
   - name: 计算postId
     type: generator
     config:
-      expression: '${user_charger.pointId} / 100'
+      expression: '${user_charger.postId}'
       variable: post_id
 
   - name: 计算pointIdInt
@@ -351,12 +355,28 @@ nodes:
     config:
       ms: "3000"
 
+  # --- 3-2. 获取模拟器 routePath (三段式 URL 拼接, 全局只取一次) ---
+  # 模拟器接口(force-close, stop-charge-by-stop-reason, charging-process-data-param/set)
+  # 采用三段式 URL 拼接: 实际URL = basePath + routePath
+  # routePath 通过 getRoutePath 接口获取, 同一次测试中不会变化, 后续 while/teardown 直接复用 ${route_path}
+  - name: 获取routePath-setup
+    type: http
+    config:
+      method: POST
+      url: "${simurl}/iot/simulator/shell/ev/v1/getRoutePath"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id}}'
+      timeout: 10000
+      extract:
+        route_path: "$.data.routePath"
+
   # --- 4. 配置充电数据 ---
   - name: 配置充电数据
     type: http
     config:
       method: POST
-      url: "${simurl}${sim_set_charge_data}"
+      url: "${simurl}${sim_set_charge_data}${route_path}"
       headers:
         Content-Type: application/json
       body: '{"pointId":${point_id_int},"postId":${post_id},"outputChargingVoltageMax":${output_voltage_max},"outputChargingVoltageMin":${output_voltage_min},"outputChargingCurrentMax":${output_current_max},"outputChargingCurrentMin":${output_current_min},"demandChargingVoltageMax":${demand_voltage_max},"demandChargingVoltageMin":${demand_voltage_min},"demandChargingCurrentMax":${demand_current_max},"demandChargingCurrentMin":${demand_current_min}}'
@@ -479,7 +499,6 @@ nodes:
   - name: 计算-充满即停限额值
     type: generator
     config:
-      # strategy=0 (AutoFull): 充满即停, limitValue不使用, 设为0
       expression: '0'
       variable: limit_value
 
@@ -491,14 +510,12 @@ nodes:
   - name: 计算-按金额限制值
     type: generator
     config:
-      # strategy=1 (AmountLimit): limitValue = prePayAmount × limit_value_amount_ratio
       expression: '${pre_pay_amount} * ${limit_value_amount_ratio}'
       variable: limit_value
 
   - name: 计算-按SOC限制值
     type: generator
     config:
-      # strategy=2 (SOCLimit): limitValue = soc值(%)
       expression: '${soc}'
       variable: limit_value
 
@@ -584,6 +601,14 @@ nodes:
     config:
       expr: '${unpaid_order_id} != "0"'
 
+  # 初始化 coupon_id 为数字 0，防止提取失败时变量保留旧值
+  # 注意：不能用 '"0"' 或 '""' (会产生字面引号字符)，用纯数字 0
+  - name: 初始化coupon_id
+    type: generator
+    config:
+      expression: '0'
+      variable: coupon_id
+
   - name: 查询待支付订单优惠券
     type: http
     config:
@@ -599,16 +624,24 @@ nodes:
       extract:
         coupon_id: "$.data.availableUserCoupon[0].instId"
 
-  - name: 签名-支付待支付充电订单
+  # 判断是否有可用优惠券：coupon_id 不为空表示有券
+  # 与 Go 代码逻辑一致：有券时带 couponId，无券时省略该字段 (omitempty)
+  - name: 判断-是否有可用优惠券
+    type: if-else
+    config:
+      expr: '${coupon_id} != 0'
+
+  # 分支1: 有优惠券 - 带 couponId 支付
+  - name: 签名-支付待支付订单(含券)
     type: generator
     config:
-      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id},\"couponId\":${coupon_id}}")}'
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id},\"couponId\":\"${coupon_id}\"}")}'
       variable: sign_result_8
       extract:
         api_sign: "$.sign"
         api_ts: "$.ts"
 
-  - name: 支付待支付订单
+  - name: 支付待支付订单(含券)
     type: http
     block_on_error: true
     config:
@@ -619,7 +652,33 @@ nodes:
         Authorization: "${token}"
         x-ev-api-sign: "${api_sign}"
         x-ev-api-timestamp: "${api_ts}"
-      body: '{"orderId":${unpaid_order_id},"couponId":${coupon_id}}'
+      body: '{"orderId":${unpaid_order_id},"couponId":"${coupon_id}"}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  # 分支2: 无优惠券 - 不带 couponId 支付
+  - name: 签名-支付待支付订单(无券)
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id}}")}'
+      variable: sign_result_8b
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 支付待支付订单(无券)
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${baseurl}${api_pay_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${unpaid_order_id}}'
       timeout: 10000
       expect_body:
         errorCode: 0
@@ -661,7 +720,7 @@ nodes:
   - name: 判断-是否有待支付占位订单
     type: if-else
     config:
-      expr: '${occupy_order_id} != ""'
+      expr: '${occupy_order_id} != "0"'
 
   - name: 签名-支付待支付占位订单
     type: generator
@@ -916,18 +975,32 @@ nodes:
       interval_seconds: 30
       max_iterations: 200
       steps:
-        # 18a. 查询充电状态 (sign_post SO 插件: 签名+HTTP POST 一体化)
-        # generator 返回响应 JSON，extract 从中提取 charging_status
-        - name: 查询充电状态
+        # 18a. 查询充电状态 (拆分为签名+HTTP两步, sign_post 插件存在 body 双重转义问题)
+        - name: 签名-查询充电状态
           type: generator
-          block_on_error: true
           config:
-            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_charging_data}","${token}","{\"orderId\":${order_id}}")}'
-            variable: charge_status_resp
+            expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${order_id}}")}'
+            variable: sign_result_charge_status
             extract:
-              charging_status: "$.data.chargingStatus"
+              api_sign: "$.sign"
+              api_ts: "$.ts"
+
+        - name: 查询充电状态
+          request:
+            method: POST
+            url: "${baseurl}${api_charging_data}"
+            headers:
+              Authorization: "${token}"
+              Content-Type: application/json
+              x-ev-api-sign: "${api_sign}"
+              x-ev-api-timestamp: "${api_ts}"
+            body: '{"orderId":${order_id}}'
+          extract:
+            - variable: charging_status
+              path: "$.data.chargingStatus"
 
         # 18b. 桩离线 (条件: charge_post_offline==1)
+        # URL 中的 ${route_path} 在主流程 获取routePath-setup 中已获取, 此处直接复用
         - name: 桩离线
           condition:
             variable: charge_post_offline
@@ -935,7 +1008,7 @@ nodes:
             value: "1"
           request:
             method: POST
-            url: "${simurl}${sim_force_close}"
+            url: "${simurl}${sim_force_close}${route_path}"
             headers:
               Content-Type: application/json
             body: '{"postId":${post_id}}'
@@ -967,7 +1040,7 @@ nodes:
             once: true
           request:
             method: POST
-            url: "${simurl}${sim_stop_charge_reason}"
+            url: "${simurl}${sim_stop_charge_reason}${route_path}"
             headers:
               Content-Type: application/json
             body: '{"pointId":${point_id_int},"postId":${post_id},"stopReason":${stop_reason}}'
@@ -980,34 +1053,67 @@ nodes:
             variable: charge_time_reached
 
         # 18f. 停止充电 (条件: charge_time_reached=="true")
-        # 注意: charge_time_reached 由 sign.check_charge_time SO 插件计算
-        # 停止充电使用 sign_post 因为需要签名
-        - name: 停止充电
+        # 拆分为签名+HTTP两步, sign_post 插件存在 body 双重转义问题
+        - name: 签名-停止充电
           condition:
             variable: charge_time_reached
             operator: equals
             value: "true"
           type: generator
-          block_on_error: true
           config:
-            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_stop_charge}","${token}","{\"orderId\":${order_id}}")}'
-            variable: stop_charge_resp
+            expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${order_id}}")}'
+            variable: sign_result_stop
+            extract:
+              api_sign: "$.sign"
+              api_ts: "$.ts"
+
+        - name: 停止充电
+          condition:
+            variable: charge_time_reached
+            operator: equals
+            value: "true"
+          request:
+            method: POST
+            url: "${baseurl}${api_stop_charge}"
+            headers:
+              Authorization: "${token}"
+              Content-Type: application/json
+              x-ev-api-sign: "${api_sign}"
+              x-ev-api-timestamp: "${api_ts}"
+            body: '{"orderId":${order_id}}'
           retry:
             max_attempts: 10
             on_429: retry
 
   # --- 19. 强制停止充电 ---
   # Go代码: ForceStopChargeStep → StopCharge() → DoPostSign (与正常停止充电使用同一个接口和签名方式)
+  # 拆分为签名+HTTP两步, sign_post 插件存在 body 双重转义问题
   - name: 判断-是否强制停止充电
     type: if-else
     config:
       expr: '${force_stop_charge} == "1"'
 
-  - name: 强制停止充电
+  - name: 签名-强制停止充电
     type: generator
     config:
-      expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_stop_charge}","${token}","{\"orderId\":${order_id}}")}'
-      variable: force_stop_charge_resp
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${order_id}}")}'
+      variable: sign_result_force_stop
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 强制停止充电
+    type: http
+    config:
+      method: POST
+      url: "${baseurl}${api_stop_charge}"
+      headers:
+        Authorization: "${token}"
+        Content-Type: application/json
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${order_id}}'
+      timeout: 10000
     retry:
       max_attempts: 10
       on_429: retry
@@ -1076,6 +1182,13 @@ nodes:
     config:
       expr: '${unpaid_order_id_after} != ""'
 
+  # 初始化 coupon_id_after 为数字 0
+  - name: 初始化coupon_id_after
+    type: generator
+    config:
+      expression: '0'
+      variable: coupon_id_after
+
   - name: 查询未付订单优惠券
     type: http
     config:
@@ -1091,16 +1204,23 @@ nodes:
       expect_body:
         errorCode: 0
 
-  - name: 签名-支付未支付充电订单
+  # 判断是否有可用优惠券
+  - name: 判断-是否有可用优惠券(后)
+    type: if-else
+    config:
+      expr: '${coupon_id_after} != 0'
+
+  # 有券分支
+  - name: 签名-支付未支付订单(含券)
     type: generator
     config:
-      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id_after},\"couponId\":${coupon_id_after}}")}'
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id_after},\"couponId\":\"${coupon_id_after}\"}")}'
       variable: sign_result_22
       extract:
         api_sign: "$.sign"
         api_ts: "$.ts"
 
-  - name: 支付未支付订单
+  - name: 支付未支付订单(含券)
     type: http
     block_on_error: true
     config:
@@ -1111,7 +1231,33 @@ nodes:
         Authorization: "${token}"
         x-ev-api-sign: "${api_sign}"
         x-ev-api-timestamp: "${api_ts}"
-      body: '{"orderId":${unpaid_order_id_after},"couponId":${coupon_id_after}}'
+      body: '{"orderId":${unpaid_order_id_after},"couponId":"${coupon_id_after}"}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  # 无券分支
+  - name: 签名-支付未支付订单(无券)
+    type: generator
+    config:
+      expression: '${__so("sign","sign","${rsa_pri_key}","{\"orderId\":${unpaid_order_id_after}}")}'
+      variable: sign_result_22b
+      extract:
+        api_sign: "$.sign"
+        api_ts: "$.ts"
+
+  - name: 支付未支付订单(无券)
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${baseurl}${api_pay_order}"
+      headers:
+        Content-Type: application/json
+        Authorization: "${token}"
+        x-ev-api-sign: "${api_sign}"
+        x-ev-api-timestamp: "${api_ts}"
+      body: '{"orderId":${unpaid_order_id_after}}'
       timeout: 10000
       expect_body:
         errorCode: 0
@@ -1310,7 +1456,7 @@ nodes:
   - name: 重置占位订单ID
     type: generator
     config:
-      expression: '""'
+      expression: '0'
       variable: occupy_order_id
 
   - name: 轮询占位订单
@@ -1320,24 +1466,38 @@ nodes:
       exit_conditions:
         - variable: occupy_order_id
           operator: not_equals
-          value: ""
+          value: "0"
       interval_seconds: 30
       max_iterations: 10
       steps:
-        - name: 查询占位订单
+        - name: 签名-查询占位订单
           type: generator
-          block_on_error: true
           config:
-            expression: '${__so("sign","sign_post","${rsa_pri_key}","${baseurl}${api_query_occupy_order}","${token}","{\"occupyOrderStatusList\":[2]}")}'
-            variable: occupy_query_resp
+            expression: '${__so("sign","sign","${rsa_pri_key}","{\"occupyOrderStatusList\":[2]}")}'
+            variable: sign_result_occupy
+            extract:
+              api_sign: "$.sign"
+              api_ts: "$.ts"
+
+        - name: 查询占位订单
+          request:
+            method: POST
+            url: "${baseurl}${api_query_occupy_order}"
+            headers:
+              Authorization: "${token}"
+              Content-Type: application/json
+              x-ev-api-sign: "${api_sign}"
+              x-ev-api-timestamp: "${api_ts}"
+            body: '{"occupyOrderStatusList":[2]}'
           extract:
-            occupy_order_id: "$.data[0].chargeOccupyOrderId"
+            - variable: occupy_order_id
+              path: "$.data[0].chargeOccupyOrderId"
 
   # --- 29. 支付占位订单 ---
   - name: 判断-是否有未支付占位订单
     type: if-else
     config:
-      expr: '${occupy_order_id} != ""'
+      expr: '${occupy_order_id} != "0"'
 
   - name: 签名-支付充电后占位订单
     type: generator
@@ -1373,11 +1533,12 @@ nodes:
 # Teardown: 断开模拟器连接
 # =============================================================================
 teardown:
+  # routePath 复用主流程 获取routePath-setup 中已提取的 ${route_path}
   - name: 断开模拟器
     type: http
     config:
       method: POST
-      url: "${simurl}${sim_force_close}"
+      url: "${simurl}${sim_force_close}${route_path}"
       headers:
         Content-Type: application/json
       body: '{"postId":${post_id}}'
@@ -1409,6 +1570,8 @@ edges:
   - from: 空闲已插枪
     to: 空闲已插枪_delay
   - from: 空闲已插枪_delay
+    to: 获取routePath-setup
+  - from: 获取routePath-setup
     to: 配置充电数据
   - from: 配置充电数据
     to: 配置充电数据_delay
@@ -1439,22 +1602,22 @@ edges:
     to: 生成-预付金额
   - from: 生成-预付金额
     to: 生成-充电策略选择
-  # 充电策略→限额值三分支(strategy=0/1/2各走一条路径, 汇合到计算-桩预计下线时间)
+  # 充电策略→限额值三分支
   - from: 生成-充电策略选择
     to: 判断-充电策略类型
-  # 分支1: strategy=="0" → AutoFull, limitValue=0
+  # 分支1: strategy==0 (AutoFull)
   - from: 判断-充电策略类型
     to: 计算-充满即停限额值
     condition: "__if_true__"
-  # 非0 → 继续判断1还是2
+  # 分支2+3: strategy!=0, 继续判断1或2
   - from: 判断-充电策略类型
     to: 判断-充电策略1或2
     condition: "__if_false__"
-  # 分支2: strategy=="1" → AmountLimit, limitValue=prePayAmount×0.75
+  # 分支2: strategy==1 (AmountLimit)
   - from: 判断-充电策略1或2
     to: 计算-按金额限制值
     condition: "__if_true__"
-  # 分支3: strategy=="2" → SOCLimit, limitValue=soc
+  # 分支3: strategy==2 (SOCLimit)
   - from: 判断-充电策略1或2
     to: 计算-按SOC限制值
     condition: "__if_false__"
@@ -1485,16 +1648,30 @@ edges:
   - from: 查询待支付订单
     to: 判断-是否有待支付充电订单
   - from: 判断-是否有待支付充电订单
-    to: 查询待支付订单优惠券
+    to: 初始化coupon_id
     condition: "__if_true__"
+  - from: 初始化coupon_id
+    to: 查询待支付订单优惠券
   - from: 判断-是否有待支付充电订单
     to: 签名-查询待支付占位订单
     condition: "__if_false__"
   - from: 查询待支付订单优惠券
-    to: 签名-支付待支付充电订单
-  - from: 签名-支付待支付充电订单
-    to: 支付待支付订单
-  - from: 支付待支付订单
+    to: 判断-是否有可用优惠券
+  # 有券分支
+  - from: 判断-是否有可用优惠券
+    to: 签名-支付待支付订单(含券)
+    condition: "__if_true__"
+  - from: 签名-支付待支付订单(含券)
+    to: 支付待支付订单(含券)
+  - from: 支付待支付订单(含券)
+    to: 支付待支付订单_delay
+  # 无券分支
+  - from: 判断-是否有可用优惠券
+    to: 签名-支付待支付订单(无券)
+    condition: "__if_false__"
+  - from: 签名-支付待支付订单(无券)
+    to: 支付待支付订单(无券)
+  - from: 支付待支付订单(无券)
     to: 支付待支付订单_delay
   - from: 支付待支付订单_delay
     to: 签名-查询待支付占位订单
@@ -1563,8 +1740,10 @@ edges:
   - from: 轮询充电状态
     to: 判断-是否强制停止充电
   - from: 判断-是否强制停止充电
-    to: 强制停止充电
+    to: 签名-强制停止充电
     condition: "__if_true__"
+  - from: 签名-强制停止充电
+    to: 强制停止充电
   - from: 判断-是否强制停止充电
     to: 判断-是否查询充电曲线
     condition: "__if_false__"
@@ -1589,16 +1768,30 @@ edges:
   - from: 查询未支付订单
     to: 判断-是否有未支付充电订单
   - from: 判断-是否有未支付充电订单
-    to: 查询未付订单优惠券
+    to: 初始化coupon_id_after
     condition: "__if_true__"
+  - from: 初始化coupon_id_after
+    to: 查询未付订单优惠券
   - from: 判断-是否有未支付充电订单
     to: 判断-是否强制支付
     condition: "__if_false__"
   - from: 查询未付订单优惠券
-    to: 签名-支付未支付充电订单
-  - from: 签名-支付未支付充电订单
-    to: 支付未支付订单
-  - from: 支付未支付订单
+    to: 判断-是否有可用优惠券(后)
+  # 有券分支
+  - from: 判断-是否有可用优惠券(后)
+    to: 签名-支付未支付订单(含券)
+    condition: "__if_true__"
+  - from: 签名-支付未支付订单(含券)
+    to: 支付未支付订单(含券)
+  - from: 支付未支付订单(含券)
+    to: 支付未支付订单_delay
+  # 无券分支
+  - from: 判断-是否有可用优惠券(后)
+    to: 签名-支付未支付订单(无券)
+    condition: "__if_false__"
+  - from: 签名-支付未支付订单(无券)
+    to: 支付未支付订单(无券)
+  - from: 支付未支付订单(无券)
     to: 支付未支付订单_delay
   - from: 支付未支付订单_delay
     to: 判断-是否强制支付
