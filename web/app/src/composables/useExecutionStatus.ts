@@ -42,7 +42,23 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
   // Version counter to trigger dependent computeds without replacing Map objects
   const version = ref(0)
 
+  // Throttle version bumps: batch rapid WS events into ~200ms intervals
+  // to prevent excessive re-renders under high concurrency
+  let pendingBump = false
+  let bumpTimer: ReturnType<typeof setTimeout> | null = null
+
   function bumpVersion() {
+    if (pendingBump) return // already scheduled
+    pendingBump = true
+    bumpTimer = setTimeout(() => {
+      version.value++
+      pendingBump = false
+    }, 200)
+  }
+
+  function bumpVersionImmediate() {
+    if (bumpTimer) { clearTimeout(bumpTimer); bumpTimer = null }
+    pendingBump = false
     version.value++
   }
 
@@ -189,6 +205,8 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
   function selectChain(chainId: string) {
     selectedChainId.value = chainId
     viewMode.value = 'chain'
+    // Immediate bump so the UI updates right away when user selects a chain
+    bumpVersionImmediate()
   }
 
   function initFromSpans(spans: SpanDTO[]) {
@@ -226,8 +244,8 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
       aggregateStatus.value.set(nodeId, counts)
     }
 
-    // Trigger reactivity for shallowRef
-    bumpVersion()
+    // Trigger reactivity for shallowRef immediately on init
+    bumpVersionImmediate()
   }
 
   function spanStatusFromSpan(status: string): NodeStatus {

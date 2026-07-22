@@ -43,16 +43,17 @@
     </VueFlow>
 
     <!-- Execution view mode toolbar (shown when running) -->
-    <div v-if="isRunning" class="exec-toolbar">
+    <div v-if="isRunning" class="exec-toolbar" :class="{ 'chain-switch-flash': chainSwitchFlash }">
       <button :class="['exec-tab', { active: execViewMode === 'aggregate' }]" @click="switchView('aggregate')">聚合视图</button>
       <button :class="['exec-tab', { active: execViewMode === 'chain' }]" @click="switchView('chain')">单链路视图</button>
       <CustomSelect
         v-show="execViewMode === 'chain'"
         v-model="localSelectedChain"
-        :options="chainOptions"
+        :options="chainSelectOpen ? frozenChainOptions : chainOptions"
         placeholder="选择链路"
         font-size="11px"
         @update:modelValue="onChainSelect"
+        @openChange="onChainSelectOpenChange"
       />
       <div v-if="wsConnected" class="ws-indicator connected" title="WebSocket 已连接">●</div>
       <div v-else class="ws-indicator disconnected" title="WebSocket 已断开">●</div>
@@ -195,6 +196,22 @@ watch(selectedChainId, (val) => {
 function onChainSelect(value: string | number) {
   if (value) {
     selectChain(String(value))
+    // Flash feedback
+    chainSwitchFlash.value = true
+    setTimeout(() => { chainSwitchFlash.value = false }, 600)
+  }
+}
+
+// Freeze chain options while dropdown is open to prevent jarring list changes
+const chainSelectOpen = ref(false)
+const frozenChainOptions = ref<{ value: string; label: string }[]>([])
+const chainSwitchFlash = ref(false)
+
+function onChainSelectOpenChange(isOpen: boolean) {
+  chainSelectOpen.value = isOpen
+  if (isOpen) {
+    // Snapshot current options when opening
+    frozenChainOptions.value = [...chainOptions.value]
   }
 }
 
@@ -827,6 +844,15 @@ function minimapNodeColor(node: any) {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   padding: 4px;
+}
+
+.exec-toolbar.chain-switch-flash {
+  animation: chain-flash 0.6s ease-out;
+}
+
+@keyframes chain-flash {
+  0% { box-shadow: 0 0 0 2px var(--accent-primary), var(--shadow-md); }
+  100% { box-shadow: 0 0 0 0px transparent, var(--shadow-md); }
 }
 
 .exec-tab {

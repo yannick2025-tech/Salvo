@@ -53,6 +53,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number]
+  'openChange': [isOpen: boolean]
 }>()
 
 const selectRef = ref<HTMLElement>()
@@ -68,6 +69,7 @@ const displayLabel = computed(() => {
 function toggle() {
   if (props.disabled) return
   isOpen.value = !isOpen.value
+  emit('openChange', isOpen.value)
   if (isOpen.value) {
     nextTick(() => updateDropdownPosition())
   }
@@ -81,6 +83,7 @@ function select(value: string) {
     emit('update:modelValue', value)
   }
   isOpen.value = false
+  emit('openChange', false)
 }
 
 function updateDropdownPosition() {
@@ -97,7 +100,10 @@ function updateDropdownPosition() {
 
 function handleClickOutside(e: MouseEvent) {
   if (selectRef.value && !selectRef.value.contains(e.target as Node)) {
-    isOpen.value = false
+    if (isOpen.value) {
+      isOpen.value = false
+      emit('openChange', false)
+    }
   }
 }
 
