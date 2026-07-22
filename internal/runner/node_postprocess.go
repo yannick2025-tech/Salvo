@@ -213,8 +213,10 @@ func (n *sceneNode) applyExtract(out *dag.Output, extracts []nodeExtractEntry, i
 	// 解析 JSON
 	var jsonData map[string]any
 	if err := json.Unmarshal(responseBody, &jsonData); err != nil {
-		nodeLog.Debug("extract skipped: response is not valid JSON",
+		nodeLog.Warn("extract skipped: response is not valid JSON, variables will keep their current values",
 			logger.F("error", err),
+			logger.F("body_preview", truncateResponseBody(responseBody, 100)),
+			logger.F("extract_count", len(extracts)),
 		)
 		return
 	}
@@ -236,6 +238,14 @@ func (n *sceneNode) applyExtract(out *dag.Output, extracts []nodeExtractEntry, i
 			)
 		}
 	}
+}
+
+// truncateResponseBody truncates a response body for logging.
+func truncateResponseBody(body []byte, maxLen int) string {
+	if len(body) <= maxLen {
+		return string(body)
+	}
+	return string(body[:maxLen]) + "..."
 }
 
 

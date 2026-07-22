@@ -30,10 +30,10 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/plugin"
 	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
-	sharedcrypto "github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+	sharedcrypto "github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
 )
 
 // genLogAdapter adapts logger.Logger to the generator.Logger interface so that
@@ -1516,11 +1516,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		URL        string            `json:"url"`
 		Headers    map[string]string `json:"headers"`
 		Body       string            `json:"body"`
-		Timeout    any               `json:"timeout"`      // float64 or string (variable ref like ${timeout_ms})
-		ExpectBody map[string]any    `json:"expect_body"`  // JSON body assertions like {"errorCode": 0}
+		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
+		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
 		Form       json.RawMessage   `json:"form"`
-		AesDecrypt string            `json:"aes_decrypt"`  // AES key (base64) for decrypting encrypted response body
-		AesMode    int               `json:"aes_mode"`     // AES mode: 0=CBC (default), 1=GCM
+		AesDecrypt string            `json:"aes_decrypt"` // AES key (base64) for decrypting encrypted response body
+		AesMode    int               `json:"aes_mode"`    // AES mode: 0=CBC (default), 1=GCM
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -2346,6 +2346,14 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 
 	globalScope := variable.NewScope(variable.WithLevel(variable.ScopeGlobal))
 
+	// Global config variables (salvo.yaml) are set FIRST as base defaults.
+	// Scene variables are set AFTER and take precedence, ensuring that
+	// DAG-defined variables (e.g. order_id: "") are not polluted by
+	// unrelated global defaults (e.g. mock-server order_id: "67890").
+	for k, v := range r.cfg.Variables {
+		globalScope.Set(k, v)
+	}
+
 	if scene.Variables != "" {
 		var vars map[string]string
 		if err := json.Unmarshal([]byte(scene.Variables), &vars); err != nil {
@@ -2361,10 +2369,6 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 		scopeLog.Debug("scene variables loaded",
 			logger.F("variable_count", len(vars)),
 			logger.F("variables", string(jsonVars)))
-	}
-
-	for k, v := range r.cfg.Variables {
-		globalScope.Set(k, v)
 	}
 
 	// Resolve nested variable references in all variable values.
