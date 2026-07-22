@@ -63,6 +63,7 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 type yamlScene struct {
 	Name          string           `yaml:"name"`
 	Description   string           `yaml:"description"`
+	DefaultTimeout int            `yaml:"default_timeout,omitempty"`
 	Variables     []yamlVarItem    `yaml:"variables,omitempty"`
 	ConfigParams  map[string]string `yaml:"config_params,omitempty"`
 	DerivedParams map[string]string `yaml:"derived_params,omitempty"`
@@ -154,6 +155,9 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	}
 	if scene.Description == "" {
 		scene.Description = ys.Description
+	}
+	if ys.DefaultTimeout > 0 {
+		scene.DefaultTimeout = ys.DefaultTimeout
 	}
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
@@ -581,6 +585,7 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 	ys := yamlScene{
 		Name:          scene.Name,
 		Description:   scene.Description,
+		DefaultTimeout: scene.DefaultTimeout,
 		Variables:     varsList,
 		ConfigParams:  configParams,
 		DerivedParams: derivedParams,

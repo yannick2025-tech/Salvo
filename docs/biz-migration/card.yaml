@@ -1,4 +1,5 @@
 name: 个人卡充电流程(Salvo适配版)
+default_timeout: 1200
 description: |
   个人卡充电流程。
   payType=1(个人卡), payChannel=概率选择(微信70%/支付宝30%), orderSource=0(微信小程序)
