@@ -59,6 +59,9 @@ func generateRSAKey(t *testing.T) (*rsa.PrivateKey, string) {
 	return privKey, pkcs8Base64
 }
 
+// intPtr returns a pointer to the given int value.
+func intPtr(v int) *int { return &v }
+
 // TestWhileStepAESDecrypt_QueryChargingStatus simulates the Manhattan query-by-order-id
 // flow: sign request → HTTP POST → AES-encrypted response → decrypt → extract charging_status.
 //
@@ -114,7 +117,7 @@ func TestWhileStepAESDecrypt_QueryChargingStatus(t *testing.T) {
 			Body:    fmt.Sprintf(`{"orderId":"%s"}`, orderID),
 		},
 		AesDecrypt: aesKeyBase64,
-		AesMode:    0, // CBC
+		AesMode:    intPtr(0), // CBC
 		Extract: []extractEntry{
 			{Variable: "charging_status", Path: "$.data.chargingStatus"},
 			{Variable: "charging_soc", Path: "$.data.soc"},
@@ -138,7 +141,11 @@ func TestWhileStepAESDecrypt_QueryChargingStatus(t *testing.T) {
 
 	// --- Decrypt using the while step logic ---
 	if step.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
-		decrypted, decryptErr := aesDecryptResponse(httpResp.Body, step.AesDecrypt, step.AesMode)
+		aesMode := 1
+		if step.AesMode != nil {
+			aesMode = *step.AesMode
+		}
+		decrypted, decryptErr := aesDecryptResponse(httpResp.Body, step.AesDecrypt, aesMode)
 		require.NoError(t, decryptErr, "AES decrypt should succeed")
 		httpResp.Body = []byte(decrypted)
 	}
@@ -192,7 +199,7 @@ func TestWhileStepAESDecrypt_CreateOrder(t *testing.T) {
 			Body:    `{"chargingPointId":"test-point","orderSource":0}`,
 		},
 		AesDecrypt: aesKeyBase64,
-		AesMode:    0,
+		AesMode:    intPtr(0),
 		Extract: []extractEntry{
 			{Variable: "order_id", Path: "$.data.orderId"},
 		},
@@ -211,7 +218,11 @@ func TestWhileStepAESDecrypt_CreateOrder(t *testing.T) {
 
 	// Decrypt
 	require.NotEqual(t, uint8('{'), httpResp.Body[0], "response should be encrypted")
-	decrypted, err := aesDecryptResponse(httpResp.Body, step.AesDecrypt, step.AesMode)
+	aesMode2 := 1
+	if step.AesMode != nil {
+		aesMode2 = *step.AesMode
+	}
+	decrypted, err := aesDecryptResponse(httpResp.Body, step.AesDecrypt, aesMode2)
 	require.NoError(t, err)
 	httpResp.Body = []byte(decrypted)
 
@@ -245,7 +256,7 @@ func TestWhileStepAESDecrypt_PlainJSONSkip(t *testing.T) {
 			Body:    `{"orderId":"test"}`,
 		},
 		AesDecrypt: aesKeyBase64,
-		AesMode:    0,
+		AesMode:    intPtr(0),
 		Extract: []extractEntry{
 			{Variable: "charging_status", Path: "$.data.chargingStatus"},
 		},
@@ -319,7 +330,7 @@ func TestWhileStepAESDecrypt_MultipleSteps(t *testing.T) {
 				Body:    `{"orderId":"202607211619060001"}`,
 			},
 			AesDecrypt: aesKeyBase64,
-			AesMode:    0,
+			AesMode:    intPtr(0),
 			Extract: []extractEntry{
 				{Variable: "charging_status", Path: "$.data.chargingStatus"},
 			},
@@ -335,7 +346,11 @@ func TestWhileStepAESDecrypt_MultipleSteps(t *testing.T) {
 
 		// Decrypt
 		if httpResp.Body[0] != '{' {
-			decrypted, err := aesDecryptResponse(httpResp.Body, step.AesDecrypt, step.AesMode)
+			aesMode3 := 1
+			if step.AesMode != nil {
+				aesMode3 = *step.AesMode
+			}
+			decrypted, err := aesDecryptResponse(httpResp.Body, step.AesDecrypt, aesMode3)
 			require.NoError(t, err)
 			httpResp.Body = []byte(decrypted)
 		}
