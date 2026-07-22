@@ -45,6 +45,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
 		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN block_on_error BOOLEAN DEFAULT FALSE`,
+		`ALTER TABLE data_sources ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)
@@ -350,6 +351,7 @@ CREATE TABLE IF NOT EXISTS data_sources (
 	columns         TEXT    NOT NULL DEFAULT '[]',
 	rows            TEXT    NOT NULL DEFAULT '[]',
 	row_count       INTEGER NOT NULL DEFAULT 0,
+	source          TEXT    NOT NULL DEFAULT 'csv',
 	created_at      DATETIME NOT NULL,
 	updated_at      DATETIME NOT NULL,
 	deleted_at      DATETIME DEFAULT NULL,

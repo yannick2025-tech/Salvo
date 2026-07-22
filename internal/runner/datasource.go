@@ -119,6 +119,7 @@ func ToDataSourceModel(sceneID snowflake.ID, fileName string, columns []string, 
 		Columns:   string(columnsJSON),
 		Rows:      string(rowsJSON),
 		RowCount:  len(rows),
+		Source:    "csv",
 	}
 }
 

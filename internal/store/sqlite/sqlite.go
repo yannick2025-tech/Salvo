@@ -1066,20 +1066,20 @@ func (r *DataSourceRepo) Create(ctx context.Context, ds *model.DataSource) error
 	ds.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO data_sources (id, scene_id, name, file_name, columns, rows, row_count, created_at, updated_at, deleted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		INSERT INTO data_sources (id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		ds.ID, ds.SceneID, ds.Name, ds.FileName, ds.Columns, ds.Rows,
-		ds.RowCount, ds.CreatedAt, ds.UpdatedAt)
+		ds.RowCount, ds.Source, ds.CreatedAt, ds.UpdatedAt)
 	return err
 }
 
 func (r *DataSourceRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.DataSource, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, name, file_name, columns, rows, row_count, created_at, updated_at
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
 		FROM data_sources WHERE id=? AND deleted_at IS NULL`, id)
 	ds := &model.DataSource{}
 	err := row.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
-		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.CreatedAt, &ds.UpdatedAt)
+		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1088,11 +1088,11 @@ func (r *DataSourceRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.D
 
 func (r *DataSourceRepo) GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) (*model.DataSource, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, name, file_name, columns, rows, row_count, created_at, updated_at
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
 		FROM data_sources WHERE scene_id=? AND name=? AND deleted_at IS NULL`, sceneID, name)
 	ds := &model.DataSource{}
 	err := row.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
-		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.CreatedAt, &ds.UpdatedAt)
+		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1101,7 +1101,7 @@ func (r *DataSourceRepo) GetBySceneIDAndName(ctx context.Context, sceneID snowfl
 
 func (r *DataSourceRepo) ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, scene_id, name, file_name, columns, rows, row_count, created_at, updated_at
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
 		FROM data_sources WHERE scene_id=? AND deleted_at IS NULL
 		ORDER BY created_at ASC`, sceneID)
 	if err != nil {
@@ -1113,7 +1113,7 @@ func (r *DataSourceRepo) ListBySceneID(ctx context.Context, sceneID snowflake.ID
 	for rows.Next() {
 		ds := &model.DataSource{}
 		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
-			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sources = append(sources, ds)

@@ -282,6 +282,7 @@ type DataSourceDTO struct {
 	FileName  string       `json:"file_name"`
 	Columns   []string     `json:"columns"`
 	RowCount  int          `json:"row_count"`
+	Source    string       `json:"source"` // "yaml" or "csv"
 	CreatedAt time.Time    `json:"created_at"`
 	UpdatedAt time.Time    `json:"updated_at"`
 }

@@ -170,12 +170,23 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		if yds.Name == "" {
 			return dto.ErrorResp(400, "data source name is required")
 		}
+		// Skip if a CSV-uploaded data source with same name already exists
+		existing, _ := h.dataSources.GetBySceneIDAndName(r.Context(), scene.ID, yds.Name)
+		if existing != nil && existing.Source == "csv" {
+			dsNameToID[yds.Name] = existing.ID
+			continue
+		}
+		// Delete existing yaml data source with same name before creating
+		if existing != nil {
+			_ = h.dataSources.Delete(r.Context(), existing.ID)
+		}
 		rowsJSON, _ := json.Marshal(yds.Rows)
 		ds := &model.DataSource{
 			SceneID: scene.ID,
 			Name:    yds.Name,
 			Columns: strings.Join(yds.Columns, ","),
 			Rows:    string(rowsJSON),
+			Source:  "yaml",
 		}
 		if err := h.dataSources.Create(r.Context(), ds); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create data source %q: %v", yds.Name, err))
@@ -450,6 +461,27 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
 	}
 
+	// Fetch data sources with source=yaml for YAML export.
+	var yamlDataSources []yamlDataSource
+	allDataSources, _ := h.dataSources.ListBySceneID(r.Context(), req.ID)
+	for _, ds := range allDataSources {
+		if ds.Source == "yaml" {
+			var columns []string
+			if ds.Columns != "" {
+				json.Unmarshal([]byte(ds.Columns), &columns)
+			}
+			var rows []map[string]string
+			if ds.Rows != "" {
+				json.Unmarshal([]byte(ds.Rows), &rows)
+			}
+			yamlDataSources = append(yamlDataSources, yamlDataSource{
+				Name:    ds.Name,
+				Columns: columns,
+				Rows:    rows,
+			})
+		}
+	}
+
 	// Parse Variables JSON.
 	var varsList []yamlVarItem
 	var configParams map[string]string
@@ -586,6 +618,7 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 		Name:          scene.Name,
 		Description:   scene.Description,
 		DefaultTimeout: scene.DefaultTimeout,
+		DataSources:   yamlDataSources,
 		Variables:     varsList,
 		ConfigParams:  configParams,
 		DerivedParams: derivedParams,
@@ -1030,6 +1063,7 @@ func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
 		FileName:  dsModel.FileName,
 		Columns:   columns,
 		RowCount:  dsModel.RowCount,
+		Source:    dsModel.Source,
 		CreatedAt: dsModel.CreatedAt,
 		UpdatedAt: dsModel.UpdatedAt,
 	})
@@ -1060,6 +1094,7 @@ func (h *Handler) ListDataSources(r *http.Request) dto.Response {
 			FileName:  ds.FileName,
 			Columns:   columns,
 			RowCount:  ds.RowCount,
+			Source:    ds.Source,
 			CreatedAt: ds.CreatedAt,
 			UpdatedAt: ds.UpdatedAt,
 		})

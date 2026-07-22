@@ -123,7 +123,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
             </div>
             <div class="ds-info">
-              <div class="ds-name">{{ ds.file_name }}</div>
+              <div class="ds-name">{{ ds.file_name }} <span class="ds-source" :class="ds.source">{{ ds.source === 'yaml' ? 'yaml配置' : 'csv上传' }}</span></div>
               <div class="ds-meta">{{ ds.columns?.length ?? 0 }} 列 · {{ ds.row_count ?? 0 }} 行</div>
             </div>
             <button v-if="canWriteScene" class="btn-icon btn-del-ds" @click.stop="handleDsDelete(ds.id)" title="删除">
@@ -992,6 +992,24 @@ onMounted(() => {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ds-source {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+.ds-source.yaml {
+  background: rgba(45, 212, 191, 0.15);
+  color: var(--accent-primary);
+}
+.ds-source.csv {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 .ds-meta {
   font-size: 11px;

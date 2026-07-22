@@ -7,6 +7,7 @@ export interface DataSourceDTO {
   file_name: string
   columns: string[]
   row_count: number
+  source: string // "yaml" or "csv"
   created_at: string
   updated_at: string
 }

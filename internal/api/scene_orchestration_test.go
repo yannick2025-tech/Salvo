@@ -294,6 +294,101 @@ func TestDataSourceEmptyCSV(t *testing.T) {
 	assert.Equal(t, 3, len(ds.Columns))
 }
 
+// --- 10.4 DataSource source field: CSV not overwritten by YAML import ---
+
+func TestYAMLImportDoesNotOverwriteCSVDataSource(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Step 1: Import YAML with a data source named "user_charger"
+	yamlContent := `
+name: source-override-test
+description: Test YAML import does not overwrite CSV data source
+data_sources:
+  - name: user_charger
+    columns:
+      - phone
+      - pointId
+      - postId
+    rows:
+      - phone: "11111111111"
+        pointId: "2200000001"
+        postId: "22000000"
+nodes:
+  - name: Setup
+    type: setup
+    config:
+      url: http://localhost/init
+  - name: Teardown
+    type: teardown
+    config:
+      url: http://localhost/cleanup
+`
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Source Override Test",
+		YAML: yamlContent,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "YAML import failed: %s", result.Message)
+
+	importData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(importData, &scene))
+
+	// Verify the YAML-imported data source has source=yaml
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/list", dto.SceneIDRequest{
+		SceneID: scene.ID,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+	dsListData, _ := json.Marshal(result.Data)
+	var dsList []dto.DataSourceDTO
+	require.NoError(t, json.Unmarshal(dsListData, &dsList))
+	require.Equal(t, 1, len(dsList), "expected 1 data source after YAML import")
+	assert.Equal(t, "yaml", dsList[0].Source, "YAML-imported data source should have source=yaml")
+	assert.Equal(t, "user_charger", dsList[0].Name)
+
+	// Step 2: Upload CSV with the same name "user_charger" (should overwrite the yaml one)
+	csvResp := postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/upload", dto.UploadDataSourceRequest{
+		SceneID:  scene.ID,
+		FileName: "user_charger.csv",
+		Content:  "phone,pointId,postId\n15550000000,1100000001,11000000\n16660000000,2200000002,22000000\n",
+	})
+	result = decodeResponse(t, csvResp)
+	assert.Equal(t, 0, result.Code, "CSV upload failed: %s", result.Message)
+
+	// Verify the CSV-uploaded data source has source=csv and overwrote the yaml one
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/list", dto.SceneIDRequest{
+		SceneID: scene.ID,
+	})
+	result = decodeResponse(t, resp)
+	dsListData, _ = json.Marshal(result.Data)
+	require.NoError(t, json.Unmarshal(dsListData, &dsList))
+	require.Equal(t, 1, len(dsList), "expected 1 data source after CSV upload")
+	assert.Equal(t, "csv", dsList[0].Source, "CSV-uploaded data source should have source=csv")
+	assert.Equal(t, 2, dsList[0].RowCount, "CSV should have 2 data rows")
+
+	// Step 3: Re-import YAML with same data source name — CSV should NOT be overwritten
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Source Override Test V2",
+		YAML: yamlContent,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code, "second YAML import failed: %s", result.Message)
+
+	// Verify CSV data source is still intact
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/list", dto.SceneIDRequest{
+		SceneID: scene.ID,
+	})
+	result = decodeResponse(t, resp)
+	dsListData, _ = json.Marshal(result.Data)
+	require.NoError(t, json.Unmarshal(dsListData, &dsList))
+	require.Equal(t, 1, len(dsList), "expected 1 data source after re-import")
+	assert.Equal(t, "csv", dsList[0].Source, "CSV data source should NOT be overwritten by YAML import")
+	assert.Equal(t, 2, dsList[0].RowCount, "CSV data should still have 2 rows")
+	assert.Equal(t, "user_charger", dsList[0].Name)
+}
+
 // --- 11.3 Group Node Integration ---
 
 func TestGroupNodeCreateAndRetrieve(t *testing.T) {

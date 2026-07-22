@@ -82,6 +82,7 @@ type DataSource struct {
 	Columns  string       `json:"columns"` // JSON array of column names
 	Rows     string       `json:"rows"`    // JSON array of row objects
 	RowCount int          `json:"row_count"`
+	Source   string       `json:"source"` // "yaml" or "csv"
 }
 
 // Edge represents a directed edge between two DAG nodes.
