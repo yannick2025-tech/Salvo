@@ -1386,7 +1386,7 @@ func (n *sceneNode) resolveAllExpressions(str string, vars map[string]any, nodeL
 		}
 		nodeLog.Warn("expression resolution failed, falling back to legacy resolution",
 			logger.F("error", err),
-			logger.F("input_preview", truncateString(str, 100)),
+			logger.F("input", str),
 		)
 	}
 	// Fallback: legacy two-step resolution
@@ -1525,7 +1525,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
 			logger.F("error", err),
-			logger.F("config_preview", truncateString(n.config, 200)),
+			logger.F("config", n.config),
 		)
 		return nil, fmt.Errorf("parse http config: %w", err)
 	}
@@ -1604,7 +1604,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		body := n.resolveAllExpressions(cfg.Body, variablesOrNil(input), nodeLog)
 		req.Body = []byte(body)
 		nodeLog.Debug("resolved body",
-			logger.F("body_preview", truncateString(body, 300)),
+			logger.F("body", body),
 		)
 	}
 
@@ -1721,12 +1721,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			if !httpResp.IsSuccess() && len(httpResp.Body) > 0 {
 				nodeLog.Debug("HTTP response body (non-2xx)",
 					logger.F("status", httpResp.StatusCode),
-					logger.F("body_preview", truncateString(string(httpResp.Body), 500)),
+					logger.F("body", string(httpResp.Body)),
 				)
 			} else if len(httpResp.Body) > 0 {
 				nodeLog.Debug("HTTP response body",
 					logger.F("status", httpResp.StatusCode),
-					logger.F("body_preview", truncateString(string(httpResp.Body), 500)),
+					logger.F("body", string(httpResp.Body)),
 				)
 			}
 		}
@@ -1734,7 +1734,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 	// Check if HTTP response is non-2xx
 	if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
-		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, truncateString(string(httpResp.Body), 200))
+		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, string(httpResp.Body))
 
 		if n.blockOnError {
 			nodeLog.Error("HTTP request failed with non2xx status and block_on_error enabled",
@@ -1770,13 +1770,13 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 					nodeLog.Error("AES decrypt failed",
 						logger.F("error", decryptErr),
 						logger.F("aes_mode", aesMode),
-						logger.F("body_preview", truncateString(string(httpResp.Body), 100)),
+						logger.F("body", string(httpResp.Body)),
 					)
 				} else {
 					httpResp.Body = []byte(decrypted)
 					nodeLog.Info("AES decrypt succeeded",
 						logger.F("decrypted_len", len(decrypted)),
-						logger.F("body_preview", truncateString(decrypted, 200)),
+						logger.F("body", decrypted),
 					)
 				}
 			} else {
@@ -1792,7 +1792,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			if err := json.Unmarshal(httpResp.Body, &bodyJSON); err != nil {
 				nodeLog.Error("failed to parse response body for expect_body validation",
 					logger.F("error", err),
-					logger.F("body_preview", truncateString(string(httpResp.Body), 200)),
+					logger.F("body", string(httpResp.Body)),
 				)
 			} else {
 				for key, expectedVal := range cfg.ExpectBody {
@@ -2365,7 +2365,7 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 		if err := json.Unmarshal([]byte(scene.Variables), &vars); err != nil {
 			scopeLog.Error("failed to parse scene variables JSON",
 				logger.F("error", err),
-				logger.F("variables_preview", truncateString(scene.Variables, 200)))
+				logger.F("variables", scene.Variables))
 			return nil, fmt.Errorf("parse scene variables: %w", err)
 		}
 		for k, v := range vars {
@@ -2644,15 +2644,6 @@ func isLikelyFilePath(v string) bool {
 		return true
 	}
 	return false
-}
-
-// truncateString returns a truncated version of s, limited to maxLen characters.
-// If s exceeds maxLen, it appends "..." to indicate truncation.
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
 }
 
 // isSensitiveHeader returns true for headers that carry secrets/tokens.
