@@ -47,6 +47,8 @@ type stepConfig struct {
 	FailAfterConsecutive int             `json:"fail_after_consecutive,omitempty"`
 	FailMessage  string                  `json:"fail_message,omitempty"`
 	BlockOnError bool                    `json:"block_on_error,omitempty"`
+	AesDecrypt   string                  `json:"aes_decrypt,omitempty"` // AES key (base64) for decrypting encrypted response body
+	AesMode      int                     `json:"aes_mode,omitempty"`    // AES mode: 0=CBC (default), 1=GCM
 }
 
 // stepConditionConfig defines a condition for step execution.
@@ -276,14 +278,27 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 						}
 
 						// Extract variables into local map, then merge back under lock.
-						if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(s.Extract) > 0 {
-							localExtracted := make(map[string]any)
-							extractVarsFromResponse(httpResp.Body, s.Extract, localExtracted)
-							varsMu.Lock()
-							for k, v := range localExtracted {
-								loopVars[k] = v
+						if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+							// AES decrypt before extract if configured.
+							if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
+								aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
+								if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, s.AesMode); decryptErr != nil {
+									nodeLog.Warn("timed trigger AES decrypt failed",
+										logger.F("step", s.Name),
+										logger.F("error", decryptErr))
+								} else {
+									httpResp.Body = []byte(decrypted)
+								}
 							}
-							varsMu.Unlock()
+							if len(s.Extract) > 0 {
+								localExtracted := make(map[string]any)
+								extractVarsFromResponse(httpResp.Body, s.Extract, localExtracted)
+								varsMu.Lock()
+								for k, v := range localExtracted {
+									loopVars[k] = v
+								}
+								varsMu.Unlock()
+							}
 						}
 					}
 
@@ -616,6 +631,31 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 		logger.F("step", step.Name),
 		logger.F("status", httpResp.StatusCode),
 		logger.F("latency_ms", httpResp.Latency.Milliseconds()))
+
+	// AES decrypt: if aes_decrypt is configured and the response body is
+	// not plain JSON (doesn't start with '{'), decrypt it before extract.
+	if step.AesDecrypt != "" && len(httpResp.Body) > 0 {
+		aesKeyStr := resolveWithVariables(step.AesDecrypt, loopVars)
+		if httpResp.Body[0] != '{' {
+			decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, step.AesMode)
+			if decryptErr != nil {
+				nodeLog.Error("while step AES decrypt failed",
+					logger.F("step", step.Name),
+					logger.F("error", decryptErr),
+					logger.F("aes_mode", step.AesMode),
+				)
+			} else {
+				httpResp.Body = []byte(decrypted)
+				nodeLog.Info("while step AES decrypt succeeded",
+					logger.F("step", step.Name),
+					logger.F("decrypted_len", len(decrypted)),
+				)
+			}
+		} else {
+			nodeLog.Debug("while step AES decrypt skipped: response is plain JSON",
+				logger.F("step", step.Name))
+		}
+	}
 
 	// Extract variables from response.
 	if len(step.Extract) > 0 {

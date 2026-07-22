@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -29,6 +30,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/plugin"
 	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
+	sharedcrypto "github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -1514,9 +1516,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		URL        string            `json:"url"`
 		Headers    map[string]string `json:"headers"`
 		Body       string            `json:"body"`
-		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
-		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
+		Timeout    any               `json:"timeout"`      // float64 or string (variable ref like ${timeout_ms})
+		ExpectBody map[string]any    `json:"expect_body"`  // JSON body assertions like {"errorCode": 0}
 		Form       json.RawMessage   `json:"form"`
+		AesDecrypt string            `json:"aes_decrypt"`  // AES key (base64) for decrypting encrypted response body
+		AesMode    int               `json:"aes_mode"`     // AES mode: 0=CBC (default), 1=GCM
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -1746,6 +1750,33 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 		// Record failed node details even without block_on_error
 		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
+	}
+
+	// AES decrypt: if aes_decrypt is configured and the response body is
+	// not plain JSON (doesn't start with '{'), decrypt it before further processing.
+	if cfg.AesDecrypt != "" {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
+			// Resolve variable references in the AES key (e.g. "${aes_key}")
+			aesKeyStr := n.resolveAllExpressions(cfg.AesDecrypt, variablesOrNil(input), nodeLog)
+			if len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
+				decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, cfg.AesMode)
+				if decryptErr != nil {
+					nodeLog.Error("AES decrypt failed",
+						logger.F("error", decryptErr),
+						logger.F("aes_mode", cfg.AesMode),
+						logger.F("body_preview", truncateString(string(httpResp.Body), 100)),
+					)
+				} else {
+					httpResp.Body = []byte(decrypted)
+					nodeLog.Info("AES decrypt succeeded",
+						logger.F("decrypted_len", len(decrypted)),
+						logger.F("body_preview", truncateString(decrypted, 200)),
+					)
+				}
+			} else {
+				nodeLog.Debug("AES decrypt skipped: response is plain JSON")
+			}
+		}
 	}
 
 	// Validate expect_body assertions against the JSON response body
@@ -2632,4 +2663,42 @@ func maskValue(v string) string {
 		return "****"
 	}
 	return v[:4] + "****" + v[len(v)-4:]
+}
+
+// aesDecryptResponse decrypts an AES-encrypted HTTP response body.
+// The body is expected to be a JSON-encoded string (with surrounding quotes)
+// containing a base64-encoded ciphertext.
+// mode: 0 = AES-CBC (default, IV derived from key[:16]), 1 = AES-GCM.
+func aesDecryptResponse(body []byte, aesKeyBase64 string, mode int) (string, error) {
+	// Step 1: Parse the body as a JSON string value (strip surrounding quotes).
+	var ciphertextBase64 string
+	if err := json.Unmarshal(body, &ciphertextBase64); err != nil {
+		// If not a JSON string, try using the raw body as the ciphertext.
+		ciphertextBase64 = strings.Trim(string(body), "\"")
+	}
+
+	// Step 2: Decode the base64 AES key to get the raw key bytes.
+	keyBytes, err := base64.StdEncoding.DecodeString(aesKeyBase64)
+	if err != nil {
+		return "", fmt.Errorf("decode aes key: %w", err)
+	}
+
+	// Step 3: Decrypt based on mode.
+	switch mode {
+	case 1: // AES-GCM
+		iv := keyBytes[:16]
+		plaintext, err := sharedcrypto.GCMDecrypt(ciphertextBase64, keyBytes, iv)
+		if err != nil {
+			return "", fmt.Errorf("aes-gcm decrypt: %w", err)
+		}
+		return plaintext, nil
+	default: // AES-CBC (mode 0 or unspecified)
+		// IV is derived from the first 16 bytes of the key (Manhattan convention).
+		iv := keyBytes[:16]
+		plaintext, err := sharedcrypto.CBCDecryptWithIV(ciphertextBase64, keyBytes, iv)
+		if err != nil {
+			return "", fmt.Errorf("aes-cbc decrypt: %w", err)
+		}
+		return plaintext, nil
+	}
 }

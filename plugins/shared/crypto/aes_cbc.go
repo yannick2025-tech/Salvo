@@ -73,6 +73,42 @@ func CBCDecrypt(ciphertextB64 string, key []byte) (string, error) {
 	return string(plaintext), nil
 }
 
+// CBCDecryptWithIV 使用 AES-CBC 解密（外部传入 IV，适用于 Manhattan 等从 key 派生 IV 的场景）。
+//
+// 与 CBCDecrypt 不同，此函数不从密文头部读取 IV，而是由调用方显式传入。
+// 典型用法：Manhattan 平台 API 响应的 AES 加密数据，IV = key[:16]。
+//
+// 参数：
+//   - ciphertextB64: base64 编码的密文（不含 IV）
+//   - key:           原始密钥字节
+//   - iv:            IV 字节（长度必须等于 aes.BlockSize）
+//
+// 返回：明文字符串
+func CBCDecryptWithIV(ciphertextB64 string, key, iv []byte) (string, error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextB64)
+	if err != nil {
+		return "", fmt.Errorf("decode ciphertext: %w", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("new cipher: %w", err)
+	}
+	if len(ciphertext) == 0 {
+		return "", errors.New("ciphertext is empty")
+	}
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return "", errors.New("ciphertext not aligned to block size")
+	}
+	plaintext := make([]byte, len(ciphertext))
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(plaintext, ciphertext)
+	plaintext, err = pkcs7Unpad(plaintext, aes.BlockSize)
+	if err != nil {
+		return "", fmt.Errorf("unpad: %w", err)
+	}
+	return string(plaintext), nil
+}
+
 // pkcs7Pad adds PKCS7 padding.
 func pkcs7Pad(data []byte, blockSize int) []byte {
 	padding := blockSize - len(data)%blockSize
