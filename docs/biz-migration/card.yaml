@@ -95,6 +95,9 @@ variables:
     value: ""
   - key: aes_key
     value: ""
+  # AES 加密模式：1=GCM（默认，Manhattan UAT 当前使用），0=CBC（老版本，仅特殊节点需要时显式设为 0）
+  - key: aes_mode
+    value: "1"
   - key: sign_apis_json
     value: "[]"
   - key: post_id
@@ -588,6 +591,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderClassification":[3]}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         unpaid_order_id: "$.data[0].orderId"
       expect_body:
@@ -654,6 +658,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id},"couponId":"${coupon_id}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -680,6 +685,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -711,6 +717,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"occupyOrderStatusList":[2]}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         occupy_order_id: "$.data[0].chargeOccupyOrderId"
       expect_body:
@@ -744,6 +751,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_before},"payChannel":${occupy_pay_channel}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -775,6 +783,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"pointId":"${user_charger.pointId}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         account_id: "$.data.accountInfoRsp.accountId"
         tenant_id: "$.data.tenantId"
@@ -805,6 +814,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         user_id: "$.data.userId"
       expect_body:
@@ -832,6 +842,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"accountId":"${account_id}","tenantId":"${tenant_id}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         vip_status: "$.data.userVipDetailRspVO.userVipStatus"
         today_left_count: "$.data.userVipDetailRspVO.userVipPackageCycleInfo.toDayLeftCount"
@@ -870,6 +881,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"pointId":"${user_charger.pointId}","activityNeed":[3]}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -895,6 +907,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"stationId":"${station_id}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         sell_flag: "$.data.SellFlag"
       expect_body:
@@ -944,6 +957,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '${create_order_body}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密（默认 aes_mode=1，无需显式指定）
       expect_body:
         errorCode: 0
       extract:
@@ -995,6 +1009,7 @@ nodes:
               x-ev-api-sign: "${api_sign}"
               x-ev-api-timestamp: "${api_ts}"
             body: '{"orderId":${order_id}}'
+          aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
           extract:
             - variable: charging_status
               path: "$.data.chargingStatus"
@@ -1081,6 +1096,7 @@ nodes:
               x-ev-api-sign: "${api_sign}"
               x-ev-api-timestamp: "${api_ts}"
             body: '{"orderId":${order_id}}'
+          aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
           retry:
             max_attempts: 10
             on_429: retry
@@ -1114,6 +1130,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${order_id}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
     retry:
       max_attempts: 10
       on_429: retry
@@ -1145,6 +1162,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${order_id}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -1171,6 +1189,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderClassification":[3]}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         unpaid_order_id_after: "$.data[0].orderId"
       expect_body:
@@ -1233,6 +1252,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id_after},"couponId":"${coupon_id_after}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -1259,6 +1279,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${unpaid_order_id_after}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -1294,6 +1315,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":${order_id}}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -1319,6 +1341,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"orderId":"${order_id}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         pay_status: "$.data.payStatus"
       expect_body:
@@ -1391,6 +1414,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         comment_star: "$.data[0].star"
         comment_tag_id: "$.data[0].tagId"
@@ -1425,6 +1449,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '${comment_body}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 
@@ -1489,6 +1514,7 @@ nodes:
               x-ev-api-sign: "${api_sign}"
               x-ev-api-timestamp: "${api_ts}"
             body: '{"occupyOrderStatusList":[2]}'
+          aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
           extract:
             - variable: occupy_order_id
               path: "$.data[0].chargeOccupyOrderId"
@@ -1521,6 +1547,7 @@ nodes:
         x-ev-api-timestamp: "${api_ts}"
       body: '{"chargeOccupyOrderId":"${occupy_order_id}","payType":${occupy_pay_type_after},"payChannel":${occupy_pay_channel},"passWord":"${password_enc}"}'
       timeout: 10000
+      aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       expect_body:
         errorCode: 0
 

@@ -1520,7 +1520,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
 		Form       json.RawMessage   `json:"form"`
 		AesDecrypt string            `json:"aes_decrypt"` // AES key (base64) for decrypting encrypted response body
-		AesMode    int               `json:"aes_mode"`    // AES mode: 0=CBC (default), 1=GCM
+		AesMode    *int              `json:"aes_mode"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		nodeLog.Error("failed to parse http config",
@@ -1758,12 +1758,18 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
 			// Resolve variable references in the AES key (e.g. "${aes_key}")
 			aesKeyStr := n.resolveAllExpressions(cfg.AesDecrypt, variablesOrNil(input), nodeLog)
+			// Default aes_mode to 1 (GCM) if not explicitly configured.
+			// Manhattan UAT environment currently uses GCM; use aes_mode: 0 for legacy CBC.
+			aesMode := 1 // default GCM
+			if cfg.AesMode != nil {
+				aesMode = *cfg.AesMode
+			}
 			if len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
-				decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, cfg.AesMode)
+				decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, aesMode)
 				if decryptErr != nil {
 					nodeLog.Error("AES decrypt failed",
 						logger.F("error", decryptErr),
-						logger.F("aes_mode", cfg.AesMode),
+						logger.F("aes_mode", aesMode),
 						logger.F("body_preview", truncateString(string(httpResp.Body), 100)),
 					)
 				} else {

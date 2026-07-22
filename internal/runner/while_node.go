@@ -48,7 +48,7 @@ type stepConfig struct {
 	FailMessage  string                  `json:"fail_message,omitempty"`
 	BlockOnError bool                    `json:"block_on_error,omitempty"`
 	AesDecrypt   string                  `json:"aes_decrypt,omitempty"` // AES key (base64) for decrypting encrypted response body
-	AesMode      int                     `json:"aes_mode,omitempty"`    // AES mode: 0=CBC (default), 1=GCM
+	AesMode      *int                   `json:"aes_mode,omitempty"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
 }
 
 // stepConditionConfig defines a condition for step execution.
@@ -282,7 +282,11 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 							// AES decrypt before extract if configured.
 							if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
 								aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
-								if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, s.AesMode); decryptErr != nil {
+								sAesMode := 1 // default GCM
+								if s.AesMode != nil {
+									sAesMode = *s.AesMode
+								}
+								if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, sAesMode); decryptErr != nil {
 									nodeLog.Warn("timed trigger AES decrypt failed",
 										logger.F("step", s.Name),
 										logger.F("error", decryptErr))
@@ -637,12 +641,16 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 	if step.AesDecrypt != "" && len(httpResp.Body) > 0 {
 		aesKeyStr := resolveWithVariables(step.AesDecrypt, loopVars)
 		if httpResp.Body[0] != '{' {
-			decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, step.AesMode)
+			stepAesMode := 1 // default GCM
+			if step.AesMode != nil {
+				stepAesMode = *step.AesMode
+			}
+			decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, stepAesMode)
 			if decryptErr != nil {
 				nodeLog.Error("while step AES decrypt failed",
 					logger.F("step", step.Name),
 					logger.F("error", decryptErr),
-					logger.F("aes_mode", step.AesMode),
+					logger.F("aes_mode", stepAesMode),
 				)
 			} else {
 				httpResp.Body = []byte(decrypted)
