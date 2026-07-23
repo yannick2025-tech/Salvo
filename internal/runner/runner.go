@@ -5,6 +5,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -1789,7 +1790,10 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	if len(cfg.ExpectBody) > 0 {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
 			var bodyJSON map[string]any
-			if err := json.Unmarshal(httpResp.Body, &bodyJSON); err != nil {
+			// Use json.Number to avoid scientific notation for large integers (e.g. 700000028 → 7.00000028e+08)
+			dec := json.NewDecoder(bytes.NewReader(httpResp.Body))
+			dec.UseNumber()
+			if err := dec.Decode(&bodyJSON); err != nil {
 				nodeLog.Error("failed to parse response body for expect_body validation",
 					logger.F("error", err),
 					logger.F("body", string(httpResp.Body)),
@@ -1806,9 +1810,8 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 						// Stats already recorded above based on HTTP status; don't double-count.
 						return nil, fmt.Errorf("%s", errMsg)
 					}
-					// Compare numeric values (JSON numbers are float64)
-					if fmt.Sprintf("%v", actualVal) != fmt.Sprintf("%v", expectedVal) {
-						errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, expectedVal, actualVal)
+					if !compareJSONValues(actualVal, expectedVal) {
+						errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, formatJSONValue(expectedVal), formatJSONValue(actualVal))
 						nodeLog.Error("expect_body validation failed",
 							logger.F("field", key),
 							logger.F("expected", expectedVal),
@@ -1835,6 +1838,48 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	return &dag.Output{Response: resp}, nil
+}
+
+// compareJSONValues compares an actual value from a JSON response body (decoded
+// with UseNumber, so numbers are json.Number) against an expected value from the
+// node configuration (decoded with standard json.Unmarshal, so numbers are float64).
+// It normalises both sides to a canonical string representation so that large
+// integers like 700000028 match regardless of whether they arrive as json.Number
+// "700000028" or float64 700000028.
+func compareJSONValues(actualVal, expectedVal any) bool {
+	return formatJSONValue(actualVal) == formatJSONValue(expectedVal)
+}
+
+// formatJSONValue returns a canonical string for a JSON value that may be
+// json.Number, float64, int, string, bool, or nil.  Numbers are formatted at
+// full precision without scientific notation.
+func formatJSONValue(v any) string {
+	switch val := v.(type) {
+	case json.Number:
+		// json.Number preserves the original text, e.g. "700000028".
+		// Try to format as integer when possible to avoid trailing ".0".
+		if s, err := val.Int64(); err == nil {
+			return strconv.FormatInt(s, 10)
+		}
+		return string(val)
+	case float64:
+		// Use 'g' format with enough precision to avoid scientific notation
+		// for typical integers, and strip trailing ".0" for clean output.
+		s := strconv.FormatFloat(val, 'f', -1, 64)
+		return s
+	case int:
+		return strconv.Itoa(val)
+	case int64:
+		return strconv.FormatInt(val, 10)
+	case string:
+		return val
+	case bool:
+		return strconv.FormatBool(val)
+	case nil:
+		return "null"
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }
 
 func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
