@@ -108,7 +108,6 @@ func New(cfg Config) (Logger, error) {
 			Compress:   cfg.Compress, // Enable compression for rotated logs
 		}
 		writers = append(writers, lj)
-		writers = append(writers, os.Stdout)
 	} else {
 		writers = append(writers, os.Stdout)
 	}

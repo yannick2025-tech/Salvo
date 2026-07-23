@@ -17,13 +17,13 @@ import (
 
 // whileConfig holds the parsed configuration for a while node.
 type whileConfig struct {
-	ExitConditions      []exitCondition `json:"exit_conditions"`
-	IntervalSeconds     int             `json:"interval_seconds"`
-	MaxIterations       int             `json:"max_iterations"`
-	MaxDurationMinutes  int             `json:"max_duration_minutes"`
-	Steps               []stepConfig    `json:"steps"`
-	FailAfterConsecutive int            `json:"fail_after_consecutive"`
-	FailMessage         string          `json:"fail_message"`
+	ExitConditions       []exitCondition `json:"exit_conditions"`
+	IntervalSeconds      int             `json:"interval_seconds"`
+	MaxIterations        int             `json:"max_iterations"`
+	MaxDurationMinutes   int             `json:"max_duration_minutes"`
+	Steps                []stepConfig    `json:"steps"`
+	FailAfterConsecutive int             `json:"fail_after_consecutive"`
+	FailMessage          string          `json:"fail_message"`
 }
 
 // exitCondition defines a condition to check for loop exit.
@@ -35,20 +35,20 @@ type exitCondition struct {
 
 // stepConfig defines a child step within a while node.
 type stepConfig struct {
-	Name         string                  `json:"name"`
-	Type         string                  `json:"type,omitempty"` // "http" (default) | "generator"
-	Config       map[string]any          `json:"config,omitempty"`
-	Condition    *stepConditionConfig    `json:"condition,omitempty"`
-	Request      *stepRequestConfig      `json:"request,omitempty"`
-	Extract      []extractEntry          `json:"extract,omitempty"`
-	ThinkTime    *thinkTimeConfig        `json:"think_time,omitempty"`
-	TimedTrigger *timedTriggerConfig     `json:"timed_trigger,omitempty"`
-	Retry        *retryConfig            `json:"retry,omitempty"`
-	FailAfterConsecutive int             `json:"fail_after_consecutive,omitempty"`
-	FailMessage  string                  `json:"fail_message,omitempty"`
-	BlockOnError bool                    `json:"block_on_error,omitempty"`
-	AesDecrypt   string                  `json:"aes_decrypt,omitempty"` // AES key (base64) for decrypting encrypted response body
-	AesMode      *int                   `json:"aes_mode,omitempty"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
+	Name                 string               `json:"name"`
+	Type                 string               `json:"type,omitempty"` // "http" (default) | "generator"
+	Config               map[string]any       `json:"config,omitempty"`
+	Condition            *stepConditionConfig `json:"condition,omitempty"`
+	Request              *stepRequestConfig   `json:"request,omitempty"`
+	Extract              []extractEntry       `json:"extract,omitempty"`
+	ThinkTime            *thinkTimeConfig     `json:"think_time,omitempty"`
+	TimedTrigger         *timedTriggerConfig  `json:"timed_trigger,omitempty"`
+	Retry                *retryConfig         `json:"retry,omitempty"`
+	FailAfterConsecutive int                  `json:"fail_after_consecutive,omitempty"`
+	FailMessage          string               `json:"fail_message,omitempty"`
+	BlockOnError         bool                 `json:"block_on_error,omitempty"`
+	AesDecrypt           string               `json:"aes_decrypt,omitempty"` // AES key (base64) for decrypting encrypted response body
+	AesMode              *int                 `json:"aes_mode,omitempty"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
 }
 
 // stepConditionConfig defines a condition for step execution.
@@ -96,7 +96,7 @@ type timedTriggerConfig struct {
 
 // retryConfig defines retry behavior.
 type retryConfig struct {
-	MaxAttempts int `json:"max_attempts"`
+	MaxAttempts int    `json:"max_attempts"`
 	On429       string `json:"on_429,omitempty"`
 }
 
@@ -319,123 +319,123 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			}
 
 			// Execute step based on type
-				stepType := step.Type
-				if stepType == "" {
-					stepType = "http" // default
+			stepType := step.Type
+			if stepType == "" {
+				stepType = "http" // default
+			}
+
+			if stepType == "generator" {
+				// Execute generator step
+				varsMu.Lock()
+				stepErr := n.executeWhileStepGenerator(ctx, &step, loopVars, nodeLog)
+				varsMu.Unlock()
+
+				if stepErr != nil {
+					// Check block_on_error first - takes precedence
+					if step.BlockOnError {
+						nodeLog.Error("while step failed with block_on_error=true",
+							logger.F("step", step.Name),
+							logger.F("error", stepErr))
+						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+					}
+
+					consecutiveFailures[stepIdx]++
+					nodeLog.Warn("while generator step failed",
+						logger.F("step", step.Name),
+						logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+						logger.F("error", stepErr))
+
+					// Check fail_after_consecutive.
+					failThreshold := cfg.FailAfterConsecutive
+					if step.FailAfterConsecutive > 0 {
+						failThreshold = step.FailAfterConsecutive
+					}
+					if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+						msg := cfg.FailMessage
+						if msg == "" {
+							msg = step.FailMessage
+						}
+						if msg == "" {
+							msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+						}
+						nodeLog.Error("while node failed due to consecutive failures",
+							logger.F("step", step.Name),
+							logger.F("failures", consecutiveFailures[stepIdx]),
+							logger.F("message", msg))
+						return nil, fmt.Errorf("while node: %s", msg)
+					}
+				} else {
+					consecutiveFailures[stepIdx] = 0
+				}
+			} else if step.Request != nil {
+				// Execute HTTP request (if any).
+				maxAttempts := 1
+				if step.Retry != nil && step.Retry.MaxAttempts > 0 {
+					maxAttempts = step.Retry.MaxAttempts
 				}
 
-				if stepType == "generator" {
-					// Execute generator step
-					varsMu.Lock()
-					stepErr := n.executeWhileStepGenerator(ctx, &step, loopVars, nodeLog)
-					varsMu.Unlock()
-
-					if stepErr != nil {
-						// Check block_on_error first - takes precedence
-						if step.BlockOnError {
-							nodeLog.Error("while step failed with block_on_error=true",
-								logger.F("step", step.Name),
-								logger.F("error", stepErr))
-							return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
-						}
-
-						consecutiveFailures[stepIdx]++
-						nodeLog.Warn("while generator step failed",
+				var stepErr error
+				for attempt := 0; attempt < maxAttempts; attempt++ {
+					if attempt > 0 {
+						nodeLog.Debug("retrying step",
 							logger.F("step", step.Name),
-							logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
-							logger.F("error", stepErr))
-
-						// Check fail_after_consecutive.
-						failThreshold := cfg.FailAfterConsecutive
-						if step.FailAfterConsecutive > 0 {
-							failThreshold = step.FailAfterConsecutive
-						}
-						if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
-							msg := cfg.FailMessage
-							if msg == "" {
-								msg = step.FailMessage
-							}
-							if msg == "" {
-								msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
-							}
-							nodeLog.Error("while node failed due to consecutive failures",
-								logger.F("step", step.Name),
-								logger.F("failures", consecutiveFailures[stepIdx]),
-								logger.F("message", msg))
-							return nil, fmt.Errorf("while node: %s", msg)
-						}
-					} else {
-						consecutiveFailures[stepIdx] = 0
-					}
-				} else if step.Request != nil {
-					// Execute HTTP request (if any).
-					maxAttempts := 1
-					if step.Retry != nil && step.Retry.MaxAttempts > 0 {
-						maxAttempts = step.Retry.MaxAttempts
+							logger.F("attempt", attempt+1),
+							logger.F("max", maxAttempts))
 					}
 
-					var stepErr error
-					for attempt := 0; attempt < maxAttempts; attempt++ {
-						if attempt > 0 {
-							nodeLog.Debug("retrying step",
-								logger.F("step", step.Name),
-								logger.F("attempt", attempt+1),
-								logger.F("max", maxAttempts))
-						}
-
-						varsMu.Lock()
-						stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
-						varsMu.Unlock()
-						if stepErr == nil {
-							break
-						}
-
-						// Check for 429 retry.
-						if step.Retry != nil && step.Retry.On429 == "retry" && isHTTP429Error(stepErr) {
-							continue
-						}
+					varsMu.Lock()
+					stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
+					varsMu.Unlock()
+					if stepErr == nil {
 						break
 					}
 
-					if stepErr != nil {
-						// Check block_on_error first - takes precedence
-						if step.BlockOnError {
-							nodeLog.Error("while step failed with block_on_error=true",
-								logger.F("step", step.Name),
-								logger.F("error", stepErr))
-							return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
-						}
-
-						_ = stepErr // used for consecutive failure tracking below
-						consecutiveFailures[stepIdx]++
-						nodeLog.Warn("while step failed",
-							logger.F("step", step.Name),
-							logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
-							logger.F("error", stepErr))
-
-						// Check fail_after_consecutive.
-						failThreshold := cfg.FailAfterConsecutive
-						if step.FailAfterConsecutive > 0 {
-							failThreshold = step.FailAfterConsecutive
-						}
-						if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
-							msg := cfg.FailMessage
-							if msg == "" {
-								msg = step.FailMessage
-							}
-							if msg == "" {
-								msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
-							}
-							nodeLog.Error("while node failed due to consecutive failures",
-								logger.F("step", step.Name),
-								logger.F("failures", consecutiveFailures[stepIdx]),
-								logger.F("message", msg))
-							return nil, fmt.Errorf("while node: %s", msg)
-						}
-					} else {
-						consecutiveFailures[stepIdx] = 0
+					// Check for 429 retry.
+					if step.Retry != nil && step.Retry.On429 == "retry" && isHTTP429Error(stepErr) {
+						continue
 					}
+					break
 				}
+
+				if stepErr != nil {
+					// Check block_on_error first - takes precedence
+					if step.BlockOnError {
+						nodeLog.Error("while step failed with block_on_error=true",
+							logger.F("step", step.Name),
+							logger.F("error", stepErr))
+						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+					}
+
+					_ = stepErr // used for consecutive failure tracking below
+					consecutiveFailures[stepIdx]++
+					nodeLog.Warn("while step failed",
+						logger.F("step", step.Name),
+						logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+						logger.F("error", stepErr))
+
+					// Check fail_after_consecutive.
+					failThreshold := cfg.FailAfterConsecutive
+					if step.FailAfterConsecutive > 0 {
+						failThreshold = step.FailAfterConsecutive
+					}
+					if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+						msg := cfg.FailMessage
+						if msg == "" {
+							msg = step.FailMessage
+						}
+						if msg == "" {
+							msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+						}
+						nodeLog.Error("while node failed due to consecutive failures",
+							logger.F("step", step.Name),
+							logger.F("failures", consecutiveFailures[stepIdx]),
+							logger.F("message", msg))
+						return nil, fmt.Errorf("while node: %s", msg)
+					}
+				} else {
+					consecutiveFailures[stepIdx] = 0
+				}
+			}
 
 			// Apply think_time (random delay).
 			if step.ThinkTime != nil && step.ThinkTime.Min > 0 && step.ThinkTime.Max > 0 {
@@ -631,10 +631,44 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 		n.nodeStats.RecordLatency(httpResp.Latency, true)
 	}
 
-	nodeLog.Debug("step HTTP request completed",
+	nodeLog.Info("step HTTP request completed",
 		logger.F("step", step.Name),
+		logger.F("method", string(req.Method)),
+		logger.F("url", req.URL),
 		logger.F("status", httpResp.StatusCode),
-		logger.F("latency_ms", httpResp.Latency.Milliseconds()))
+		logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+		logger.F("success", httpResp.IsSuccess()),
+	)
+
+	if len(req.Headers) > 0 {
+		nodeLog.Debug("step HTTP request headers",
+			logger.F("step", step.Name),
+			logger.F("headers", req.Headers),
+		)
+	}
+
+	if len(req.Body) > 0 {
+		nodeLog.Debug("step HTTP request body",
+			logger.F("step", step.Name),
+			logger.F("body", string(req.Body)),
+		)
+	}
+
+	if len(httpResp.Body) > 0 {
+		if httpResp.IsSuccess() {
+			nodeLog.Debug("step HTTP response body",
+				logger.F("step", step.Name),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("body", string(httpResp.Body)),
+			)
+		} else {
+			nodeLog.Debug("step HTTP response body (non-2xx)",
+				logger.F("step", step.Name),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("body", string(httpResp.Body)),
+			)
+		}
+	}
 
 	// AES decrypt: if aes_decrypt is configured and the response body is
 	// not plain JSON (doesn't start with '{'), decrypt it before extract.

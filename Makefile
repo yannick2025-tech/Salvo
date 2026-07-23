@@ -130,7 +130,7 @@ start: frontend-deps
 	@if lsof -i :$(BACKEND_PORT) >/dev/null 2>&1; then \
 		echo "Backend already running on :$(BACKEND_PORT)"; \
 	else \
-		nohup ./$(BIN) -config $(CONFIG) > logs/salvo-stdout.log 2> logs/salvo-stderr.log & \
+		nohup ./$(BIN) -config $(CONFIG) >> logs/salvo.log 2>&1 & \
 		echo "Backend started (PID $$!)"; \
 		disown $$! 2>/dev/null || true; \
 	fi
