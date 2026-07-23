@@ -40,7 +40,7 @@ type stepConfig struct {
 	Config               map[string]any       `json:"config,omitempty"`
 	Condition            *stepConditionConfig `json:"condition,omitempty"`
 	Request              *stepRequestConfig   `json:"request,omitempty"`
-	Extract              []extractEntry       `json:"extract,omitempty"`
+	Extract              extractConfig        `json:"extract,omitempty"`
 	ThinkTime            *thinkTimeConfig     `json:"think_time,omitempty"`
 	TimedTrigger         *timedTriggerConfig  `json:"timed_trigger,omitempty"`
 	Retry                *retryConfig         `json:"retry,omitempty"`
@@ -73,38 +73,55 @@ type stepFormConfig struct {
 	Files  map[string]string `json:"files,omitempty"`
 }
 
+// extractConfig holds extract entries parsed from either JSON format:
+//   - Array format:  [{"variable": "x", "path": "$.y"}, ...]
+//   - Object format: {"x": "$.y", "z": "$.w", ...}
+//
+// Both formats are supported transparently via custom UnmarshalJSON.
+type extractConfig []extractEntry
+
 // extractEntry maps a JSON path to a variable name.
 type extractEntry struct {
-	// JSON format: {"variableName": "$.path.to.value"}
 	Variable string `json:"variable"`
-	// For simple map format: map[string]string with one entry
-	// We'll parse this flexibly.
-	Path string `json:"path"`
+	Path     string `json:"path"`
 }
 
-// thinkTimeConfig defines a random delay range in milliseconds.
-type thinkTimeConfig struct {
-	Min int `json:"min"`
-	Max int `json:"max"`
+// UnmarshalJSON implements custom JSON unmarshaling for extractConfig.
+// It accepts both array and object JSON formats for the extract field.
+func (ec *extractConfig) UnmarshalJSON(data []byte) error {
+	// Try array format first: [{"variable": "x", "path": "$.y"}]
+	var arr []json.RawMessage
+	if err := json.Unmarshal(data, &arr); err == nil {
+		entries := make([]extractEntry, 0, len(arr))
+		for _, raw := range arr {
+			var e extractEntry
+			if err := unmarshalExtractEntry(raw, &e); err != nil {
+				return fmt.Errorf("invalid extract entry in array: %w", err)
+			}
+			entries = append(entries, e)
+		}
+		*ec = entries
+		return nil
+	}
+
+	// Try object format: {"x": "$.y", "z": "$.w"}
+	var obj map[string]string
+	if err := json.Unmarshal(data, &obj); err == nil {
+		entries := make([]extractEntry, 0, len(obj))
+		for k, v := range obj {
+			entries = append(entries, extractEntry{Variable: k, Path: v})
+		}
+		*ec = entries
+		return nil
+	}
+
+	return fmt.Errorf("invalid extract config: expected array or object, got: %s", string(data))
 }
 
-// timedTriggerConfig defines an async timed trigger.
-type timedTriggerConfig struct {
-	AfterSeconds string `json:"after_seconds"` // supports ${var} references
-	Once         bool   `json:"once"`
-}
-
-// retryConfig defines retry behavior.
-type retryConfig struct {
-	MaxAttempts int    `json:"max_attempts"`
-	On429       string `json:"on_429,omitempty"`
-}
-
-// UnmarshalJSON implements custom JSON unmarshaling for extractEntry.
-// Supports both formats:
-//   - {"variable": "chargingStatus", "path": "$.result.status"}
-//   - {"chargingStatus": "$.result.status"} (single-key map)
-func (e *extractEntry) UnmarshalJSON(data []byte) error {
+// unmarshalExtractEntry unmarshals a single extract entry, supporting both
+// structured format {"variable": "x", "path": "$.y"} and
+// map format {"x": "$.y"}.
+func unmarshalExtractEntry(data []byte, e *extractEntry) error {
 	// Try structured format first.
 	var structured struct {
 		Variable string `json:"variable"`
@@ -127,6 +144,24 @@ func (e *extractEntry) UnmarshalJSON(data []byte) error {
 	}
 
 	return fmt.Errorf("invalid extract entry: %s", string(data))
+}
+
+// thinkTimeConfig defines a random delay range in milliseconds.
+type thinkTimeConfig struct {
+	Min int `json:"min"`
+	Max int `json:"max"`
+}
+
+// timedTriggerConfig defines an async timed trigger.
+type timedTriggerConfig struct {
+	AfterSeconds string `json:"after_seconds"` // supports ${var} references
+	Once         bool   `json:"once"`
+}
+
+// retryConfig defines retry behavior.
+type retryConfig struct {
+	MaxAttempts int    `json:"max_attempts"`
+	On429       string `json:"on_429,omitempty"`
 }
 
 func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
@@ -294,9 +329,10 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 									httpResp.Body = []byte(decrypted)
 								}
 							}
-							if len(s.Extract) > 0 {
+							if len(s.Extract) > 0 || (s.Config != nil && s.Config["extract"] != nil) {
 								localExtracted := make(map[string]any)
-								extractVarsFromResponse(httpResp.Body, s.Extract, localExtracted)
+								allExtracts := mergeStepExtracts(&s, nodeLog)
+								extractVarsFromResponse(httpResp.Body, allExtracts, localExtracted, nodeLog)
 								varsMu.Lock()
 								for k, v := range localExtracted {
 									loopVars[k] = v
@@ -456,7 +492,14 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 				condExpr := fmt.Sprintf("${%s} %s \"%s\"", ec.Variable, ec.Operator, ec.Value)
 				varsMu.RLock()
 				ecMet := expr.EvaluateConditionExpr(condExpr, loopVars)
+				currentVal := loopVars[ec.Variable]
 				varsMu.RUnlock()
+				nodeLog.Debug("exit condition evaluated",
+					logger.F("variable", ec.Variable),
+					logger.F("current_value", currentVal),
+					logger.F("operator", ec.Operator),
+					logger.F("target", ec.Value),
+					logger.F("result", ecMet))
 				if !ecMet {
 					allMet = false
 					break
@@ -533,8 +576,10 @@ func (n *sceneNode) executeWhileStepGenerator(ctx context.Context, step *stepCon
 		logger.F("variable", variable),
 		logger.F("value", result))
 
-	// Extract variables from result if configured
-	if len(step.Extract) > 0 {
+	// Extract variables from result if configured.
+	// Merge extracts from both step.Extract (top-level) and Config["extract"] (nested).
+	allExtracts := mergeStepExtracts(step, nodeLog)
+	if len(allExtracts) > 0 {
 		// Try to parse result as JSON
 		var resultData map[string]any
 		if err := json.Unmarshal([]byte(result), &resultData); err != nil {
@@ -542,14 +587,19 @@ func (n *sceneNode) executeWhileStepGenerator(ctx context.Context, step *stepCon
 				logger.F("step", step.Name),
 				logger.F("error", err))
 		} else {
-			for _, ext := range step.Extract {
+			for _, ext := range allExtracts {
 				value := resolveJSONPath(resultData, ext.Path)
 				if value != nil {
 					loopVars[ext.Variable] = value
-					nodeLog.Debug("extracted variable from generator",
+					nodeLog.Info("extracted variable from generator",
 						logger.F("step", step.Name),
 						logger.F("variable", ext.Variable),
 						logger.F("value", value))
+				} else {
+					nodeLog.Warn("extract path not found in generator result",
+						logger.F("step", step.Name),
+						logger.F("variable", ext.Variable),
+						logger.F("path", ext.Path))
 				}
 			}
 		}
@@ -700,8 +750,10 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 	}
 
 	// Extract variables from response.
-	if len(step.Extract) > 0 {
-		extractVarsFromResponse(httpResp.Body, step.Extract, loopVars)
+	// Merge extracts from both step.Extract (top-level) and Config["extract"] (nested).
+	allExtracts := mergeStepExtracts(step, nodeLog)
+	if len(allExtracts) > 0 {
+		extractVarsFromResponse(httpResp.Body, allExtracts, loopVars, nodeLog)
 	}
 
 	return nil
@@ -764,13 +816,19 @@ func buildStepHTTPRequest(cfg *stepRequestConfig, vars map[string]any, nodeLog l
 
 // extractVarsFromResponse extracts variables from an HTTP response body
 // using the configured extract entries and stores them in the vars map.
-func extractVarsFromResponse(body []byte, extracts []extractEntry, vars map[string]any) {
+func extractVarsFromResponse(body []byte, extracts extractConfig, vars map[string]any, nodeLog logger.Logger) {
 	if len(body) == 0 {
+		nodeLog.Debug("extract skipped: empty response body",
+			logger.F("extract_count", len(extracts)))
 		return
 	}
 
 	var jsonData map[string]any
 	if err := json.Unmarshal(body, &jsonData); err != nil {
+		nodeLog.Warn("extract skipped: response is not valid JSON",
+			logger.F("error", err),
+			logger.F("body_preview", truncateResponseBody(body, 100)),
+			logger.F("extract_count", len(extracts)))
 		return
 	}
 
@@ -778,6 +836,14 @@ func extractVarsFromResponse(body []byte, extracts []extractEntry, vars map[stri
 		value := resolveJSONPath(jsonData, ext.Path)
 		if value != nil {
 			vars[ext.Variable] = value
+			nodeLog.Info("extracted variable",
+				logger.F("variable", ext.Variable),
+				logger.F("path", ext.Path),
+				logger.F("value", value))
+		} else {
+			nodeLog.Warn("extract path not found in response",
+				logger.F("variable", ext.Variable),
+				logger.F("path", ext.Path))
 		}
 	}
 }
@@ -865,4 +931,37 @@ func randomInt(min, max int) int {
 	// In production, use crypto/rand or math/rand with proper seeding.
 	r := time.Now().UnixNano() % int64(max-min+1)
 	return min + int(r)
+}
+
+// mergeStepExtracts merges extract entries from step.Extract (top-level)
+// and step.Config["extract"] (nested, e.g. for generator steps where
+// extract is inside the config block in YAML).
+func mergeStepExtracts(step *stepConfig, nodeLog logger.Logger) extractConfig {
+	result := make(extractConfig, 0, len(step.Extract)+2)
+	result = append(result, step.Extract...)
+
+	if step.Config != nil {
+		if rawExtract, ok := step.Config["extract"]; ok {
+			// Marshal and unmarshal the raw extract config through JSON
+			// to reuse the extractConfig UnmarshalJSON logic that handles
+			// both object and array formats.
+			extractBytes, err := json.Marshal(rawExtract)
+			if err != nil {
+				nodeLog.Warn("failed to marshal generator config extract",
+					logger.F("step", step.Name),
+					logger.F("error", err))
+			} else {
+				var cfgExtract extractConfig
+				if err := json.Unmarshal(extractBytes, &cfgExtract); err != nil {
+					nodeLog.Warn("failed to parse generator config extract",
+						logger.F("step", step.Name),
+						logger.F("error", err))
+				} else {
+					result = append(result, cfgExtract...)
+				}
+			}
+		}
+	}
+
+	return result
 }

@@ -137,7 +137,7 @@ func TestExecuteLoop_VariableAccumulation(t *testing.T) {
 			{
 				Name:    "accumulate",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
-				Extract: []extractEntry{{Variable: "iterationNum", Path: "$.iteration"}},
+				Extract: extractConfig{{Variable: "iterationNum", Path: "$.iteration"}},
 			},
 		},
 	}

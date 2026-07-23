@@ -59,7 +59,7 @@ func TestParallel_MultipleStepsExtractDifferentVars(t *testing.T) {
 			{
 				Name:    "get auth",
 				Request: &stepRequestConfig{Method: "GET", URL: serverA.URL + "/auth"},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "token", Path: "$.data.token"},
 					{Variable: "user", Path: "$.data.user"},
 				},
@@ -67,7 +67,7 @@ func TestParallel_MultipleStepsExtractDifferentVars(t *testing.T) {
 			{
 				Name:    "get charge",
 				Request: &stepRequestConfig{Method: "GET", URL: serverB.URL + "/charge"},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargeLevel", Path: "$.data.charge"},
 					{Variable: "chargeStatus", Path: "$.data.status"},
 				},
@@ -120,12 +120,12 @@ func TestParallel_InputVariablesPropagatedToAllSteps(t *testing.T) {
 			{
 				Name:    "step1",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/user/${userId}"},
-				Extract: []extractEntry{{Variable: "result", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "result", Path: "$.status"}},
 			},
 			{
 				Name:    "step2",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/device/${deviceId}"},
-				Extract: []extractEntry{{Variable: "result2", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "result2", Path: "$.status"}},
 			},
 		},
 	}
@@ -180,7 +180,7 @@ func TestParallel_InputVariablesInHeaders(t *testing.T) {
 					URL:     server.URL + "/check",
 					Headers: map[string]string{"Authorization": "Bearer ${token}"},
 				},
-				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "status", Path: "$.status"}},
 			},
 		},
 	}
@@ -378,7 +378,7 @@ func TestParallel_SOPluginExpressionInStep(t *testing.T) {
 					Method: "GET",
 					URL:    fmt.Sprintf(server.URL+"/submit?data=%s", encResult),
 				},
-				Extract: []extractEntry{{Variable: "result", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "result", Path: "$.status"}},
 			},
 		},
 	}
@@ -420,17 +420,17 @@ func TestParallel_SameVariableExtractedByMultipleSteps(t *testing.T) {
 			{
 				Name:    "stepA",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/a"},
-				Extract: []extractEntry{{Variable: "shared", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "shared", Path: "$.value"}},
 			},
 			{
 				Name:    "stepB",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/b"},
-				Extract: []extractEntry{{Variable: "shared", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "shared", Path: "$.value"}},
 			},
 			{
 				Name:    "stepC",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/c"},
-				Extract: []extractEntry{{Variable: "shared", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "shared", Path: "$.value"}},
 			},
 		},
 	}
@@ -628,7 +628,7 @@ func TestParallel_NestedJSONPathExtraction(t *testing.T) {
 			{
 				Name:    "get profile",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/user"},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "userName", Path: "$.response.data.user.profile.name"},
 					{Variable: "email", Path: "$.response.data.user.profile.email"},
 					{Variable: "theme", Path: "$.response.data.user.settings.theme"},
@@ -682,7 +682,7 @@ func TestParallel_StepWithNoRequest(t *testing.T) {
 			{
 				Name:    "active step",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/active"},
-				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "status", Path: "$.status"}},
 			},
 		},
 	}
@@ -727,7 +727,7 @@ func TestParallel_StepConditionTrue(t *testing.T) {
 				Name:      "conditional step — passes",
 				Condition: &stepConditionConfig{Variable: "role", Operator: "equals", Value: "admin"},
 				Request:   &stepRequestConfig{Method: "GET", URL: server.URL + "/admin"},
-				Extract:   []extractEntry{{Variable: "adminStatus", Path: "$.status"}},
+				Extract:   extractConfig{{Variable: "adminStatus", Path: "$.status"}},
 			},
 			{
 				Name:      "conditional step — fails",
@@ -779,7 +779,7 @@ func TestParallel_ManyStepsConcurrentExtraction(t *testing.T) {
 		steps[i] = stepConfig{
 			Name:    fmt.Sprintf("step_%d", i),
 			Request: &stepRequestConfig{Method: "GET", URL: server.URL + fmt.Sprintf("/%d", i)},
-			Extract: []extractEntry{{Variable: varName, Path: "$.value"}},
+			Extract: extractConfig{{Variable: varName, Path: "$.value"}},
 		}
 	}
 
@@ -829,7 +829,7 @@ func TestParallel_OutputResponseShape(t *testing.T) {
 			{
 				Name:    "step",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/test"},
-				Extract: []extractEntry{{Variable: "myVar", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "myVar", Path: "$.value"}},
 			},
 		},
 	}

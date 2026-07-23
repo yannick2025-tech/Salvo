@@ -118,7 +118,7 @@ func TestWhileStepAESDecrypt_QueryChargingStatus(t *testing.T) {
 		},
 		AesDecrypt: aesKeyBase64,
 		AesMode:    intPtr(0), // CBC
-		Extract: []extractEntry{
+		Extract: extractConfig{
 			{Variable: "charging_status", Path: "$.data.chargingStatus"},
 			{Variable: "charging_soc", Path: "$.data.soc"},
 		},
@@ -154,7 +154,7 @@ func TestWhileStepAESDecrypt_QueryChargingStatus(t *testing.T) {
 	assert.Equal(t, uint8('{'), httpResp.Body[0], "decrypted response should be JSON")
 
 	// --- Extract variables ---
-	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars)
+	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars, newTestLogger())
 
 	// Verify extracted values
 	assert.Equal(t, float64(6), loopVars["charging_status"],
@@ -200,7 +200,7 @@ func TestWhileStepAESDecrypt_CreateOrder(t *testing.T) {
 		},
 		AesDecrypt: aesKeyBase64,
 		AesMode:    intPtr(0),
-		Extract: []extractEntry{
+		Extract: extractConfig{
 			{Variable: "order_id", Path: "$.data.orderId"},
 		},
 	}
@@ -227,7 +227,7 @@ func TestWhileStepAESDecrypt_CreateOrder(t *testing.T) {
 	httpResp.Body = []byte(decrypted)
 
 	// Extract
-	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars)
+	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars, newTestLogger())
 
 	assert.Equal(t, orderID, loopVars["order_id"],
 		"order_id should be extracted from decrypted response")
@@ -257,7 +257,7 @@ func TestWhileStepAESDecrypt_PlainJSONSkip(t *testing.T) {
 		},
 		AesDecrypt: aesKeyBase64,
 		AesMode:    intPtr(0),
-		Extract: []extractEntry{
+		Extract: extractConfig{
 			{Variable: "charging_status", Path: "$.data.chargingStatus"},
 		},
 	}
@@ -278,7 +278,7 @@ func TestWhileStepAESDecrypt_PlainJSONSkip(t *testing.T) {
 	}
 
 	// Extract directly (no decrypt needed)
-	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars)
+	extractVarsFromResponse(httpResp.Body, step.Extract, loopVars, newTestLogger())
 
 	assert.Equal(t, float64(3), loopVars["charging_status"],
 		"charging_status should be extracted from plain JSON response")
@@ -331,7 +331,7 @@ func TestWhileStepAESDecrypt_MultipleSteps(t *testing.T) {
 			},
 			AesDecrypt: aesKeyBase64,
 			AesMode:    intPtr(0),
-			Extract: []extractEntry{
+			Extract: extractConfig{
 				{Variable: "charging_status", Path: "$.data.chargingStatus"},
 			},
 		}
@@ -356,7 +356,7 @@ func TestWhileStepAESDecrypt_MultipleSteps(t *testing.T) {
 		}
 
 		// Extract
-		extractVarsFromResponse(httpResp.Body, step.Extract, loopVars)
+		extractVarsFromResponse(httpResp.Body, step.Extract, loopVars, newTestLogger())
 
 		expectedStatus := float64(statusSequence[i])
 		assert.Equal(t, expectedStatus, loopVars["charging_status"],

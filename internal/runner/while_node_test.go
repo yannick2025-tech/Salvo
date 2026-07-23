@@ -57,7 +57,7 @@ func TestExecuteWhile_ExitConditionMet(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -111,7 +111,7 @@ func TestExecuteWhile_ExitConditionNotMetContinues(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -160,7 +160,7 @@ func TestExecuteWhile_MaxIterations(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -197,7 +197,7 @@ func TestExecuteWhile_ContextCancel(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -287,7 +287,7 @@ func TestExecuteWhile_StepCondition(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -406,7 +406,7 @@ func TestExecuteWhile_ThinkTime(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 				ThinkTime: &thinkTimeConfig{
@@ -478,7 +478,7 @@ func TestResolveJSONPath_NoDollarPrefix(t *testing.T) {
 func TestExtractEntry_UnmarshalStructured(t *testing.T) {
 	data := []byte(`{"variable": "chargingStatus", "path": "$.result.status"}`)
 	var entry extractEntry
-	err := json.Unmarshal(data, &entry)
+	err := unmarshalExtractEntry(data, &entry)
 	require.NoError(t, err)
 	assert.Equal(t, "chargingStatus", entry.Variable)
 	assert.Equal(t, "$.result.status", entry.Path)
@@ -487,7 +487,7 @@ func TestExtractEntry_UnmarshalStructured(t *testing.T) {
 func TestExtractEntry_UnmarshalKV(t *testing.T) {
 	data := []byte(`{"chargingStatus": "$.result.status"}`)
 	var entry extractEntry
-	err := json.Unmarshal(data, &entry)
+	err := unmarshalExtractEntry(data, &entry)
 	require.NoError(t, err)
 	assert.Equal(t, "chargingStatus", entry.Variable)
 	assert.Equal(t, "$.result.status", entry.Path)
@@ -496,7 +496,7 @@ func TestExtractEntry_UnmarshalKV(t *testing.T) {
 func TestExtractEntry_UnmarshalInvalid(t *testing.T) {
 	data := []byte(`{"key": 123}`)
 	var entry extractEntry
-	err := json.Unmarshal(data, &entry)
+	err := unmarshalExtractEntry(data, &entry)
 	require.Error(t, err)
 }
 
@@ -524,23 +524,23 @@ func TestIsHTTP429Error(t *testing.T) {
 
 func TestExtractVarsFromResponse_EmptyBody(t *testing.T) {
 	vars := make(map[string]any)
-	extractVarsFromResponse(nil, []extractEntry{{Variable: "x", Path: "$.status"}}, vars)
+	extractVarsFromResponse(nil, extractConfig{{Variable: "x", Path: "$.status"}}, vars, newTestLogger())
 	assert.Empty(t, vars)
 }
 
 func TestExtractVarsFromResponse_InvalidJSON(t *testing.T) {
 	vars := make(map[string]any)
-	extractVarsFromResponse([]byte(`not json`), []extractEntry{{Variable: "x", Path: "$.status"}}, vars)
+	extractVarsFromResponse([]byte(`not json`), extractConfig{{Variable: "x", Path: "$.status"}}, vars, newTestLogger())
 	assert.Empty(t, vars)
 }
 
 func TestExtractVarsFromResponse_Success(t *testing.T) {
 	vars := make(map[string]any)
 	body := []byte(`{"result":{"status":"4","kwh":"12.5"}}`)
-	extractVarsFromResponse(body, []extractEntry{
+	extractVarsFromResponse(body, extractConfig{
 		{Variable: "chargingStatus", Path: "$.result.status"},
 		{Variable: "kwh", Path: "$.result.kwh"},
-	}, vars)
+	}, vars, newTestLogger())
 	assert.Equal(t, "4", vars["chargingStatus"])
 	assert.Equal(t, "12.5", vars["kwh"])
 }
@@ -548,9 +548,9 @@ func TestExtractVarsFromResponse_Success(t *testing.T) {
 func TestExtractVarsFromResponse_ArrayExtract(t *testing.T) {
 	vars := make(map[string]any)
 	body := []byte(`{"items":[{"id":"1"},{"id":"2"}]}`)
-	extractVarsFromResponse(body, []extractEntry{
+	extractVarsFromResponse(body, extractConfig{
 		{Variable: "firstId", Path: "$.items[0].id"},
-	}, vars)
+	}, vars, newTestLogger())
 	assert.Equal(t, "1", vars["firstId"])
 }
 
@@ -576,7 +576,7 @@ func TestExecuteWhile_VariableExtraction(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 					{Variable: "chargeKwh", Path: "$.result.kwh"},
 					{Variable: "chargeMoney", Path: "$.result.money"},
@@ -662,7 +662,7 @@ func TestExecuteWhile_NoLoopVar(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -791,7 +791,7 @@ func TestExecuteWhile_MultipleExitConditions(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 					{Variable: "chargeKwh", Path: "$.result.kwh"},
 				},
@@ -847,7 +847,7 @@ func TestExecuteWhile_RetryOnFailure(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 				Retry: &retryConfig{
@@ -900,7 +900,7 @@ func TestExecuteWhile_TimedTrigger(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/trigger",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -943,7 +943,7 @@ func TestExecuteWhile_TimedTrigger(t *testing.T) {
 					Method: "GET",
 					URL:    server2.URL + "/query",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -992,7 +992,7 @@ func TestExecuteWhile_WithInitialVariables(t *testing.T) {
 						"sceneId": "${sceneId}",
 					},
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 				},
 			},
@@ -1036,7 +1036,7 @@ func TestExecuteWhile_SuccessRequestsCounted(t *testing.T) {
 			{
 				Name:    "query",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
-				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "status", Path: "$.status"}},
 			},
 		},
 	}
@@ -1137,7 +1137,7 @@ func TestExecuteWhile_MultipleIterationsCounted(t *testing.T) {
 			{
 				Name:    "query",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
-				Extract: []extractEntry{{Variable: "status", Path: "$.status"}},
+				Extract: extractConfig{{Variable: "status", Path: "$.status"}},
 			},
 		},
 	}
@@ -1154,4 +1154,150 @@ func TestExecuteWhile_MultipleIterationsCounted(t *testing.T) {
 	assert.Equal(t, int64(3), node.stats.TotalReqs.Load(), "global stats should count 3 total requests from 3 iterations")
 	assert.Equal(t, int64(3), node.stats.SuccessReqs.Load(), "global stats should count 3 successes")
 	assert.Equal(t, int64(0), node.stats.FailedReqs.Load(), "global stats should count 0 failures")
+}
+
+// --- extractConfig unmarshal tests ---
+
+func TestExtractConfig_UnmarshalArrayFormat(t *testing.T) {
+	data := []byte(`[{"variable": "charging_status", "path": "$.data.chargingStatus"}]`)
+	var cfg extractConfig
+	err := json.Unmarshal(data, &cfg)
+	require.NoError(t, err)
+	require.Len(t, cfg, 1)
+	assert.Equal(t, "charging_status", cfg[0].Variable)
+	assert.Equal(t, "$.data.chargingStatus", cfg[0].Path)
+}
+
+func TestExtractConfig_UnmarshalObjectFormat(t *testing.T) {
+	data := []byte(`{"charging_status": "$.data.chargingStatus", "api_sign": "$.sign"}`)
+	var cfg extractConfig
+	err := json.Unmarshal(data, &cfg)
+	require.NoError(t, err)
+	require.Len(t, cfg, 2)
+	// Map iteration order is non-deterministic, so check by variable name.
+	vars := map[string]string{}
+	for _, e := range cfg {
+		vars[e.Variable] = e.Path
+	}
+	assert.Equal(t, "$.data.chargingStatus", vars["charging_status"])
+	assert.Equal(t, "$.sign", vars["api_sign"])
+}
+
+func TestExtractConfig_UnmarshalInvalidFormat(t *testing.T) {
+	data := []byte(`"not an object or array"`)
+	var cfg extractConfig
+	err := json.Unmarshal(data, &cfg)
+	require.Error(t, err)
+}
+
+func TestExtractConfig_WhileConfigIntegration(t *testing.T) {
+	// Simulate the YAML → JSON → whileConfig pipeline with both extract formats.
+	jsonConfig := `{
+		"exit_conditions": [{"variable": "charging_status", "operator": "equals", "value": "6"}],
+		"interval_seconds": 1,
+		"max_iterations": 3,
+		"steps": [
+			{
+				"name": "generator-step",
+				"type": "generator",
+				"config": {
+					"expression": "test",
+					"variable": "result",
+					"extract": {"api_sign": "$.sign", "api_ts": "$.ts"}
+				}
+			},
+			{
+				"name": "http-step",
+				"request": {"method": "GET", "url": "/api/test"},
+				"extract": [{"variable": "charging_status", "path": "$.data.chargingStatus"}]
+			}
+		]
+	}`
+
+	var cfg whileConfig
+	err := json.Unmarshal([]byte(jsonConfig), &cfg)
+	require.NoError(t, err)
+
+	// Generator step: extract should be empty (extract is inside config, not step-level)
+	assert.Empty(t, cfg.Steps[0].Extract, "generator step extract should be empty (it's inside config)")
+	assert.NotNil(t, cfg.Steps[0].Config["extract"])
+
+	// HTTP step: extract should be parsed from array format
+	require.Len(t, cfg.Steps[1].Extract, 1)
+	assert.Equal(t, "charging_status", cfg.Steps[1].Extract[0].Variable)
+	assert.Equal(t, "$.data.chargingStatus", cfg.Steps[1].Extract[0].Path)
+}
+
+func TestExtractConfig_ObjectFormatAtStepLevel(t *testing.T) {
+	// Test that dictionary format at step level is now supported.
+	jsonConfig := `{
+		"exit_conditions": [{"variable": "charging_status", "operator": "equals", "value": "6"}],
+		"interval_seconds": 1,
+		"max_iterations": 3,
+		"steps": [
+			{
+				"name": "http-step",
+				"request": {"method": "GET", "url": "/api/test"},
+				"extract": {"charging_status": "$.data.chargingStatus", "charge_time": "$.data.chargeTime"}
+			}
+		]
+	}`
+
+	var cfg whileConfig
+	err := json.Unmarshal([]byte(jsonConfig), &cfg)
+	require.NoError(t, err)
+
+	require.Len(t, cfg.Steps[0].Extract, 2)
+	vars := map[string]string{}
+	for _, e := range cfg.Steps[0].Extract {
+		vars[e.Variable] = e.Path
+	}
+	assert.Equal(t, "$.data.chargingStatus", vars["charging_status"])
+	assert.Equal(t, "$.data.chargeTime", vars["charge_time"])
+}
+
+func TestMergeStepExtracts_ConfigExtract(t *testing.T) {
+	step := &stepConfig{
+		Name: "generator-step",
+		Config: map[string]any{
+			"expression": "test",
+			"variable":   "result",
+			"extract": map[string]any{
+				"api_sign": "$.sign",
+				"api_ts":   "$.ts",
+			},
+		},
+	}
+
+	extracts := mergeStepExtracts(step, newTestLogger())
+	require.Len(t, extracts, 2)
+	vars := map[string]string{}
+	for _, e := range extracts {
+		vars[e.Variable] = e.Path
+	}
+	assert.Equal(t, "$.sign", vars["api_sign"])
+	assert.Equal(t, "$.ts", vars["api_ts"])
+}
+
+func TestMergeStepExtracts_BothSources(t *testing.T) {
+	step := &stepConfig{
+		Name: "mixed-step",
+		Extract: extractConfig{
+			{Variable: "top_level_var", Path: "$.top"},
+		},
+		Config: map[string]any{
+			"extract": map[string]any{
+				"config_var": "$.config",
+			},
+		},
+	}
+
+	extracts := mergeStepExtracts(step, newTestLogger())
+	require.Len(t, extracts, 2)
+	vars := map[string]string{}
+	for _, e := range extracts {
+		vars[e.Variable] = e.Path
+	}
+	assert.Equal(t, "$.top", vars["top_level_var"])
+	assert.Equal(t, "$.config", vars["config_var"])
 }

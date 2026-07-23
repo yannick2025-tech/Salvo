@@ -230,7 +230,7 @@ func (n *sceneNode) executeParallelStepHTTP(ctx context.Context, step *stepConfi
 
 	// Extract variables from response into localVars.
 	if len(step.Extract) > 0 {
-		extractVarsFromResponse(httpResp.Body, step.Extract, localVars)
+		extractVarsFromResponse(httpResp.Body, step.Extract, localVars, nodeLog)
 	}
 
 	// Apply think_time if configured (random delay).

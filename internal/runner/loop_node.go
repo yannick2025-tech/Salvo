@@ -145,7 +145,7 @@ func (n *sceneNode) executeLoop(ctx context.Context, input *dag.Input, nodeLog l
 					}
 					// Extract variables from response.
 					if len(step.Extract) > 0 {
-						extractVarsFromResponse(httpResp.Body, step.Extract, mergedVars)
+						extractVarsFromResponse(httpResp.Body, step.Extract, mergedVars, nodeLog)
 					}
 				}
 			}

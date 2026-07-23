@@ -55,7 +55,7 @@ func TestWhile_ExitCondition_Equals(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargeStatus", Path: "$.result.status"},
 				},
 			},
@@ -102,7 +102,7 @@ func TestWhile_ExitCondition_NotEquals(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargeStatus", Path: "$.result.status"},
 				},
 			},
@@ -151,7 +151,7 @@ func TestWhile_ExitCondition_GreaterThan(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/progress",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "progress", Path: "$.result.progress"},
 				},
 			},
@@ -204,7 +204,7 @@ func TestWhile_ExitCondition_GreaterThanOrEqual(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/score",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "score", Path: "$.score"},
 				},
 			},
@@ -249,7 +249,7 @@ func TestWhile_ExitCondition_LessThan(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/val",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "val", Path: "$.value"},
 				},
 			},
@@ -293,7 +293,7 @@ func TestWhile_ExitCondition_LessThanOrEqual(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/val",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "val", Path: "$.value"},
 				},
 			},
@@ -353,7 +353,7 @@ func TestWhile_ExitCondition_NotEmpty(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/data",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "myData", Path: "$.result.data"},
 				},
 			},
@@ -399,7 +399,7 @@ func TestWhile_ExitCondition_Empty(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/task",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "taskId", Path: "$.result.taskId"},
 				},
 			},
@@ -446,7 +446,7 @@ func TestWhile_ExitCondition_KeywordOperator(t *testing.T) {
 						Method: "GET",
 						URL:    server.URL + "/val",
 					},
-					Extract: []extractEntry{
+					Extract: extractConfig{
 						{Variable: "val", Path: "$.value"},
 					},
 				},
@@ -473,7 +473,7 @@ func TestWhile_ExitCondition_KeywordOperator(t *testing.T) {
 						Method: "GET",
 						URL:    server.URL + "/val",
 					},
-					Extract: []extractEntry{
+					Extract: extractConfig{
 						{Variable: "val", Path: "$.value"},
 					},
 				},
@@ -529,7 +529,7 @@ func TestWhile_ExpressionEngineInStepURL(t *testing.T) {
 					// URL is pre-resolved (expression engine handles this before executeWhile).
 					URL: resolvedURL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -600,7 +600,7 @@ func TestWhile_MultipleExitConditions_AllMustBeMet(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargeStatus", Path: "$.result.status"},
 					{Variable: "progress", Path: "$.result.progress"},
 				},
@@ -650,7 +650,7 @@ func TestWhile_MultipleExitConditions_PartialMatchDoesNotExit(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargeStatus", Path: "$.result.status"},
 					{Variable: "progress", Path: "$.result.progress"},
 				},
@@ -703,7 +703,7 @@ func TestWhile_StepCondition_SkipBasedOnVariable(t *testing.T) {
 					Method: "GET",
 					URL:    mainServer.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -770,7 +770,7 @@ func TestWhile_TimedTriggerInLoop(t *testing.T) {
 					Method: "GET",
 					URL:    mainServer.URL + "/poll",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -784,7 +784,7 @@ func TestWhile_TimedTriggerInLoop(t *testing.T) {
 					Method: "GET",
 					URL:    triggerServer.URL + "/trigger",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					// Use a dedicated variable that the poll step does not overwrite.
 					{Variable: "trigger_status", Path: "$.status"},
 				},
@@ -845,7 +845,7 @@ func TestWhile_RetryOnStepFailure(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 				Retry: &retryConfig{
@@ -894,7 +894,7 @@ func TestWhile_VariablePropagationToOutput(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "chargingStatus", Path: "$.result.status"},
 					{Variable: "chargeKwh", Path: "$.result.kwh"},
 					{Variable: "chargeMoney", Path: "$.result.money"},
@@ -968,7 +968,7 @@ func TestWhile_ConcurrentLoops(t *testing.T) {
 					Method: "GET",
 					URL:    server1.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -988,7 +988,7 @@ func TestWhile_ConcurrentLoops(t *testing.T) {
 					Method: "GET",
 					URL:    server2.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -1063,7 +1063,7 @@ func TestWhile_ExpressionEngineRandomInInterval(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -1129,7 +1129,7 @@ func TestWhile_SOPluginExpressionInStep(t *testing.T) {
 					Method: "GET",
 					URL:    stepURL,
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},
@@ -1175,7 +1175,7 @@ func TestWhile_ContextCancellationDuringInterval(t *testing.T) {
 					Method: "GET",
 					URL:    server.URL + "/status",
 				},
-				Extract: []extractEntry{
+				Extract: extractConfig{
 					{Variable: "status", Path: "$.status"},
 				},
 			},

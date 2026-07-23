@@ -127,12 +127,12 @@ func TestExecuteParallel_VariableIsolation(t *testing.T) {
 			{
 				Name: "stepA",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/a"},
-				Extract: []extractEntry{{Variable: "varA", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "varA", Path: "$.value"}},
 			},
 			{
 				Name: "stepB",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL + "/b"},
-				Extract: []extractEntry{{Variable: "varB", Path: "$.value"}},
+				Extract: extractConfig{{Variable: "varB", Path: "$.value"}},
 			},
 		},
 	}
@@ -179,12 +179,12 @@ func TestExecuteParallel_VariableConflict(t *testing.T) {
 			{
 				Name: "stepA",
 				Request: &stepRequestConfig{Method: "GET", URL: serverA.URL},
-				Extract: []extractEntry{{Variable: "token", Path: "$.token"}},
+				Extract: extractConfig{{Variable: "token", Path: "$.token"}},
 			},
 			{
 				Name: "stepB",
 				Request: &stepRequestConfig{Method: "GET", URL: serverB.URL},
-				Extract: []extractEntry{{Variable: "token", Path: "$.token"}},
+				Extract: extractConfig{{Variable: "token", Path: "$.token"}},
 			},
 		},
 	}
@@ -347,7 +347,7 @@ func TestExecuteParallel_VariableMergeWithInitialVars(t *testing.T) {
 			{
 				Name:    "extract step",
 				Request: &stepRequestConfig{Method: "GET", URL: server.URL},
-				Extract: []extractEntry{{Variable: "newVar", Path: "$.result"}},
+				Extract: extractConfig{{Variable: "newVar", Path: "$.result"}},
 			},
 		},
 	}
