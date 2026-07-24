@@ -139,6 +139,13 @@ type Report struct {
 	FinishedAt *time.Time   `json:"finished_at,omitempty"`
 }
 
+// ReportDetail represents the detailed data of a report.
+// This is stored in a separate table to optimize query performance.
+type ReportDetail struct {
+	ReportID snowflake.ID `json:"report_id,string"`
+	Detail   string       `json:"detail,omitempty"`
+}
+
 const (
 	ReportStatusSuccess = "success"
 	ReportStatusFailed  = "failed"

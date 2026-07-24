@@ -35,7 +35,7 @@
             <td>{{ r.started_at ? formatTime(r.started_at) : '-' }}</td>
             <td>{{ r.finished_at ? formatTime(r.finished_at) : '-' }}</td>
             <td class="duration-cell">{{ calculateDuration(r.started_at, r.finished_at) }}</td>
-            <td><router-link :to="`/reports/${r.id}`" class="link">查看</router-link></td>
+            <td><a href="#" @click.prevent="viewReport(r.id)" class="link">查看</a></td>
           </tr>
         </tbody>
       </table>
@@ -44,22 +44,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { listReports } from '@/api/report'
-import type { ReportDTO } from '@/types'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { listReports, getReport } from '@/api/report'
+import type { ReportDTO, ReportListItemDTO } from '@/types'
 
-const reports = ref<ReportDTO[]>([])
+const router = useRouter()
+const reports = ref<ReportListItemDTO[]>([])
+const detailCache = new Map<string, ReportDTO>()
+const loading = ref(false)
 
 async function fetchReports() {
   try {
+    // 1. 加载列表（轻量级）
     const resp = await listReports({ limit: 50 })
-    if (resp.code === 0) reports.value = resp.data.items || []
+    if (resp.code === 0) {
+      reports.value = resp.data.items || []
+
+      // 2. 智能预加载前 5 个报告详情
+      const preloadCount = Math.min(5, reports.value.length)
+      const preloadPromises = reports.value.slice(0, preloadCount).map(r =>
+        getReport(r.id).then(resp => {
+          if (resp.code === 0) {
+            detailCache.set(r.id, resp.data)
+          }
+        }).catch(() => {/* 忽略预加载失败 */})
+      )
+
+      // 不等待预加载完成，让用户先看到列表
+      Promise.all(preloadPromises)
+    }
   } catch { /* ignore */ }
 }
 
-function extractMetric(r: ReportDTO, key: string): string {
+async function viewReport(id: string) {
+  // 优先使用缓存
+  if (detailCache.has(id)) {
+    router.push(`/reports/${id}`)
+    return
+  }
+
+  // 缓存未命中，显示加载状态
+  loading.value = true
   try {
-    const source = r.summary || r.detail
+    await getReport(id)
+    router.push(`/reports/${id}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 组件卸载时清空缓存
+onUnmounted(() => {
+  detailCache.clear()
+})
+
+function extractMetric(r: ReportListItemDTO, key: string): string {
+  try {
+    const source = r.summary
     const detail = typeof source === 'string' ? JSON.parse(source) : source
     return detail?.[key] ?? '-'
   } catch { return '-' }

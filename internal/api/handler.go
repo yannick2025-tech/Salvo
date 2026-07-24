@@ -1263,12 +1263,12 @@ func (h *Handler) ListReports(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, fmt.Sprintf("list reports: %v", err))
 	}
 
-	items := make([]dto.ReportDTO, 0, len(reports))
+	items := make([]dto.ReportListItemDTO, 0, len(reports))
 	for _, rp := range reports {
-		items = append(items, toReportDTO(rp))
+		items = append(items, toReportListItemDTO(rp))
 	}
 
-	return dto.OK(dto.ListResponse[[]dto.ReportDTO]{
+	return dto.OK(dto.ListResponse[[]dto.ReportListItemDTO]{
 		Items: items,
 		Pagination: dto.Pagination{
 			Offset: req.Offset,
@@ -1562,6 +1562,20 @@ func toReportDTO(rp *model.Report) dto.ReportDTO {
 		Status:     rp.Status,
 		Summary:    rp.Summary,
 		Detail:     rp.Detail,
+		StartedAt:  rp.StartedAt,
+		FinishedAt: rp.FinishedAt,
+		CreatedAt:  rp.CreatedAt,
+		UpdatedAt:  rp.UpdatedAt,
+	}
+}
+
+func toReportListItemDTO(rp *model.Report) dto.ReportListItemDTO {
+	return dto.ReportListItemDTO{
+		ID:         rp.ID,
+		SceneID:    rp.SceneID,
+		RunID:      rp.RunID,
+		Status:     rp.Status,
+		Summary:    rp.Summary,
 		StartedAt:  rp.StartedAt,
 		FinishedAt: rp.FinishedAt,
 		CreatedAt:  rp.CreatedAt,

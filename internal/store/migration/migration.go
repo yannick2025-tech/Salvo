@@ -20,6 +20,7 @@ func Migrate(db *sql.DB) error {
 		{"variables", createVariablesTable},
 		{"plugin_configs", createPluginConfigsTable},
 		{"reports", createReportsTable},
+		{"report_details", createReportDetailsTable},
 		{"run_records", createRunRecordsTable},
 		{"traces", createTracesTable},
 		{"spans", createSpansTable},
@@ -46,6 +47,13 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN block_on_error BOOLEAN DEFAULT FALSE`,
 		`ALTER TABLE data_sources ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
+		// Migration for report_details table
+		`INSERT INTO report_details (report_id, detail) SELECT id, detail FROM reports WHERE detail IS NOT NULL AND detail != ''`,
+		`ALTER TABLE reports DROP COLUMN detail`,
+		// Add indexes for better query performance
+		`CREATE INDEX IF NOT EXISTS idx_reports_run_id ON reports(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_reports_started_at ON reports(started_at)`,
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)
@@ -201,7 +209,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 5
+const currentVersion = 6
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -316,6 +324,28 @@ func CurrentVersion() int {
 	return currentVersion
 }
 
+// RollbackReportDetailsMigration rolls back the report_details table migration.
+// This function restores the original reports.detail column and removes the report_details table.
+// WARNING: This function should only be used during development or for emergency rollbacks.
+func RollbackReportDetailsMigration(db *sql.DB) error {
+	rollbackMigrations := []string{
+		// Add detail column back to reports table
+		`ALTER TABLE reports ADD COLUMN detail TEXT DEFAULT ''`,
+		// Restore data from report_details to reports
+		`UPDATE reports SET detail = (SELECT detail FROM report_details WHERE report_id = reports.id)`,
+		// Drop report_details table
+		`DROP TABLE IF EXISTS report_details`,
+	}
+
+	for _, sql := range rollbackMigrations {
+		if _, err := db.Exec(sql); err != nil {
+			return fmt.Errorf("rollback: %w", err)
+		}
+	}
+
+	return nil
+}
+
 const createTimeSeriesSamplesTable = `
 CREATE TABLE IF NOT EXISTS time_series_samples (
 	id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -377,4 +407,12 @@ CREATE TABLE IF NOT EXISTS so_plugins (
 CREATE INDEX IF NOT EXISTS idx_so_plugins_name ON so_plugins(name);
 CREATE INDEX IF NOT EXISTS idx_so_plugins_status ON so_plugins(status);
 CREATE INDEX IF NOT EXISTS idx_so_plugins_deleted_at ON so_plugins(deleted_at);
+`
+
+const createReportDetailsTable = `
+CREATE TABLE IF NOT EXISTS report_details (
+	report_id       INTEGER PRIMARY KEY,
+	detail          TEXT,
+	FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
+);
 `

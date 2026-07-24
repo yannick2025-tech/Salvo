@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/auth"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/migration"
+	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 )
 
@@ -481,4 +483,131 @@ func TestInvalidJSON(t *testing.T) {
 	resp := w.Result()
 	result := decodeResponse(t, resp)
 	assert.Equal(t, 400, result.Code)
+}
+
+// TestListReportsReturnsLightweightDTO tests that ListReports returns lightweight DTOs without detail field
+func TestListReportsReturnsLightweightDTO(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Create a scene
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "report-list-test",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Create a test report directly using repository
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      srv.db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     `{"test": "data"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	reportsRepo := sqlite.NewReportRepo(srv.db)
+	require.NoError(t, reportsRepo.Create(context.Background(), report))
+
+	// List reports
+	resp = postJSONAuth(t, srv, token, "/api/v1/reports/list", dto.ListReportsRequest{
+		SceneID: scene.ID,
+		Limit:   10,
+	})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	// Decode the response to verify structure
+	listData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+
+	var listResp dto.ListResponse[[]json.RawMessage]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+
+	// Verify we have at least one report
+	require.NotEmpty(t, listResp.Items, "Should have at least one report")
+
+	// Decode the first report item
+	var reportItem map[string]interface{}
+	require.NoError(t, json.Unmarshal(listResp.Items[0], &reportItem))
+
+	// Verify that the report item does NOT contain "detail" field
+	_, hasDetail := reportItem["detail"]
+	assert.False(t, hasDetail, "List reports should not include detail field")
+
+	// Verify that the report item contains expected fields
+	assert.Contains(t, reportItem, "id")
+	assert.Contains(t, reportItem, "scene_id")
+	assert.Contains(t, reportItem, "run_id")
+	assert.Contains(t, reportItem, "status")
+	assert.Contains(t, reportItem, "summary")
+	assert.Contains(t, reportItem, "started_at")
+	assert.Contains(t, reportItem, "finished_at")
+	assert.Contains(t, reportItem, "created_at")
+	assert.Contains(t, reportItem, "updated_at")
+}
+
+// TestGetReportReturnsFullDTO tests that GetReport returns full DTO with detail field
+func TestGetReportReturnsFullDTO(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Create a scene
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "report-get-test",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Create a test report with detail
+	now := time.Now().UTC()
+	testDetail := `{"metrics":{"total":1000,"success":990,"failed":10}}`
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      srv.db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     testDetail,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	reportsRepo := sqlite.NewReportRepo(srv.db)
+	require.NoError(t, reportsRepo.Create(context.Background(), report))
+
+	// Get the report
+	resp = postJSONAuth(t, srv, token, "/api/v1/reports/get", dto.GetReportRequest{
+		ID: report.ID,
+	})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	// Decode the response
+	reportData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+
+	var reportDTO dto.ReportDTO
+	require.NoError(t, json.Unmarshal(reportData, &reportDTO))
+
+	// Verify that the DTO contains detail field
+	assert.Equal(t, report.ID, reportDTO.ID)
+	assert.Equal(t, scene.ID, reportDTO.SceneID)
+	assert.Equal(t, report.RunID, reportDTO.RunID)
+	assert.Equal(t, "success", reportDTO.Status)
+	assert.Equal(t, "Test summary", reportDTO.Summary)
+	assert.NotEmpty(t, reportDTO.Detail, "GetReport should include detail field")
+	assert.JSONEq(t, testDetail, reportDTO.Detail, "Detail should match")
+	assert.NotNil(t, reportDTO.StartedAt)
+	assert.NotNil(t, reportDTO.FinishedAt)
 }

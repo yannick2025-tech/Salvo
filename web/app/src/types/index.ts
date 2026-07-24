@@ -139,17 +139,20 @@ export interface SpanDTO {
   duration_ns: number
 }
 
-export interface ReportDTO {
+export interface ReportListItemDTO {
   id: string
   scene_id: string
   run_id: string
   status: string
   summary: string
-  detail: string
   started_at?: string
   finished_at?: string
   created_at: string
   updated_at: string
+}
+
+export interface ReportDTO extends ReportListItemDTO {
+  detail: string
 }
 
 export interface ChangePasswordRequest {

@@ -499,45 +499,81 @@ func (r *ReportRepo) Create(ctx context.Context, report *model.Report) error {
 	report.CreatedAt = now
 	report.UpdatedAt = now
 
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO reports (id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at, deleted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 插入 reports 表（不包含 detail）
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reports (id, scene_id, run_id, status, summary, started_at, finished_at, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		report.ID, report.SceneID, report.RunID, report.Status,
-		report.Summary, report.Detail, report.StartedAt, report.FinishedAt,
+		report.Summary, report.StartedAt, report.FinishedAt,
 		report.CreatedAt, report.UpdatedAt)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 如果有 detail，插入 report_details 表
+	if report.Detail != "" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO report_details (report_id, detail)
+			VALUES (?, ?)`,
+			report.ID, report.Detail)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r *ReportRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Report, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
-		FROM reports WHERE id=? AND deleted_at IS NULL`, id)
+		SELECT r.id, r.scene_id, r.run_id, r.status, r.summary, rd.detail, r.started_at, r.finished_at, r.created_at, r.updated_at
+		FROM reports r
+		LEFT JOIN report_details rd ON r.id = rd.report_id
+		WHERE r.id=? AND r.deleted_at IS NULL`, id)
 	rp := &model.Report{}
+	var detail sql.NullString
 	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
-		&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+		&rp.Summary, &detail, &rp.StartedAt, &rp.FinishedAt,
 		&rp.CreatedAt, &rp.UpdatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if detail.Valid {
+		rp.Detail = detail.String
 	}
 	return rp, nil
 }
 
 func (r *ReportRepo) GetByRunID(ctx context.Context, runID snowflake.ID) (*model.Report, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
-		FROM reports WHERE run_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, runID)
+		SELECT r.id, r.scene_id, r.run_id, r.status, r.summary, rd.detail, r.started_at, r.finished_at, r.created_at, r.updated_at
+		FROM reports r
+		LEFT JOIN report_details rd ON r.id = rd.report_id
+		WHERE r.run_id=? AND r.deleted_at IS NULL 
+		ORDER BY r.created_at DESC LIMIT 1`, runID)
 	rp := &model.Report{}
+	var detail sql.NullString
 	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
-		&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+		&rp.Summary, &detail, &rp.StartedAt, &rp.FinishedAt,
 		&rp.CreatedAt, &rp.UpdatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if detail.Valid {
+		rp.Detail = detail.String
 	}
 	return rp, nil
 }
 
 func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Report, error) {
-	query := `SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
+	query := `SELECT id, scene_id, run_id, status, summary, started_at, finished_at, created_at, updated_at
 		FROM reports WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -562,7 +598,7 @@ func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Rep
 	for rows.Next() {
 		rp := &model.Report{}
 		if err := rows.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
-			&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+			&rp.Summary, &rp.StartedAt, &rp.FinishedAt,
 			&rp.CreatedAt, &rp.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -573,18 +609,62 @@ func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Rep
 
 func (r *ReportRepo) Update(ctx context.Context, report *model.Report) error {
 	report.UpdatedAt = time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE reports SET status=?, summary=?, detail=?, started_at=?, finished_at=?, updated_at=?
+
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 更新 reports 表（不包含 detail）
+	_, err = tx.ExecContext(ctx, `
+		UPDATE reports SET status=?, summary=?, started_at=?, finished_at=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
-		report.Status, report.Summary, report.Detail,
-		report.StartedAt, report.FinishedAt, report.UpdatedAt, report.ID)
-	return err
+		report.Status, report.Summary, report.StartedAt, report.FinishedAt,
+		report.UpdatedAt, report.ID)
+	if err != nil {
+		return err
+	}
+
+	// 更新或插入 report_details
+	if report.Detail != "" {
+		// 使用 INSERT OR REPLACE (SQLite 的 upsert)
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO report_details (report_id, detail)
+			VALUES (?, ?)`,
+			report.ID, report.Detail)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r *ReportRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `UPDATE reports SET deleted_at=? WHERE id=?`, now, id)
-	return err
+
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 软删除 reports
+	_, err = tx.ExecContext(ctx, `UPDATE reports SET deleted_at=? WHERE id=?`, now, id)
+	if err != nil {
+		return err
+	}
+
+	// 手动删除 report_details（保持数据一致性）
+	_, err = tx.ExecContext(ctx, `DELETE FROM report_details WHERE report_id=?`, id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // --- RunRecordRepo ---

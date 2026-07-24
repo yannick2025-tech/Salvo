@@ -379,6 +379,20 @@ type ReportDTO struct {
 	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
+// ReportListItemDTO is the lightweight report data returned in list responses.
+// It excludes the detail field to optimize payload size for list queries.
+type ReportListItemDTO struct {
+	ID         snowflake.ID `json:"id,string"`
+	SceneID    snowflake.ID `json:"scene_id,string"`
+	RunID      snowflake.ID `json:"run_id,string"`
+	Status     string       `json:"status"`
+	Summary    string       `json:"summary"`
+	StartedAt  *time.Time   `json:"started_at,omitempty"`
+	FinishedAt *time.Time   `json:"finished_at,omitempty"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
+}
+
 // --- RunRecord ---
 
 // ListRunRecordsRequest is the request body for listing run records.

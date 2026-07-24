@@ -456,3 +456,302 @@ func TestOpenWALMode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "wal", journalMode)
 }
+
+// --- ReportRepo tests with report_details ---
+
+func TestReportRepoCreateWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "report-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	detailJSON := `{"metrics":{"total":1000,"success":990}}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "All passed",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	err := rr.Create(ctx, report)
+	require.NoError(t, err)
+	assert.NotZero(t, report.ID)
+
+	// 验证 reports 表和 report_details 表都有数据
+	var count int
+	err = db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// 验证可以通过 GetByID 获取 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoCreateWithoutDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "report-no-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "All passed",
+		Detail:     "", // 空 detail
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	err := rr.Create(ctx, report)
+	require.NoError(t, err)
+
+	// 验证 report_details 表没有数据（因为 detail 为空）
+	var count int
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// 验证 GetByID 返回空 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", found.Detail)
+}
+
+func TestReportRepoGetByIDWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "get-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	detailJSON := `{"nodes":[{"id":"A","success":true}]}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 测试 GetByID
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, report.ID, found.ID)
+	assert.Equal(t, report.SceneID, found.SceneID)
+	assert.Equal(t, report.RunID, found.RunID)
+	assert.Equal(t, "success", found.Status)
+	assert.Equal(t, "Test summary", found.Summary)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoGetByRunIDWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "get-by-run-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	runID := db.NextID()
+	detailJSON := `{"metrics":{"latency":45.5}}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      runID,
+		Status:     "success",
+		Summary:    "Run summary",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 测试 GetByRunID
+	found, err := rr.GetByRunID(ctx, runID)
+	require.NoError(t, err)
+	assert.Equal(t, report.ID, found.ID)
+	assert.Equal(t, runID, found.RunID)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoListWithoutDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "list-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	// 创建多个报告，有的有 detail，有的没有
+	for i := 0; i < 5; i++ {
+		report := &model.Report{
+			SceneID:    scene.ID,
+			RunID:      db.NextID(),
+			Status:     "success",
+			Summary:    "Summary " + string(rune('A'+i)),
+			Detail:     `{"data":"test"}`,
+			StartedAt:  &now,
+			FinishedAt: &now,
+		}
+		require.NoError(t, rr.Create(ctx, report))
+	}
+
+	// 测试 List 方法不返回 detail
+	reports, err := rr.List(ctx, repo.Filter{SceneID: scene.ID, Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, reports, 5)
+
+	for _, r := range reports {
+		assert.Equal(t, "", r.Detail, "List method should not return detail field")
+		assert.NotEmpty(t, r.Summary)
+		assert.NotEmpty(t, r.Status)
+	}
+}
+
+func TestReportRepoUpdateDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "update-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "Original summary",
+		Detail:     `{"old":"data"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 更新报告，包括 detail
+	report.Status = "failed"
+	report.Summary = "Updated summary"
+	report.Detail = `{"new":"data"}`
+	require.NoError(t, rr.Update(ctx, report))
+
+	// 验证更新后的数据
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", found.Status)
+	assert.Equal(t, "Updated summary", found.Summary)
+	assert.Equal(t, `{"new":"data"}`, found.Detail)
+}
+
+func TestReportRepoUpdateAddDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "add-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "No detail initially",
+		Detail:     "", // 初始没有 detail
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 验证初始没有 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", found.Detail)
+
+	// 更新，添加 detail
+	report.Detail = `{"added":"detail"}`
+	require.NoError(t, rr.Update(ctx, report))
+
+	// 验证 detail 已添加
+	found, err = rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, `{"added":"detail"}`, found.Detail)
+}
+
+func TestReportRepoDeleteCascade(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "delete-cascade-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "To be deleted",
+		Detail:     `{"data":"will be deleted"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 验证数据存在
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ? AND deleted_at IS NULL`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// 删除报告
+	require.NoError(t, rr.Delete(ctx, report.ID))
+
+	// 验证 reports 表已被软删除
+	err = db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ? AND deleted_at IS NULL`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count, "reports table should be soft-deleted")
+
+	// 验证 report_details 表已被删除
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count, "report_details should be deleted")
+
+	// 验证 GetByID 返回错误
+	_, err = rr.GetByID(ctx, report.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
