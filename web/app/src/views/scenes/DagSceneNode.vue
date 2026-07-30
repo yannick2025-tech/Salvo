@@ -20,7 +20,7 @@
       <span v-else-if="chainStatus === 'running'">⟳</span>
     </div>
 
-    <div class="node-body" @click.stop="toggleExpand">
+    <div class="node-body" @click="toggleExpand">
       <div :class="['node-icon-wrap', data.nodeType]">
         <span class="node-icon" v-html="data.icon"></span>
       </div>
