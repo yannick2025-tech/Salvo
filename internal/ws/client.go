@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
+	writeWait      = 30 * time.Second // increased from 10s for poor network conditions
+	pongWait       = 90 * time.Second // increased from 60s to match writeWait headroom
 	pingPeriod     = 30 * time.Second
 	maxMessageSize = 512
 )
@@ -25,8 +25,10 @@ type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 
-	// send buffers outbound messages as []byte (JSON-encoded).
-	send chan []byte
+	// outbox is a deduplicating send queue that replaces the old
+	// buffered channel. Messages keyed by (run_id,chain_id,node_id)
+	// are coalesced so slow networks never cause silent drops.
+	outbox *SendQueue
 
 	// subscriptions tracks the run_ids this client is subscribed to.
 	subscriptions map[string]struct{}
@@ -37,7 +39,7 @@ func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 	return &Client{
 		hub:           hub,
 		conn:          conn,
-		send:          make(chan []byte, sendBufSize),
+		outbox:        NewSendQueue(),
 		subscriptions: make(map[string]struct{}),
 	}
 }
@@ -78,7 +80,10 @@ func (c *Client) ReadPump() {
 	}
 }
 
-// WritePump writes messages from the send channel to the WebSocket connection.
+// WritePump writes messages from the outbox queue to the WebSocket
+// connection. It drains all pending messages in a batch before waiting
+// for the next signal, which minimizes frame overhead and ensures
+// no message is left behind when the network is slow.
 // It also sends periodic pings. It should be invoked in a goroutine.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
@@ -88,18 +93,29 @@ func (c *Client) WritePump() {
 	}()
 
 	for {
-		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		// Drain all pending messages before waiting.
+		for {
+			data, ok := c.outbox.TryPop()
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				break
+			}
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				return
 			}
+		}
 
-			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				return
-			}
+		// If the queue was closed, send close frame and exit.
+		if c.outbox.IsClosed() {
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+			return
+		}
 
+		// Wait for new messages or the next ping tick.
+		select {
+		case <-c.outbox.Signal():
+			// New message(s) available — loop back to drain.
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {

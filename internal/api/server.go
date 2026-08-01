@@ -20,6 +20,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -52,6 +53,9 @@ type Config struct {
 
 func New(cfg Config) *Server {
 	// Create the WebSocket Hub early so it can be wired into the tracer.
+	// The Hub is created without SpanState first; we set it after the
+	// tracer is available (circular dependency: hub needs tracer, tracer
+	// needs hub.BroadcastToRun).
 	wsHub := ws.NewHub()
 
 	h := &Handler{
@@ -97,6 +101,33 @@ func New(cfg Config) *Server {
 		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
 	}
 	h.tracer = tracer
+
+	// Wire the tracer into the Hub so that Subscribe can push current
+	// span states to newly connected clients, eliminating the race
+	// between subscription and broadcast over slow networks.
+	wsHub.SetSpanState(func(runID string) []ws.Message {
+		var id snowflake.ID
+		if err := id.Parse(runID); err != nil {
+			return nil
+		}
+		tr, ok := tracer.ByRunID(id)
+		if !ok {
+			return nil
+		}
+		msgs := make([]ws.Message, 0, len(tr.Spans))
+		for _, span := range tr.Spans {
+			msgs = append(msgs, ws.Message{
+				Type:       "span_update",
+				RunID:      runID,
+				ChainID:    span.ChainID,
+				NodeID:     span.NodeID,
+				Status:     string(span.Status),
+				DurationNs: int64(span.Duration),
+				Error:      span.Error,
+			})
+		}
+		return msgs
+	})
 
 	if err := h.tracer.LoadFromDB(context.Background()); err != nil {
 		cfg.Logger.Warn("failed to load traces from db on startup", logger.F("error", err))
