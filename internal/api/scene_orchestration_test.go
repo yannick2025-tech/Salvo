@@ -348,7 +348,7 @@ nodes:
 	assert.Equal(t, "yaml", dsList[0].Source, "YAML-imported data source should have source=yaml")
 	assert.Equal(t, "user_charger", dsList[0].Name)
 
-	// Step 2: Upload CSV with the same name "user_charger" (should overwrite the yaml one)
+	// Step 2: Upload CSV with the same name "user_charger" — YAML and CSV now coexist
 	csvResp := postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/upload", dto.UploadDataSourceRequest{
 		SceneID:  scene.ID,
 		FileName: "user_charger.csv",
@@ -357,16 +357,27 @@ nodes:
 	result = decodeResponse(t, csvResp)
 	assert.Equal(t, 0, result.Code, "CSV upload failed: %s", result.Message)
 
-	// Verify the CSV-uploaded data source has source=csv and overwrote the yaml one
+	// Verify both YAML and CSV data sources coexist with the same name
 	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/list", dto.SceneIDRequest{
 		SceneID: scene.ID,
 	})
 	result = decodeResponse(t, resp)
 	dsListData, _ = json.Marshal(result.Data)
 	require.NoError(t, json.Unmarshal(dsListData, &dsList))
-	require.Equal(t, 1, len(dsList), "expected 1 data source after CSV upload")
-	assert.Equal(t, "csv", dsList[0].Source, "CSV-uploaded data source should have source=csv")
-	assert.Equal(t, 2, dsList[0].RowCount, "CSV should have 2 data rows")
+	require.Equal(t, 2, len(dsList), "expected 2 data sources (yaml + csv) after CSV upload")
+	// Find the CSV and YAML entries
+	var csvDS, yamlDS *dto.DataSourceDTO
+	for i := range dsList {
+		if dsList[i].Source == "csv" {
+			csvDS = &dsList[i]
+		} else if dsList[i].Source == "yaml" {
+			yamlDS = &dsList[i]
+		}
+	}
+	require.NotNil(t, csvDS, "CSV data source should exist")
+	assert.Equal(t, 2, csvDS.RowCount, "CSV should have 2 data rows")
+	require.NotNil(t, yamlDS, "YAML data source should still exist")
+	assert.Equal(t, 1, yamlDS.RowCount, "YAML should have 1 data row")
 
 	// Step 3: Re-import YAML with same data source name — CSV should NOT be overwritten
 	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
@@ -376,17 +387,21 @@ nodes:
 	result = decodeResponse(t, resp)
 	assert.Equal(t, 0, result.Code, "second YAML import failed: %s", result.Message)
 
-	// Verify CSV data source is still intact
+	// Verify both CSV and YAML data sources still exist after re-import
 	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/datasources/list", dto.SceneIDRequest{
 		SceneID: scene.ID,
 	})
 	result = decodeResponse(t, resp)
 	dsListData, _ = json.Marshal(result.Data)
 	require.NoError(t, json.Unmarshal(dsListData, &dsList))
-	require.Equal(t, 1, len(dsList), "expected 1 data source after re-import")
-	assert.Equal(t, "csv", dsList[0].Source, "CSV data source should NOT be overwritten by YAML import")
-	assert.Equal(t, 2, dsList[0].RowCount, "CSV data should still have 2 rows")
-	assert.Equal(t, "user_charger", dsList[0].Name)
+	require.Equal(t, 2, len(dsList), "expected 2 data sources after re-import (yaml + csv coexist)")
+	// Verify CSV is still intact
+	for i := range dsList {
+		if dsList[i].Source == "csv" {
+			assert.Equal(t, 2, dsList[i].RowCount, "CSV data should still have 2 rows")
+			assert.Equal(t, "user_charger", dsList[i].Name)
+		}
+	}
 }
 
 // --- 11.3 Group Node Integration ---

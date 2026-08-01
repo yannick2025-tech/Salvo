@@ -12,17 +12,18 @@ func TestParseCSV(t *testing.T) {
 	csv := `name,age,city
 Alice,30,NYC
 Bob,25,LA`
-	columns, rows, err := ParseCSV("users.csv", strings.NewReader(csv))
+	columns, rows, removed, err := ParseCSV("users.csv", strings.NewReader(csv))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"name", "age", "city"}, columns)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "Alice", rows[0]["name"])
 	assert.Equal(t, "30", rows[0]["age"])
 	assert.Equal(t, "Bob", rows[1]["name"])
+	assert.Equal(t, 0, removed)
 }
 
 func TestParseCSVEmptyFile(t *testing.T) {
-	_, _, err := ParseCSV("empty.csv", strings.NewReader(""))
+	_, _, _, err := ParseCSV("empty.csv", strings.NewReader(""))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "empty")
 }
@@ -30,7 +31,7 @@ func TestParseCSVEmptyFile(t *testing.T) {
 func TestParseCSVDuplicateColumns(t *testing.T) {
 	csv := `name,age,name
 Alice,30,Bob`
-	_, _, err := ParseCSV("dup.csv", strings.NewReader(csv))
+	_, _, _, err := ParseCSV("dup.csv", strings.NewReader(csv))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate")
 }
@@ -38,9 +39,38 @@ Alice,30,Bob`
 func TestParseCSVInvalidFileName(t *testing.T) {
 	csv := `a,b
 1,2`
-	_, _, err := ParseCSV("my-file.csv", strings.NewReader(csv))
+	_, _, _, err := ParseCSV("my-file.csv", strings.NewReader(csv))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "file name")
+}
+
+func TestParseCSVRemovesEmptyRows(t *testing.T) {
+	csv := `name,age,city
+Alice,30,NYC
+,,
+Bob,25,LA
+,,`
+	columns, rows, removed, err := ParseCSV("users.csv", strings.NewReader(csv))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"name", "age", "city"}, columns)
+	require.Len(t, rows, 2)
+	assert.Equal(t, "Alice", rows[0]["name"])
+	assert.Equal(t, "Bob", rows[1]["name"])
+	assert.Equal(t, 2, removed, "should remove 2 empty rows")
+}
+
+func TestParseCSVPartialEmptyRow(t *testing.T) {
+	csv := `name,age,city
+Alice,30,
+,25,LA
+,,`
+	columns, rows, removed, err := ParseCSV("users.csv", strings.NewReader(csv))
+	require.NoError(t, err)
+	_ = columns
+	require.Len(t, rows, 2, "partial empty rows should be kept")
+	assert.Equal(t, "Alice", rows[0]["name"])
+	assert.Equal(t, "25", rows[1]["age"])
+	assert.Equal(t, 1, removed, "only fully empty row should be removed")
 }
 
 func TestRowIterator(t *testing.T) {

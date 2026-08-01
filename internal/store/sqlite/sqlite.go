@@ -1166,10 +1166,32 @@ func (r *DataSourceRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.D
 	return ds, nil
 }
 
-func (r *DataSourceRepo) GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) (*model.DataSource, error) {
+func (r *DataSourceRepo) GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) ([]*model.DataSource, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND name=? AND deleted_at IS NULL
+		ORDER BY source ASC`, sceneID, name) // "csv" < "yaml" lexicographically, so csv comes first
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var results []*model.DataSource
+	for rows.Next() {
+		ds := &model.DataSource{}
+		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			return nil, err
+		}
+		results = append(results, ds)
+	}
+	return results, nil
+}
+
+func (r *DataSourceRepo) GetBySceneIDAndNameAndSource(ctx context.Context, sceneID snowflake.ID, name string, source string) (*model.DataSource, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
-		FROM data_sources WHERE scene_id=? AND name=? AND deleted_at IS NULL`, sceneID, name)
+		FROM data_sources WHERE scene_id=? AND name=? AND source=? AND deleted_at IS NULL`, sceneID, name, source)
 	ds := &model.DataSource{}
 	err := row.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
 		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt)
@@ -1183,7 +1205,7 @@ func (r *DataSourceRepo) ListBySceneID(ctx context.Context, sceneID snowflake.ID
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
 		FROM data_sources WHERE scene_id=? AND deleted_at IS NULL
-		ORDER BY created_at ASC`, sceneID)
+		ORDER BY name ASC, source ASC`, sceneID)
 	if err != nil {
 		return nil, err
 	}

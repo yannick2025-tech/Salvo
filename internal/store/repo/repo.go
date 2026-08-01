@@ -135,7 +135,8 @@ type RolePermissionRepo interface {
 type DataSourceRepo interface {
 	Create(ctx context.Context, ds *model.DataSource) error
 	GetByID(ctx context.Context, id snowflake.ID) (*model.DataSource, error)
-	GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) (*model.DataSource, error)
+	GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) ([]*model.DataSource, error)
+	GetBySceneIDAndNameAndSource(ctx context.Context, sceneID snowflake.ID, name string, source string) (*model.DataSource, error)
 	ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error)
 	Delete(ctx context.Context, id snowflake.ID) error
 }

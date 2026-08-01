@@ -24,19 +24,19 @@ var validFileNamePattern = strings.NewReplacer(
 	"",
 )
 
-// ParseCSV parses a CSV file content and returns the column names and row data.
-// It validates the file size, file name format, and detects duplicate columns.
-func ParseCSV(fileName string, reader io.Reader) ([]string, []map[string]string, error) {
+// ParseCSV parses a CSV file content and returns the column names, row data,
+// and the count of removed empty rows (rows where all columns are empty).
+func ParseCSV(fileName string, reader io.Reader) ([]string, []map[string]string, int, error) {
 	content, err := io.ReadAll(io.LimitReader(reader, maxFileSizeBytes+1))
 	if err != nil {
-		return nil, nil, fmt.Errorf("read csv file: %w", err)
+		return nil, nil, 0, fmt.Errorf("read csv file: %w", err)
 	}
 	if len(content) > maxFileSizeBytes {
-		return nil, nil, fmt.Errorf("file size exceeds %d byte limit", maxFileSizeBytes)
+		return nil, nil, 0, fmt.Errorf("file size exceeds %d byte limit", maxFileSizeBytes)
 	}
 
 	if !isValidFileName(fileName) {
-		return nil, nil, fmt.Errorf("file name must contain only letters, digits, and underscores")
+		return nil, nil, 0, fmt.Errorf("file name must contain only letters, digits, and underscores")
 	}
 
 	csvReader := csv.NewReader(strings.NewReader(string(content)))
@@ -44,46 +44,55 @@ func ParseCSV(fileName string, reader io.Reader) ([]string, []map[string]string,
 
 	headers, err := csvReader.Read()
 	if err == io.EOF {
-		return nil, nil, fmt.Errorf("csv file is empty")
+		return nil, nil, 0, fmt.Errorf("csv file is empty")
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse csv headers: %w", err)
+		return nil, nil, 0, fmt.Errorf("parse csv headers: %w", err)
 	}
 	if len(headers) == 0 {
-		return nil, nil, fmt.Errorf("csv has no columns")
+		return nil, nil, 0, fmt.Errorf("csv has no columns")
 	}
 
 	// Check duplicate column names
 	headerSet := make(map[string]bool)
 	for _, h := range headers {
 		if headerSet[h] {
-			return nil, nil, fmt.Errorf("duplicate column name detected: %q", h)
+			return nil, nil, 0, fmt.Errorf("duplicate column name detected: %q", h)
 		}
 		headerSet[h] = true
 	}
 
 	var rows []map[string]string
+	var emptyRowCount int
 	for {
 		record, err := csvReader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("parse csv record %d: %w", len(rows)+1, err)
+			return nil, nil, 0, fmt.Errorf("parse csv record %d: %w", len(rows)+1, err)
 		}
 
 		row := make(map[string]string, len(headers))
+		allEmpty := true
 		for i, h := range headers {
+			val := ""
 			if i < len(record) {
-				row[h] = record[i]
-			} else {
-				row[h] = ""
+				val = record[i]
 			}
+			row[h] = val
+			if val != "" {
+				allEmpty = false
+			}
+		}
+		if allEmpty {
+			emptyRowCount++
+			continue
 		}
 		rows = append(rows, row)
 	}
 
-	return headers, rows, nil
+	return headers, rows, emptyRowCount, nil
 }
 
 // isValidFileName checks that the file name is non-empty and has a .csv extension.

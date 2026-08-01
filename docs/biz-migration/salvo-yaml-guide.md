@@ -193,6 +193,36 @@ body: '{"phone":"${users.phone}","cardNum":"${users.cardnum}"}'
 body: '{"charger":"${chargers.charger}","pointId":"${chargers.pointId}"}'
 ```
 
+#### 2.4.1 YAML 与 CSV 数据源共存
+
+同一场景中，同名数据源可以同时存在 YAML 版本（`source=yaml`）和 CSV 版本（`source=csv`），两者独立存储、互不覆盖。
+
+**共存规则**：
+
+| 操作 | 行为 |
+|------|------|
+| **YAML 导入** | 若同名 CSV 已存在 → 跳过（保留 CSV）；若同名 YAML 已存在 → 覆盖旧 YAML |
+| **CSV 上传** | 若同名 CSV 已存在 → 覆盖旧 CSV；若同名 YAML 已存在 → 保留 YAML（不覆盖） |
+| **节点执行时取值** | 同名数据源中 **CSV 优先**，CSV 不存在时 fallback 到 YAML |
+
+**典型场景**：
+
+YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文件（包含 3 条特定数据）：
+
+- GUI 数据源列表中会显示两条记录：`users` (yaml配置) + `users` (csv上传)
+- 节点执行时引用 `${users.phone}` 优先使用 CSV 的 3 条数据
+- CSV 数据只有 3 行，但 LOOP 30 次：RowIterator 会**循环轮询**，第 4 次取第 1 行，第 5 次取第 2 行，依此类推
+- 删除 CSV 数据源后，自动 fallback 到 YAML 的 10 条数据
+
+**RowIterator 循环取值**：
+
+数据源行迭代器在所有行遍历完毕后自动回到第一行（round-robin），因此数据行数不必与循环次数匹配：
+
+```
+数据源有 3 行: [row1, row2, row3]
+循环 7 次的取值顺序: row1 → row2 → row3 → row1 → row2 → row3 → row1
+```
+
 参考实现：[handler.go#L162-L181]($PROJECT_HOME/salvo/internal/api/handler.go#L162-L181)
 
 ---

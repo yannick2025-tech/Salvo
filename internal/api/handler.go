@@ -171,22 +171,26 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			return dto.ErrorResp(400, "data source name is required")
 		}
 		// Skip if a CSV-uploaded data source with same name already exists
-		existing, _ := h.dataSources.GetBySceneIDAndName(r.Context(), scene.ID, yds.Name)
-		if existing != nil && existing.Source == "csv" {
-			dsNameToID[yds.Name] = existing.ID
+		existingCSV, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), scene.ID, yds.Name, "csv")
+		if existingCSV != nil {
+			dsNameToID[yds.Name] = existingCSV.ID
 			continue
 		}
 		// Delete existing yaml data source with same name before creating
-		if existing != nil {
-			_ = h.dataSources.Delete(r.Context(), existing.ID)
+		existingYAML, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), scene.ID, yds.Name, "yaml")
+		if existingYAML != nil {
+			_ = h.dataSources.Delete(r.Context(), existingYAML.ID)
 		}
+		columnsJSON, _ := json.Marshal(yds.Columns)
 		rowsJSON, _ := json.Marshal(yds.Rows)
 		ds := &model.DataSource{
-			SceneID: scene.ID,
-			Name:    yds.Name,
-			Columns: strings.Join(yds.Columns, ","),
-			Rows:    string(rowsJSON),
-			Source:  "yaml",
+			SceneID:  scene.ID,
+			Name:     yds.Name,
+			FileName: yds.Name + ".csv",
+			Columns:  string(columnsJSON),
+			Rows:     string(rowsJSON),
+			RowCount: len(yds.Rows),
+			Source:   "yaml",
 		}
 		if err := h.dataSources.Create(r.Context(), ds); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create data source %q: %v", yds.Name, err))
@@ -1037,19 +1041,18 @@ func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
 	}
 
-	// Parse CSV
-	columns, rows, err := runner.ParseCSV(req.FileName, strings.NewReader(req.Content))
+	// Parse CSV (empty rows are automatically removed)
+	columns, rows, removedEmptyRows, err := runner.ParseCSV(req.FileName, strings.NewReader(req.Content))
 	if err != nil {
 		return dto.ErrorResp(400, fmt.Sprintf("parse csv: %v", err))
 	}
 
-	// Check for existing data source with same name (upsert)
+	// Check for existing CSV data source with same name (upsert, YAML data source is preserved)
 	dsModel := runner.ToDataSourceModel(req.SceneID, req.FileName, columns, rows)
 
-	existing, _ := h.dataSources.GetBySceneIDAndName(r.Context(), req.SceneID, dsModel.Name)
-	if existing != nil {
-		// Delete old and create new
-		_ = h.dataSources.Delete(r.Context(), existing.ID)
+	existingCSV, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), req.SceneID, dsModel.Name, "csv")
+	if existingCSV != nil {
+		_ = h.dataSources.Delete(r.Context(), existingCSV.ID)
 	}
 
 	if err := h.dataSources.Create(r.Context(), dsModel); err != nil {
@@ -1057,15 +1060,16 @@ func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
 	}
 
 	return dto.OK(dto.DataSourceDTO{
-		ID:        dsModel.ID,
-		SceneID:   dsModel.SceneID,
-		Name:      dsModel.Name,
-		FileName:  dsModel.FileName,
-		Columns:   columns,
-		RowCount:  dsModel.RowCount,
-		Source:    dsModel.Source,
-		CreatedAt: dsModel.CreatedAt,
-		UpdatedAt: dsModel.UpdatedAt,
+		ID:               dsModel.ID,
+		SceneID:          dsModel.SceneID,
+		Name:             dsModel.Name,
+		FileName:         dsModel.FileName,
+		Columns:          columns,
+		RowCount:         dsModel.RowCount,
+		Source:           dsModel.Source,
+		RemovedEmptyRows: removedEmptyRows,
+		CreatedAt:        dsModel.CreatedAt,
+		UpdatedAt:        dsModel.UpdatedAt,
 	})
 }
 
@@ -1086,7 +1090,12 @@ func (h *Handler) ListDataSources(r *http.Request) dto.Response {
 	var items []dto.DataSourceDTO
 	for _, ds := range sources {
 		var columns []string
-		_ = json.Unmarshal([]byte(ds.Columns), &columns)
+		if err := json.Unmarshal([]byte(ds.Columns), &columns); err != nil {
+			// Legacy format: comma-separated string (from older YAML imports)
+			if ds.Columns != "" {
+				columns = strings.Split(ds.Columns, ",")
+			}
+		}
 		items = append(items, dto.DataSourceDTO{
 			ID:        ds.ID,
 			SceneID:   ds.SceneID,
@@ -1120,7 +1129,12 @@ func (h *Handler) PreviewDataSource(r *http.Request) dto.Response {
 	}
 
 	var columns []string
-	_ = json.Unmarshal([]byte(ds.Columns), &columns)
+	if err := json.Unmarshal([]byte(ds.Columns), &columns); err != nil {
+		// Legacy format: comma-separated string (from older YAML imports)
+		if ds.Columns != "" {
+			columns = strings.Split(ds.Columns, ",")
+		}
+	}
 	var rows []map[string]string
 	_ = json.Unmarshal([]byte(ds.Rows), &rows)
 

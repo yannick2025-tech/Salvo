@@ -276,15 +276,16 @@ type DeleteSOPluginRequest struct {
 
 // DataSourceDTO is the data source detail returned in API responses.
 type DataSourceDTO struct {
-	ID        snowflake.ID `json:"id"`
-	SceneID   snowflake.ID `json:"scene_id"`
-	Name      string       `json:"name"`
-	FileName  string       `json:"file_name"`
-	Columns   []string     `json:"columns"`
-	RowCount  int          `json:"row_count"`
-	Source    string       `json:"source"` // "yaml" or "csv"
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
+	ID                snowflake.ID `json:"id"`
+	SceneID           snowflake.ID `json:"scene_id"`
+	Name              string       `json:"name"`
+	FileName          string       `json:"file_name"`
+	Columns           []string     `json:"columns"`
+	RowCount          int          `json:"row_count"`
+	Source            string       `json:"source"` // "yaml" or "csv"
+	RemovedEmptyRows  int          `json:"removed_empty_rows,omitempty"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
 }
 
 // SOPluginDTO is the SO plugin detail returned in API responses.

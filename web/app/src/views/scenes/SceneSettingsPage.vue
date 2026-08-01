@@ -375,7 +375,12 @@ async function handleDsUpload(file: File) {
       showToast(resp.message || '上传失败', 'error')
       return
     }
-    showToast('上传成功', 'success')
+    const removed = resp.data?.removed_empty_rows
+    if (removed && removed > 0) {
+      showToast(`上传成功，已自动去除 ${removed} 行空行`, 'info')
+    } else {
+      showToast('上传成功', 'success')
+    }
     fetchDataSources()
   } catch {
     showToast('上传失败', 'error')
@@ -509,8 +514,13 @@ async function dsSaveEdit() {
     }
     const csvContent = csvLines.join('\n')
     const sceneId = route.params.id as string
-    await uploadDataSource(sceneId, dsPreview.value.file_name, csvContent)
-    showToast('保存成功', 'success')
+    const resp = await uploadDataSource(sceneId, dsPreview.value.file_name, csvContent)
+    const removed = resp.data?.removed_empty_rows
+    if (removed && removed > 0) {
+      showToast(`保存成功，已自动去除 ${removed} 行空行`, 'info')
+    } else {
+      showToast('保存成功', 'success')
+    }
     fetchDataSources()
     showDsPreview.value = false
   } catch {

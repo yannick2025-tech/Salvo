@@ -8,6 +8,7 @@ export interface DataSourceDTO {
   columns: string[]
   row_count: number
   source: string // "yaml" or "csv"
+  removed_empty_rows?: number
   created_at: string
   updated_at: string
 }

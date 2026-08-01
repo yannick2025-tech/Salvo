@@ -389,7 +389,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	runLog.Info("scope built", logger.F("variable_count", len(scope.Keys())))
 
-	// Load data sources and create row iterators
+	// Load data sources and create row iterators.
+	// When YAML and CSV data sources share the same name, CSV takes priority.
 	if r.dataSources != nil {
 		dSources, dsErr := r.dataSources.ListBySceneID(r.ctx, r.cfg.SceneID)
 		if dsErr != nil {
@@ -397,6 +398,12 @@ func (r *Runner) Run(ctx context.Context) error {
 		} else if len(dSources) > 0 {
 			r.rowIterators = make(map[string]*RowIterator, len(dSources))
 			for _, ds := range dSources {
+				// Skip YAML data source if a CSV one with the same name was already loaded
+				if _, exists := r.rowIterators[ds.Name]; exists {
+					runLog.Info("skipped data source (CSV takes priority)",
+						logger.F("name", ds.Name), logger.F("source", ds.Source))
+					continue
+				}
 				var rows []map[string]string
 				if err := json.Unmarshal([]byte(ds.Rows), &rows); err != nil {
 					runLog.Warn("failed to parse data source rows",
@@ -406,6 +413,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				r.rowIterators[ds.Name] = NewRowIterator(rows)
 				runLog.Info("loaded data source",
 					logger.F("name", ds.Name),
+					logger.F("source", ds.Source),
 					logger.F("rows", len(rows)),
 				)
 			}
