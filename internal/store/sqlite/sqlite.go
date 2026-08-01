@@ -1223,6 +1223,15 @@ func (r *DataSourceRepo) ListBySceneID(ctx context.Context, sceneID snowflake.ID
 	return sources, rows.Err()
 }
 
+func (r *DataSourceRepo) Update(ctx context.Context, ds *model.DataSource) error {
+	ds.UpdatedAt = time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE data_sources SET columns=?, rows=?, row_count=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		ds.Columns, ds.Rows, ds.RowCount, ds.UpdatedAt, ds.ID)
+	return err
+}
+
 func (r *DataSourceRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE data_sources SET deleted_at=? WHERE id=?`, now, id)

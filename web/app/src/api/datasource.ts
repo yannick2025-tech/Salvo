@@ -21,6 +21,10 @@ export function uploadDataSource(sceneId: string, fileName: string, content: str
   return post<DataSourceDTO>('/scenes/datasources/upload', { scene_id: sceneId, file_name: fileName, content })
 }
 
+export function updateDataSource(id: string, content: string) {
+  return post<DataSourceDTO>('/scenes/datasources/update', { id, content })
+}
+
 export function listDataSources(sceneId: string) {
   return post<{ items: DataSourceDTO[] }>('/scenes/datasources/list', { scene_id: sceneId })
 }

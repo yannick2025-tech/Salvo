@@ -240,6 +240,12 @@ type UploadDataSourceRequest struct {
 	Content  string       `json:"content"` // raw CSV content
 }
 
+// UpdateDataSourceRequest is the request body for POST /api/v1/scenes/datasources/update.
+type UpdateDataSourceRequest struct {
+	ID       snowflake.ID `json:"id"`
+	Content  string       `json:"content"` // raw CSV content
+}
+
 // --- SO Plugin ---
 
 type UploadSOPluginRequest struct {

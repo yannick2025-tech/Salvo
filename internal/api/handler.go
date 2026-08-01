@@ -1157,6 +1157,57 @@ func (h *Handler) PreviewDataSource(r *http.Request) dto.Response {
 	})
 }
 
+func (h *Handler) UpdateDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.UpdateDataSourceRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+	if req.Content == "" {
+		return dto.ErrorResp(400, "content is required")
+	}
+
+	existing, err := h.dataSources.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "data source not found")
+	}
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("get data source: %v", err))
+	}
+
+	// Parse the updated CSV content
+	columns, rows, removedEmptyRows, err := runner.ParseCSV(existing.FileName, strings.NewReader(req.Content))
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("parse csv: %v", err))
+	}
+
+	// Update the existing record in-place, preserving its source (yaml/csv)
+	columnsJSON, _ := json.Marshal(columns)
+	rowsJSON, _ := json.Marshal(rows)
+	existing.Columns = string(columnsJSON)
+	existing.Rows = string(rowsJSON)
+	existing.RowCount = len(rows)
+
+	if err := h.dataSources.Update(r.Context(), existing); err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("update data source: %v", err))
+	}
+
+	return dto.OK(dto.DataSourceDTO{
+		ID:               existing.ID,
+		SceneID:          existing.SceneID,
+		Name:             existing.Name,
+		FileName:         existing.FileName,
+		Columns:          columns,
+		RowCount:         existing.RowCount,
+		Source:           existing.Source,
+		RemovedEmptyRows: removedEmptyRows,
+		CreatedAt:        existing.CreatedAt,
+		UpdatedAt:        existing.UpdatedAt,
+	})
+}
+
 func (h *Handler) DeleteDataSource(r *http.Request) dto.Response {
 	req, err := decode[dto.IDRequest](r)
 	if err != nil {

@@ -138,6 +138,7 @@ type DataSourceRepo interface {
 	GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) ([]*model.DataSource, error)
 	GetBySceneIDAndNameAndSource(ctx context.Context, sceneID snowflake.ID, name string, source string) (*model.DataSource, error)
 	ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error)
+	Update(ctx context.Context, ds *model.DataSource) error
 	Delete(ctx context.Context, id snowflake.ID) error
 }
 

@@ -239,7 +239,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getScene, updateScene, batchSetVariables } from '@/api/scene'
-import { listDataSources, uploadDataSource, deleteDataSource, previewDataSource } from '@/api/datasource'
+import { listDataSources, uploadDataSource, updateDataSource, deleteDataSource, previewDataSource } from '@/api/datasource'
 import type { DataSourceDTO, DataSourcePreviewDTO } from '@/api/datasource'
 import type { SceneDTO } from '@/types'
 import { useAuthStore } from '@/stores/auth'
@@ -513,8 +513,7 @@ async function dsSaveEdit() {
       csvLines.push(dsEditColumns.value.map(c => row[c] || '').join(','))
     }
     const csvContent = csvLines.join('\n')
-    const sceneId = route.params.id as string
-    const resp = await uploadDataSource(sceneId, dsPreview.value.file_name, csvContent)
+    const resp = await updateDataSource(dsPreview.value.id, csvContent)
     const removed = resp.data?.removed_empty_rows
     if (removed && removed > 0) {
       showToast(`保存成功，已自动去除 ${removed} 行空行`, 'info')

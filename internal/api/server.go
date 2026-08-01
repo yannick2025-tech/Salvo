@@ -254,6 +254,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/scenes/variables/batch-set", s.handleAuth(s.handler.BatchSetVariables))
 
 	mux.HandleFunc("POST /api/v1/scenes/datasources/upload", s.handleAuth(s.handler.UploadDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/update", s.handleAuth(s.handler.UpdateDataSource))
 	mux.HandleFunc("POST /api/v1/scenes/datasources/list", s.handleAuth(s.handler.ListDataSources))
 	mux.HandleFunc("POST /api/v1/scenes/datasources/preview", s.handleAuth(s.handler.PreviewDataSource))
 	mux.HandleFunc("POST /api/v1/scenes/datasources/delete", s.handleAuth(s.handler.DeleteDataSource))
