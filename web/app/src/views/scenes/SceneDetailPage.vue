@@ -13,7 +13,7 @@
           设置
         </button>
         <button class="btn-outline btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCopyModal = true">复制</button>
-        <button class="btn-login-primary btn-sm" :disabled="!canRunScene" :title="canRunScene ? '' : '您当前的角色没有运行权限'" @click="showRunConfig = true">▶ 启动测试</button>
+        <button class="btn-primary btn-sm" :disabled="!canRunScene" :title="canRunScene ? '' : '您当前的角色没有运行权限'" @click="showRunConfig = true">▶ 启动测试</button>
       </div>
     </div>
 
@@ -367,7 +367,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
-          <button class="btn-login-primary" :disabled="nodes.length === 0 || !canRunScene" @click="handleStart">
+          <button class="btn-primary" :disabled="nodes.length === 0 || !canRunScene" @click="handleStart">
             {{ nodes.length === 0 ? '无 DAG 节点' : '启动' }}
           </button>
         </div>
@@ -383,7 +383,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCopyModal = false">取消</button>
-          <button class="btn-login-primary" @click="handleCopyScene">确认复制</button>
+          <button class="btn-primary" @click="handleCopyScene">确认复制</button>
         </div>
       </div>
     </div>
@@ -611,7 +611,7 @@
             <div style="flex:1"></div>
             <button class="btn-sm" @click="dsAddRow">+ 行</button>
             <button class="btn-sm" @click="dsAddColumn">+ 列</button>
-            <button class="btn-login-primary btn-sm" @click="dsSaveEdit" :disabled="dsSaving">{{ dsSaving ? '保存中...' : '保存' }}</button>
+            <button class="btn-primary btn-sm" @click="dsSaveEdit" :disabled="dsSaving">{{ dsSaving ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -1981,17 +1981,6 @@ onMounted(() => {
   background: var(--bg-hover);
 }
 
-/* 主按钮（青色） */
-.btn-primary {
-  padding: 7px 16px; border: none; border-radius: var(--radius-md);
-  background: var(--accent-primary); color: #fff; font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all 0.2s ease;
-}
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.88; box-shadow: 0 2px 8px rgba(0,229,255,0.25);
-}
-
 /* 次要按钮 */
 .btn-secondary {
   padding: 7px 16px; border: 1px solid var(--border-primary);
@@ -2019,7 +2008,6 @@ onMounted(() => {
   cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
 }
 .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.04); }
 
 /* 工具栏按钮变体 */

@@ -36,7 +36,7 @@
           <label>总请求数</label>
           <input v-model.number="form.count" type="number" min="1" />
         </div>
-        <button class="btn-login-primary" @click="handleStart" :disabled="!canRunScene || !form.scene_id || starting || selectedSceneHasNoDAG" :title="canRunScene ? '' : '您当前的角色没有运行权限'">
+        <button class="btn-primary" @click="handleStart" :disabled="!canRunScene || !form.scene_id || starting || selectedSceneHasNoDAG" :title="canRunScene ? '' : '您当前的角色没有运行权限'">
           {{ starting ? '启动中...' : '启动' }}
         </button>
         <div v-if="form.scene_id && selectedSceneHasNoDAG" class="no-dag-warning">
@@ -368,9 +368,7 @@ onUnmounted(() => {
 .form-group input, .form-group select { height: 34px; padding: 0 8px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-.btn-primary { padding: 8px 20px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; margin-top: 8px; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { padding: 8px 20px; margin-top: 8px; }
 .no-dag-warning { margin-top: 8px; font-size: 12px; color: #f0ad4e; background: rgba(240,173,78,0.1); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(240,173,78,0.3); }
 
 .btn-sm {
@@ -541,6 +539,7 @@ onUnmounted(() => {
   animation: slideIn 0.3s ease;
 }
 .toast.info { background: var(--accent-primary); color: #fff; }
+.toast.success { background: var(--accent-success); color: #fff; }
 .toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
 @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>

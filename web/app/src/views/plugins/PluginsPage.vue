@@ -2,7 +2,7 @@
   <div class="plugins-page">
     <div class="page-header">
       <h2>SO 插件管理</h2>
-      <button class="btn-login-primary" @click="showUpload = true">+ 上传插件</button>
+      <button class="btn-primary" @click="showUpload = true">+ 上传插件</button>
     </div>
 
     <div class="table-wrapper">
@@ -80,7 +80,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeUpload">取消</button>
-          <button class="btn-login-primary" :disabled="uploading" @click="handleUpload">
+          <button class="btn-primary" :disabled="uploading" @click="handleUpload">
             {{ uploading ? '上传中...' : '上传' }}
           </button>
         </div>
@@ -98,7 +98,7 @@
         <div v-if="configError" class="form-error">{{ configError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showConfig = false">取消</button>
-          <button class="btn-login-primary" :disabled="savingConfig" @click="handleSaveConfig">
+          <button class="btn-primary" :disabled="savingConfig" @click="handleSaveConfig">
             {{ savingConfig ? '保存中...' : '保存' }}
           </button>
         </div>

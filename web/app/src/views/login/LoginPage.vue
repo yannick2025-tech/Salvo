@@ -35,7 +35,7 @@
 
         <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
 
-        <button type="submit" class="btn-login" :disabled="loading">
+        <button type="submit" class="btn-primary login-submit" :disabled="loading">
           <span v-if="loading" class="spinner"></span>
           <span v-else>登 录</span>
         </button>
@@ -119,10 +119,6 @@ async function handleLogin() {
   stroke: #0969da;
 }
 
-[data-theme='light'] .btn-login {
-  background: #0969da;
-}
-
 .login-header h1 {
   font-size: 28px;
   font-weight: 700;
@@ -186,28 +182,12 @@ async function handleLogin() {
   border-radius: var(--radius-sm);
 }
 
-.btn-login {
+.login-submit {
   height: 42px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: #58a6ff;
-  color: #fff;
   font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.btn-login:hover {
-  opacity: 0.9;
-}
-
-.btn-login:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .spinner {

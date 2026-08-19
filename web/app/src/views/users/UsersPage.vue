@@ -2,7 +2,7 @@
   <div class="users-page">
     <div class="page-header">
       <h2>用户管理</h2>
-      <button class="btn-login-primary" @click="showCreate = true">+ 新建用户</button>
+      <button class="btn-primary" @click="showCreate = true">+ 新建用户</button>
     </div>
 
     <div class="table-wrapper">
@@ -69,7 +69,7 @@
         <div v-if="formError" class="form-error">{{ formError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeModal">取消</button>
-          <button class="btn-login-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
+          <button class="btn-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
         </div>
       </div>
     </div>
@@ -270,7 +270,6 @@ onMounted(() => {
 .users-page { display: flex; flex-direction: column; gap: 16px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; }
 .page-header h2 { font-size: 18px; font-weight: 600; }
-.btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
 .btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.15s ease; }
 .btn-sm.danger { color: var(--accent-danger); border-color: var(--accent-danger); }

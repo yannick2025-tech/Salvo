@@ -1255,25 +1255,6 @@ onMounted(() => {
   color: var(--accent-primary);
   background: rgba(0, 229, 255, 0.04);
 }
-.btn-primary {
-  padding: 7px 16px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.88;
-  box-shadow: 0 2px 8px rgba(0, 229, 255, 0.25);
-}
 .btn-secondary {
   padding: 7px 16px;
   border: 1px solid var(--border-primary);
@@ -1482,7 +1463,6 @@ onMounted(() => {
 .toast.info { background: var(--accent-primary); }
 .toast.error { background: var(--accent-danger); }
 .toast.success { background: var(--accent-success); }
-[data-theme='dark'] .toast.success { background: #58a6ff; }
 @keyframes toastSlideIn {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

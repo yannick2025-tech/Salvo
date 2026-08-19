@@ -23,6 +23,9 @@
   --accent-danger: #f85149;
   --accent-info: #58a6ff;
 
+  --btn-primary-bg: #58a6ff;
+  --btn-primary-bg-hover: #388bfd;
+
   --chart-line-1: #2dd4bf;
   --chart-line-2: #3fb950;
   --chart-line-3: #e3b341;
@@ -68,6 +71,9 @@
   --accent-warning: #bf8700;
   --accent-danger: #cf222e;
   --accent-info: #0969da;
+
+  --btn-primary-bg: #0969da;
+  --btn-primary-bg-hover: #0860ca;
 
   --chart-line-1: #0d9488;
   --chart-line-2: #1a7f37;
@@ -123,28 +129,24 @@ a {
   background: var(--text-tertiary);
 }
 
-/* Login button style - blue theme for primary actions */
-.btn-login-primary {
+/* Primary button - blue brand color for primary actions */
+.btn-primary {
   padding: 8px 16px;
   border: none;
   border-radius: var(--radius-md);
-  background: #58a6ff;
+  background: var(--btn-primary-bg);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: all 0.2s ease;
 }
 
-[data-theme='light'] .btn-login-primary {
-  background: #0969da;
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-primary-bg-hover);
 }
 
-.btn-login-primary:hover {
-  opacity: 0.9;
-}
-
-.btn-login-primary:disabled {
+.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -4,7 +4,7 @@
       <h2>场景管理</h2>
       <div class="header-actions">
         <button class="btn-secondary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showImport = true">导入 YAML</button>
-        <button class="btn-login-primary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCreate = true">+ 新建场景</button>
+        <button class="btn-primary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCreate = true">+ 新建场景</button>
       </div>
     </div>
 
@@ -59,7 +59,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreate = false">取消</button>
-          <button class="btn-login-primary" @click="handleCreate">创建</button>
+          <button class="btn-primary" @click="handleCreate">创建</button>
         </div>
       </div>
     </div>
@@ -99,7 +99,7 @@
           <button class="btn-secondary" @click="loadExample">加载示例</button>
           <button class="btn-secondary" @click="loadExampleV2">加载新版示例</button>
           <button class="btn-secondary" @click="showImport = false">取消</button>
-          <button class="btn-login-primary" @click="handleImport" :disabled="importing">
+          <button class="btn-primary" @click="handleImport" :disabled="importing">
             {{ importing ? '导入中...' : '导入' }}
           </button>
         </div>
@@ -878,17 +878,11 @@ onMounted(() => {
 .page-header h2 { font-size: 18px; font-weight: 600; }
 .header-actions { display: flex; gap: 8px; }
 
-.btn-primary {
-  padding: 8px 16px; border: none; border-radius: var(--radius-md);
-  background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer;
-}
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary {
   padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
 }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-login-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm {
   padding: 4px 10px;
   border: 1px solid var(--border-primary);

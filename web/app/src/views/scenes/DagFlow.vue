@@ -919,7 +919,7 @@ function minimapNodeColor(node: any) {
 }
 
 .dag-toast.success {
-  background: rgba(46, 204, 113, 0.92);
+  background: var(--accent-success);
   color: #fff;
 }
 
