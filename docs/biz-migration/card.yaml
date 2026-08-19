@@ -1015,13 +1015,16 @@ nodes:
             - variable: charging_status
               path: "$.data.chargingStatus"
 
-        # 18b. 桩离线 (条件: charge_post_offline==1)
+        # 18b. 桩离线 (条件: charge_post_offline==1, 延迟触发, 仅执行一次)
         # URL 中的 ${route_path} 在主流程 获取routePath-setup 中已获取, 此处直接复用
         - name: 桩离线
           condition:
             variable: charge_post_offline
             operator: equals
             value: "1"
+          timed_trigger:
+            after_seconds: "${charge_post_offline_time}"
+            once: true
           request:
             method: POST
             url: "${simurl}${sim_force_close}${route_path}"

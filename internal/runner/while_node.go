@@ -264,95 +264,120 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			}
 
 			// Check if this step has a once-only timed trigger that already fired.
-			if step.TimedTrigger != nil && step.TimedTrigger.Once {
-				triggeredMu.Lock()
-				if triggeredSteps[stepIdx] {
-					triggeredMu.Unlock()
-					consecutiveFailures[stepIdx] = 0
-					continue
-				}
+		if step.TimedTrigger != nil && step.TimedTrigger.Once {
+			triggeredMu.Lock()
+			if triggeredSteps[stepIdx] {
 				triggeredMu.Unlock()
-			}
-
-			// If step has a timed trigger with after_seconds, fire it asynchronously.
-			if step.TimedTrigger != nil && step.TimedTrigger.AfterSeconds != "" {
-				delayStr := resolveWithVariables(step.TimedTrigger.AfterSeconds, loopVars)
-				delaySec, err := parseDurationSeconds(delayStr)
-				if err != nil {
-					nodeLog.Warn("invalid timed_trigger after_seconds", logger.F("raw", step.TimedTrigger.AfterSeconds), logger.F("error", err))
-					continue
-				}
-
-				// Fire the trigger asynchronously.
-				go func(idx int, s stepConfig) {
-					select {
-					case <-ctx.Done():
-						return
-					case <-time.After(time.Duration(delaySec) * time.Second):
-					}
-
-					// Snapshot loopVars for read-only use (avoid concurrent map access).
-					varsMu.RLock()
-					localVars := make(map[string]any, len(loopVars))
-					for k, v := range loopVars {
-						localVars[k] = v
-					}
-					varsMu.RUnlock()
-
-					// Execute the step's HTTP request.
-					if s.Request != nil {
-						req := buildStepHTTPRequest(s.Request, localVars, nodeLog)
-						proto := httpprotocol.NewProtocol()
-						resp, err := proto.Execute(ctx, req)
-						if err != nil {
-							nodeLog.Warn("timed trigger HTTP request failed",
-								logger.F("step", s.Name),
-								logger.F("url", s.Request.URL),
-								logger.F("error", err))
-							return
-						}
-
-						// Extract variables into local map, then merge back under lock.
-						if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
-							// AES decrypt before extract if configured.
-							if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
-								aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
-								sAesMode := 1 // default GCM
-								if s.AesMode != nil {
-									sAesMode = *s.AesMode
-								}
-								if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, sAesMode); decryptErr != nil {
-									nodeLog.Warn("timed trigger AES decrypt failed",
-										logger.F("step", s.Name),
-										logger.F("error", decryptErr))
-								} else {
-									httpResp.Body = []byte(decrypted)
-								}
-							}
-							if len(s.Extract) > 0 || (s.Config != nil && s.Config["extract"] != nil) {
-								localExtracted := make(map[string]any)
-								allExtracts := mergeStepExtracts(&s, nodeLog)
-								extractVarsFromResponse(httpResp.Body, allExtracts, localExtracted, nodeLog)
-								varsMu.Lock()
-								for k, v := range localExtracted {
-									loopVars[k] = v
-								}
-								varsMu.Unlock()
-							}
-						}
-					}
-
-					triggeredMu.Lock()
-					triggeredSteps[idx] = true
-					triggeredMu.Unlock()
-
-					nodeLog.Info("timed trigger executed",
-						logger.F("step", s.Name),
-						logger.F("after_seconds", delaySec))
-				}(stepIdx, step)
-
+				consecutiveFailures[stepIdx] = 0
 				continue
 			}
+			triggeredMu.Unlock()
+		}
+
+		// If step has a timed trigger with after_seconds, fire it asynchronously.
+		if step.TimedTrigger != nil && step.TimedTrigger.AfterSeconds != "" {
+			delayStr := resolveWithVariables(step.TimedTrigger.AfterSeconds, loopVars)
+			delaySec, err := parseDurationSeconds(delayStr)
+			if err != nil {
+				nodeLog.Warn("invalid timed_trigger after_seconds", logger.F("raw", step.TimedTrigger.AfterSeconds), logger.F("error", err))
+				continue
+			}
+
+			// Mark as triggered BEFORE launching the goroutine so that
+			// subsequent iterations skip this step immediately. Previously
+			// the flag was set after the goroutine completed (delay + HTTP),
+			// causing every iteration before that to launch a duplicate
+			// goroutine — violating once:true semantics.
+			triggeredMu.Lock()
+			triggeredSteps[stepIdx] = true
+			triggeredMu.Unlock()
+
+			// Fire the trigger asynchronously.
+			go func(idx int, s stepConfig) {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Duration(delaySec) * time.Second):
+				}
+
+				// Snapshot loopVars for read-only use (avoid concurrent map access).
+				varsMu.RLock()
+				localVars := make(map[string]any, len(loopVars))
+				for k, v := range loopVars {
+					localVars[k] = v
+				}
+				varsMu.RUnlock()
+
+				// Execute the step's HTTP request.
+				if s.Request != nil {
+					req := buildStepHTTPRequest(s.Request, localVars, nodeLog)
+					proto := httpprotocol.NewProtocol()
+					resp, err := proto.Execute(ctx, req)
+					if err != nil {
+						nodeLog.Warn("timed trigger HTTP request failed",
+							logger.F("step", s.Name),
+							logger.F("url", s.Request.URL),
+							logger.F("error", err))
+						return
+					}
+
+					if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+						// Log the HTTP request result for observability.
+						nodeLog.Info("timed trigger HTTP request completed",
+							logger.F("step", s.Name),
+							logger.F("method", string(req.Method)),
+							logger.F("url", req.URL),
+							logger.F("status", httpResp.StatusCode),
+							logger.F("latency_ms", httpResp.Latency.Milliseconds()))
+
+						if len(req.Body) > 0 {
+							nodeLog.Debug("timed trigger request body",
+								logger.F("step", s.Name),
+								logger.F("body", string(req.Body)))
+						}
+
+						if len(httpResp.Body) > 0 {
+							nodeLog.Debug("timed trigger response body",
+								logger.F("step", s.Name),
+								logger.F("status", httpResp.StatusCode),
+								logger.F("body", string(httpResp.Body)))
+						}
+
+						// AES decrypt before extract if configured.
+						if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
+							aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
+							sAesMode := 1 // default GCM
+							if s.AesMode != nil {
+								sAesMode = *s.AesMode
+							}
+							if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, sAesMode); decryptErr != nil {
+								nodeLog.Warn("timed trigger AES decrypt failed",
+									logger.F("step", s.Name),
+									logger.F("error", decryptErr))
+							} else {
+								httpResp.Body = []byte(decrypted)
+							}
+						}
+						if len(s.Extract) > 0 || (s.Config != nil && s.Config["extract"] != nil) {
+							localExtracted := make(map[string]any)
+							allExtracts := mergeStepExtracts(&s, nodeLog)
+							extractVarsFromResponse(httpResp.Body, allExtracts, localExtracted, nodeLog)
+							varsMu.Lock()
+							for k, v := range localExtracted {
+								loopVars[k] = v
+							}
+							varsMu.Unlock()
+						}
+					}
+				}
+
+				nodeLog.Info("timed trigger executed",
+					logger.F("step", s.Name),
+					logger.F("after_seconds", delaySec))
+			}(stepIdx, step)
+
+			continue
+		}
 
 			// Execute step based on type
 			stepType := step.Type
