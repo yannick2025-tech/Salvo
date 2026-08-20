@@ -253,8 +253,8 @@ data_sources:
       - pointId
       - postId
     rows:
-      - phone: "15550000005"
-        pointId: "1100000005"
+      - phone: "15550000000"
+        pointId: "1100000001"
         postId: "11000000"
 
 # =============================================================================
@@ -1388,7 +1388,7 @@ nodes:
       url: "${gatewayurl}${api_upload_file}"
       headers:
         Authorization: "${token}"
-      multipart:
+      form:
         token: "${upload_token}"
         file: "asserts/comments.jpg"
       timeout: 10000
