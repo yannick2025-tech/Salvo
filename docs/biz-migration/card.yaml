@@ -1374,7 +1374,7 @@ nodes:
       headers:
         Content-Type: application/json
         Authorization: "${token}"
-      body: '{"userId":${user_id},"tenantId":${tenant_id}}'
+      body: '{"userId":${user_id},"userType":0,"tenantId":${tenant_id},"accessType":1,"srcService":"toc-charging-application"}'
       timeout: 10000
       extract:
         upload_token: "$.data"
