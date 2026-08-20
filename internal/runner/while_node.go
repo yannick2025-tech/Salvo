@@ -254,13 +254,17 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 				condMet := expr.EvaluateConditionExpr(condExpr, loopVars)
 				varsMu.RUnlock()
 				if !condMet {
-					nodeLog.Debug("skipping step due to condition not met",
-						logger.F("step", step.Name),
-						logger.F("condition", condExpr))
-					// Reset consecutive failure counter since this step was skipped, not failed.
-					consecutiveFailures[stepIdx] = 0
-					continue
-				}
+				varsMu.RLock()
+				currentVal := loopVars[step.Condition.Variable]
+				varsMu.RUnlock()
+				nodeLog.Debug("skipping step due to condition not met",
+					logger.F("step", step.Name),
+					logger.F("condition", condExpr),
+					logger.F("current_value", currentVal))
+				// Reset consecutive failure counter since this step was skipped, not failed.
+				consecutiveFailures[stepIdx] = 0
+				continue
+			}
 			}
 
 			// Check if this step has a once-only timed trigger that already fired.
@@ -268,6 +272,8 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			triggeredMu.Lock()
 			if triggeredSteps[stepIdx] {
 				triggeredMu.Unlock()
+				nodeLog.Info("timed trigger already fired, skipping",
+					logger.F("step", step.Name))
 				consecutiveFailures[stepIdx] = 0
 				continue
 			}
@@ -291,6 +297,10 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 			triggeredMu.Lock()
 			triggeredSteps[stepIdx] = true
 			triggeredMu.Unlock()
+
+			nodeLog.Info("timed trigger scheduled",
+				logger.F("step", step.Name),
+				logger.F("delay_seconds", delaySec))
 
 			// Fire the trigger asynchronously.
 			go func(idx int, s stepConfig) {
@@ -343,6 +353,19 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 								logger.F("body", string(httpResp.Body)))
 						}
 
+						// Log ERROR with full details for non-2xx responses.
+						if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+							nodeLog.Error("timed trigger HTTP request failed with non-2xx status",
+								logger.F("step", s.Name),
+								logger.F("method", string(req.Method)),
+								logger.F("url", req.URL),
+								logger.F("status", httpResp.StatusCode),
+								logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+								logger.F("request_headers", req.Headers),
+								logger.F("request_body", string(req.Body)),
+								logger.F("response_body", string(httpResp.Body)))
+						}
+
 						// AES decrypt before extract if configured.
 						if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
 							aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
@@ -351,12 +374,15 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 								sAesMode = *s.AesMode
 							}
 							if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, sAesMode); decryptErr != nil {
-								nodeLog.Warn("timed trigger AES decrypt failed",
-									logger.F("step", s.Name),
-									logger.F("error", decryptErr))
-							} else {
-								httpResp.Body = []byte(decrypted)
-							}
+							nodeLog.Warn("timed trigger AES decrypt failed",
+								logger.F("step", s.Name),
+								logger.F("error", decryptErr))
+						} else {
+							httpResp.Body = []byte(decrypted)
+							nodeLog.Debug("timed trigger AES decrypted plaintext",
+								logger.F("step", s.Name),
+								logger.F("body", decrypted))
+						}
 						}
 						if len(s.Extract) > 0 || (s.Config != nil && s.Config["extract"] != nil) {
 							localExtracted := make(map[string]any)
@@ -519,7 +545,7 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 				ecMet := expr.EvaluateConditionExpr(condExpr, loopVars)
 				currentVal := loopVars[ec.Variable]
 				varsMu.RUnlock()
-				nodeLog.Debug("exit condition evaluated",
+				nodeLog.Info("exit condition evaluated",
 					logger.F("variable", ec.Variable),
 					logger.F("current_value", currentVal),
 					logger.F("operator", ec.Operator),
@@ -693,6 +719,16 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
 			logger.F("status_code", httpResp.StatusCode),
 			logger.F("reason", "http_error"))
+		// Log ERROR with full request/response details for observability at INFO level.
+		nodeLog.Error("while step HTTP request failed with non-2xx status",
+			logger.F("step", step.Name),
+			logger.F("method", string(req.Method)),
+			logger.F("url", req.URL),
+			logger.F("status", httpResp.StatusCode),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+			logger.F("response_body", string(httpResp.Body)))
 		return fmt.Errorf("step %q HTTP %d", step.Name, httpResp.StatusCode)
 	}
 
@@ -767,6 +803,9 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 					logger.F("step", step.Name),
 					logger.F("decrypted_len", len(decrypted)),
 				)
+				nodeLog.Debug("AES decrypted plaintext",
+					logger.F("step", step.Name),
+					logger.F("body", decrypted))
 			}
 		} else {
 			nodeLog.Debug("while step AES decrypt skipped: response is plain JSON",

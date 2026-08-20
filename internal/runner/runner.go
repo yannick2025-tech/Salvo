@@ -1697,10 +1697,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 
 		nodeLog.Error("HTTP request failed",
-			logger.F("method", method),
-			logger.F("url", url),
-			logger.F("error", err),
-		)
+		logger.F("method", method),
+		logger.F("url", url),
+		logger.F("error", err),
+		logger.F("request_headers", req.Headers),
+		logger.F("request_body", string(req.Body)),
+	)
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
@@ -1743,6 +1745,17 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 	// Check if HTTP response is non-2xx
 	if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
+		// Log ERROR with full request/response details for observability at INFO level.
+		nodeLog.Error("HTTP request failed with non-2xx status",
+			logger.F("method", method),
+			logger.F("url", url),
+			logger.F("status", httpResp.StatusCode),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+			logger.F("response_headers", httpResp.Headers),
+			logger.F("response_body", string(httpResp.Body)),
+		)
 		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, string(httpResp.Body))
 
 		if n.blockOnError {
