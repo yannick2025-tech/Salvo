@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserDTO } from '@/types'
 import { login as apiLogin, me as apiMe, logout as apiLogout } from '@/api/auth'
+import { sessionExpired } from '@/composables/useSessionExpired'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('salvo_token') || '')
@@ -55,7 +56,13 @@ export const useAuthStore = defineStore('auth', () => {
         validated.value = true
       }
     } catch {
-      doLogout()
+      // Session expired: interceptor already set the flag.
+      // Don't logout here — the global dialog handles redirect.
+      if (sessionExpired.value) {
+        validated.value = true
+      } else {
+        doLogout()
+      }
     }
   }
 

@@ -1,5 +1,7 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
+import { sessionExpired } from '@/composables/useSessionExpired'
+import './fetchInterceptor'
 
 const client = axios.create({
   baseURL: '/api/v1',
@@ -15,15 +17,29 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+/** Mark session as expired and clear stored credentials. */
+function handleSessionExpired() {
+  if (!sessionExpired.value) {
+    sessionExpired.value = true
+    localStorage.removeItem('salvo_token')
+    localStorage.removeItem('salvo_user')
+    localStorage.removeItem('salvo_permissions')
+  }
+}
+
 client.interceptors.response.use(
-  (resp) => resp,
+  (resp) => {
+    // Backend returns HTTP 200 with body {"code":401} for expired tokens.
+    if (resp.data?.code === 401) {
+      handleSessionExpired()
+      return Promise.reject(new Error(resp.data?.message || 'invalid or expired token'))
+    }
+    return resp
+  },
   (error) => {
     const status = error.response?.status
     if (status === 401 || status === 403) {
-      localStorage.removeItem('salvo_token')
-      localStorage.removeItem('salvo_user')
-      localStorage.removeItem('salvo_permissions')
-      window.location.href = '/login'
+      handleSessionExpired()
     }
     return Promise.reject(error)
   }

@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import App from './App.vue'
 import './styles/global.css'
+import './api/fetchInterceptor'
 
 const router = createRouter({
   history: createWebHistory(),
