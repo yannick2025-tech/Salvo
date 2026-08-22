@@ -910,7 +910,7 @@ nodes:
       timeout: 10000
       aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
-        sell_flag: "$.data.SellFlag"
+        sell_flag: "$.data.sellFlag"
       expect_body:
         errorCode: 0
 
@@ -1136,8 +1136,8 @@ nodes:
       timeout: 10000
       aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
     retry:
-      max_attempts: 10
-      on_429: retry
+      count: 0
+      interval: ''
 
   # --- 20. 查询充电曲线 (5%概率) ---
   - name: 判断-是否查询充电曲线
@@ -1203,7 +1203,7 @@ nodes:
   - name: 判断-是否有未支付充电订单
     type: if-else
     config:
-      expr: '${unpaid_order_id_after} != ""'
+      expr: '${unpaid_order_id_after} != "0"'
 
   # 初始化 coupon_id_after 为数字 0
   - name: 初始化coupon_id_after
@@ -1377,7 +1377,7 @@ nodes:
       body: '{"userId":${user_id},"userType":0,"tenantId":${tenant_id},"accessType":1,"srcService":"toc-charging-application"}'
       timeout: 10000
       extract:
-        upload_token: "$.data"
+        upload_token: "$.data.token"
       expect_body:
         errorCode: 0
 
@@ -1421,7 +1421,7 @@ nodes:
       aes_decrypt: "${aes_key}"   # Manhattan 响应 AES-GCM 解密
       extract:
         comment_star: "$.data[0].star"
-        comment_tag_id: "$.data[0].tagId"
+        comment_tag_id: "$.data[0].tagVoList[0].tagId"
       expect_body:
         errorCode: 0
 
