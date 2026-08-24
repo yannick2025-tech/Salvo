@@ -2442,6 +2442,26 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 			logger.F("variable_count", len(vars)),
 			logger.F("variables", string(jsonVars)))
 	}
+	// Merge config_params and derived_params into scope (stored separately
+	// for YAML export fidelity, but unified at runtime).
+	for _, src := range []struct{ name, data string }{
+		{"config_params", scene.ConfigParams},
+		{"derived_params", scene.DerivedParams},
+	} {
+		if src.data == "" {
+			continue
+		}
+		var m map[string]string
+		if err := json.Unmarshal([]byte(src.data), &m); err != nil {
+			scopeLog.Error("failed to parse scene "+src.name+" JSON",
+				logger.F("error", err),
+				logger.F(src.name, src.data))
+			return nil, fmt.Errorf("parse scene %s: %w", src.name, err)
+		}
+		for k, v := range m {
+			globalScope.Set(k, v)
+		}
+	}
 
 	// Resolve nested variable references in all variable values.
 	if err := resolveNestedVariables(globalScope); err != nil {

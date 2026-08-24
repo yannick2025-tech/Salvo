@@ -50,6 +50,7 @@
             :edges="edges"
             :is-running="isSceneRunning"
             :run-id="currentRunId"
+            :scene-id="route.params.id as string"
             @edit="editNode"
             @delete-node="handleDeleteNode"
             @add-edge="onDagAddEdge"

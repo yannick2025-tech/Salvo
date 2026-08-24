@@ -110,6 +110,8 @@ type SceneDTO struct {
 	Description    string       `json:"description"`
 	DAGJSON        string       `json:"dag_json"`
 	Variables      string       `json:"variables"`
+	ConfigParams   string       `json:"config_params"`
+	DerivedParams  string       `json:"derived_params"`
 	Plugins        string       `json:"plugins"`
 	Status         string       `json:"status"`
 	DefaultTimeout int          `json:"default_timeout"`
@@ -163,6 +165,7 @@ type NodeDTO struct {
 	Position     string       `json:"position"`
 	LoopCount    int          `json:"loop_count"`
 	BlockOnError bool         `json:"block_on_error"`
+	Lifecycle    string       `json:"lifecycle"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    time.Time    `json:"updated_at"`
 }
@@ -242,8 +245,8 @@ type UploadDataSourceRequest struct {
 
 // UpdateDataSourceRequest is the request body for POST /api/v1/scenes/datasources/update.
 type UpdateDataSourceRequest struct {
-	ID       snowflake.ID `json:"id"`
-	Content  string       `json:"content"` // raw CSV content
+	ID      snowflake.ID `json:"id"`
+	Content string       `json:"content"` // raw CSV content
 }
 
 // --- SO Plugin ---
@@ -282,16 +285,16 @@ type DeleteSOPluginRequest struct {
 
 // DataSourceDTO is the data source detail returned in API responses.
 type DataSourceDTO struct {
-	ID                snowflake.ID `json:"id"`
-	SceneID           snowflake.ID `json:"scene_id"`
-	Name              string       `json:"name"`
-	FileName          string       `json:"file_name"`
-	Columns           []string     `json:"columns"`
-	RowCount          int          `json:"row_count"`
-	Source            string       `json:"source"` // "yaml" or "csv"
-	RemovedEmptyRows  int          `json:"removed_empty_rows,omitempty"`
-	CreatedAt         time.Time    `json:"created_at"`
-	UpdatedAt         time.Time    `json:"updated_at"`
+	ID               snowflake.ID `json:"id"`
+	SceneID          snowflake.ID `json:"scene_id"`
+	Name             string       `json:"name"`
+	FileName         string       `json:"file_name"`
+	Columns          []string     `json:"columns"`
+	RowCount         int          `json:"row_count"`
+	Source           string       `json:"source"` // "yaml" or "csv"
+	RemovedEmptyRows int          `json:"removed_empty_rows,omitempty"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
 }
 
 // SOPluginDTO is the SO plugin detail returned in API responses.

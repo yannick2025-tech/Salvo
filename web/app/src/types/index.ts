@@ -173,6 +173,8 @@ export interface NodeDTO {
   config: string
   position: string
   loop_count: number
+  block_on_error: boolean
+  lifecycle: string
   created_at: string
   updated_at: string
 }
@@ -407,4 +409,8 @@ export interface UpdateSOPluginStatusRequest {
 export interface UpdateSOPluginConfigRequest {
   id: string
   config: string
+}
+
+export interface ExportYAMLResponse {
+  yaml: string
 }

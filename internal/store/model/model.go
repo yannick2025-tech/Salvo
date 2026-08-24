@@ -32,6 +32,8 @@ type Scene struct {
 	Description    string `json:"description,omitempty"`
 	DAGJSON        string `json:"dag_json"`
 	Variables      string `json:"variables,omitempty"`
+	ConfigParams   string `json:"config_params,omitempty"`
+	DerivedParams  string `json:"derived_params,omitempty"`
 	Plugins        string `json:"plugins,omitempty"`
 	Status         string `json:"status"`
 	DefaultTimeout int    `json:"default_timeout,omitempty"` // 场景默认超时(秒)，0 表示使用系统默认
@@ -48,13 +50,14 @@ const (
 // Node represents a DAG node within a scene.
 type Node struct {
 	Model
-	SceneID       snowflake.ID `json:"scene_id,string"`
-	Name          string       `json:"name"`
-	Type          string       `json:"type"`
-	Config        string       `json:"config,omitempty"`
-	Position      string       `json:"position,omitempty"`
-	LoopCount     int          `json:"loop_count,omitempty"`
-	BlockOnError  bool         `json:"block_on_error,omitempty"`
+	SceneID      snowflake.ID `json:"scene_id,string"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError bool         `json:"block_on_error,omitempty"`
+	Lifecycle    string       `json:"lifecycle,omitempty"`
 }
 
 const (
@@ -71,6 +74,14 @@ const (
 	NodeTypeTeardown  = "teardown"
 	NodeTypeTimer     = "timer"
 	NodeTypeGenerator = "generator"
+)
+
+// Node lifecycle indicates which YAML section a node belongs to
+// (setup/teardown/main). Empty string means main. Orthogonal to Type.
+const (
+	NodeLifecycleMain     = ""
+	NodeLifecycleSetup    = "setup"
+	NodeLifecycleTeardown = "teardown"
 )
 
 // DataSource represents a CSV data source attached to a scene.

@@ -1,5 +1,5 @@
 import { post } from './client'
-import type { SceneDTO, CreateSceneRequest, ListResponse, RunRecordDTO, SceneStatusDTO, StartSceneRequest } from '@/types'
+import type { SceneDTO, CreateSceneRequest, ListResponse, RunRecordDTO, SceneStatusDTO, StartSceneRequest, ExportYAMLResponse } from '@/types'
 
 export function listScenes(params?: { status?: string; offset?: number; limit?: number }) {
   return post<ListResponse<SceneDTO>>('/scenes/list', params)
@@ -15,6 +15,10 @@ export function createScene(req: CreateSceneRequest) {
 
 export function importYAML(req: { name: string; description?: string; yaml: string }) {
   return post<SceneDTO>('/scenes/import', req)
+}
+
+export function exportYAML(id: string) {
+  return post<ExportYAMLResponse>('/scenes/export', { id })
 }
 
 export function updateScene(req: any) {

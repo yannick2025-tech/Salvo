@@ -210,8 +210,8 @@ clean-logs:
 
 clean: clean-logs clean-db clean-so
 	@rm -rf bin/ salvo
-	@rm -rf web/app/dist web/app/.vite web/dist
-	@find web/app/src -name "*.vue.js" -delete 2>/dev/null || true
+	@rm -rf web/app/dist web/app/.vite web/dist web/app/node_modules/.vite
+	@find web/app/src -name "*.js" -delete 2>/dev/null || true
 	@echo "Cleaned all artifacts."
 
 # ============================================================

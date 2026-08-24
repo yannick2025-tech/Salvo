@@ -2,6 +2,7 @@ package api
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -61,17 +62,17 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 }
 
 type yamlScene struct {
-	Name          string           `yaml:"name"`
-	Description   string           `yaml:"description"`
-	DefaultTimeout int            `yaml:"default_timeout,omitempty"`
-	Variables     []yamlVarItem    `yaml:"variables,omitempty"`
-	ConfigParams  map[string]string `yaml:"config_params,omitempty"`
-	DerivedParams map[string]string `yaml:"derived_params,omitempty"`
-	DataSources   []yamlDataSource `yaml:"data_sources,omitempty"`
-	Setup         []yamlNode       `yaml:"setup,omitempty"`
-	Nodes         []yamlNode       `yaml:"nodes"`
-	Teardown      []yamlNode       `yaml:"teardown,omitempty"`
-	Edges         []yamlEdge       `yaml:"edges,omitempty"`
+	Name           string            `yaml:"name"`
+	DefaultTimeout int               `yaml:"default_timeout,omitempty"`
+	Description    string            `yaml:"description"`
+	Variables      []yamlVarItem     `yaml:"variables,omitempty"`
+	ConfigParams   map[string]string `yaml:"config_params,omitempty"`
+	DerivedParams  map[string]string `yaml:"derived_params,omitempty"`
+	DataSources    []yamlDataSource  `yaml:"data_sources,omitempty"`
+	Setup          []yamlNode        `yaml:"setup,omitempty"`
+	Nodes          []yamlNode        `yaml:"nodes"`
+	Teardown       []yamlNode        `yaml:"teardown,omitempty"`
+	Edges          []yamlEdge        `yaml:"edges,omitempty"`
 }
 
 type yamlDataSource struct {
@@ -86,14 +87,14 @@ type yamlRetry struct {
 }
 
 type yamlNode struct {
-	Name           string         `yaml:"name"`
-	Type           string         `yaml:"type"`
-	Config         map[string]any `yaml:"config,omitempty"`
-	ThinkTime      string         `yaml:"think_time,omitempty"`
-	Retry          *yamlRetry     `yaml:"retry,omitempty"`
-	Condition      string         `yaml:"condition,omitempty"`
-	TimedTrigger   string         `yaml:"timed_trigger,omitempty"`
-	BlockOnError   bool           `yaml:"block_on_error,omitempty"`
+	Name         string         `yaml:"name"`
+	Type         string         `yaml:"type"`
+	Config       map[string]any `yaml:"config,omitempty"`
+	ThinkTime    string         `yaml:"think_time,omitempty"`
+	Retry        *yamlRetry     `yaml:"retry,omitempty"`
+	Condition    string         `yaml:"condition,omitempty"`
+	TimedTrigger string         `yaml:"timed_trigger,omitempty"`
+	BlockOnError bool           `yaml:"block_on_error,omitempty"`
 }
 
 type yamlEdge struct {
@@ -129,29 +130,35 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(400, "scene name is required")
 	}
 
-	// Construct scene-level Variables from YAML variables + config_params + derived_params.
-	// Stored as JSON object (map[string]string) to be compatible with buildScope, BatchSetVariables, etc.
+	// Store variables, config_params, derived_params as separate JSON fields
+	// so export can reconstruct the original YAML sections without heuristics.
 	var varsJSON string
 	vm := make(map[string]string)
 	for _, v := range ys.Variables {
 		vm[v.Key] = v.Value
 	}
-	for k, v := range ys.ConfigParams {
-		vm[k] = v
-	}
-	for k, v := range ys.DerivedParams {
-		vm[k] = v
-	}
 	if len(vm) > 0 {
 		vb, _ := json.Marshal(vm)
 		varsJSON = string(vb)
 	}
+	var configParamsJSON string
+	if len(ys.ConfigParams) > 0 {
+		vb, _ := json.Marshal(ys.ConfigParams)
+		configParamsJSON = string(vb)
+	}
+	var derivedParamsJSON string
+	if len(ys.DerivedParams) > 0 {
+		vb, _ := json.Marshal(ys.DerivedParams)
+		derivedParamsJSON = string(vb)
+	}
 
 	scene := &model.Scene{
-		Name:        name,
-		Description: req.Description,
-		Variables:   varsJSON,
-		Status:      model.SceneStatusDraft,
+		Name:          name,
+		Description:   req.Description,
+		Variables:     varsJSON,
+		ConfigParams:  configParamsJSON,
+		DerivedParams: derivedParamsJSON,
+		Status:        model.SceneStatusDraft,
 	}
 	if scene.Description == "" {
 		scene.Description = ys.Description
@@ -200,12 +207,26 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 
 	nodeNameToID := make(map[string]snowflake.ID)
 
-	allNodes := make([]yamlNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
-	allNodes = append(allNodes, ys.Setup...)
-	allNodes = append(allNodes, ys.Nodes...)
-	allNodes = append(allNodes, ys.Teardown...)
+	// Build a tagged list so each node carries the YAML section (setup/nodes/teardown)
+	// it came from. Lifecycle is orthogonal to Type and stored on the Node for
+	// lossless reconstruction of setup/teardown sections on export.
+	type taggedNode struct {
+		yn        yamlNode
+		lifecycle string
+	}
+	allNodes := make([]taggedNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
+	for _, yn := range ys.Setup {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleSetup})
+	}
+	for _, yn := range ys.Nodes {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleMain})
+	}
+	for _, yn := range ys.Teardown {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleTeardown})
+	}
 
-	for _, yn := range allNodes {
+	for _, item := range allNodes {
+		yn := item.yn
 		if err := validateNodeName(yn.Name); err != nil {
 			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", yn.Name, err))
 		}
@@ -234,6 +255,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			Type:         yn.Type,
 			Config:       string(configBytes),
 			BlockOnError: yn.BlockOnError,
+			Lifecycle:    item.lifecycle,
 		}
 		if err := h.nodes.Create(r.Context(), node); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
@@ -243,7 +265,8 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 
 	// Resolve group node_ids from names to IDs.
 	// Group config stores node_ids as string IDs; in YAML they are node names.
-	for _, yn := range allNodes {
+	for _, item := range allNodes {
+		yn := item.yn
 		if yn.Type != model.NodeTypeGroup {
 			continue
 		}
@@ -486,38 +509,39 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 		}
 	}
 
-	// Parse Variables JSON.
+	// Read variables, config_params, derived_params from their dedicated
+	// DB fields (stored separately at import time for YAML section fidelity).
 	var varsList []yamlVarItem
-	var configParams map[string]string
-	var derivedParams map[string]string
 	if scene.Variables != "" {
-		var raw []struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
-		}
-		if err := json.Unmarshal([]byte(scene.Variables), &raw); err == nil {
-			for _, v := range raw {
-				entry := yamlVarItem{Key: v.Key, Value: v.Value}
-				// Heuristic: if value looks like an expression ${...}, treat as derived_param.
-				if strings.Contains(v.Value, "${") && strings.Contains(v.Value, "}") {
-					if derivedParams == nil {
-						derivedParams = make(map[string]string)
-					}
-					derivedParams[v.Key] = v.Value
-					continue
+		var asMap map[string]string
+		if err := json.Unmarshal([]byte(scene.Variables), &asMap); err == nil {
+			for k, v := range asMap {
+				varsList = append(varsList, yamlVarItem{Key: k, Value: v})
+			}
+		} else {
+			var asSlice []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal([]byte(scene.Variables), &asSlice); err == nil {
+				for _, v := range asSlice {
+					varsList = append(varsList, yamlVarItem{Key: v.Key, Value: v.Value})
 				}
-				// Heuristic: if key starts with cfg_, treat as config_param.
-				if strings.HasPrefix(v.Key, "cfg_") {
-					if configParams == nil {
-						configParams = make(map[string]string)
-					}
-					configParams[v.Key] = v.Value
-					continue
-				}
-				varsList = append(varsList, entry)
 			}
 		}
 	}
+	var configParams map[string]string
+	if scene.ConfigParams != "" {
+		_ = json.Unmarshal([]byte(scene.ConfigParams), &configParams)
+	}
+	var derivedParams map[string]string
+	if scene.DerivedParams != "" {
+		_ = json.Unmarshal([]byte(scene.DerivedParams), &derivedParams)
+	}
+	// Sort variables by key for deterministic output.
+	sort.Slice(varsList, func(i, j int) bool {
+		return varsList[i].Key < varsList[j].Key
+	})
 
 	// Build YAML nodes.
 	var yamlNodes []yamlNode
@@ -534,9 +558,10 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 		}
 
 		yn := yamlNode{
-			Name:   n.Name,
-			Type:   n.Type,
-			Config: nil,
+			Name:         n.Name,
+			Type:         n.Type,
+			Config:       nil,
+			BlockOnError: n.BlockOnError,
 		}
 
 		// Extract known top-level fields back out of config.
@@ -585,10 +610,10 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 			yn.Config = extraConfig
 		}
 
-		switch n.Type {
-		case model.NodeTypeSetup:
+		switch n.Lifecycle {
+		case model.NodeLifecycleSetup:
 			yamlSetup = append(yamlSetup, yn)
-		case model.NodeTypeTeardown:
+		case model.NodeLifecycleTeardown:
 			yamlTeardown = append(yamlTeardown, yn)
 		default:
 			yamlNodes = append(yamlNodes, yn)
@@ -619,23 +644,27 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 
 	// Build YAML scene.
 	ys := yamlScene{
-		Name:          scene.Name,
-		Description:   scene.Description,
+		Name:           scene.Name,
+		Description:    scene.Description,
 		DefaultTimeout: scene.DefaultTimeout,
-		DataSources:   yamlDataSources,
-		Variables:     varsList,
-		ConfigParams:  configParams,
-		DerivedParams: derivedParams,
-		Setup:         yamlSetup,
-		Nodes:         yamlNodes,
-		Teardown:      yamlTeardown,
-		Edges:         yamlEdges,
+		DataSources:    yamlDataSources,
+		Variables:      varsList,
+		ConfigParams:   configParams,
+		DerivedParams:  derivedParams,
+		Setup:          yamlSetup,
+		Nodes:          yamlNodes,
+		Teardown:       yamlTeardown,
+		Edges:          yamlEdges,
 	}
 
-	yamlBytes, err := yaml.Marshal(ys)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(ys); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("marshal yaml: %v", err))
 	}
+	enc.Close()
+	yamlBytes := buf.Bytes()
 
 	return dto.OK(dto.ExportYAMLResponse{
 		YAML: string(yamlBytes),
@@ -1556,6 +1585,8 @@ func toSceneDTO(s *model.Scene) dto.SceneDTO {
 		Description:    s.Description,
 		DAGJSON:        s.DAGJSON,
 		Variables:      s.Variables,
+		ConfigParams:   s.ConfigParams,
+		DerivedParams:  s.DerivedParams,
 		Plugins:        s.Plugins,
 		Status:         s.Status,
 		DefaultTimeout: s.DefaultTimeout,
@@ -1574,6 +1605,7 @@ func toNodeDTO(n *model.Node) dto.NodeDTO {
 		Position:     n.Position,
 		LoopCount:    n.LoopCount,
 		BlockOnError: n.BlockOnError,
+		Lifecycle:    n.Lifecycle,
 		CreatedAt:    n.CreatedAt,
 		UpdatedAt:    n.UpdatedAt,
 	}

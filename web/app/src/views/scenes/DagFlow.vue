@@ -65,13 +65,13 @@
         美化布局
       </button>
       <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" title="复制YAML配置" @click="copyYaml">
+      <button class="toolbar-btn" title="复制YAML配置" :disabled="exporting" @click="copyYaml">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-        复制YAML
+        {{ exporting ? '导出中…' : '复制YAML' }}
       </button>
-      <button class="toolbar-btn" title="导出YAML文件" @click="exportYaml">
+      <button class="toolbar-btn" title="导出YAML文件" :disabled="exporting" @click="exportYaml">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        导出YAML
+        {{ exporting ? '导出中…' : '导出YAML' }}
       </button>
     </div>
 
@@ -97,6 +97,7 @@ import type { NodeDTO, EdgeDTO } from '@/types'
 import { useExecutionWs } from '@/composables/useExecutionWs'
 import { useExecutionStatus, type ViewMode } from '@/composables/useExecutionStatus'
 import { getTraceByRun } from '@/api/trace'
+import { exportYAML } from '@/api/scene'
 import CustomSelect from '@/components/CustomSelect.vue'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -109,6 +110,7 @@ const props = defineProps<{
   dataSources?: { name: string; columns: string[]; rows: Record<string, string>[] }[]
   isRunning?: boolean
   runId?: string
+  sceneId: string
 }>()
 
 const emit = defineEmits<{
@@ -519,150 +521,25 @@ async function autoLayout() {
   showToast('布局已重新排列', 'success')
 }
 
-function yamlScalar(val: any): string {
-  if (val === null || val === undefined) return 'null'
-  if (typeof val === 'boolean') return val ? 'true' : 'false'
-  if (typeof val === 'number') return String(val)
-  if (typeof val === 'string') {
-    if (val === '') return "''"
-    if (/^[a-zA-Z0-9_\-.\/@$:{}[\]() ]+$/.test(val) && !/^(\d|true|false|null|yes|no|on|off)/i.test(val)) {
-      return val
-    }
-    const escaped = val.replace(/'/g, "''")
-    return `'${escaped}'`
-  }
-  return String(val)
-}
-
-// 标量/空复杂类型返回内联表示；非空对象或数组返回 null（需块格式展开）
-function yamlInline(v: any): string | null {
-  if (Array.isArray(v)) return v.length === 0 ? '[]' : null
-  if (v !== null && typeof v === 'object') return Object.keys(v).length === 0 ? '{}' : null
-  return yamlScalar(v)
-}
-
-// 将值序列化为 YAML 块格式行，追加到 lines。
-// 数组中的对象/数组项：首个键与 "-" 同行，其余键缩进对齐，
-// 修复旧实现 "-   key"（破折号后多出对象自身缩进）的坏缩进问题。
-function toYamlLines(val: any, indent: string, lines: string[]): void {
-  if (Array.isArray(val)) {
-    if (val.length === 0) { lines.push(`${indent}[]`); return }
-    for (const item of val) {
-      const inline = yamlInline(item)
-      if (inline !== null) {
-        lines.push(`${indent}- ${inline}`)
-      } else if (Array.isArray(item)) {
-        lines.push(`${indent}-`)
-        toYamlLines(item, indent + '  ', lines)
-      } else {
-        const entries = Object.entries(item)
-        const [firstK, firstV] = entries[0]
-        const firstInline = yamlInline(firstV)
-        if (firstInline !== null) {
-          lines.push(`${indent}- ${firstK}: ${firstInline}`)
-        } else {
-          lines.push(`${indent}- ${firstK}:`)
-          toYamlLines(firstV, indent + '    ', lines)
-        }
-        for (const [k, v] of entries.slice(1)) {
-          const vi = yamlInline(v)
-          if (vi !== null) {
-            lines.push(`${indent}  ${k}: ${vi}`)
-          } else {
-            lines.push(`${indent}  ${k}:`)
-            toYamlLines(v, indent + '    ', lines)
-          }
-        }
-      }
-    }
-    return
-  }
-  if (val !== null && typeof val === 'object') {
-    if (Object.keys(val).length === 0) { lines.push(`${indent}{}`); return }
-    for (const [k, v] of Object.entries(val)) {
-      const vi = yamlInline(v)
-      if (vi !== null) {
-        lines.push(`${indent}${k}: ${vi}`)
-      } else {
-        lines.push(`${indent}${k}:`)
-        toYamlLines(v, indent + '  ', lines)
-      }
-    }
-    return
-  }
-  lines.push(`${indent}${yamlScalar(val)}`)
-}
-
-function generateYaml(): string {
-  const lines: string[] = []
-  lines.push('# DAG 场景配置导出')
-  lines.push('')
-
-  const idToName = new Map<string, string>()
-  for (const n of props.nodes) {
-    idToName.set(n.id, n.name)
-  }
-
-  // Data sources section
-  if (props.dataSources && props.dataSources.length > 0) {
-    lines.push('data_sources:')
-    for (const ds of props.dataSources) {
-      lines.push(`  - name: ${yamlScalar(ds.name)}`)
-      if (ds.columns && ds.columns.length > 0) {
-        lines.push(`    columns:`)
-        for (const col of ds.columns) {
-          lines.push(`      - ${col}`)
-        }
-      }
-      if (ds.rows && ds.rows.length > 0) {
-        lines.push(`    rows:`)
-        for (const row of ds.rows) {
-          lines.push(`      - { ${Object.entries(row).map(([k, v]) => `${k}: ${yamlScalar(v)}`).join(', ')} }`)
-        }
-      }
-      lines.push('')
-    }
-  }
-
-  lines.push('nodes:')
-  for (const n of props.nodes) {
-    lines.push(`  - name: ${yamlScalar(n.name)}`)
-    lines.push(`    type: ${n.type}`)
-    try {
-      const parsed = JSON.parse(n.config || '{}')
-      // For group nodes, convert node_ids from IDs to names for readability
-      if (n.type === 'group' && parsed.node_ids) {
-        parsed.node_ids = (parsed.node_ids as string[]).map((id: string) => idToName.get(id) || id)
-      }
-      if (Object.keys(parsed).length > 0) {
-        lines.push(`    config:`)
-        toYamlLines(parsed, '      ', lines)
-      }
-    } catch {
-      lines.push(`    config: {}`)
-    }
-    if (n.loop_count && n.loop_count > 0) {
-      lines.push(`    loop_count: ${n.loop_count}`)
-    }
-    lines.push('')
-  }
-
-  lines.push('edges:')
-  for (const e of props.edges) {
-    const fromName = idToName.get(e.from_node) || e.from_node
-    const toName = idToName.get(e.to_node) || e.to_node
-    const cond = e.condition || '(default)'
-    lines.push(`  - from: ${yamlScalar(fromName)}`)
-    lines.push(`    to: ${yamlScalar(toName)}`)
-    lines.push(`    condition: ${cond}`)
-    lines.push('')
-  }
-
-  return lines.join('\n')
-}
+const exporting = ref(false)
 
 async function copyYaml() {
-  const yaml = generateYaml()
+  if (exporting.value) return
+  exporting.value = true
+  let yaml = ''
+  try {
+    const resp = await exportYAML(props.sceneId)
+    if (resp.code !== 0 || !resp.data) {
+      exporting.value = false
+      showToast(resp.message || '导出失败，请重试', 'error')
+      return
+    }
+    yaml = resp.data.yaml
+  } catch {
+    exporting.value = false
+    showToast('导出失败，请重试', 'error')
+    return
+  }
   // 优先 Clipboard API；运行过场景后文档可能失焦导致 writeText reject，回退到 textarea + execCommand
   let ok = false
   try {
@@ -684,11 +561,27 @@ async function copyYaml() {
       ok = false
     }
   }
+  exporting.value = false
   showToast(ok ? 'YAML 已复制到剪贴板' : '复制失败，请手动选择文本', ok ? 'success' : 'error')
 }
 
-function exportYaml() {
-  const yaml = generateYaml()
+async function exportYaml() {
+  if (exporting.value) return
+  exporting.value = true
+  let yaml = ''
+  try {
+    const resp = await exportYAML(props.sceneId)
+    if (resp.code !== 0 || !resp.data) {
+      exporting.value = false
+      showToast(resp.message || '导出失败，请重试', 'error')
+      return
+    }
+    yaml = resp.data.yaml
+  } catch {
+    exporting.value = false
+    showToast('导出失败，请重试', 'error')
+    return
+  }
   const blob = new Blob([yaml], { type: 'text/yaml;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -698,6 +591,7 @@ function exportYaml() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+  exporting.value = false
   showToast('YAML 文件已导出', 'success')
 }
 

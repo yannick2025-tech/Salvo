@@ -46,6 +46,9 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
 		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN block_on_error BOOLEAN DEFAULT FALSE`,
+		`ALTER TABLE nodes ADD COLUMN lifecycle TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scenes ADD COLUMN config_params TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scenes ADD COLUMN derived_params TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE data_sources ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
 		// Migration for report_details table
 		`INSERT INTO report_details (report_id, detail) SELECT id, detail FROM reports WHERE detail IS NOT NULL AND detail != ''`,
@@ -209,7 +212,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
-const currentVersion = 6
+const currentVersion = 8
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {

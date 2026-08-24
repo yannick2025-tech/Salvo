@@ -3,12 +3,16 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
+	"github.com/yannick2025-tech/Salvo/internal/store/model"
+	"gopkg.in/yaml.v3"
 )
 
 // --- 11.1 Scene Variables Integration ---
@@ -1033,14 +1037,45 @@ nodes:
 	var scene dto.SceneDTO
 	require.NoError(t, json.Unmarshal(sceneData, &scene))
 
-	// Verify variables stored include config_params and derived_params.
-	// Variables are stored as JSON object (map[string]string).
+	// config_params and derived_params are now stored in separate DB fields.
+	// scene.Variables should be empty (no variables section in this YAML).
 	var varKeys map[string]string
-	require.NoError(t, json.Unmarshal([]byte(scene.Variables), &varKeys))
-	assert.Equal(t, "http://localhost:8080", varKeys["cfg_base_url"])
-	assert.Equal(t, "30s", varKeys["cfg_timeout"])
-	assert.Equal(t, "${cfg_base_url}/api/v1/users", varKeys["full_url"])
-	assert.Equal(t, "${__uuid()}", varKeys["request_id"])
+	if scene.Variables != "" {
+		require.NoError(t, json.Unmarshal([]byte(scene.Variables), &varKeys))
+	}
+	assert.Empty(t, varKeys, "variables should be empty, config_params stored separately")
+
+	// Verify config_params stored separately.
+	var cfgKeys map[string]string
+	require.NoError(t, json.Unmarshal([]byte(scene.ConfigParams), &cfgKeys))
+	assert.Equal(t, "http://localhost:8080", cfgKeys["cfg_base_url"])
+	assert.Equal(t, "30s", cfgKeys["cfg_timeout"])
+
+	// Verify derived_params stored separately.
+	var derivKeys map[string]string
+	require.NoError(t, json.Unmarshal([]byte(scene.DerivedParams), &derivKeys))
+	assert.Equal(t, "${cfg_base_url}/api/v1/users", derivKeys["full_url"])
+	assert.Equal(t, "${__uuid()}", derivKeys["request_id"])
+
+	// Export round-trip: config_params and derived_params should be in their
+	// own YAML sections, NOT merged into variables.
+	exportResp := postJSONAuth(t, srv, token, "/api/v1/scenes/export", dto.IDRequest{
+		ID: scene.ID,
+	})
+	exportResult := decodeResponse(t, exportResp)
+	assert.Equal(t, 0, exportResult.Code, "export failed: %s", exportResult.Message)
+
+	var exportData dto.ExportYAMLResponse
+	exportBytes, _ := json.Marshal(exportResult.Data)
+	require.NoError(t, json.Unmarshal(exportBytes, &exportData))
+
+	var exportedYS yamlScene
+	require.NoError(t, yaml.Unmarshal([]byte(exportData.YAML), &exportedYS))
+	assert.Empty(t, exportedYS.Variables, "exported variables should be empty")
+	assert.Equal(t, "http://localhost:8080", exportedYS.ConfigParams["cfg_base_url"])
+	assert.Equal(t, "30s", exportedYS.ConfigParams["cfg_timeout"])
+	assert.Equal(t, "${cfg_base_url}/api/v1/users", exportedYS.DerivedParams["full_url"])
+	assert.Equal(t, "${__uuid()}", exportedYS.DerivedParams["request_id"])
 }
 
 func TestYAMLImportWithThinkTimeRetryConditionTimedTrigger(t *testing.T) {
@@ -1238,4 +1273,335 @@ func TestYAMLExportSceneNotFound(t *testing.T) {
 	result := decodeResponse(t, resp)
 	assert.Equal(t, 404, result.Code, "should return 404 for non-existent scene")
 	assert.Contains(t, result.Message, "not found")
+}
+
+// TestYAMLExportRoundTripWithSetupTeardownLifecycle verifies that setup/teardown
+// sections (using real node types like http/generator, not legacy type=setup),
+// block_on_error and default_timeout survive an import -> export round trip.
+//
+// Covers tasks 5.1-5.4 of the fix-yaml-export-info-loss change.
+func TestYAMLExportRoundTripWithSetupTeardownLifecycle(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	originalYAML := `
+name: lifecycle-round-trip
+description: Verifies setup/teardown lifecycle, block_on_error and default_timeout round trip
+default_timeout: 60
+config_params:
+  cfg_host: "localhost"
+derived_params:
+  url_template: "${cfg_host}:8080/api"
+setup:
+  - name: InitDB
+    type: http
+    config:
+      url: "${url_template}/init"
+      method: POST
+  - name: SeedData
+    type: generator
+    config:
+      count: 100
+nodes:
+  - name: GetUsers
+    type: http
+    config:
+      url: "${url_template}/users"
+      method: GET
+    block_on_error: true
+  - name: LoopStep
+    type: loop
+    config:
+      loop_count: 5
+teardown:
+  - name: Cleanup
+    type: http
+    config:
+      url: "${url_template}/cleanup"
+      method: DELETE
+  - name: Report
+    type: generator
+    config:
+      format: json
+edges:
+  - from: GetUsers
+    to: LoopStep
+`
+
+	// Step 1: Import the original YAML.
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Lifecycle Round Trip",
+		YAML: originalYAML,
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code, "import failed: %s", result.Message)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+	assert.Equal(t, "Lifecycle Round Trip", scene.Name)
+
+	// Step 2: List nodes and verify lifecycle + type are correct (task 5.2).
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var listResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+	nodes := listResp.Items
+	require.Equal(t, 6, len(nodes), "expected 6 nodes (2 setup + 2 main + 2 teardown)")
+
+	// Map by name for easy verification.
+	byName := make(map[string]dto.NodeDTO, len(nodes))
+	for _, n := range nodes {
+		byName[n.Name] = n
+	}
+
+	// Setup section nodes: lifecycle=setup, type unchanged.
+	initDB, ok := byName["InitDB"]
+	require.True(t, ok, "InitDB node missing")
+	assert.Equal(t, model.NodeLifecycleSetup, initDB.Lifecycle, "InitDB should have setup lifecycle")
+	assert.Equal(t, "http", initDB.Type, "InitDB type should be http")
+	seedData, ok := byName["SeedData"]
+	require.True(t, ok, "SeedData node missing")
+	assert.Equal(t, model.NodeLifecycleSetup, seedData.Lifecycle, "SeedData should have setup lifecycle")
+	assert.Equal(t, "generator", seedData.Type, "SeedData type should be generator")
+
+	// Main section nodes: lifecycle="" (main).
+	getUsers, ok := byName["GetUsers"]
+	require.True(t, ok, "GetUsers node missing")
+	assert.Equal(t, model.NodeLifecycleMain, getUsers.Lifecycle, "GetUsers should have main (empty) lifecycle")
+	assert.Equal(t, "http", getUsers.Type)
+	assert.True(t, getUsers.BlockOnError, "GetUsers should have block_on_error=true")
+	loopStep, ok := byName["LoopStep"]
+	require.True(t, ok, "LoopStep node missing")
+	assert.Equal(t, model.NodeLifecycleMain, loopStep.Lifecycle, "LoopStep should have main (empty) lifecycle")
+	assert.Equal(t, "loop", loopStep.Type)
+
+	// Teardown section nodes: lifecycle=teardown, type unchanged.
+	cleanup, ok := byName["Cleanup"]
+	require.True(t, ok, "Cleanup node missing")
+	assert.Equal(t, model.NodeLifecycleTeardown, cleanup.Lifecycle, "Cleanup should have teardown lifecycle")
+	assert.Equal(t, "http", cleanup.Type)
+	report, ok := byName["Report"]
+	require.True(t, ok, "Report node missing")
+	assert.Equal(t, model.NodeLifecycleTeardown, report.Lifecycle, "Report should have teardown lifecycle")
+	assert.Equal(t, "generator", report.Type)
+
+	// Step 3: Export the scene back to YAML.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/export", dto.IDRequest{ID: scene.ID})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code, "export failed: %s", result.Message)
+	var exportResp dto.ExportYAMLResponse
+	exportData, _ := json.Marshal(result.Data)
+	require.NoError(t, json.Unmarshal(exportData, &exportResp))
+	require.NotEmpty(t, exportResp.YAML)
+
+	// Step 4: Parse exported YAML and verify sections (task 5.3).
+	var exportedYS yamlScene
+	require.NoError(t, yaml.Unmarshal([]byte(exportResp.YAML), &exportedYS))
+
+	// default_timeout round-trips (task 5.4).
+	assert.Equal(t, 60, exportedYS.DefaultTimeout, "default_timeout should round-trip to 60")
+
+	// setup section has both nodes with correct types.
+	require.Equal(t, 2, len(exportedYS.Setup), "setup section should have 2 nodes")
+	assert.Equal(t, "InitDB", exportedYS.Setup[0].Name)
+	assert.Equal(t, "http", exportedYS.Setup[0].Type)
+	assert.Equal(t, "SeedData", exportedYS.Setup[1].Name)
+	assert.Equal(t, "generator", exportedYS.Setup[1].Type)
+
+	// nodes section has the main nodes.
+	require.Equal(t, 2, len(exportedYS.Nodes), "nodes section should have 2 nodes")
+	// Locate GetUsers in the exported nodes and verify block_on_error preserved (task 5.4).
+	var exportedGetUsers *yamlNode
+	for i := range exportedYS.Nodes {
+		if exportedYS.Nodes[i].Name == "GetUsers" {
+			exportedGetUsers = &exportedYS.Nodes[i]
+		}
+	}
+	require.NotNil(t, exportedGetUsers, "GetUsers should be in exported nodes section")
+	assert.True(t, exportedGetUsers.BlockOnError, "GetUsers block_on_error should be true in export")
+	assert.Equal(t, "http", exportedGetUsers.Type)
+
+	// teardown section has both nodes with correct types.
+	require.Equal(t, 2, len(exportedYS.Teardown), "teardown section should have 2 nodes")
+	assert.Equal(t, "Cleanup", exportedYS.Teardown[0].Name)
+	assert.Equal(t, "http", exportedYS.Teardown[0].Type)
+	assert.Equal(t, "Report", exportedYS.Teardown[1].Name)
+	assert.Equal(t, "generator", exportedYS.Teardown[1].Type)
+
+	// Variables/config_params/derived_params survived (task 5.4).
+	require.NotNil(t, exportedYS.ConfigParams, "config_params should be present")
+	assert.Equal(t, "localhost", exportedYS.ConfigParams["cfg_host"])
+	require.NotNil(t, exportedYS.DerivedParams, "derived_params should be present")
+	assert.Equal(t, "${cfg_host}:8080/api", exportedYS.DerivedParams["url_template"])
+
+	// Step 5: Re-import exported YAML and verify sections + lifecycle survive a
+	// second round trip (ensures export format is import-compatible).
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "Lifecycle Round Trip Re-import",
+		YAML: exportResp.YAML,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code, "re-import failed: %s", result.Message)
+	scene2Data, _ := json.Marshal(result.Data)
+	var scene2 dto.SceneDTO
+	require.NoError(t, json.Unmarshal(scene2Data, &scene2))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene2.ID,
+		Limit:   20,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	listData2, _ := json.Marshal(result.Data)
+	var listResp2 dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData2, &listResp2))
+	nodes2 := listResp2.Items
+	require.Equal(t, 6, len(nodes2), "expected 6 nodes after re-import")
+
+	lifecycleCount := make(map[string]int)
+	for _, n := range nodes2 {
+		lifecycleCount[n.Lifecycle]++
+	}
+	assert.Equal(t, 2, lifecycleCount[model.NodeLifecycleSetup], "2 setup nodes after re-import")
+	assert.Equal(t, 2, lifecycleCount[model.NodeLifecycleMain], "2 main nodes after re-import")
+	assert.Equal(t, 2, lifecycleCount[model.NodeLifecycleTeardown], "2 teardown nodes after re-import")
+
+	// default_timeout survived second round trip.
+	assert.Equal(t, 60, scene2.DefaultTimeout, "default_timeout should survive second round trip")
+
+	// block_on_error survived second round trip.
+	var getUsers2 *dto.NodeDTO
+	for i := range nodes2 {
+		if nodes2[i].Name == "GetUsers" {
+			getUsers2 = &nodes2[i]
+		}
+	}
+	require.NotNil(t, getUsers2)
+	assert.True(t, getUsers2.BlockOnError, "block_on_error should survive second round trip")
+}
+
+// TestYAMLExportCardYAMLRoundTrip imports the real docs/biz-migration/card.yaml
+// and verifies the exported YAML preserves setup/teardown sections, block_on_error,
+// default_timeout, variables, config_params and derived_params.
+//
+// Covers the programmatic portion of task 8.1 (manual visual diff is still
+// recommended, but this test guarantees the key fields survive the round trip).
+func TestYAMLExportCardYAMLRoundTrip(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	yamlBytes, err := os.ReadFile(filepath.Join("..", "..", "docs", "biz-migration", "card.yaml"))
+	require.NoError(t, err, "failed to read card.yaml")
+	originalYAML := string(yamlBytes)
+
+	// Step 1: Import the real card.yaml.
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "card.yaml round trip",
+		YAML: originalYAML,
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code, "import card.yaml failed: %s", result.Message)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// default_timeout stored on the scene.
+	assert.Equal(t, 1200, scene.DefaultTimeout, "default_timeout should be 1200")
+
+	// Step 2: List nodes and verify setup/teardown lifecycle counts.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: scene.ID,
+		Limit:   200,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var listResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+	nodes := listResp.Items
+	require.NotEmpty(t, nodes)
+
+	lifecycleCount := make(map[string]int)
+	blockOnErrCount := 0
+	for _, n := range nodes {
+		lifecycleCount[n.Lifecycle]++
+		if n.BlockOnError {
+			blockOnErrCount++
+		}
+	}
+	assert.Greater(t, lifecycleCount[model.NodeLifecycleSetup], 0, "should have setup nodes")
+	assert.Greater(t, lifecycleCount[model.NodeLifecycleTeardown], 0, "should have teardown nodes")
+	assert.Greater(t, lifecycleCount[model.NodeLifecycleMain], 0, "should have main nodes")
+	assert.Greater(t, blockOnErrCount, 0, "should have nodes with block_on_error=true")
+
+	// Step 3: Export back to YAML.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/export", dto.IDRequest{ID: scene.ID})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code, "export failed: %s", result.Message)
+	var exportResp dto.ExportYAMLResponse
+	exportData, _ := json.Marshal(result.Data)
+	require.NoError(t, json.Unmarshal(exportData, &exportResp))
+	require.NotEmpty(t, exportResp.YAML)
+
+	// Step 4: Parse exported YAML and verify key fields survived.
+	var exportedYS yamlScene
+	require.NoError(t, yaml.Unmarshal([]byte(exportResp.YAML), &exportedYS))
+
+	// default_timeout round-trips.
+	assert.Equal(t, 1200, exportedYS.DefaultTimeout, "default_timeout should round-trip to 1200")
+
+	// setup/teardown sections present with real node types (not type=setup/teardown).
+	require.NotEmpty(t, exportedYS.Setup, "setup section should be present")
+	require.NotEmpty(t, exportedYS.Teardown, "teardown section should be present")
+	for _, n := range exportedYS.Setup {
+		assert.NotEqual(t, "setup", n.Type, "setup node type should be real (http/generator), not legacy 'setup'")
+	}
+	for _, n := range exportedYS.Teardown {
+		assert.NotEqual(t, "teardown", n.Type, "teardown node type should be real (http), not legacy 'teardown'")
+	}
+
+	// At least one node with block_on_error=true in setup or nodes.
+	blockOnErrInExport := false
+	for _, n := range exportedYS.Setup {
+		if n.BlockOnError {
+			blockOnErrInExport = true
+			break
+		}
+	}
+	if !blockOnErrInExport {
+		for _, n := range exportedYS.Nodes {
+			if n.BlockOnError {
+				blockOnErrInExport = true
+				break
+			}
+		}
+	}
+	assert.True(t, blockOnErrInExport, "at least one node should have block_on_error=true in export")
+
+	// variables / config_params / derived_params survived.
+	// config_params from card.yaml use arbitrary keys (order_source, pay_type, ...)
+	// not the cfg_ prefix the export heuristic keys on, so they may be classified as
+	// plain variables on export. The data must survive somewhere — verify by looking
+	// across all three sections.
+	exportedVars := make(map[string]string)
+	for _, v := range exportedYS.Variables {
+		exportedVars[v.Key] = v.Value
+	}
+	for k, v := range exportedYS.ConfigParams {
+		exportedVars[k] = v
+	}
+	for k, v := range exportedYS.DerivedParams {
+		exportedVars[k] = v
+	}
+	assert.Equal(t, "0", exportedVars["order_source"], "order_source should survive in some section")
+	assert.Equal(t, "1", exportedVars["pay_type"], "pay_type should survive in some section")
+
+	// data_sources survived.
+	require.NotEmpty(t, exportedYS.DataSources, "data_sources should be present")
+	assert.Equal(t, "user_charger", exportedYS.DataSources[0].Name)
 }
