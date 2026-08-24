@@ -222,7 +222,7 @@ config_params:
   force_pay_prob: "1=50,0=50"               # 强制支付: 50%概率
   pay_channel_prob: "1=70,2=30"             # 支付通道: 1=微信(70%), 2=支付宝(30%)
   user_vip_prob: "1=0,0=100"                # VIP用户: 0%概率(默认关闭)，预置数据时需要全部用户都开VIP，减少查询VIP逻辑
-  safe_buy_prob: "1=50,0=50"                # 安行充: 50%概率
+  safe_buy_prob: "1=0,0=100"                # 安行充: 50%概率，新版本增加了对充值流程的校验，如果测试用用户没有充值会报错，之前批量测试用户是直接插表，故这里先关闭安行充
   # =================================================================
   # 取值范围配置(供generator节点的__random/__oneOf使用)
   # =================================================================
@@ -1490,7 +1490,7 @@ nodes:
 
   - name: 轮询占位订单
     type: while
-    block_on_error: true
+    block_on_error: false
     config:
       exit_conditions:
         - variable: occupy_order_id
