@@ -519,7 +519,7 @@ async function autoLayout() {
   showToast('布局已重新排列', 'success')
 }
 
-function toYamlValue(val: any, indent: string): string {
+function yamlScalar(val: any): string {
   if (val === null || val === undefined) return 'null'
   if (typeof val === 'boolean') return val ? 'true' : 'false'
   if (typeof val === 'number') return String(val)
@@ -531,30 +531,66 @@ function toYamlValue(val: any, indent: string): string {
     const escaped = val.replace(/'/g, "''")
     return `'${escaped}'`
   }
-  if (Array.isArray(val)) {
-    if (val.length === 0) return '[]'
-    const items = val.map((item) => {
-      const v = toYamlValue(item, indent + '  ')
-      return `${indent}  - ${v}`
-    })
-    return '\n' + items.join('\n')
-  }
-  if (typeof val === 'object') {
-    const keys = Object.keys(val)
-    if (keys.length === 0) return '{}'
-    const items = keys.map(k => {
-      const v = toYamlValue(val[k], indent + '  ')
-      if (typeof val[k] === 'object' && val[k] !== null && !Array.isArray(val[k]) && Object.keys(val[k]).length > 0) {
-        return `${indent}  ${k}:\n${v}`
-      }
-      if (Array.isArray(val[k]) && val[k].length > 0) {
-        return `${indent}  ${k}:${v}`
-      }
-      return `${indent}  ${k}: ${v}`
-    })
-    return items.join('\n')
-  }
   return String(val)
+}
+
+// 标量/空复杂类型返回内联表示；非空对象或数组返回 null（需块格式展开）
+function yamlInline(v: any): string | null {
+  if (Array.isArray(v)) return v.length === 0 ? '[]' : null
+  if (v !== null && typeof v === 'object') return Object.keys(v).length === 0 ? '{}' : null
+  return yamlScalar(v)
+}
+
+// 将值序列化为 YAML 块格式行，追加到 lines。
+// 数组中的对象/数组项：首个键与 "-" 同行，其余键缩进对齐，
+// 修复旧实现 "-   key"（破折号后多出对象自身缩进）的坏缩进问题。
+function toYamlLines(val: any, indent: string, lines: string[]): void {
+  if (Array.isArray(val)) {
+    if (val.length === 0) { lines.push(`${indent}[]`); return }
+    for (const item of val) {
+      const inline = yamlInline(item)
+      if (inline !== null) {
+        lines.push(`${indent}- ${inline}`)
+      } else if (Array.isArray(item)) {
+        lines.push(`${indent}-`)
+        toYamlLines(item, indent + '  ', lines)
+      } else {
+        const entries = Object.entries(item)
+        const [firstK, firstV] = entries[0]
+        const firstInline = yamlInline(firstV)
+        if (firstInline !== null) {
+          lines.push(`${indent}- ${firstK}: ${firstInline}`)
+        } else {
+          lines.push(`${indent}- ${firstK}:`)
+          toYamlLines(firstV, indent + '    ', lines)
+        }
+        for (const [k, v] of entries.slice(1)) {
+          const vi = yamlInline(v)
+          if (vi !== null) {
+            lines.push(`${indent}  ${k}: ${vi}`)
+          } else {
+            lines.push(`${indent}  ${k}:`)
+            toYamlLines(v, indent + '    ', lines)
+          }
+        }
+      }
+    }
+    return
+  }
+  if (val !== null && typeof val === 'object') {
+    if (Object.keys(val).length === 0) { lines.push(`${indent}{}`); return }
+    for (const [k, v] of Object.entries(val)) {
+      const vi = yamlInline(v)
+      if (vi !== null) {
+        lines.push(`${indent}${k}: ${vi}`)
+      } else {
+        lines.push(`${indent}${k}:`)
+        toYamlLines(v, indent + '  ', lines)
+      }
+    }
+    return
+  }
+  lines.push(`${indent}${yamlScalar(val)}`)
 }
 
 function generateYaml(): string {
@@ -571,7 +607,7 @@ function generateYaml(): string {
   if (props.dataSources && props.dataSources.length > 0) {
     lines.push('data_sources:')
     for (const ds of props.dataSources) {
-      lines.push(`  - name: ${toYamlValue(ds.name, '')}`)
+      lines.push(`  - name: ${yamlScalar(ds.name)}`)
       if (ds.columns && ds.columns.length > 0) {
         lines.push(`    columns:`)
         for (const col of ds.columns) {
@@ -581,7 +617,7 @@ function generateYaml(): string {
       if (ds.rows && ds.rows.length > 0) {
         lines.push(`    rows:`)
         for (const row of ds.rows) {
-          lines.push(`      - { ${Object.entries(row).map(([k, v]) => `${k}: ${toYamlValue(v, '')}`).join(', ')} }`)
+          lines.push(`      - { ${Object.entries(row).map(([k, v]) => `${k}: ${yamlScalar(v)}`).join(', ')} }`)
         }
       }
       lines.push('')
@@ -590,7 +626,7 @@ function generateYaml(): string {
 
   lines.push('nodes:')
   for (const n of props.nodes) {
-    lines.push(`  - name: ${toYamlValue(n.name, '')}`)
+    lines.push(`  - name: ${yamlScalar(n.name)}`)
     lines.push(`    type: ${n.type}`)
     try {
       const parsed = JSON.parse(n.config || '{}')
@@ -600,17 +636,7 @@ function generateYaml(): string {
       }
       if (Object.keys(parsed).length > 0) {
         lines.push(`    config:`)
-        for (const [k, v] of Object.entries(parsed)) {
-          const yv = toYamlValue(v, '      ')
-          if (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v as object).length > 0) {
-            lines.push(`      ${k}:`)
-            lines.push(yv)
-          } else if (Array.isArray(v) && (v as any[]).length > 0) {
-            lines.push(`      ${k}:${yv}`)
-          } else {
-            lines.push(`      ${k}: ${yv}`)
-          }
-        }
+        toYamlLines(parsed, '      ', lines)
       }
     } catch {
       lines.push(`    config: {}`)
@@ -626,8 +652,8 @@ function generateYaml(): string {
     const fromName = idToName.get(e.from_node) || e.from_node
     const toName = idToName.get(e.to_node) || e.to_node
     const cond = e.condition || '(default)'
-    lines.push(`  - from: ${toYamlValue(fromName, '')}`)
-    lines.push(`    to: ${toYamlValue(toName, '')}`)
+    lines.push(`  - from: ${yamlScalar(fromName)}`)
+    lines.push(`    to: ${yamlScalar(toName)}`)
     lines.push(`    condition: ${cond}`)
     lines.push('')
   }
