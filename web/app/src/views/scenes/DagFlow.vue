@@ -637,12 +637,28 @@ function generateYaml(): string {
 
 async function copyYaml() {
   const yaml = generateYaml()
+  // 优先 Clipboard API；运行过场景后文档可能失焦导致 writeText reject，回退到 textarea + execCommand
+  let ok = false
   try {
     await navigator.clipboard.writeText(yaml)
-    showToast('YAML 已复制到剪贴板', 'success')
+    ok = true
   } catch {
-    showToast('复制失败，请手动选择文本', 'error')
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = yaml
+      ta.style.position = 'fixed'
+      ta.style.top = '-9999px'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+    } catch {
+      ok = false
+    }
   }
+  showToast(ok ? 'YAML 已复制到剪贴板' : '复制失败，请手动选择文本', ok ? 'success' : 'error')
 }
 
 function exportYaml() {
