@@ -1498,6 +1498,7 @@ nodes:
           value: "0"
       interval_seconds: 30
       max_iterations: 10
+      fail_on_max_iterations: false
       steps:
         - name: 签名-查询占位订单
           type: generator
