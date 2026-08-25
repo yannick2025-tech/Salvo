@@ -206,23 +206,23 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">成功率</div>
-                    <div class="metric-value">{{printf "%.1f%%" .GlobalSummary.SuccessRate}}</div>
+                    <div class="metric-value">{{printf "%.2f%%" .GlobalSummary.SuccessRate}}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">平均延迟 (ms)</div>
-                    <div class="metric-value">{{printf "%.1f" .GlobalSummary.AvgLatencyMs}}</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.AvgLatencyMs}}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">P95 延迟 (ms)</div>
-                    <div class="metric-value">{{printf "%.1f" .GlobalSummary.P95LatencyMs}}</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.P95LatencyMs}}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">P99 延迟 (ms)</div>
-                    <div class="metric-value">{{printf "%.1f" .GlobalSummary.P99LatencyMs}}</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.P99LatencyMs}}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">吞吐量 (req/s)</div>
-                    <div class="metric-value">{{printf "%.1f" .GlobalSummary.Throughput}}</div>
+                    <div class="metric-value">{{printf "%.2f" .GlobalSummary.Throughput}}</div>
                 </div>
             </div>
         </div>
@@ -253,8 +253,8 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
                         <td>{{.NodeName}}</td>
                         <td>{{printf "%.0f" .Summary.TotalRequests}}</td>
                         <td>{{printf "%.0f" .Summary.SuccessCount}} / {{printf "%.0f" .Summary.FailCount}}</td>
-                        <td><span class="status-badge status-success">{{printf "%.1f%%" .Summary.SuccessRate}}</span></td>
-                        <td>{{printf "%.1f" .Summary.P50LatencyMs}} / {{printf "%.1f" .Summary.P95LatencyMs}} / {{printf "%.1f" .Summary.P99LatencyMs}}</td>
+                        <td><span class="status-badge status-success">{{printf "%.2f%%" .Summary.SuccessRate}}</span></td>
+                        <td>{{printf "%.3f" .Summary.P50LatencyMs}} / {{printf "%.3f" .Summary.P95LatencyMs}} / {{printf "%.3f" .Summary.P99LatencyMs}}</td>
                         <td>{{printf "%.2f" .Summary.AvgQPS}}</td>
                     </tr>
                     {{end}}

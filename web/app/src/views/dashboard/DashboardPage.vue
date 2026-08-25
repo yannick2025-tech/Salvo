@@ -95,7 +95,7 @@
               <span :class="['run-status', run.status]">{{ run.status }}</span>
             </div>
             <div class="run-metrics">
-              <span>QPS: {{ formatNum(run.total_reqs / Math.max(run.duration, 1)) }}</span>
+              <span>QPS: {{ formatRate(run.total_reqs / Math.max(run.duration, 1)) }}</span>
               <span>P99: {{ formatMs(run.p99_latency) }}</span>
               <span>成功率: {{ ((run.success_reqs / Math.max(run.total_reqs, 1)) * 100).toFixed(2) }}%</span>
             </div>
@@ -753,6 +753,13 @@ function formatNum(n: number): string {
   return Math.round(n).toString()
 }
 
+function formatRate(n: number): string {
+  if (!n) return '0'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K'
+  return n.toFixed(2)
+}
+
 function formatMs(sec: number): string {
   if (!sec) return '0ms'
   const ms = sec * 1000
@@ -782,9 +789,9 @@ function getNodeMaxLatency(node: any): number {
 function nodeQPS(node: any): string {
   if (node.ts_qps?.length) {
     const valid = node.ts_qps.filter((v: number) => v > 0)
-    if (valid.length) return formatNum(valid.reduce((a: number, b: number) => a + b, 0) / valid.length)
+    if (valid.length) return formatRate(valid.reduce((a: number, b: number) => a + b, 0) / valid.length)
   }
-  if (node.total_reqs > 0 && node.avg_latency > 0) return formatNum(1 / node.avg_latency)
+  if (node.total_reqs > 0 && node.avg_latency > 0) return formatRate(1 / node.avg_latency)
   return '0'
 }
 
@@ -1169,7 +1176,7 @@ function getTooltipConfig() {
         const name = param.seriesName
         let val: string
         let unit: string
-        if (name === 'QPS') { val = rawVal.toFixed(1); unit = '' }
+        if (name === 'QPS') { val = rawVal.toFixed(2); unit = '' }
         else if (name === '错误率' || name === 'error_rate') { val = rawVal.toFixed(2); unit = '%' }
         else if (name === 'HeapAlloc' || name === 'HeapSys') { val = rawVal.toFixed(1); unit = ' MB' }
         else if (name === 'CPU') { val = rawVal.toFixed(1); unit = '%' }
@@ -1236,7 +1243,7 @@ function renderQpsChart() {
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
     series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` }, { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0)` }]) } }],
     tooltip: getTooltipConfig(),
   }, true)

@@ -72,7 +72,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 		if q <= 0 {
 			return "--"
 		}
-		return fmt.Sprintf("%.1f", q)
+		return fmt.Sprintf("%.2f", q)
 	},
 	"formatNumber": func(n interface{}) string {
 		switch v := n.(type) {
@@ -804,7 +804,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         <div class="metric-card">
             <div class="metric-label">总请求数</div>
             <div class="metric-value" style="color: var(--accent-primary)">{{formatNumber .Metrics.TotalRequests}}</div>
-            <div class="metric-sub">{{if .Metrics.DurationS}}{{printf "%.1f" .Metrics.DurationS}}s{{else}}--{{end}} 持续时间</div>
+            <div class="metric-sub">{{if .Metrics.DurationS}}{{printf "%.2f" .Metrics.DurationS}}s{{else}}--{{end}} 持续时间</div>
         </div>
 
         <div class="metric-card">
@@ -1813,7 +1813,7 @@ function renderLatencyChart() {
             type: 'value',
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: tc.lineColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } },
+            axisLabel: { color: tc.lineColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } },
             splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }
         },
         series: [{
@@ -1930,8 +1930,8 @@ function renderLatencyTrend() {
         dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: [
-            { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
-            { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(0) } } }
+            { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+            { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) } } }
         ],
         series: [
             { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[0] }, itemStyle: { color: tc.latencyColors[0] }, symbol: 'none' },

@@ -1139,7 +1139,7 @@ function renderAll() {
       name: '',
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: isDark() ? '#6e7681' : '#8c959f', fontSize: 10, formatter: (v: number) => v.toFixed(0) },
+      axisLabel: { color: isDark() ? '#6e7681' : '#8c959f', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
       splitLine: { lineStyle: { color: isDark() ? 'rgba(48,54,61,0.5)' : 'rgba(208,215,222,0.6)', type: 'dashed' as const } }
     },
     series: [{

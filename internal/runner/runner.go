@@ -752,17 +752,17 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		"total_reqs":     runRecord.TotalReqs,
 		"success_reqs":   runRecord.SuccessReqs,
 		"failed_reqs":    runRecord.FailedReqs,
-		"success_rate":   fmt.Sprintf("%.1f%%", successRate),
+		"success_rate":   fmt.Sprintf("%.2f%%", successRate),
 		"avg_latency_s":  runRecord.AvgLatency,
 		"p50_latency_s":  runRecord.P50Latency,
 		"p90_latency_s":  runRecord.P90Latency,
 		"p95_latency_s":  runRecord.P95Latency,
 		"p99_latency_s":  runRecord.P99Latency,
 		"min_latency_ms": time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
-		"p50":            fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
-		"p90":            fmt.Sprintf("%.1fms", runRecord.P90Latency*1000),
-		"p95":            fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
-		"p99":            fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
+		"p50":            fmt.Sprintf("%.3fms", runRecord.P50Latency*1000),
+		"p90":            fmt.Sprintf("%.3fms", runRecord.P90Latency*1000),
+		"p95":            fmt.Sprintf("%.3fms", runRecord.P95Latency*1000),
+		"p99":            fmt.Sprintf("%.3fms", runRecord.P99Latency*1000),
 	}
 	summaryBytes, _ := json.Marshal(summary)
 

@@ -136,7 +136,7 @@
             <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
             <td>{{ Math.round(r.worker_count || 0) }}</td>
             <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? '持续时间' : '请求数' }}</span></td>
-            <td class="mono">{{ r.run_mode === 'duration' ? Math.round(r.duration || 0) + 's' : (r.count || 0).toLocaleString() }}</td>
+            <td class="mono">{{ r.run_mode === 'duration' ? (r.duration || 0).toFixed(2) + 's' : (r.count || 0).toLocaleString() }}</td>
             <td>{{ r.total_reqs }}</td>
             <td>{{ ((r.success_reqs / Math.max(r.total_reqs, 1)) * 100).toFixed(2) }}%</td>
             <td>{{ formatMs(r.p99_latency) }}</td>
