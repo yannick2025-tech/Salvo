@@ -60,13 +60,15 @@
               <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
               <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
             </div>
-            <button class="btn-sm danger" 
-                    :disabled="!canRunScene || stoppingSceneIds.has(run.scene_id) || run.status !== 'running'" 
-                    :title="canRunScene ? '' : '您当前的角色没有运行权限'"
-                    @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
-              {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
-            </button>
-            <button class="btn-sm progress" @click="viewProgress(run.scene_id)">实时进度</button>
+            <div class="run-actions">
+              <button class="btn-sm danger"
+                      :disabled="!canRunScene || stoppingSceneIds.has(run.scene_id) || run.status !== 'running'"
+                      :title="canRunScene ? '' : '您当前的角色没有运行权限'"
+                      @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
+                {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
+              </button>
+              <button class="btn-sm progress" @click="viewProgress(run.scene_id)">实时进度</button>
+            </div>
           </div>
         </div>
         
@@ -507,7 +509,8 @@ onUnmounted(() => {
 .run-name { font-size: 13px; font-weight: 500; }
 .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
-.run-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.run-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+.run-actions { display: flex; gap: 8px; }
 .run-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric-label { font-size: 11px; color: var(--text-tertiary); }
