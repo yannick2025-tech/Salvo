@@ -6,6 +6,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -1249,14 +1250,28 @@ func NewSOPluginRepo(db *DB) *SOPluginRepo {
 
 func (r *SOPluginRepo) Create(ctx context.Context, p *model.SOPlugin) error {
 	now := time.Now().UTC()
+	nowStr := now.Format("2006-01-02 15:04:05.000")
+
+	// Dedup: soft-delete any existing plugin with the same name+version.
+	var existingID snowflake.ID
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id FROM so_plugins WHERE name=? AND version=? AND deleted_at IS NULL LIMIT 1`,
+		p.Name, p.Version).Scan(&existingID)
+	if err == nil {
+		// Soft-delete the old record so the new one becomes the latest active version.
+		_, _ = r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, nowStr, existingID)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check duplicate plugin: %w", err)
+	}
+
 	p.ID = snowflake.ID(r.db.NextID())
 	p.CreatedAt = now
 	p.UpdatedAt = now
 
-	_, err := r.db.ExecContext(ctx, `
+	_, err = r.db.ExecContext(ctx, `
 		INSERT INTO so_plugins (id, name, version, file_path, status, config, created_at, updated_at, deleted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-		p.ID, p.Name, p.Version, p.FilePath, p.Status, p.Config, p.CreatedAt, p.UpdatedAt)
+		p.ID, p.Name, p.Version, p.FilePath, p.Status, p.Config, nowStr, nowStr)
 	return err
 }
 
@@ -1310,19 +1325,19 @@ func (r *SOPluginRepo) List(ctx context.Context, filter repo.Filter) ([]*model.S
 }
 
 func (r *SOPluginRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
-	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET status=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, status, now, id)
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET status=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, status, nowStr, id)
 	return err
 }
 
 func (r *SOPluginRepo) UpdateConfig(ctx context.Context, id snowflake.ID, config string) error {
-	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET config=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, config, now, id)
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET config=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, config, nowStr, id)
 	return err
 }
 
 func (r *SOPluginRepo) Delete(ctx context.Context, id snowflake.ID) error {
-	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, now, id)
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, nowStr, id)
 	return err
 }
