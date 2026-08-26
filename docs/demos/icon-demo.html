@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>图标选择 Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 40px;
+  }
+  h1 { font-size: 22px; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 16px; margin: 32px 0 16px; color: #aaa; font-weight: 500; }
+  .section { margin-bottom: 40px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: #16213e;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .card:hover {
+    border-color: #0f3460;
+    background: #1a2744;
+    transform: translateY(-2px);
+  }
+  .card.selected {
+    border-color: #00e5ff;
+    box-shadow: 0 0 12px rgba(0,229,255,0.3);
+  }
+  .card svg {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 8px;
+  }
+  .card .label {
+    font-size: 12px;
+    color: #888;
+  }
+  .card .name {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+  }
+  .badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: #16213e;
+    border-radius: 12px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .badge svg { width: 14px; height: 14px; }
+  .badge.pass { background: rgba(46,204,113,0.18); color: #2ecc71; }
+  .badge.running { background: rgba(0,229,255,0.14); color: #00e5ff; }
+  .badge.skip { background: rgba(241,196,15,0.16); color: #f1c40f; }
+  .badge.fail { background: rgba(231,76,60,0.16); color: #e74c3c; }
+  .badge.idle { background: rgba(139,148,158,0.12); color: #8b949e; }
+  .preview-label { font-size: 13px; color: #888; margin-right: 8px; }
+  .node-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-left: 3px solid #00e5ff;
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+  .node-name { font-size: 14px; color: #e0e0e0; }
+  .node-type { font-size: 11px; color: #666; }
+  .exec-badges { display: flex; gap: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes dash { to { stroke-dashoffset: -20; } }
+  .spin { animation: spin 1.5s linear infinite; }
+  .dash-spin { animation: dash 1s linear infinite; }
+  .pulse { animation: exec-pulse 1.5s ease-in-out infinite; }
+  @keyframes exec-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+
+<h1>图标选择 Demo</h1>
+<p style="color:#888;font-size:14px;">点击卡片选择，下方预览会实时更新</p>
+
+<!-- ===== RUNNING 图标 ===== -->
+<div class="section">
+  <h2>运行中 (running) 图标候选</h2>
+  <div class="grid" id="running-grid">
+
+    <!-- 1. 旋转圆环 (当前 ⟳) -->
+    <div class="card" data-type="running" data-icon="spinner" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" class="spin">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+      <div class="label">旋转圆环</div>
+      <div class="name">spinner</div>
+    </div>
+
+    <!-- 2. 播放三角形 -->
+    <div class="card" data-type="running" data-icon="play" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="#00e5ff">
+        <polygon points="6,3 20,12 6,21"/>
+      </svg>
+      <div class="label">播放三角</div>
+      <div class="name">play</div>
+    </div>
+
+    <!-- 3. 闪电 -->
+    <div class="card" data-type="running" data-icon="zap" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/>
+      </svg>
+      <div class="label">闪电</div>
+      <div class="name">zap</div>
+    </div>
+
+    <!-- 4. 脉冲/活动线 -->
+    <div class="card" data-type="running" data-icon="activity" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+      </svg>
+      <div class="label">脉冲线</div>
+      <div class="name">activity</div>
+    </div>
+
+    <!-- 5. 齿轮 -->
+    <div class="card" data-type="running" data-icon="gear" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" class="spin">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <div class="label">齿轮</div>
+      <div class="name">gear</div>
+    </div>
+
+    <!-- 6. 信号/波纹 -->
+    <div class="card" data-type="running" data-icon="signal" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round">
+        <path d="M2 12h2M6 12h2M10 12h2M14 12h2M18 12h2M22 12h0" class="pulse"/>
+        <circle cx="12" cy="12" r="2" fill="#00e5ff"/>
+      </svg>
+      <div class="label">信号波纹</div>
+      <div class="name">signal</div>
+    </div>
+
+    <!-- 7. 火箭 -->
+    <div class="card" data-type="running" data-icon="rocket" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+      </svg>
+      <div class="label">火箭</div>
+      <div class="name">rocket</div>
+    </div>
+
+    <!-- 8. 加载圆点 -->
+    <div class="card" data-type="running" data-icon="loader" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round" class="spin">
+        <line x1="12" y1="2" x2="12" y2="6"/>
+        <line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+        <line x1="2" y1="12" x2="6" y2="12"/>
+        <line x1="18" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+      </svg>
+      <div class="label">加载圆点</div>
+      <div class="name">loader</div>
+    </div>
+
+    <!-- 9. 播放+暂停组合 -->
+    <div class="card" data-type="running" data-icon="play-pause" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="#00e5ff">
+        <polygon points="5,3 10,3 10,21 5,21"/>
+        <polygon points="14,3 19,3 19,21 14,21"/>
+      </svg>
+      <div class="label">双竖条</div>
+      <div class="name">bars</div>
+    </div>
+
+    <!-- 10. 火焰 -->
+    <div class="card" data-type="running" data-icon="flame" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+      </svg>
+      <div class="label">火焰</div>
+      <div class="name">flame</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== SKIP 图标 ===== -->
+<div class="section">
+  <h2>跳过 (skip) 图标候选</h2>
+  <div class="grid" id="skip-grid">
+
+    <!-- 1. 快进 (当前 ) -->
+    <div class="card" data-type="skip" data-icon="skip-forward" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="#f1c40f">
+        <polygon points="5,4 15,12 5,20"/>
+        <polygon points="15,4 20,4 20,20 15,20"/>
+      </svg>
+      <div class="label">快进</div>
+      <div class="name">skip-forward</div>
+    </div>
+
+    <!-- 2. 跳过箭头 -->
+    <div class="card" data-type="skip" data-icon="skip-arrow" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="13,17 18,12 13,7"/>
+        <polyline points="6,17 11,12 6,7"/>
+      </svg>
+      <div class="label">双箭头</div>
+      <div class="name">chevrons</div>
+    </div>
+
+    <!-- 3. 禁止/斜杠圆 -->
+    <div class="card" data-type="skip" data-icon="ban" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+      </svg>
+      <div class="label">禁止圆</div>
+      <div class="name">ban</div>
+    </div>
+
+    <!-- 4. 减号圆 -->
+    <div class="card" data-type="skip" data-icon="minus-circle" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <div class="label">减号圆</div>
+      <div class="name">minus-circle</div>
+    </div>
+
+    <!-- 5. 暂停 -->
+    <div class="card" data-type="skip" data-icon="pause" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="#f1c40f">
+        <rect x="5" y="3" width="4" height="18" rx="1"/>
+        <rect x="15" y="3" width="4" height="18" rx="1"/>
+      </svg>
+      <div class="label">暂停</div>
+      <div class="name">pause</div>
+    </div>
+
+    <!-- 6. 省略号 -->
+    <div class="card" data-type="skip" data-icon="ellipsis" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="#f1c40f">
+        <circle cx="6" cy="12" r="2"/>
+        <circle cx="12" cy="12" r="2"/>
+        <circle cx="18" cy="12" r="2"/>
+      </svg>
+      <div class="label">省略号</div>
+      <div class="name">ellipsis</div>
+    </div>
+
+    <!-- 7. 虚线圆 -->
+    <div class="card" data-type="skip" data-icon="dashed-circle" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-dasharray="4 3">
+        <circle cx="12" cy="12" r="10"/>
+      </svg>
+      <div class="label">虚线圆</div>
+      <div class="name">dashed-circle</div>
+    </div>
+
+    <!-- 8. 斜杠 -->
+    <div class="card" data-type="skip" data-icon="slash" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2.5" stroke-linecap="round">
+        <line x1="7" y1="19" x2="17" y2="5"/>
+      </svg>
+      <div class="label">斜杠</div>
+      <div class="name">slash</div>
+    </div>
+
+    <!-- 9. 箭头绕过 -->
+    <div class="card" data-type="skip" data-icon="bypass" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9,18 15,12 9,6"/>
+      </svg>
+      <div class="label">右箭头</div>
+      <div class="name">chevron-right</div>
+    </div>
+
+    <!-- 10. 虚线方块 -->
+    <div class="card" data-type="skip" data-icon="dashed-square" onclick="selectIcon(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f1c40f" stroke-width="2" stroke-dasharray="3 3">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+      <div class="label">虚线方块</div>
+      <div class="name">dashed-square</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 实时预览 ===== -->
+<div class="section">
+  <h2>实时预览</h2>
+  <div class="badge-row">
+    <span class="preview-label">徽章样式：</span>
+    <span class="badge pass" id="preview-pass">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+      1216
+    </span>
+    <span class="badge running" id="preview-running">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin" id="preview-running-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      6
+    </span>
+    <span class="badge skip" id="preview-skip">
+      <svg viewBox="0 0 24 24" fill="currentColor" id="preview-skip-icon"><polygon points="5,4 15,12 5,20"/><polygon points="15,4 20,4 20,20 15,20"/></svg>
+      52
+    </span>
+  </div>
+
+  <div class="node-preview">
+    <div>
+      <div class="node-name">浏览商品列表</div>
+      <div class="node-type">HTTP</div>
+    </div>
+    <div class="exec-badges">
+      <span class="badge pass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+        1216
+      </span>
+      <span class="badge running" id="node-running">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin" id="node-running-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        6
+      </span>
+      <span class="badge skip" id="node-skip">
+        <svg viewBox="0 0 24 24" fill="currentColor" id="node-skip-icon"><polygon points="5,4 15,12 5,20"/><polygon points="15,4 20,4 20,20 15,20"/></svg>
+        52
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+const icons = {
+  running: {
+    spinner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>',
+    zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    signal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="pulse"><path d="M2 12h4M10 12h4M18 12h4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
+    rocket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+    loader: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>',
+    'play-pause': '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 10,3 10,21 5,21"/><polygon points="14,3 19,3 19,21 14,21"/></svg>',
+    flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+  },
+  skip: {
+    'skip-forward': '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><polygon points="15,4 20,4 20,20 15,20"/></svg>',
+    'skip-arrow': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13,17 18,12 13,7"/><polyline points="6,17 11,12 6,7"/></svg>',
+    ban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+    'minus-circle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>',
+    ellipsis: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>',
+    'dashed-circle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"><circle cx="12" cy="12" r="10"/></svg>',
+    slash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="7" y1="19" x2="17" y2="5"/></svg>',
+    bypass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>',
+    'dashed-square': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
+  }
+};
+
+const selection = { running: 'spinner', skip: 'skip-forward' };
+
+function selectIcon(card) {
+  const type = card.dataset.type;
+  const icon = card.dataset.icon;
+  selection[type] = icon;
+
+  // Update selection highlight
+  document.querySelectorAll(`.card[data-type="${type}"]`).forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+
+  // Update preview
+  const previewIcon = document.getElementById(`preview-${type}-icon`);
+  const nodeIcon = document.getElementById(`node-${type}-icon`);
+  if (icons[type][icon]) {
+    // Replace the SVG in both preview areas
+    const svgHTML = icons[type][icon];
+    // For badge preview
+    const badgeEl = document.getElementById(`preview-${type}`);
+    badgeEl.innerHTML = svgHTML + badgeEl.textContent.trim();
+    // For node preview
+    const nodeEl = document.getElementById(`node-${type}`);
+    const num = nodeEl.textContent.trim();
+    nodeEl.innerHTML = svgHTML + num;
+  }
+}
+
+// Set initial selection
+document.querySelector('.card[data-type="running"][data-icon="spinner"]').classList.add('selected');
+document.querySelector('.card[data-type="skip"][data-icon="skip-forward"]').classList.add('selected');
+</script>
+</body>
+</html>

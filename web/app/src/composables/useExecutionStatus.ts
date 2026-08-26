@@ -175,7 +175,7 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
       const parts: string[] = []
       if (badge.pass > 0) parts.push(`${badge.pass}✓`)
       if (badge.fail > 0) parts.push(`${badge.fail}✗`)
-      if (badge.skip > 0) parts.push(`${badge.skip}⊘`)
+      if (badge.skip > 0) parts.push(`${badge.skip}>>`)
       if (badge.running > 0) parts.push(`${badge.running}⟳`)
       badge.label = parts.join(' ') || ''
 

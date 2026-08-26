@@ -7,7 +7,7 @@
     <div v-if="executionStatus && viewMode === 'aggregate'" class="exec-badges">
       <span v-if="executionStatus.pass > 0" class="exec-badge pass">✓{{ executionStatus.pass }}</span>
       <span v-if="executionStatus.fail > 0" class="exec-badge fail">✗{{ executionStatus.fail }}</span>
-      <span v-if="executionStatus.skip > 0" class="exec-badge skip">⊘{{ executionStatus.skip }}</span>
+      <span v-if="executionStatus.skip > 0" class="exec-badge skip">&gt;&gt;{{ executionStatus.skip }}</span>
       <span v-if="executionStatus.running > 0" class="exec-badge running">⟳{{ executionStatus.running }}</span>
       <span v-if="executionStatus.idle > 0" class="exec-badge idle">◦{{ executionStatus.idle }}</span>
     </div>
@@ -16,7 +16,7 @@
     <div v-if="chainStatus && viewMode === 'chain'" :class="['exec-status-dot', chainStatus]">
       <span v-if="chainStatus === 'pass'">✓</span>
       <span v-else-if="chainStatus === 'fail'">✗</span>
-      <span v-else-if="chainStatus === 'skip'">⊘</span>
+      <span v-else-if="chainStatus === 'skip'">&gt;&gt;</span>
       <span v-else-if="chainStatus === 'running'">⟳</span>
     </div>
 
