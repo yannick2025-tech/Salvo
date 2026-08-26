@@ -351,9 +351,9 @@ description: |
 
 variables:
   - key: env
-    value: staging
+    value: local
   - key: api_host
-    value: \${env}-api.example.com
+    value: localhost:9090
   - key: base_url
     value: http://\${api_host}/mock/api
   - key: token

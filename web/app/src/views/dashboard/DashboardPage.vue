@@ -1244,7 +1244,7 @@ function renderQpsChart() {
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
-    series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` }, { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0)` }]) } }],
+    series: [{ name: 'QPS', data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` }, { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0)` }]) } }],
     tooltip: getTooltipConfig(),
   }, true)
   qpsChart.off('datazoom')

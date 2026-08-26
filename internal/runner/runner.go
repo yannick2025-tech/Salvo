@@ -279,6 +279,10 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		return nil, fmt.Errorf("runner: create snowflake node: %w", err)
 	}
 
+	// Generate runID once and share it between Runner and TimeSeriesCollector
+	// so that time series data can be queried by run_record ID.
+	runID := n.Generate()
+
 	r := &Runner{
 		cfg:           cfg,
 		stats:         &Stats{},
@@ -291,7 +295,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		dataSources:   dataSources,
 		tracer:        tracer,
 		nodeGen:       n,
-		runID:         n.Generate(),
+		runID:         runID,
 		done:          make(chan struct{}),
 		log:           log,
 		nodeStats:     make(map[string]*NodeStats),
@@ -301,7 +305,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 			FlushInterval:   10 * time.Second,
 			MemoryWindowSec: 300,
 			MaxNodes:        100,
-		}, n.Generate(), tsStore, nil),
+		}, runID, tsStore, nil),
 		tsStore:          tsStore,
 		runtimeCollector: NewRuntimeMetricsCollector(2*time.Second, cfg.EnableSystemMetrics),
 	}
@@ -1672,7 +1676,9 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	proto := httpprotocol.NewProtocol()
+	httpStart := time.Now()
 	resp, err := proto.Execute(ctx, req)
+	httpLatency := time.Since(httpStart)
 	if err != nil {
 		// Manual scene cancellation: the user clicked Stop. These in-flight
 		// requests never reached the server, so they should be recorded as
@@ -1704,10 +1710,13 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		logger.F("request_body", string(req.Body)),
 	)
 		if n.stats != nil {
-			n.stats.RecordLatency(0, false)
+			n.stats.RecordLatency(httpLatency, false)
 		}
 		if n.httpOnlyStats != nil {
-			n.httpOnlyStats.RecordLatency(0, false)
+			n.httpOnlyStats.RecordLatency(httpLatency, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(httpLatency, false)
 		}
 
 		// Record failed node details

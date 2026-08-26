@@ -2061,10 +2061,12 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				liveSuccess := st.SuccessReqs.Load()
 				liveFailed := st.FailedReqs.Load()
 
-				if liveTotal > 0 || rnStatus == "running" {
-					if rnStatus == "running" {
-						running++
-					}
+				// Only use live stats when the runner is still actively running.
+				// When the runner has stopped (done/canceled/failed), fall through
+				// to use the stored run_record values to avoid latency fluctuations
+				// from in-flight requests completing after stop.
+				if rnStatus == "running" {
+					running++
 
 					totalReqs += liveTotal
 					successReqs += liveSuccess
@@ -2336,6 +2338,8 @@ func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake
 				CPUMax           float64 `json:"cpu_max"`
 				CPUAvg           float64 `json:"cpu_avg"`
 				TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+				TaskWaitP50MaxMs float64 `json:"task_wait_p50_max_ms"`
+				TaskWaitP95MaxMs float64 `json:"task_wait_p95_max_ms"`
 				TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
 				GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
 				PendingQueueMax  float64 `json:"pending_queue_max"`
@@ -2361,8 +2365,8 @@ func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake
 		RSSMemoryMB:     0,
 		ActiveWorkers:   int(sm.Summary.ActiveWorkersMax),
 		PendingQueueLen: int(sm.Summary.PendingQueueMax),
-		TaskWaitP50Ms:   0,
-		TaskWaitP95Ms:   0,
+		TaskWaitP50Ms:   sm.Summary.TaskWaitP50MaxMs,
+		TaskWaitP95Ms:   sm.Summary.TaskWaitP95MaxMs,
 		TaskWaitP99Ms:   sm.Summary.TaskWaitP99MaxMs,
 		GCPauseLastMs:   sm.Summary.GCPauseTotalMs,
 	}

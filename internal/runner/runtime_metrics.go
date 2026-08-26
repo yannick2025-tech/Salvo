@@ -279,6 +279,8 @@ type SystemMetricsSummary struct {
 
 	// Task Wait
 	TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+	TaskWaitP50MaxMs float64 `json:"task_wait_p50_max_ms"`
+	TaskWaitP95MaxMs float64 `json:"task_wait_p95_max_ms"`
 	TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
 
 	// Pending Queue
@@ -325,6 +327,8 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 	var heapAllocTotal float64
 	var cpuTotal float64
 	var taskWaitAvgTotal float64
+	var taskWaitP50Max float64
+	var taskWaitP95Max float64
 	var taskWaitP99Max float64
 	var taskWaitSamples int64
 	var pendingQueueTotal int
@@ -375,6 +379,12 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 			taskWaitAvgTotal += s.TaskWaitAvgMs
 			taskWaitSamples++
 		}
+		if s.TaskWaitP50Ms > taskWaitP50Max {
+			taskWaitP50Max = s.TaskWaitP50Ms
+		}
+		if s.TaskWaitP95Ms > taskWaitP95Max {
+			taskWaitP95Max = s.TaskWaitP95Ms
+		}
 		if s.TaskWaitP99Ms > taskWaitP99Max {
 			taskWaitP99Max = s.TaskWaitP99Ms
 		}
@@ -400,6 +410,8 @@ func (c *RuntimeMetricsCollector) ComputeSummary() SystemMetricsSummary {
 	if taskWaitSamples > 0 {
 		summary.TaskWaitAvgMs = taskWaitAvgTotal / float64(taskWaitSamples)
 	}
+	summary.TaskWaitP50MaxMs = taskWaitP50Max
+	summary.TaskWaitP95MaxMs = taskWaitP95Max
 	summary.TaskWaitP99MaxMs = taskWaitP99Max
 	summary.PendingQueueMax = pendingQueueMax
 	summary.PendingQueueAvg = float64(pendingQueueTotal) / n
