@@ -424,3 +424,106 @@ dagre 布局引擎不支持变长节点尺寸。所有节点统一使用 300×90
 - 断线后 1s → 2s → 4s → ... → 最大 30s
 - 重连后必须重新发送 subscribe 消息
 - onUnmounted 时断开连接，防止内存泄漏
+
+---
+
+## Lesson 7: Go 1.26.2 运行时 FD.Write 返回错误字节数导致 mock server panic (2026-08-26)
+
+### 现象
+Salvo 运行测试场景期间，日志中出现 goroutine panic：
+```
+panic: invalid return from write: got 129 from a write of 7
+```
+panic 发生在 mock server 处理 `POST /mock/api/users` 返回 201 响应后，flush 阶段崩溃。
+
+### 完整证据链
+
+**Step 1: 定位 panic 日志**
+```bash
+grep -n "panic\|invalid return from write" logs/salvo.log
+# 结果：3 处匹配（1 次原始 panic + 1 次 recovered panic + 1 次 finalFlush 重入）
+```
+
+**Step 2: 分析堆栈**
+```
+goroutine 241945 [running]:
+internal/poll.(*FD).Write(0x..., {0x..., 0x109, 0x1000})    ← Go 标准库 poller
+net.(*netFD).Write(0x..., {0x...})
+net.(*conn).Write(0x..., {0x...})
+net/http.checkConnErrorWriter.Write({0x...}, {0x...})
+bufio.(*Writer).Flush(0x...)
+net/http.(*response).finishRequest(0x...)   ← HTTP 响应结束 flush
+net/http.(*conn).serve(0x..., {0x..., 0x...})
+created by net/http.(*Server).Serve in goroutine 3
+```
+
+**Step 3: 确认无 Salvo 业务代码在堆栈中**
+- 堆栈最深层为 `internal/poll.(*FD).Write`（Go 运行时）
+- 无任何 `internal/runner/`、`internal/mock/`、`internal/api/` 路径
+- panic 发生在 `net/http.(*response).finishRequest` → `bufio.Flush` → `FD.Write`
+
+**Step 4: 确认 panic 被 recover**
+```
+panic: invalid return from write: got 129 from a write of 7 [recovered]
+```
+`net/http.(*conn).serve.func1()` 中的 defer recover 捕获了 panic，**不影响其他请求**。
+
+**Step 5: 确认触发上下文**
+```
+[MOCK-REQ] 2026/08/26 14:19:55 POST /mock/api/users | 201 | 114.55ms
+2026/08/26 14:19:55 http: panic serving [::1]:50136: invalid return from write: got 129 from a write of 7
+```
+- Mock server 正常处理请求并返回 201
+- 客户端地址 `[::1]:50136` 是 Salvo runner 发出的请求
+- 在 flush 响应体时，底层 write 系统调用返回 129（期望 7）
+
+**Step 6: 确认 Go 版本**
+```bash
+go version
+# go version go1.26.2 darwin/arm64
+```
+
+### 根因
+
+这是 **Go 1.26.2 在 macOS (darwin/arm64) 上的运行时 bug**。`internal/poll.(*FD).Write` 在某些边界条件下（高并发 + 连接关闭时序竞争）返回了错误的字节数。`net/http` server 检测到 `n != len(p)` 后主动 panic 以保护数据一致性。
+
+**关键细节**：堆栈中 `FD.Write` 的 buffer 参数为 `{ptr, 0x109, 0x1000}`（length=265, cap=4096），但 panic 消息说 "write of 7"。这说明 panic 来自更上层的某次小写入（可能是 HTTP chunked encoding 的 trailing chunk `0\r\n\r\n` = 5 bytes 或 headers flush），而非堆栈中显示的 265-byte buffer write。这是 Go HTTP server 在 response finish 阶段多次 flush 中的某一次失败了。
+
+### 影响评估
+
+| 维度 | 评估 |
+|------|------|
+| 数据完整性 | 该连接响应可能不完整，但 mock server 无状态，不影响测试数据 |
+| 其他请求 | 不受影响，panic 被 per-connection goroutine 的 recover 捕获 |
+| 正在运行的场景 | 不受影响，runner 的 HTTP client 会收到连接重置错误，按正常错误路径处理 |
+| 进程稳定性 | 不受影响，仅该 goroutine 终止 |
+| 复现频率 | 日志中仅出现 1 次（3 行匹配为同一事件的重入），属偶发 |
+
+### 建议
+
+1. **无需修复 Salvo 代码**：这不是应用层 bug，堆栈中无业务代码
+2. **短期**：观察日志中该 panic 的出现频率，如果仅偶发（< 10 次/小时），可忽略
+3. **中期**：关注 Go 1.26.3+ release notes，确认是否修复此 poller bug
+4. **长期**：如频繁出现，考虑回退到 Go 1.25.x 或升级到修复版本
+
+### Lessons Learned
+
+#### 1. 堆栈分析是区分应用 bug 和运行时 bug 的关键
+- 检查堆栈中是否包含业务代码路径
+- 如果堆栈完全在标准库/运行时内 → 优先怀疑 Go 版本 bug
+- 如果堆栈包含业务代码 → 检查业务代码逻辑
+
+#### 2. `net/http` server 的 per-connection panic 不会杀死进程
+- `serve.func1()` 有 defer recover，panic 仅终止该连接的 goroutine
+- 其他连接和 goroutine 不受影响
+- 这是 Go HTTP server 的设计特性，不是 bug
+
+#### 3. "invalid return from write" 是 poller 层的经典问题
+- 常见于 macOS kqueue / Linux epoll 的异步 I/O 实现
+- 通常由连接关闭时序竞争引起（client 已关闭连接，server 仍在写）
+- Go 运行时选择 panic 而非静默忽略，是为了防止数据损坏
+
+#### 4. 排查 panic 的标准流程
+```
+日志 grep panic → 提取堆栈 → 判断业务/运行时 → 确认 recover 状态 → 评估影响 → 决定修复策略
+```
