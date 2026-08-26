@@ -295,6 +295,8 @@ nodes:
         Content-Type: application/json
       body: '{"OperatorID":"${operator_id}","Data":"{\"UserID\":\"\",\"PhoneNum\":\"\",\"PlateNum\":\"\",\"CarPlateNo\":\"\",\"Customer\":\"\",\"UserPolicyInfos\":null,\"SubAppKey\":\"\",\"FeeLimit\":0,\"StartChargeSeq\":\"${evcs_order}\",\"QRCode\":\"\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
       timeout: 15000
+      expect_body:
+        $.Data.FailReasonMsg: null
       extract:
         evcs_start_stat: "$.Data"
 
@@ -321,7 +323,7 @@ nodes:
       interval_seconds: 30
       max_iterations: 200
       steps:
-        # 7a. 查询充电状态 (Data 是 JSON 字符串, 需穿透解析)
+        # 7a. 查询充电状态 (Data 是 JSON 字符串, JSONPath 已支持自动穿透)
         - name: 查询充电状态
           request:
             method: POST
@@ -329,6 +331,8 @@ nodes:
             headers:
               Content-Type: application/json
             body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+            expect_body:
+              $.Data.FailReasonMsg: null
           extract:
             - variable: evcs_status
               path: "$.Data.StartChargeSeqStat"
@@ -400,6 +404,8 @@ nodes:
             headers:
               Content-Type: application/json
             body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+            expect_body:
+              $.Data.FailReasonMsg: null
           retry:
             max_attempts: 10
             on_429: retry
@@ -419,6 +425,8 @@ nodes:
         Content-Type: application/json
       body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
       timeout: 10000
+      expect_body:
+        $.Data.FailReasonMsg: null
 
   # --- 9. 后占位 (delay) ---
   - name: 后占位

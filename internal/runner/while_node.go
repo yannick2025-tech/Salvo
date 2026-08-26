@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -62,11 +63,12 @@ type stepConditionConfig struct {
 
 // stepRequestConfig defines an HTTP request within a step.
 type stepRequestConfig struct {
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers,omitempty"`
-	Body    any               `json:"body,omitempty"`
-	Form    *stepFormConfig   `json:"form,omitempty"`
+	Method     string            `json:"method"`
+	URL        string            `json:"url"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Body       any               `json:"body,omitempty"`
+	Form       *stepFormConfig   `json:"form,omitempty"`
+	ExpectBody map[string]any    `json:"expect_body,omitempty"`
 }
 
 // stepFormConfig defines a multipart/form-data body for a step request.
@@ -847,6 +849,56 @@ func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, 
 		}
 	}
 
+	// Validate expect_body assertions (supports JSONPath with JSON string penetration).
+	if len(step.Request.ExpectBody) > 0 && len(httpResp.Body) > 0 {
+		var bodyJSON map[string]any
+		dec := json.NewDecoder(bytes.NewReader(httpResp.Body))
+		dec.UseNumber()
+		if err := dec.Decode(&bodyJSON); err != nil {
+			nodeLog.Error("while step: failed to parse response body for expect_body validation",
+				logger.F("step", step.Name),
+				logger.F("error", err))
+		} else {
+			for key, expectedVal := range step.Request.ExpectBody {
+				var actualVal any
+				if strings.HasPrefix(key, "$.") {
+					actualVal = resolveJSONPath(bodyJSON, key)
+					if actualVal == nil && expectedVal != nil {
+						errMsg := fmt.Sprintf("expect_body path %q not found in response", key)
+						nodeLog.Error("while step expect_body validation failed",
+							logger.F("step", step.Name),
+							logger.F("field", key),
+							logger.F("error", errMsg))
+						return fmt.Errorf("step %q: %s", step.Name, errMsg)
+					}
+				} else {
+					var exists bool
+					actualVal, exists = bodyJSON[key]
+					if !exists {
+						errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
+						nodeLog.Error("while step expect_body validation failed",
+							logger.F("step", step.Name),
+							logger.F("field", key),
+							logger.F("error", errMsg))
+						return fmt.Errorf("step %q: %s", step.Name, errMsg)
+					}
+				}
+				if !compareJSONValues(actualVal, expectedVal) {
+					errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, formatJSONValue(expectedVal), formatJSONValue(actualVal))
+					nodeLog.Error("while step expect_body validation failed",
+						logger.F("step", step.Name),
+						logger.F("field", key),
+						logger.F("expected", expectedVal),
+						logger.F("actual", actualVal))
+					return fmt.Errorf("step %q: %s", step.Name, errMsg)
+				}
+			}
+			nodeLog.Info("while step expect_body validation passed",
+				logger.F("step", step.Name),
+				logger.F("assertions", step.Request.ExpectBody))
+		}
+	}
+
 	// Extract variables from response.
 	// Merge extracts from both step.Extract (top-level) and Config["extract"] (nested).
 	allExtracts := mergeStepExtracts(step, nodeLog)
@@ -948,6 +1000,8 @@ func extractVarsFromResponse(body []byte, extracts extractConfig, vars map[strin
 
 // resolveJSONPath resolves a simple JSON path (e.g., "$.result.status") against data.
 // Supports: $.field, $.field.subfield, $.field[index], $.field.subfield[index]
+// Auto-penetrates JSON strings: when a field value is a JSON string (not an object),
+// it is automatically unmarshalled and traversal continues into the parsed object.
 func resolveJSONPath(data map[string]any, path string) any {
 	if !strings.HasPrefix(path, "$") {
 		return nil
@@ -969,6 +1023,15 @@ func resolveJSONPath(data map[string]any, path string) any {
 			continue
 		}
 
+		// Auto-penetrate JSON strings: if current is a string that looks like
+		// a JSON object/array, parse it so traversal can continue.
+		if s, ok := current.(string); ok {
+			var parsed map[string]any
+			if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+				current = parsed
+			}
+		}
+
 		// Check for array index: fieldName[index]
 		if idx := strings.Index(part, "["); idx >= 0 {
 			fieldName := part[:idx]
@@ -979,6 +1042,14 @@ func resolveJSONPath(data map[string]any, path string) any {
 				current = m[fieldName]
 			} else {
 				return nil
+			}
+
+			// Auto-penetrate JSON strings after field access too.
+			if s, ok := current.(string); ok {
+				var parsed map[string]any
+				if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+					current = parsed
+				}
 			}
 
 			// Navigate into the array.

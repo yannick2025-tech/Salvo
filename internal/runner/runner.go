@@ -1830,15 +1830,33 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 				)
 			} else {
 				for key, expectedVal := range cfg.ExpectBody {
-					actualVal, exists := bodyJSON[key]
-					if !exists {
-						errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
-						nodeLog.Error("expect_body validation failed",
-							logger.F("field", key),
-							logger.F("error", errMsg),
-						)
-						// Stats already recorded above based on HTTP status; don't double-count.
-						return nil, fmt.Errorf("%s", errMsg)
+					// Support JSONPath keys with "$." prefix for nested/penetrating
+					// lookups (e.g., "$.Data.FailReasonMsg"). Plain keys use
+					// top-level field lookup for backward compatibility.
+					var actualVal any
+					if strings.HasPrefix(key, "$.") {
+						actualVal = resolveJSONPath(bodyJSON, key)
+						// Distinguish "field is null" from "field not found":
+						// nil result with non-nil expected → not found error.
+						if actualVal == nil && expectedVal != nil {
+							errMsg := fmt.Sprintf("expect_body path %q not found in response", key)
+							nodeLog.Error("expect_body validation failed",
+								logger.F("field", key),
+								logger.F("error", errMsg),
+							)
+							return nil, fmt.Errorf("%s", errMsg)
+						}
+					} else {
+						var exists bool
+						actualVal, exists = bodyJSON[key]
+						if !exists {
+							errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
+							nodeLog.Error("expect_body validation failed",
+								logger.F("field", key),
+								logger.F("error", errMsg),
+							)
+							return nil, fmt.Errorf("%s", errMsg)
+						}
 					}
 					if !compareJSONValues(actualVal, expectedVal) {
 						errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, formatJSONValue(expectedVal), formatJSONValue(actualVal))
@@ -1847,7 +1865,6 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("expected", expectedVal),
 							logger.F("actual", actualVal),
 						)
-						// Stats already recorded above based on HTTP status; don't double-count.
 						return nil, fmt.Errorf("%s", errMsg)
 					}
 				}
