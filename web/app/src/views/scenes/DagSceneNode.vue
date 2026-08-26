@@ -5,11 +5,26 @@
 
     <!-- Aggregated view badges (top-right) -->
     <div v-if="executionStatus && viewMode === 'aggregate'" class="exec-badges">
-      <span v-if="executionStatus.pass > 0" class="exec-badge pass">✓{{ executionStatus.pass }}</span>
-      <span v-if="executionStatus.fail > 0" class="exec-badge fail">✗{{ executionStatus.fail }}</span>
-      <span v-if="executionStatus.skip > 0" class="exec-badge skip">&gt;&gt;{{ executionStatus.skip }}</span>
-      <span v-if="executionStatus.running > 0" class="exec-badge running">⟳{{ executionStatus.running }}</span>
-      <span v-if="executionStatus.idle > 0" class="exec-badge idle">◦{{ executionStatus.idle }}</span>
+      <span v-if="executionStatus.pass > 0" class="exec-badge pass">
+        <svg class="exec-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+        {{ executionStatus.pass }}
+      </span>
+      <span v-if="executionStatus.fail > 0" class="exec-badge fail">
+        <svg class="exec-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        {{ executionStatus.fail }}
+      </span>
+      <span v-if="executionStatus.skip > 0" class="exec-badge skip">
+        <svg class="exec-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z"/><path d="M16 6l-1.41 1.41L19.17 12l-4.58 4.59L16 18l6-6-6-6z"/></svg>
+        {{ executionStatus.skip }}
+      </span>
+      <span v-if="executionStatus.running > 0" class="exec-badge running">
+        <svg class="exec-icon exec-icon-spin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10h-2c0 4.41-3.59 8-8 8s-8-3.59-8-8 3.59-8 8-8V2z"/></svg>
+        {{ executionStatus.running }}
+      </span>
+      <span v-if="executionStatus.idle > 0" class="exec-badge idle">
+        <svg class="exec-icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>
+        {{ executionStatus.idle }}
+      </span>
     </div>
 
     <!-- Single chain status indicator (top-right) -->
@@ -288,13 +303,31 @@ function getNodeTypeLabel(type: string): string {
   gap: 3px;
   z-index: 10;
 }
+.exec-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+.exec-icon-spin {
+  animation: exec-spin 1.2s linear infinite;
+}
+@keyframes exec-spin {
+  to { transform: rotate(360deg); }
+}
 .exec-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   letter-spacing: 0.02em;
-  line-height: 1.5;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  min-height: 20px;
 }
 .exec-badge.pass { background: rgba(46,204,113,0.18); color: #2ecc71; }
 .exec-badge.fail { background: rgba(231,76,60,0.16); color: #e74c3c; }

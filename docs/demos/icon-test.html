@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG Icon Test</title>
+<style>
+  body { background: #1a1a2e; color: #fff; font-family: system-ui; padding: 40px; }
+  h2 { margin-bottom: 20px; }
+  .row { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    display: inline-flex; align-items: center; white-space: nowrap; line-height: 1.4;
+  }
+  .badge svg { width: 14px; height: 14px; margin-right: 3px; flex-shrink: 0; }
+  .badge.pass { background: rgba(46,204,113,0.18); color: #2ecc71; }
+  .badge.fail { background: rgba(231,76,60,0.16); color: #e74c3c; }
+  .badge.skip { background: rgba(241,196,15,0.16); color: #f1c40f; }
+  .badge.running { background: rgba(0,229,255,0.14); color: #00e5ff; }
+  .badge.idle { background: rgba(139,148,158,0.12); color: #8b949e; }
+
+  .exec-icon-spin { animation: spin 1.2s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section { margin-bottom: 32px; border: 1px solid #333; padding: 16px; border-radius: 8px; }
+  .section h3 { margin-top: 0; color: #aaa; font-size: 13px; }
+
+  /* Zoom simulation */
+  .zoom-50 { transform: scale(0.5); transform-origin: top left; }
+  .zoom-150 { transform: scale(1.5); transform-origin: top left; }
+  .zoom-200 { transform: scale(2); transform-origin: top left; }
+</style>
+</head>
+<body>
+
+<h2>SVG Icon Size Test — 14x14 display</h2>
+
+<div class="section">
+  <h3>Set A: Lucide-style filled icons (viewBox 0 0 24 24)</h3>
+  <div class="row">
+    <span class="badge pass">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      18
+    </span>
+    <span class="badge idle">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>
+      5
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Set B: Filled shapes (viewBox 0 0 16 16)</h3>
+  <div class="row">
+    <span class="badge pass">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 3.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0L1.7 8.1a1 1 0 1 1 1.4-1.4L6 9.6l6.3-6.3a1 1 0 0 1 1.4 0z"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.7 3.3a1 1 0 0 1 1.4 0L8 5.2l1.9-1.9a1 1 0 1 1 1.4 1.4L9.4 6.6l1.9 1.9a1 1 0 0 1-1.4 1.4L8 8l-1.9 1.9a1 1 0 0 1-1.4-1.4L6.6 6.6 4.7 4.7a1 1 0 0 1 0-1.4z"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2l6 6-6 6V2z"/><path d="M9 2l6 6-6 6V2z"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 0 1 7 7h-3a4 4 0 1 0-4 4v3a7 7 0 0 1-7-7 7 7 0 0 1 7-7z"/></svg>
+      18
+    </span>
+    <span class="badge idle">
+      <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3.5"/></svg>
+      5
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Set C: All stroke-based Lucide (viewBox 0 0 24 24, stroke-width 2.5)</h3>
+  <div class="row">
+    <span class="badge pass">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      18
+    </span>
+    <span class="badge idle">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>
+      5
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Set D: All filled Lucide-style (viewBox 0 0 24 24)</h3>
+  <div class="row">
+    <span class="badge pass">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z"/><path d="M16 6l-1.41 1.41L19.17 12l-4.58 4.59L16 18l6-6-6-6z"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10h-2c0 4.41-3.59 8-8 8s-8-3.59-8-8 3.59-8 8-8V2z"/></svg>
+      18
+    </span>
+    <span class="badge idle">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>
+      5
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Zoom test (Set D at different scales)</h3>
+  <div class="row" style="margin-bottom: 8px;">
+    <span style="color:#888; font-size:12px;">50%:</span>
+  </div>
+  <div class="row zoom-50" style="margin-bottom: 16px;">
+    <span class="badge pass">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z"/><path d="M16 6l-1.41 1.41L19.17 12l-4.58 4.59L16 18l6-6-6-6z"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10h-2c0 4.41-3.59 8-8 8s-8-3.59-8-8 3.59-8 8-8V2z"/></svg>
+      18
+    </span>
+  </div>
+  <div class="row" style="margin-bottom: 8px;">
+    <span style="color:#888; font-size:12px;">150%:</span>
+  </div>
+  <div class="row zoom-150">
+    <span class="badge pass">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+      918
+    </span>
+    <span class="badge fail">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      42
+    </span>
+    <span class="badge skip">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z"/><path d="M16 6l-1.41 1.41L19.17 12l-4.58 4.59L16 18l6-6-6-6z"/></svg>
+      31
+    </span>
+    <span class="badge running">
+      <svg class="exec-icon-spin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10h-2c0 4.41-3.59 8-8 8s-8-3.59-8-8 3.59-8 8-8V2z"/></svg>
+      18
+    </span>
+  </div>
+</div>
+
+</body>
+</html>
