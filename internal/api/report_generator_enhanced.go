@@ -2484,6 +2484,9 @@ func buildEnhancedContext(detail *runner.ReportDetail) *EnhancedReportContext {
 		ctx.Metadata.RunMode = mode
 	}
 
+	// Populate failed nodes if available.
+	ctx.FailedNodes = detail.FailedNodes
+
 	// Populate system metrics if available.
 	if detail.SystemMetrics != nil {
 		sm := detail.SystemMetrics

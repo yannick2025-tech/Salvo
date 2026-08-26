@@ -99,6 +99,53 @@
         </div>
       </div>
 
+      <!-- Failed Nodes Detail -->
+      <div class="charts-row" v-if="failedNodes.length > 0">
+        <div class="chart-card wide">
+          <div class="chart-header">
+            <h3>失败节点详情</h3>
+            <div class="chart-tip">共 {{ failedNodes.length }} 条失败记录</div>
+          </div>
+          <div class="failed-nodes-list">
+            <div v-for="(fn, idx) in failedNodes" :key="idx" class="failed-node-card">
+              <div class="failed-node-header">
+                <span class="failed-node-name">{{ fn.node_name }}</span>
+                <span class="failed-node-badge">{{ fn.node_type }}</span>
+                <span class="failed-node-time">{{ formatFailedNodeTime(fn.timestamp) }}</span>
+              </div>
+              <div class="failed-node-error">
+                <strong>错误信息:</strong> <span class="error-text">{{ fn.error_message }}</span>
+              </div>
+              <details v-if="fn.request_url" class="failed-node-details">
+                <summary>请求详情</summary>
+                <div class="failed-node-detail-body">
+                  <div><strong>Method:</strong> {{ fn.request_method }}</div>
+                  <div><strong>URL:</strong> <code>{{ fn.request_url }}</code></div>
+                  <div v-if="fn.request_headers"><strong>Headers:</strong>
+                    <pre>{{ formatHeaders(fn.request_headers) }}</pre>
+                  </div>
+                  <div v-if="fn.request_body"><strong>Body:</strong>
+                    <pre>{{ fn.request_body }}</pre>
+                  </div>
+                </div>
+              </details>
+              <details v-if="fn.response_body || fn.response_status" class="failed-node-details">
+                <summary>响应详情</summary>
+                <div class="failed-node-detail-body">
+                  <div><strong>Status:</strong> <span class="error-text">{{ fn.response_status }}</span></div>
+                  <div v-if="fn.response_headers"><strong>Headers:</strong>
+                    <pre>{{ formatResponseHeaders(fn.response_headers) }}</pre>
+                  </div>
+                  <div v-if="fn.response_body"><strong>Body:</strong>
+                    <pre>{{ fn.response_body }}</pre>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Latency Percentiles Bar Chart -->
       <div class="charts-row">
         <div class="chart-card wide">
@@ -660,6 +707,9 @@ function parseMetrics(r: ReportDTO): Record<string, any> {
           ts_p99: (node.time_series || []).map((s: any) => s.p99_ms || s.P99LatencyMs || 0),
         }))
       }
+      if (detailData.failed_nodes && Array.isArray(detailData.failed_nodes)) {
+        result.failed_nodes = detailData.failed_nodes
+      }
       if (detailData.metadata) result = { ...result, ...detailData.metadata }
       if (detailData.system_metrics) {
         result.system_metrics = detailData.system_metrics
@@ -754,6 +804,27 @@ const errorBreakdown = computed((): ErrorItem[] => {
   const m = metrics.value
   if (!m?.error_breakdown) return []
   return m.error_breakdown as ErrorItem[]
+})
+
+interface FailedNode {
+  node_id: string
+  node_name: string
+  node_type: string
+  error_message: string
+  timestamp: string
+  request_url?: string
+  request_method?: string
+  request_headers?: Record<string, string>
+  request_body?: string
+  response_status?: number
+  response_headers?: Record<string, string[]>
+  response_body?: string
+}
+
+const failedNodes = computed((): FailedNode[] => {
+  const m = metrics.value
+  if (!m?.failed_nodes) return []
+  return m.failed_nodes as FailedNode[]
 })
 
 async function fetchReport() {
@@ -1554,6 +1625,18 @@ function formatTimeShort(t: string): string {
   } catch { return t }
 }
 
+function formatFailedNodeTime(t: string): string {
+  return formatTimeShort(t)
+}
+
+function formatHeaders(headers: Record<string, string>): string {
+  return Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('\n')
+}
+
+function formatResponseHeaders(headers: Record<string, string[]>): string {
+  return Object.entries(headers).map(([k, vs]) => `${k}: ${vs.join(', ')}`).join('\n')
+}
+
 function getRunModeLabel(): string {
   const m = metrics.value
   if (!m) return '-'
@@ -1730,6 +1813,53 @@ onUnmounted(() => {
 .chart-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .chart-tip { font-size: 11px; color: var(--text-tertiary); }
 .chart-body { height: 260px; }
+
+/* ===== Failed Nodes ===== */
+.failed-nodes-list { max-height: 600px; overflow-y: auto; }
+.failed-node-card {
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--danger, #cf222e);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.failed-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+}
+.failed-node-name { font-weight: 600; font-size: 13px; }
+.failed-node-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.failed-node-time { font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
+.failed-node-error { padding: 10px 14px; font-size: 13px; }
+.error-text { color: var(--danger, #cf222e); }
+.failed-node-details { padding: 8px 14px; border-top: 1px solid var(--border-color); }
+.failed-node-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+  font-size: 12px;
+}
+.failed-node-detail-body { margin-top: 8px; font-size: 12px; font-family: monospace; }
+.failed-node-detail-body pre {
+  margin: 4px 0;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 
 /* ===== Info Section ===== */
 .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

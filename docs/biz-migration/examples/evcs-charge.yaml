@@ -1,0 +1,537 @@
+name: 互联互通充电流程(EVCS, Salvo适配版)
+default_timeout: 1200
+description: |
+  互联互通(EVCS)充电流程。
+  与B2C流程(card/prepay/fleet-card)完全不同:
+    1. 无需用户登录、Token获取、签名API列表
+    2. 通过EVCS B2B协议直连充电(StartCharge/ChargeStatus/StopCharge)
+    3. 请求格式: {OperatorID, Data(JSON字符串), TimeStamp, Seq, Sig}
+    4. Sig="NO_CRYPTO_AND_NO_SIGN", 无加密签名
+    5. 无Manhattan订单创建/支付/评论流程
+    6. 充电状态: 1=启动中, 3=停止中(失败), 4=已结束(成功), 5=未知(失败)
+  依赖: 仅模拟器接口(配置枪状态/桩离线/故障码)
+  数据来源: CSV上传(pointId=充电枪编号)
+
+# =============================================================================
+# 场景变量
+# =============================================================================
+variables:
+  # --- 环境 ---
+  - key: env_type
+    value: "uat1"
+  - key: gatewayurl
+    value: "http://gateway.ev-shell.com.cn"
+  - key: simurl
+    value: "http://gateway.ev-shell.com.cn"
+  # --- 模拟器 ---
+  - key: sim_connect_ip
+    value: "iot-netty-sever-for-device"
+  - key: sim_port
+    value: "15051"
+  # --- EVCS API 路径 ---
+  - key: api_evcs_start_charge
+    value: "/evcs/v1shell/query_start_charge"
+  - key: api_evcs_charge_status
+    value: "/evcs/v1shell/query_equip_charge_status"
+  - key: api_evcs_stop_charge
+    value: "/evcs/v1shell/query_stop_charge"
+  # --- 模拟器 API ---
+  - key: sim_cmds
+    value: "/iot/simulator/shell/ev/v1/cmds"
+  - key: sim_update_point_status
+    value: "/iot/simulator/shell/ev/v1/device/update-point-status"
+  - key: sim_force_close
+    value: "/iot/simulator/shell/ev/v1/force-close/"
+  - key: sim_stop_charge_reason
+    value: "/iot/simulator/shell/ev/v1/stop-charge-by-stop-reason/"
+  # --- 运行时变量 ---
+  - key: post_id
+    value: "0"
+  - key: point_id_int
+    value: "0"
+  - key: evcs_order
+    value: ""
+  - key: evcs_status
+    value: ""
+  - key: route_path
+    value: ""
+  - key: charge_start_time_ms
+    value: ""
+  - key: charge_time_reached
+    value: "false"
+  # --- 运行时生成字段 ---
+  - key: charge_time
+    value: ""
+  - key: pre_occupy_time
+    value: ""
+  - key: after_occupy_time
+    value: ""
+  - key: charge_post_offline
+    value: ""
+  - key: raise_error
+    value: ""
+  - key: force_stop_charge
+    value: ""
+  - key: charge_post_offline_time
+    value: ""
+  - key: charge_post_online_time
+    value: ""
+  - key: raise_error_time
+    value: ""
+  - key: stop_sent
+    value: "false"
+
+# =============================================================================
+# 配置参数
+# =============================================================================
+config_params:
+  # === EVCS 协议常量 ===
+  operator_id: "200000011"          # 组织机构代码
+  evcs_timestamp: "20240904110125"  # 协议时间戳(固定值)
+  evcs_seq: "7861"                  # 序列号(固定值)
+  evcs_sig: "NO_CRYPTO_AND_NO_SIGN" # 无加密签名
+  # === EVCS 充电状态 ===
+  evcs_state_starting: "1"   # 启动中
+  evcs_state_stopping: "3"   # 停止中(失败)
+  evcs_state_done: "4"       # 已结束(成功)
+  evcs_state_unknown: "5"    # 未知(失败)
+  # === 故障码停止原因 ===
+  stop_reason: "20"          # 故障码: 20=电流异常
+  # =================================================================
+  # 概率权重配置
+  # =================================================================
+  charge_post_offline_prob: "1=95,0=5"   # 强制桩离线: 95%概率
+  raise_error_prob: "1=30,0=70"          # 强制故障码: 30%概率
+  force_stop_prob: "1=65,0=35"           # 强制停止充电: 65%概率
+  # =================================================================
+  # 取值范围配置
+  # =================================================================
+  charge_time_min: "300"     # 充电时长下限(秒)
+  charge_time_max: "600"     # 充电时长上限(秒)
+  pre_occupy_min: "40"       # 前占位时长下限(秒)
+  pre_occupy_max: "60"       # 前占位时长上限(秒)
+  after_occupy_min: "60"     # 后占位时长下限(秒)
+  after_occupy_max: "120"    # 后占位时长上限(秒)
+
+# =============================================================================
+# CSV 数据源
+# =============================================================================
+data_sources:
+  - name: charger
+    columns:
+      - pointId
+      - postId
+    rows:
+      - pointId: "1100000001"
+        postId: "11000000"
+
+# =============================================================================
+# Setup: 无(EVCS不需要登录)
+# =============================================================================
+
+# =============================================================================
+# 主流程节点
+# =============================================================================
+nodes:
+  # --- 1. 连接模拟器 ---
+  - name: 计算postId
+    type: generator
+    config:
+      expression: '${charger.postId}'
+      variable: post_id
+
+  - name: 计算pointIdInt
+    type: generator
+    config:
+      expression: '${charger.pointId}'
+      variable: point_id_int
+
+  - name: 连接模拟器
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${simurl}${sim_cmds}"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  - name: 连接模拟器_delay
+    type: delay
+    config:
+      ms: "3000"
+
+  # --- 2. 空闲未插枪 (status=0) ---
+  - name: 空闲未插枪
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":0}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  - name: 空闲未插枪_delay
+    type: delay
+    config:
+      ms: "3000"
+
+  # --- 3. 空闲已插枪 (status=11) ---
+  - name: 空闲已插枪
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":11}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  - name: 空闲已插枪_delay
+    type: delay
+    config:
+      ms: "3000"
+
+  # --- 3-2. 获取模拟器 routePath ---
+  - name: 获取routePath-setup
+    type: http
+    config:
+      method: POST
+      url: "${simurl}/iot/simulator/shell/ev/v1/getRoutePath"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id}}'
+      timeout: 10000
+      extract:
+        route_path: "$.data.routePath"
+
+  # --- 4. 概率/随机字段生成器 ---
+  - name: 生成-桩离线标志
+    type: generator
+    config:
+      expression: '${__weightedChoice("${charge_post_offline_prob}")}'
+      variable: charge_post_offline
+
+  - name: 生成-故障码标志
+    type: generator
+    config:
+      expression: '${__weightedChoice("${raise_error_prob}")}'
+      variable: raise_error
+
+  - name: 生成-强制停止标志
+    type: generator
+    config:
+      expression: '${__weightedChoice("${force_stop_prob}")}'
+      variable: force_stop_charge
+
+  - name: 生成-充电时长
+    type: generator
+    config:
+      expression: '${__random(${charge_time_min}, ${charge_time_max})}'
+      variable: charge_time
+
+  - name: 生成-前占位时长
+    type: generator
+    config:
+      expression: '${__random(${pre_occupy_min}, ${pre_occupy_max})}'
+      variable: pre_occupy_time
+
+  - name: 生成-后占位时长
+    type: generator
+    config:
+      expression: '${__random(${after_occupy_min}, ${after_occupy_max})}'
+      variable: after_occupy_time
+
+  - name: 计算-桩预计下线时间
+    type: generator
+    config:
+      expression: '${charge_time} * 0.25'
+      variable: charge_post_offline_time
+
+  - name: 计算-桩预计上线时间
+    type: generator
+    config:
+      expression: '${charge_time} * 0.35'
+      variable: charge_post_online_time
+
+  - name: 计算-故障预计触发时间
+    type: generator
+    config:
+      expression: '${charge_time} * 0.55'
+      variable: raise_error_time
+
+  # --- 前占位 (delay) ---
+  - name: 前占位
+    type: delay
+    config:
+      ms: "${pre_occupy_time}000"
+
+  # --- 5. 生成EVCS订单号 ---
+  # Go代码: getOrderSeq() = "200000011" + snowflakeId + randomDigit
+  - name: 生成订单序列号
+    type: generator
+    config:
+      expression: '${operator_id}${__so("sign","now_ms")}${__random(0, 9)}'
+      variable: evcs_order
+
+  # --- 6. EVCS启动充电 ---
+  - name: EVCS启动充电
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "${gatewayurl}${api_evcs_start_charge}"
+      headers:
+        Content-Type: application/json
+      body: '{"OperatorID":"${operator_id}","Data":"{\"UserID\":\"\",\"PhoneNum\":\"\",\"PlateNum\":\"\",\"CarPlateNo\":\"\",\"Customer\":\"\",\"UserPolicyInfos\":null,\"SubAppKey\":\"\",\"FeeLimit\":0,\"StartChargeSeq\":\"${evcs_order}\",\"QRCode\":\"\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+      timeout: 15000
+      extract:
+        evcs_start_stat: "$.Data"
+
+  - name: 启动充电_delay
+    type: delay
+    config:
+      ms: "3000"
+
+  - name: 记录充电开始时间
+    type: generator
+    config:
+      expression: '${__so("sign","now_ms")}'
+      variable: charge_start_time_ms
+
+  # --- 7. 轮询充电状态 (30s间隔, status=="4"退出) ---
+  - name: 轮询充电状态
+    type: while
+    block_on_error: true
+    config:
+      exit_conditions:
+        - variable: evcs_status
+          operator: equals
+          value: "4"
+      interval_seconds: 30
+      max_iterations: 200
+      steps:
+        # 7a. 查询充电状态 (Data 是 JSON 字符串, 需穿透解析)
+        - name: 查询充电状态
+          request:
+            method: POST
+            url: "${gatewayurl}${api_evcs_charge_status}"
+            headers:
+              Content-Type: application/json
+            body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+          extract:
+            - variable: evcs_status
+              path: "$.Data.StartChargeSeqStat"
+
+        # 7b. 桩离线 (条件: charge_post_offline==1, 延迟触发, 仅执行一次)
+        - name: 桩离线
+          condition:
+            variable: charge_post_offline
+            operator: equals
+            value: "1"
+          timed_trigger:
+            after_seconds: "${charge_post_offline_time}"
+            once: true
+          request:
+            method: POST
+            url: "${simurl}${sim_force_close}${route_path}"
+            headers:
+              Content-Type: application/json
+            body: '{"postId":${post_id}}'
+
+        # 7c. 桩上线 (条件: charge_post_offline==1, 延迟触发)
+        - name: 桩上线
+          condition:
+            variable: charge_post_offline
+            operator: equals
+            value: "1"
+          timed_trigger:
+            after_seconds: "${charge_post_online_time}"
+            once: true
+          request:
+            method: POST
+            url: "${simurl}${sim_cmds}"
+            headers:
+              Content-Type: application/json
+            body: '{"postId":${post_id},"cmds":[{"cmd":"connect","body":"{\"ip\":\"${sim_connect_ip}\",\"port\":${sim_port},\"debugMode\":false,\"reconnect\":false}"}]}'
+
+        # 7d. 故障码上报停止充电 (条件: raise_error==1, 延迟触发)
+        - name: 故障码停止
+          condition:
+            variable: raise_error
+            operator: equals
+            value: "1"
+          timed_trigger:
+            after_seconds: "${raise_error_time}"
+            once: true
+          request:
+            method: POST
+            url: "${simurl}${sim_stop_charge_reason}${route_path}"
+            headers:
+              Content-Type: application/json
+            body: '{"pointId":${point_id_int},"postId":${post_id},"stopReason":${stop_reason}}'
+
+        # 7e. 检查充电时长是否到达
+        - name: 检查充电时长
+          type: generator
+          config:
+            expression: '${__so("sign","check_charge_time","${charge_start_time_ms}","${charge_time}")}'
+            variable: charge_time_reached
+
+        # 7f. EVCS停止充电 (条件: charge_time_reached=="true")
+        - name: EVCS停止充电
+          condition:
+            variable: charge_time_reached
+            operator: equals
+            value: "true"
+          request:
+            method: POST
+            url: "${gatewayurl}${api_evcs_stop_charge}"
+            headers:
+              Content-Type: application/json
+            body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+          retry:
+            max_attempts: 10
+            on_429: retry
+
+  # --- 8. 强制停止充电 ---
+  - name: 判断-是否强制停止充电
+    type: if-else
+    config:
+      expr: '${force_stop_charge} == "1"'
+
+  - name: 强制停止充电
+    type: http
+    config:
+      method: POST
+      url: "${gatewayurl}${api_evcs_stop_charge}"
+      headers:
+        Content-Type: application/json
+      body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+      timeout: 10000
+
+  # --- 9. 后占位 (delay) ---
+  - name: 后占位
+    type: delay
+    config:
+      ms: "${after_occupy_time}000"
+
+  # --- 10. 重置枪状态 (空闲未插枪 status=0) ---
+  - name: 重置枪状态
+    type: http
+    config:
+      method: POST
+      url: "${simurl}${sim_update_point_status}"
+      headers:
+        Content-Type: application/json
+      body: '{"pointId":${point_id_int},"status":0}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+  - name: 重置枪状态_delay
+    type: delay
+    config:
+      ms: "3000"
+
+# =============================================================================
+# Teardown: 断开模拟器连接
+# =============================================================================
+teardown:
+  - name: 断开模拟器
+    type: http
+    config:
+      method: POST
+      url: "${simurl}${sim_force_close}${route_path}"
+      headers:
+        Content-Type: application/json
+      body: '{"postId":${post_id}}'
+      timeout: 10000
+      expect_body:
+        errorCode: 0
+
+# =============================================================================
+# DAG 边定义
+# =============================================================================
+edges:
+  # 模拟器连接 + 状态设置
+  - from: 计算postId
+    to: 计算pointIdInt
+  - from: 计算pointIdInt
+    to: 连接模拟器
+  - from: 连接模拟器
+    to: 连接模拟器_delay
+  - from: 连接模拟器_delay
+    to: 空闲未插枪
+  - from: 空闲未插枪
+    to: 空闲未插枪_delay
+  - from: 空闲未插枪_delay
+    to: 空闲已插枪
+  - from: 空闲已插枪
+    to: 空闲已插枪_delay
+  - from: 空闲已插枪_delay
+    to: 获取routePath-setup
+  - from: 获取routePath-setup
+    to: 生成-桩离线标志
+
+  # 生成器链路
+  - from: 生成-桩离线标志
+    to: 生成-故障码标志
+  - from: 生成-故障码标志
+    to: 生成-强制停止标志
+  - from: 生成-强制停止标志
+    to: 生成-充电时长
+  - from: 生成-充电时长
+    to: 生成-前占位时长
+  - from: 生成-前占位时长
+    to: 生成-后占位时长
+  - from: 生成-后占位时长
+    to: 计算-桩预计下线时间
+  - from: 计算-桩预计下线时间
+    to: 计算-桩预计上线时间
+  - from: 计算-桩预计上线时间
+    to: 计算-故障预计触发时间
+  - from: 计算-故障预计触发时间
+    to: 前占位
+
+  # 前占位 → 启动充电
+  - from: 前占位
+    to: 生成订单序列号
+  - from: 生成订单序列号
+    to: EVCS启动充电
+  - from: EVCS启动充电
+    to: 启动充电_delay
+  - from: 启动充电_delay
+    to: 记录充电开始时间
+  - from: 记录充电开始时间
+    to: 轮询充电状态
+
+  # 轮询后 → 强制停止
+  - from: 轮询充电状态
+    to: 判断-是否强制停止充电
+  - from: 判断-是否强制停止充电
+    to: 强制停止充电
+    condition: "__if_true__"
+  - from: 判断-是否强制停止充电
+    to: 后占位
+    condition: "__if_false__"
+  - from: 强制停止充电
+    to: 后占位
+
+  # 后占位 → 重置枪 → 结束
+  - from: 后占位
+    to: 重置枪状态
+  - from: 重置枪状态
+    to: 重置枪状态_delay
+  - from: 重置枪状态_delay
+    to: 断开模拟器
