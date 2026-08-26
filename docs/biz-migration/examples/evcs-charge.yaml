@@ -29,6 +29,7 @@ variables:
   - key: sim_port
     value: "15051"
   # --- EVCS API 路径 ---
+  # 历史问题造成的丑陋url，这里版本号{v1shell}是一个通配，建议后续改成../v1/shell..后续服务端更新这里也要更新
   - key: api_evcs_start_charge
     value: "/evcs/v1shell/query_start_charge"
   - key: api_evcs_charge_status
@@ -86,7 +87,6 @@ variables:
 # =============================================================================
 config_params:
   # === EVCS 协议常量 ===
-  operator_id: "200000011"          # 组织机构代码
   evcs_timestamp: "20240904110125"  # 协议时间戳(固定值)
   evcs_seq: "7861"                  # 序列号(固定值)
   evcs_sig: "NO_CRYPTO_AND_NO_SIGN" # 无加密签名
@@ -117,6 +117,7 @@ config_params:
 # CSV 数据源
 # =============================================================================
 data_sources:
+  # 充电枪数据 (charger.csv)
   - name: charger
     columns:
       - pointId
@@ -124,7 +125,25 @@ data_sources:
     rows:
       - pointId: "1100000001"
         postId: "11000000"
-
+      - pointId: "1100000201"
+        postId: "11000002"
+  # 互联互通方数据 (operator.csv)
+  - name: operator
+    columns:
+      - operator_id
+    rows:
+      - operator_id: "200000011"
+      - operator_id: "202500001"
+  # 用户信息数据 (user.csv)，但vin上传系统不会用，系统使用的是IOT-模拟器上配置的VIN
+  - name: user
+    columns:
+      - vin
+      - plate_number
+    rows:
+      - vin: "LSVAU2180N2123456"
+        plate_number: "粤B12345"
+      - vin: "LSVAU2180N2123400"
+        plate_number: "粤C12345"
 # =============================================================================
 # Setup: 无(EVCS不需要登录)
 # =============================================================================
@@ -281,7 +300,7 @@ nodes:
   - name: 生成订单序列号
     type: generator
     config:
-      expression: '${operator_id}${__so("sign","now_ms")}${__random(0, 9)}'
+      expression: '${operator.operator_id}${__so("sign","now_ms")}${__random(0, 9)}'
       variable: evcs_order
 
   # --- 6. EVCS启动充电 ---
@@ -293,7 +312,7 @@ nodes:
       url: "${gatewayurl}${api_evcs_start_charge}"
       headers:
         Content-Type: application/json
-      body: '{"OperatorID":"${operator_id}","Data":"{\"UserID\":\"\",\"PhoneNum\":\"\",\"PlateNum\":\"\",\"CarPlateNo\":\"\",\"Customer\":\"\",\"UserPolicyInfos\":null,\"SubAppKey\":\"\",\"FeeLimit\":0,\"StartChargeSeq\":\"${evcs_order}\",\"QRCode\":\"\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+      body: '{"OperatorID":"${operator.operator_id}","Data":"{\"Vin\":\"${user.vin}\",\"UserID\":\"\",\"PhoneNum\":\"\",\"PlateNum\":\"${user.plate_number}\",\"CarPlateNo\":\"\",\"Customer\":\"\",\"UserPolicyInfos\":null,\"SubAppKey\":\"\",\"FeeLimit\":0,\"StartChargeSeq\":\"${evcs_order}\",\"QRCode\":\"\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
       timeout: 15000
       expect_body:
         $.Data.FailReasonMsg: null
@@ -330,7 +349,7 @@ nodes:
             url: "${gatewayurl}${api_evcs_charge_status}"
             headers:
               Content-Type: application/json
-            body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+            body: '{"OperatorID":"${operator.operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
             expect_body:
               $.Data.FailReasonMsg: null
           extract:
@@ -403,7 +422,7 @@ nodes:
             url: "${gatewayurl}${api_evcs_stop_charge}"
             headers:
               Content-Type: application/json
-            body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+            body: '{"OperatorID":"${operator.operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
             expect_body:
               $.Data.FailReasonMsg: null
           retry:
@@ -423,7 +442,7 @@ nodes:
       url: "${gatewayurl}${api_evcs_stop_charge}"
       headers:
         Content-Type: application/json
-      body: '{"OperatorID":"${operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
+      body: '{"OperatorID":"${operator.operator_id}","Data":"{\"StartChargeSeq\":\"${evcs_order}\",\"ConnectorID\":\"${charger.pointId}\"}","TimeStamp":"${evcs_timestamp}","Seq":"${evcs_seq}","Sig":"${evcs_sig}"}'
       timeout: 10000
       expect_body:
         $.Data.FailReasonMsg: null
