@@ -447,6 +447,151 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             color: var(--text-secondary);
         }
         .node-chart-body { height: 200px; }
+
+        /* Failed Nodes Section */
+        .failed-nodes-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .failed-nodes-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .failed-nodes-search {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            width: 16px;
+            height: 16px;
+            color: var(--text-tertiary);
+            pointer-events: none;
+        }
+        .search-input {
+            width: 100%;
+            padding: 8px 32px 8px 34px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus {
+            border-color: var(--accent-primary);
+        }
+        .search-input::placeholder {
+            color: var(--text-tertiary);
+        }
+        .search-clear {
+            position: absolute;
+            right: 8px;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            line-height: 1;
+        }
+        .search-clear:hover {
+            color: var(--text-primary);
+        }
+        .failed-nodes-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .failed-nodes-empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+        .failed-node-card {
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--danger, #cf222e);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .failed-node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            flex-wrap: wrap;
+        }
+        .failed-node-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .failed-node-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+        .failed-node-badge.http {
+            background: rgba(9,105,218,0.12);
+            color: #0969da;
+        }
+        .failed-node-error-code {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            background: rgba(207,34,46,0.12);
+            color: var(--danger, #cf222e);
+        }
+        .failed-node-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-left: auto;
+        }
+        .failed-node-error {
+            padding: 10px 14px;
+            font-size: 13px;
+        }
+        .error-text {
+            color: var(--danger, #cf222e);
+        }
+        .failed-node-details {
+            padding: 8px 14px;
+            border-top: 1px solid var(--border-color);
+        }
+        .failed-node-details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-secondary);
+            user-select: none;
+            font-size: 12px;
+        }
+        .failed-node-detail-body {
+            margin-top: 8px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .failed-node-detail-body pre {
+            margin: 4px 0;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
         .node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
         .node-chart-panel { position: relative; }
         .node-chart-panel-label {
@@ -1043,64 +1188,6 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     </section>
     {{end}}
 
-    {{if .FailedNodes}}
-    <!-- Failed Nodes Detail Section -->
-    <section class="nodes-section">
-        <h3>失败节点详情</h3>
-        {{range $idx, $fn := .FailedNodes}}
-        <div class="chart-card" style="margin-bottom: 16px; border-left: 3px solid #cf222e;">
-            <div class="chart-header">
-                <h3 style="color: #cf222e;">{{$fn.NodeName}}</h3>
-                <div class="node-badges">
-                    <span class="node-badge" style="background: rgba(207,34,46,0.15); color: #cf222e;">{{$fn.NodeType}}</span>
-                    <span class="node-badge">{{$fn.Timestamp.Format "15:04:05"}}</span>
-                </div>
-            </div>
-            <div style="padding: 12px 16px;">
-                <div style="margin-bottom: 8px;">
-                    <strong>错误信息:</strong> <span style="color: #cf222e;">{{$fn.ErrorMessage}}</span>
-                </div>
-                {{if $fn.RequestURL}}
-                <details style="margin-top: 8px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #656d76; user-select: none;">请求详情</summary>
-                    <div style="margin-top: 8px; padding: 10px; background: var(--bg-secondary, #f6f8fa); border-radius: 6px; font-size: 13px; font-family: monospace;">
-                        <div><strong>Method:</strong> {{$fn.RequestMethod}}</div>
-                        <div><strong>URL:</strong> <code>{{$fn.RequestURL}}</code></div>
-                        {{if $fn.RequestHeaders}}
-                        <div style="margin-top: 6px;"><strong>Headers:</strong></div>
-                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{range $k, $v := $fn.RequestHeaders}}{{$k}}: {{$v}}
-{{end}}</pre>
-                        {{end}}
-                        {{if $fn.RequestBody}}
-                        <div style="margin-top: 6px;"><strong>Body:</strong></div>
-                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{$fn.RequestBody}}</pre>
-                        {{end}}
-                    </div>
-                </details>
-                {{end}}
-                {{if or $fn.ResponseBody $fn.ResponseStatus}}
-                <details style="margin-top: 8px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #656d76; user-select: none;">响应详情</summary>
-                    <div style="margin-top: 8px; padding: 10px; background: var(--bg-secondary, #f6f8fa); border-radius: 6px; font-size: 13px; font-family: monospace;">
-                        <div><strong>Status:</strong> <span style="color: #cf222e; font-weight: 600;">{{$fn.ResponseStatus}}</span></div>
-                        {{if $fn.ResponseHeaders}}
-                        <div style="margin-top: 6px;"><strong>Headers:</strong></div>
-                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{range $k, $v := $fn.ResponseHeaders}}{{$k}}: {{range $i, $vv := $v}}{{if $i}}, {{end}}{{$vv}}{{end}}
-{{end}}</pre>
-                        {{end}}
-                        {{if $fn.ResponseBody}}
-                        <div style="margin-top: 6px;"><strong>Body:</strong></div>
-                        <pre style="margin: 4px 0; padding: 8px; background: var(--bg-tertiary, #eaeef2); border-radius: 4px; overflow-x: auto; font-size: 12px;">{{$fn.ResponseBody}}</pre>
-                        {{end}}
-                    </div>
-                </details>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
-    </section>
-    {{end}}
-
     {{end}}
 
     {{if .SystemMetrics}}
@@ -1222,6 +1309,85 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             <button class="page-btn" onclick="goToPage(totalPages)">末页</button>
         </div>
     </div>
+    {{end}}
+
+    {{if .FailedNodes}}
+    <!-- Failed Nodes Detail Section (moved to end) -->
+    <section class="nodes-section">
+        <div class="failed-nodes-header">
+            <h3>失败节点详情</h3>
+            <div class="chart-tip">共 {{len .FailedNodes}} 条失败记录</div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="failed-nodes-search">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="failedNodeSearchInput" type="text" class="search-input" placeholder="搜索节点名、NodeID 或错误码（如 504、timeout）" oninput="filterFailedNodes()"/>
+            <button id="failedNodeSearchClear" class="search-clear" style="display:none;" onclick="clearFailedNodeSearch()">✕</button>
+        </div>
+
+        <div class="failed-nodes-list" id="failedNodesList">
+            {{range $idx, $fn := .FailedNodes}}
+            <div class="failed-node-card" data-name="{{$fn.NodeName}}" data-id="{{$fn.NodeID}}" data-code="{{$fn.ErrorCode}}" data-msg="{{$fn.ErrorMessage}}">
+                <div class="failed-node-header">
+                    <span class="failed-node-name">{{$fn.NodeName}}</span>
+                    <span class="failed-node-badge {{if $fn.Protocol}}{{$fn.Protocol}}{{else}}http{{end}}">{{$fn.Protocol}}</span>
+                    {{if $fn.ErrorCode}}<span class="failed-node-error-code">{{$fn.ErrorCode}}</span>{{end}}
+                    <span class="failed-node-time">{{$fn.Timestamp.Format "15:04:05"}}</span>
+                </div>
+                <div class="failed-node-error">
+                    <strong>错误信息:</strong> <span class="error-text">{{$fn.ErrorMessage}}</span>
+                </div>
+                {{if $fn.RequestURL}}
+                <details class="failed-node-details">
+                    <summary>请求详情</summary>
+                    <div class="failed-node-detail-body">
+                        <div><strong>Method:</strong> {{$fn.RequestMethod}}</div>
+                        <div><strong>URL:</strong> <code>{{$fn.RequestURL}}</code></div>
+                        {{if $fn.RequestHeaders}}
+                        <div><strong>Headers:</strong></div>
+                        <pre>{{range $k, $v := $fn.RequestHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.RequestBody}}
+                        <div><strong>Body:</strong></div>
+                        <pre>{{$fn.RequestBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+                {{if or $fn.ResponseBody $fn.ResponseStatus}}
+                <details class="failed-node-details">
+                    <summary>响应详情</summary>
+                    <div class="failed-node-detail-body">
+                        <div><strong>Status:</strong> <span class="error-text">{{$fn.ResponseStatus}}</span></div>
+                        {{if $fn.ResponseHeaders}}
+                        <div><strong>Headers:</strong></div>
+                        <pre>{{range $k, $v := $fn.ResponseHeaders}}{{$k}}: {{range $i, $vv := $v}}{{if $i}}, {{end}}{{$vv}}{{end}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.ResponseBody}}
+                        <div><strong>Body:</strong></div>
+                        <pre>{{$fn.ResponseBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+                {{if $fn.Attributes}}
+                <details class="failed-node-details">
+                    <summary>扩展属性</summary>
+                    <div class="failed-node-detail-body">
+                        {{range $k, $v := $fn.Attributes}}
+                        <div><strong>{{$k}}:</strong> <span>{{$v}}</span></div>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        <div class="failed-nodes-empty" id="failedNodesEmpty" style="display:none;">没有匹配的记录</div>
+    </section>
     {{end}}
 
     <footer style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
@@ -2218,6 +2384,43 @@ function applyTheme() {
 }
 
 applyTheme();
+
+// Failed Nodes Search
+function filterFailedNodes() {
+    var input = document.getElementById('failedNodeSearchInput');
+    var clearBtn = document.getElementById('failedNodeSearchClear');
+    var cards = document.querySelectorAll('.failed-node-card');
+    var emptyMsg = document.getElementById('failedNodesEmpty');
+    var q = input.value.toLowerCase().trim();
+
+    if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+
+    var visibleCount = 0;
+    cards.forEach(function(card) {
+        var name = (card.getAttribute('data-name') || '').toLowerCase();
+        var id = (card.getAttribute('data-id') || '').toLowerCase();
+        var code = (card.getAttribute('data-code') || '').toLowerCase();
+        var msg = (card.getAttribute('data-msg') || '').toLowerCase();
+
+        if (!q || name.includes(q) || id.includes(q) || code.includes(q) || msg.includes(q)) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    if (emptyMsg) emptyMsg.style.display = (q && visibleCount === 0) ? 'block' : 'none';
+}
+
+function clearFailedNodeSearch() {
+    var input = document.getElementById('failedNodeSearchInput');
+    if (input) {
+        input.value = '';
+        filterFailedNodes();
+        input.focus();
+    }
+}
 </script>
 </body>
 </html>`))

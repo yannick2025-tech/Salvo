@@ -25,6 +25,8 @@ type FailedNodeDetail struct {
 	NodeID       string            `json:"node_id"`
 	NodeName     string            `json:"node_name"`
 	NodeType     string            `json:"node_type"`
+	Protocol     string            `json:"protocol,omitempty"`       // http, db, mq, etc.
+	ErrorCode    string            `json:"error_code,omitempty"`     // e.g. "504", "timeout", "connection_refused"
 	ErrorMessage string            `json:"error_message"`
 	Timestamp    time.Time         `json:"timestamp"`
 	RequestURL   string            `json:"request_url,omitempty"`
@@ -34,6 +36,7 @@ type FailedNodeDetail struct {
 	ResponseStatus int             `json:"response_status,omitempty"`
 	ResponseHeaders map[string][]string `json:"response_headers,omitempty"`
 	ResponseBody string            `json:"response_body,omitempty"`
+	Attributes   map[string]string `json:"attributes,omitempty"`     // protocol-specific key-value pairs
 }
 
 // SystemMetricsData holds runtime and system performance metrics collected

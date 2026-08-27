@@ -99,53 +99,6 @@
         </div>
       </div>
 
-      <!-- Failed Nodes Detail -->
-      <div class="charts-row" v-if="failedNodes.length > 0">
-        <div class="chart-card wide">
-          <div class="chart-header">
-            <h3>失败节点详情</h3>
-            <div class="chart-tip">共 {{ failedNodes.length }} 条失败记录</div>
-          </div>
-          <div class="failed-nodes-list">
-            <div v-for="(fn, idx) in failedNodes" :key="idx" class="failed-node-card">
-              <div class="failed-node-header">
-                <span class="failed-node-name">{{ fn.node_name }}</span>
-                <span class="failed-node-badge">{{ fn.node_type }}</span>
-                <span class="failed-node-time">{{ formatFailedNodeTime(fn.timestamp) }}</span>
-              </div>
-              <div class="failed-node-error">
-                <strong>错误信息:</strong> <span class="error-text">{{ fn.error_message }}</span>
-              </div>
-              <details v-if="fn.request_url" class="failed-node-details">
-                <summary>请求详情</summary>
-                <div class="failed-node-detail-body">
-                  <div><strong>Method:</strong> {{ fn.request_method }}</div>
-                  <div><strong>URL:</strong> <code>{{ fn.request_url }}</code></div>
-                  <div v-if="fn.request_headers"><strong>Headers:</strong>
-                    <pre>{{ formatHeaders(fn.request_headers) }}</pre>
-                  </div>
-                  <div v-if="fn.request_body"><strong>Body:</strong>
-                    <pre>{{ fn.request_body }}</pre>
-                  </div>
-                </div>
-              </details>
-              <details v-if="fn.response_body || fn.response_status" class="failed-node-details">
-                <summary>响应详情</summary>
-                <div class="failed-node-detail-body">
-                  <div><strong>Status:</strong> <span class="error-text">{{ fn.response_status }}</span></div>
-                  <div v-if="fn.response_headers"><strong>Headers:</strong>
-                    <pre>{{ formatResponseHeaders(fn.response_headers) }}</pre>
-                  </div>
-                  <div v-if="fn.response_body"><strong>Body:</strong>
-                    <pre>{{ fn.response_body }}</pre>
-                  </div>
-                </div>
-              </details>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Latency Percentiles Bar Chart -->
       <div class="charts-row">
         <div class="chart-card wide">
@@ -488,6 +441,77 @@
           </div>
         </div>
       </section>
+
+      <!-- Failed Nodes Detail (moved to end) -->
+      <section v-if="failedNodes.length > 0" class="nodes-section">
+        <div class="failed-nodes-header">
+          <h3>失败节点详情</h3>
+          <div class="chart-tip">共 {{ failedNodes.length }} 条失败记录</div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="failed-nodes-search">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            v-model="failedNodeSearch"
+            type="text"
+            class="search-input"
+            placeholder="搜索节点名、NodeID 或错误码（如 504、timeout）"
+          />
+          <button v-if="failedNodeSearch" class="search-clear" @click="failedNodeSearch = ''">✕</button>
+        </div>
+
+        <div class="failed-nodes-list">
+          <div v-for="(fn, idx) in filteredFailedNodes" :key="idx" class="failed-node-card">
+            <div class="failed-node-header">
+              <span class="failed-node-name">{{ fn.node_name }}</span>
+              <span class="failed-node-badge" :class="fn.protocol || 'http'">{{ fn.protocol || 'http' }}</span>
+              <span v-if="fn.error_code" class="failed-node-error-code">{{ fn.error_code }}</span>
+              <span class="failed-node-time">{{ formatFailedNodeTime(fn.timestamp) }}</span>
+            </div>
+            <div class="failed-node-error">
+              <strong>错误信息:</strong> <span class="error-text">{{ fn.error_message }}</span>
+            </div>
+            <details v-if="fn.request_url" class="failed-node-details">
+              <summary>请求详情</summary>
+              <div class="failed-node-detail-body">
+                <div><strong>Method:</strong> {{ fn.request_method }}</div>
+                <div><strong>URL:</strong> <code>{{ fn.request_url }}</code></div>
+                <div v-if="fn.request_headers"><strong>Headers:</strong>
+                  <pre>{{ formatHeaders(fn.request_headers) }}</pre>
+                </div>
+                <div v-if="fn.request_body"><strong>Body:</strong>
+                  <pre>{{ fn.request_body }}</pre>
+                </div>
+              </div>
+            </details>
+            <details v-if="fn.response_body || fn.response_status" class="failed-node-details">
+              <summary>响应详情</summary>
+              <div class="failed-node-detail-body">
+                <div><strong>Status:</strong> <span class="error-text">{{ fn.response_status }}</span></div>
+                <div v-if="fn.response_headers"><strong>Headers:</strong>
+                  <pre>{{ formatResponseHeaders(fn.response_headers) }}</pre>
+                </div>
+                <div v-if="fn.response_body"><strong>Body:</strong>
+                  <pre>{{ fn.response_body }}</pre>
+                </div>
+              </div>
+            </details>
+            <!-- Protocol-specific attributes -->
+            <details v-if="fn.attributes && Object.keys(fn.attributes).length > 0" class="failed-node-details">
+              <summary>扩展属性</summary>
+              <div class="failed-node-detail-body">
+                <div v-for="(val, key) in fn.attributes" :key="key">
+                  <strong>{{ key }}:</strong> <span>{{ val }}</span>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div v-if="filteredFailedNodes.length === 0" class="failed-nodes-empty">
+            没有匹配的记录
+          </div>
+        </div>
+      </section>
     </div>
 
     <div v-else-if="!report" class="empty-state">
@@ -810,6 +834,8 @@ interface FailedNode {
   node_id: string
   node_name: string
   node_type: string
+  protocol?: string
+  error_code?: string
   error_message: string
   timestamp: string
   request_url?: string
@@ -819,12 +845,28 @@ interface FailedNode {
   response_status?: number
   response_headers?: Record<string, string[]>
   response_body?: string
+  attributes?: Record<string, string>
 }
 
 const failedNodes = computed((): FailedNode[] => {
   const m = metrics.value
   if (!m?.failed_nodes) return []
   return m.failed_nodes as FailedNode[]
+})
+
+const failedNodeSearch = ref('')
+
+const filteredFailedNodes = computed((): FailedNode[] => {
+  const nodes = failedNodes.value
+  const q = failedNodeSearch.value.trim().toLowerCase()
+  if (!q) return nodes
+  return nodes.filter(fn => {
+    const name = (fn.node_name || '').toLowerCase()
+    const id = (fn.node_id || '').toLowerCase()
+    const code = (fn.error_code || '').toLowerCase()
+    const msg = (fn.error_message || '').toLowerCase()
+    return name.includes(q) || id.includes(q) || code.includes(q) || msg.includes(q)
+  })
 })
 
 async function fetchReport() {
@@ -1815,7 +1857,59 @@ onUnmounted(() => {
 .chart-body { height: 260px; }
 
 /* ===== Failed Nodes ===== */
+.failed-nodes-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.failed-nodes-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0; }
+.failed-nodes-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 8px 32px 8px 34px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-input:focus { border-color: var(--accent-primary); }
+.search-input::placeholder { color: var(--text-tertiary); }
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+}
+.search-clear:hover { color: var(--text-primary); }
 .failed-nodes-list { max-height: 600px; overflow-y: auto; }
+.failed-nodes-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
 .failed-node-card {
   border: 1px solid var(--border-color);
   border-left: 3px solid var(--danger, #cf222e);
@@ -1829,6 +1923,7 @@ onUnmounted(() => {
   gap: 8px;
   padding: 10px 14px;
   background: var(--bg-tertiary);
+  flex-wrap: wrap;
 }
 .failed-node-name { font-weight: 600; font-size: 13px; }
 .failed-node-badge {
@@ -1837,6 +1932,15 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   color: var(--text-secondary);
+}
+.failed-node-badge.http { background: rgba(9,105,218,0.12); color: #0969da; }
+.failed-node-error-code {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(207,34,46,0.12);
+  color: var(--danger, #cf222e);
 }
 .failed-node-time { font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
 .failed-node-error { padding: 10px 14px; font-size: 13px; }

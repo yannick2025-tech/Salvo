@@ -1355,10 +1355,22 @@ func (n *sceneNode) recordFailedNode(method, url string, reqHeaders map[string]s
 		return
 	}
 
+	// Derive error code from response status or error message
+	errorCode := ""
+	if respStatus > 0 {
+		errorCode = fmt.Sprintf("%d", respStatus)
+	} else if strings.Contains(errMsg, "timeout") {
+		errorCode = "timeout"
+	} else if strings.Contains(errMsg, "connection refused") {
+		errorCode = "connection_refused"
+	}
+
 	detail := FailedNodeDetail{
 		NodeID:          n.id,
 		NodeName:        n.name,
 		NodeType:        n.nodeType,
+		Protocol:        "http",
+		ErrorCode:       errorCode,
 		ErrorMessage:    errMsg,
 		Timestamp:       time.Now(),
 		RequestURL:      url,
