@@ -297,7 +297,7 @@ function getNodeTypeLabel(type: string): string {
 /* Aggregated view badges */
 .exec-badges {
   position: absolute;
-  top: 6px;
+  bottom: 6px;
   right: 6px;
   display: flex;
   gap: 3px;
