@@ -461,23 +461,25 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             color: var(--text-primary);
             margin: 0;
         }
-        .failed-nodes-search {
+        .failed-nodes-search-hint {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        .failed-nodes-search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .search-field {
             position: relative;
             display: flex;
             align-items: center;
-            margin-bottom: 16px;
-        }
-        .search-icon {
-            position: absolute;
-            left: 10px;
-            width: 16px;
-            height: 16px;
-            color: var(--text-tertiary);
-            pointer-events: none;
         }
         .search-input {
             width: 100%;
-            padding: 8px 32px 8px 34px;
+            padding: 8px 28px 8px 10px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             background: var(--bg-secondary);
@@ -485,6 +487,7 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-size: 13px;
             outline: none;
             transition: border-color 0.2s;
+            box-sizing: border-box;
         }
         .search-input:focus {
             border-color: var(--accent-primary);
@@ -492,9 +495,24 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         .search-input::placeholder {
             color: var(--text-tertiary);
         }
+        .search-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        .search-select:focus {
+            border-color: var(--accent-primary);
+        }
         .search-clear {
             position: absolute;
-            right: 8px;
+            right: 6px;
             background: none;
             border: none;
             color: var(--text-tertiary);
@@ -1319,16 +1337,35 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             <div class="chart-tip">共 {{len .FailedNodes}} 条失败记录</div>
         </div>
 
-        <!-- Search Bar -->
-        <div class="failed-nodes-search">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input id="failedNodeSearchInput" type="text" class="search-input" placeholder="搜索节点名、NodeID 或错误码（如 504、timeout）" oninput="filterFailedNodes()"/>
-            <button id="failedNodeSearchClear" class="search-clear" style="display:none;" onclick="clearFailedNodeSearch()">✕</button>
+        <!-- Multi-field Search -->
+        <div class="failed-nodes-search-hint">多个字段同时匹配（AND）</div>
+        <div class="failed-nodes-search-grid">
+            <div class="search-field">
+                <input id="fnSearchName" type="text" class="search-input" placeholder="节点名" oninput="filterFailedNodes()"/>
+                <button id="fnSearchNameClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchName')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchId" type="text" class="search-input" placeholder="NodeID" oninput="filterFailedNodes()"/>
+                <button id="fnSearchIdClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchId')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchCode" type="text" class="search-input" placeholder="错误码（如 504、timeout）" oninput="filterFailedNodes()"/>
+                <button id="fnSearchCodeClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchCode')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchMsg" type="text" class="search-input" placeholder="错误信息" oninput="filterFailedNodes()"/>
+                <button id="fnSearchMsgClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchMsg')">✕</button>
+            </div>
+            <div class="search-field">
+                <select id="fnSearchProtocol" class="search-select" onchange="filterFailedNodes()">
+                    <option value="">全部协议</option>
+                </select>
+            </div>
         </div>
 
         <div class="failed-nodes-list" id="failedNodesList">
             {{range $idx, $fn := .FailedNodes}}
-            <div class="failed-node-card" data-name="{{$fn.NodeName}}" data-id="{{$fn.NodeID}}" data-code="{{$fn.ErrorCode}}" data-msg="{{$fn.ErrorMessage}}">
+            <div class="failed-node-card" data-name="{{$fn.NodeName}}" data-id="{{$fn.NodeID}}" data-code="{{$fn.ErrorCode}}" data-msg="{{$fn.ErrorMessage}}" data-protocol="{{if $fn.Protocol}}{{$fn.Protocol}}{{else}}http{{end}}">
                 <div class="failed-node-header">
                     <span class="failed-node-name">{{$fn.NodeName}}</span>
                     <span class="failed-node-badge {{if $fn.Protocol}}{{$fn.Protocol}}{{else}}http{{end}}">{{$fn.Protocol}}</span>
@@ -2385,24 +2422,62 @@ function applyTheme() {
 
 applyTheme();
 
-// Failed Nodes Search
+// Failed Nodes Multi-field Search (AND logic)
+function populateProtocolOptions() {
+    var select = document.getElementById('fnSearchProtocol');
+    if (!select) return;
+    var protocols = {};
+    document.querySelectorAll('.failed-node-card').forEach(function(card) {
+        var p = card.getAttribute('data-protocol') || 'http';
+        protocols[p] = true;
+    });
+    Object.keys(protocols).sort().forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        select.appendChild(opt);
+    });
+}
+
 function filterFailedNodes() {
-    var input = document.getElementById('failedNodeSearchInput');
-    var clearBtn = document.getElementById('failedNodeSearchClear');
+    var qName = (document.getElementById('fnSearchName') || {}).value || '';
+    var qId = (document.getElementById('fnSearchId') || {}).value || '';
+    var qCode = (document.getElementById('fnSearchCode') || {}).value || '';
+    var qMsg = (document.getElementById('fnSearchMsg') || {}).value || '';
+    var qProto = (document.getElementById('fnSearchProtocol') || {}).value || '';
+
+    qName = qName.toLowerCase().trim();
+    qId = qId.toLowerCase().trim();
+    qCode = qCode.toLowerCase().trim();
+    qMsg = qMsg.toLowerCase().trim();
+
+    // Show/hide clear buttons
+    var fields = ['fnSearchName', 'fnSearchId', 'fnSearchCode', 'fnSearchMsg'];
+    fields.forEach(function(id) {
+        var inp = document.getElementById(id);
+        var btn = document.getElementById(id + 'Clear');
+        if (btn) btn.style.display = (inp && inp.value) ? 'block' : 'none';
+    });
+
     var cards = document.querySelectorAll('.failed-node-card');
     var emptyMsg = document.getElementById('failedNodesEmpty');
-    var q = input.value.toLowerCase().trim();
-
-    if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
-
     var visibleCount = 0;
+
     cards.forEach(function(card) {
         var name = (card.getAttribute('data-name') || '').toLowerCase();
         var id = (card.getAttribute('data-id') || '').toLowerCase();
         var code = (card.getAttribute('data-code') || '').toLowerCase();
         var msg = (card.getAttribute('data-msg') || '').toLowerCase();
+        var proto = card.getAttribute('data-protocol') || 'http';
 
-        if (!q || name.includes(q) || id.includes(q) || code.includes(q) || msg.includes(q)) {
+        var match = true;
+        if (qName && !name.includes(qName)) match = false;
+        if (qId && !id.includes(qId)) match = false;
+        if (qCode && !code.includes(qCode)) match = false;
+        if (qMsg && !msg.includes(qMsg)) match = false;
+        if (qProto && proto !== qProto) match = false;
+
+        if (match) {
             card.style.display = '';
             visibleCount++;
         } else {
@@ -2410,17 +2485,20 @@ function filterFailedNodes() {
         }
     });
 
-    if (emptyMsg) emptyMsg.style.display = (q && visibleCount === 0) ? 'block' : 'none';
+    if (emptyMsg) emptyMsg.style.display = (visibleCount === 0 && (qName || qId || qCode || qMsg || qProto)) ? 'block' : 'none';
 }
 
-function clearFailedNodeSearch() {
-    var input = document.getElementById('failedNodeSearchInput');
-    if (input) {
-        input.value = '';
+function clearField(fieldId) {
+    var inp = document.getElementById(fieldId);
+    if (inp) {
+        inp.value = '';
         filterFailedNodes();
-        input.focus();
+        inp.focus();
     }
 }
+
+// Initialize protocol options on load
+populateProtocolOptions();
 </script>
 </body>
 </html>`))

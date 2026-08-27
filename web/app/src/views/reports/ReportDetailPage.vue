@@ -449,16 +449,31 @@
           <div class="chart-tip">共 {{ failedNodes.length }} 条失败记录</div>
         </div>
 
-        <!-- Search Bar -->
-        <div class="failed-nodes-search">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
-            v-model="failedNodeSearch"
-            type="text"
-            class="search-input"
-            placeholder="搜索节点名、NodeID 或错误码（如 504、timeout）"
-          />
-          <button v-if="failedNodeSearch" class="search-clear" @click="failedNodeSearch = ''">✕</button>
+        <!-- Multi-field Search -->
+        <div class="failed-nodes-search-hint">多个字段同时匹配（AND）</div>
+        <div class="failed-nodes-search-grid">
+          <div class="search-field">
+            <input v-model="failedNodeSearchName" type="text" class="search-input" placeholder="节点名" />
+            <button v-if="failedNodeSearchName" class="search-clear" @click="failedNodeSearchName = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchId" type="text" class="search-input" placeholder="NodeID" />
+            <button v-if="failedNodeSearchId" class="search-clear" @click="failedNodeSearchId = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchCode" type="text" class="search-input" placeholder="错误码（如 504、timeout）" />
+            <button v-if="failedNodeSearchCode" class="search-clear" @click="failedNodeSearchCode = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchMsg" type="text" class="search-input" placeholder="错误信息" />
+            <button v-if="failedNodeSearchMsg" class="search-clear" @click="failedNodeSearchMsg = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <select v-model="failedNodeSearchProtocol" class="search-select">
+              <option value="">全部协议</option>
+              <option v-for="p in availableProtocols" :key="p" :value="p">{{ p }}</option>
+            </select>
+          </div>
         </div>
 
         <div class="failed-nodes-list">
@@ -854,18 +869,36 @@ const failedNodes = computed((): FailedNode[] => {
   return m.failed_nodes as FailedNode[]
 })
 
-const failedNodeSearch = ref('')
+const failedNodeSearchName = ref('')
+const failedNodeSearchId = ref('')
+const failedNodeSearchCode = ref('')
+const failedNodeSearchMsg = ref('')
+const failedNodeSearchProtocol = ref('')
+
+// Derive available protocols from data
+const availableProtocols = computed(() => {
+  const set = new Set<string>()
+  failedNodes.value.forEach(fn => {
+    if (fn.protocol) set.add(fn.protocol)
+  })
+  return Array.from(set).sort()
+})
 
 const filteredFailedNodes = computed((): FailedNode[] => {
   const nodes = failedNodes.value
-  const q = failedNodeSearch.value.trim().toLowerCase()
-  if (!q) return nodes
+  const qName = failedNodeSearchName.value.trim().toLowerCase()
+  const qId = failedNodeSearchId.value.trim().toLowerCase()
+  const qCode = failedNodeSearchCode.value.trim().toLowerCase()
+  const qMsg = failedNodeSearchMsg.value.trim().toLowerCase()
+  const qProto = failedNodeSearchProtocol.value
+
   return nodes.filter(fn => {
-    const name = (fn.node_name || '').toLowerCase()
-    const id = (fn.node_id || '').toLowerCase()
-    const code = (fn.error_code || '').toLowerCase()
-    const msg = (fn.error_message || '').toLowerCase()
-    return name.includes(q) || id.includes(q) || code.includes(q) || msg.includes(q)
+    if (qName && !(fn.node_name || '').toLowerCase().includes(qName)) return false
+    if (qId && !(fn.node_id || '').toLowerCase().includes(qId)) return false
+    if (qCode && !(fn.error_code || '').toLowerCase().includes(qCode)) return false
+    if (qMsg && !(fn.error_message || '').toLowerCase().includes(qMsg)) return false
+    if (qProto && (fn.protocol || 'http') !== qProto) return false
+    return true
   })
 })
 
@@ -1864,23 +1897,25 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 .failed-nodes-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0; }
-.failed-nodes-search {
+.failed-nodes-search-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.failed-nodes-search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.search-field {
   position: relative;
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
-}
-.search-icon {
-  position: absolute;
-  left: 10px;
-  width: 16px;
-  height: 16px;
-  color: var(--text-tertiary);
-  pointer-events: none;
 }
 .search-input {
   width: 100%;
-  padding: 8px 32px 8px 34px;
+  padding: 8px 28px 8px 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
@@ -1888,12 +1923,27 @@ onUnmounted(() => {
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 .search-input:focus { border-color: var(--accent-primary); }
 .search-input::placeholder { color: var(--text-tertiary); }
+.search-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.search-select:focus { border-color: var(--accent-primary); }
 .search-clear {
   position: absolute;
-  right: 8px;
+  right: 6px;
   background: none;
   border: none;
   color: var(--text-tertiary);

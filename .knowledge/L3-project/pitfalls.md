@@ -527,3 +527,69 @@ go version
 ```
 日志 grep panic → 提取堆栈 → 判断业务/运行时 → 确认 recover 状态 → 评估影响 → 决定修复策略
 ```
+
+---
+
+## Lesson 8: 失败节点多字段 AND 查询 — 前端 computed 与导出 HTML JS 双实现模式 (2026-08-27)
+
+### 现象
+测试报告失败节点详情只有单搜索框（OR 逻辑），无法满足"节点名含'订单'且错误码是503"的联合查询需求。
+
+### 根因
+单搜索框跨字段 OR 模糊匹配，只要任一字段命中即返回，无法精确定位多条件组合的记录。
+
+### 修复方案
+拆分为 5 个独立查询字段（节点名、NodeID、错误码、错误信息、协议下拉），AND 逻辑联合过滤。
+
+### 关键实现模式 — 双套实现
+
+| 环境 | 实现方式 | 说明 |
+|------|---------|------|
+| 前端 SPA | Vue `ref` + `computed` | 5 个 ref 绑定 v-model，computed 响应式自动过滤 |
+| 导出 HTML | 原生 JS + `data-*` 属性 | 5 个 input/select，`oninput`/`onchange` 触发过滤函数 |
+
+**前端 computed 核心逻辑**：
+```typescript
+const filteredFailedNodes = computed(() => {
+  return nodes.filter(fn => {
+    if (qName && !fn.node_name.toLowerCase().includes(qName)) return false
+    if (qProto && (fn.protocol || 'http') !== qProto) return false  // 协议精确匹配
+    return true
+  })
+})
+```
+
+**导出 HTML JS 核心逻辑**：
+```javascript
+function filterFailedNodes() {
+  cards.forEach(function(card) {
+    var match = true;
+    if (qName && !name.includes(qName)) match = false;
+    if (qProto && proto !== qProto) match = false;
+    card.style.display = match ? '' : 'none';
+  });
+}
+```
+
+### Lessons Learned
+
+#### 1. 空字段不参与过滤
+- 空字段视为"无约束"，只有用户主动填写的字段才作为 AND 条件
+- 避免了"必须填满所有字段才能查询"的误区
+
+#### 2. 文本用模糊匹配，协议用精确匹配
+- node_name/node_id/error_code/error_message 用 `includes()` 模糊匹配 + 忽略大小写
+- protocol 用 `===` 精确匹配（下拉选择，值固定）
+- protocol 为空时默认按 "http" 处理
+
+#### 3. 协议下拉选项从数据动态生成
+- 前端：`computed` 从 failedNodes 提取 unique protocols
+- 导出 HTML：`populateProtocolOptions()` 遍历 `.failed-node-card` 的 `data-protocol` 属性
+
+#### 4. CSS Grid 网格布局自适应
+- `grid-template-columns: repeat(auto-fit, minmax(160px, 1fr))` 实现一行排列 + 窄屏自动换行
+- 避免五个输入框在窄屏拥挤
+
+#### 5. 双套实现需保持逻辑一致
+- 前端 Vue computed 和导出 HTML JS 各自独立实现，但过滤逻辑必须一致
+- 修改时需同步更新两处，避免行为不一致
