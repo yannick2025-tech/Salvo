@@ -1715,12 +1715,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 
 		nodeLog.Error("HTTP request failed",
-		logger.F("method", method),
-		logger.F("url", url),
-		logger.F("error", err),
-		logger.F("request_headers", req.Headers),
-		logger.F("request_body", string(req.Body)),
-	)
+			logger.F("method", method),
+			logger.F("url", url),
+			logger.F("error", err),
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+		)
 		if n.stats != nil {
 			n.stats.RecordLatency(httpLatency, false)
 		}
@@ -2108,13 +2108,15 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 	if input != nil && input.Variables != nil {
 		variables = input.Variables
 	}
+	startTime := time.Now()
 	result := expr.EvaluateConditionExpr(cfg.Expr, variables)
 	nodeLog.Info("condition node evaluated",
 		logger.F("expr", cfg.Expr),
 		logger.F("result", result),
 	)
 	if n.nodeStats != nil {
-		n.nodeStats.RecordLatency(0, true)
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, true)
 	}
 	return &dag.Output{Response: map[string]any{"condition": result}}, nil
 }
@@ -2128,6 +2130,7 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 		return nil, fmt.Errorf("parse if-else config: %w", err)
 	}
 
+	startTime := time.Now()
 	result := evaluateExpression(cfg.Expr, input)
 	nodeLog.Info("if-else node evaluated",
 		logger.F("expr", cfg.Expr),
@@ -2135,7 +2138,8 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 		logger.F("branch", map[bool]string{true: "if_true", false: "if_false"}[result]),
 	)
 	if n.nodeStats != nil {
-		n.nodeStats.RecordLatency(0, true)
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, true)
 	}
 	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
 }
@@ -2168,6 +2172,7 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 	)
 
 	var lastOutput *dag.Output
+	startTime := time.Now()
 	for i := 0; i < loopCount; i++ {
 		if loopCount > 1 {
 			nodeLog.Debug("group iteration started",
@@ -2206,7 +2211,8 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 	}
 
 	if n.nodeStats != nil {
-		n.nodeStats.RecordLatency(0, true)
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, true)
 	}
 
 	return &dag.Output{Response: map[string]any{
@@ -2218,8 +2224,8 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 }
 
 func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
-	// Accept multiple field names for the duration value: seconds (canonical),
-	// delay, duration, interval — so YAML configs using any of them work.
+	// Field units: `seconds` is in seconds (legacy alias); `delay`,
+	// `duration` and `interval` are in milliseconds.
 	var cfg struct {
 		Mode     string  `json:"mode"`
 		Seconds  float64 `json:"seconds"`
@@ -2232,36 +2238,29 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 		return nil, fmt.Errorf("parse timer config: %w", err)
 	}
 
-	// Pick the first non-zero value from the aliased fields.
-	seconds := cfg.Seconds
-	if seconds <= 0 && cfg.Delay > 0 {
-		seconds = cfg.Delay
-	}
-	if seconds <= 0 && cfg.Duration > 0 {
-		seconds = cfg.Duration
-	}
-	if seconds <= 0 && cfg.Interval > 0 {
-		seconds = cfg.Interval
-	}
-
-	if seconds <= 0 {
-		nodeLog.Warn("timer duration is zero or missing, using default 1s",
-			logger.F("raw_seconds", cfg.Seconds),
-			logger.F("raw_delay", cfg.Delay),
-			logger.F("raw_duration", cfg.Duration),
-			logger.F("raw_interval", cfg.Interval),
-			logger.F("mode", cfg.Mode))
-		seconds = 1.0
-	}
-
-	duration := time.Duration(seconds * float64(time.Second))
 	startTime := time.Now()
 
 	switch cfg.Mode {
 	case "delay":
-		nodeLog.Info("timer delay started", logger.F("seconds", seconds))
+		// delay/duration are milliseconds; seconds is the legacy seconds alias.
+		delayMs := cfg.Delay
+		if delayMs <= 0 {
+			delayMs = cfg.Duration
+		}
+		if delayMs <= 0 && cfg.Seconds > 0 {
+			delayMs = cfg.Seconds * 1000
+		}
+		if delayMs <= 0 {
+			nodeLog.Warn("timer delay is zero or missing, using default 1000ms",
+				logger.F("raw_seconds", cfg.Seconds),
+				logger.F("raw_delay", cfg.Delay),
+				logger.F("raw_duration", cfg.Duration),
+				logger.F("mode", cfg.Mode))
+			delayMs = 1000
+		}
+		nodeLog.Info("timer delay started", logger.F("ms", delayMs))
 		select {
-		case <-time.After(duration):
+		case <-time.After(time.Duration(delayMs * float64(time.Millisecond))):
 			nodeLog.Info("timer delay completed")
 		case <-ctx.Done():
 			nodeLog.Info("timer delay cancelled")
@@ -2272,9 +2271,29 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 			return nil, fmt.Errorf("timer cancelled: %w", ctx.Err())
 		}
 	case "interval":
-		nodeLog.Info("timer interval started", logger.F("seconds", seconds))
-		ticker := time.NewTicker(duration)
+		// interval is the tick period in ms; duration is the total run
+		// time in ms. Without duration the timer runs until the chain
+		// context is cancelled (heartbeat semantics).
+		intervalMs := cfg.Interval
+		if intervalMs <= 0 && cfg.Seconds > 0 {
+			intervalMs = cfg.Seconds * 1000
+		}
+		if intervalMs <= 0 {
+			nodeLog.Warn("timer interval is zero or missing, using default 1000ms",
+				logger.F("raw_interval", cfg.Interval),
+				logger.F("mode", cfg.Mode))
+			intervalMs = 1000
+		}
+		nodeLog.Info("timer interval started",
+			logger.F("interval_ms", intervalMs),
+			logger.F("duration_ms", cfg.Duration))
+		ticker := time.NewTicker(time.Duration(intervalMs * float64(time.Millisecond)))
 		defer ticker.Stop()
+
+		var deadline <-chan time.Time
+		if cfg.Duration > 0 {
+			deadline = time.After(time.Duration(cfg.Duration * float64(time.Millisecond)))
+		}
 
 		tickCount := 0
 		for {
@@ -2282,6 +2301,18 @@ func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog 
 			case <-ticker.C:
 				tickCount++
 				nodeLog.Info("timer tick", logger.F("tick", tickCount))
+			case <-deadline:
+				nodeLog.Info("timer interval duration elapsed", logger.F("ticks", tickCount))
+				elapsed := time.Since(startTime)
+				if n.nodeStats != nil {
+					n.nodeStats.RecordLatency(elapsed, true)
+				}
+				return &dag.Output{Response: map[string]any{
+					"node_id": n.id,
+					"type":    "timer",
+					"mode":    "interval",
+					"ticks":   tickCount,
+				}}, nil
 			case <-ctx.Done():
 				nodeLog.Info("timer interval stopped", logger.F("ticks", tickCount))
 				elapsed := time.Since(startTime)
@@ -2440,9 +2471,20 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		sn.loopCount = 1
 	}
 
-	// Timer nodes are always async — they should never block the DAG main chain.
+	// Timer execution mode depends on its timer mode:
+	//   - delay: think-time, downstream nodes must wait for the delay to
+	//     complete, so it runs synchronously.
+	//   - interval: heartbeat that runs in the background; downstream nodes
+	//     proceed immediately, so it runs asynchronously.
 	if n.Type == model.NodeTypeTimer {
-		sn.mode = dag.ExecAsync
+		var tcfg struct {
+			Mode string `json:"mode"`
+		}
+		_ = json.Unmarshal([]byte(n.Config), &tcfg)
+		if tcfg.Mode == "interval" {
+			sn.mode = dag.ExecAsync
+		}
+		// delay mode (and unset) stays ExecSync
 	}
 
 	return sn, nil

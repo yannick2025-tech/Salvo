@@ -115,20 +115,37 @@ func TestExecuteTimerInvalidMode(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid timer mode")
 }
 
-func TestTimerNodeAlwaysAsync(t *testing.T) {
-	cfg, _ := json.Marshal(map[string]any{
-		"mode":    "delay",
-		"seconds": 1,
+func TestTimerNodeModeBasedExec(t *testing.T) {
+	// Delay mode timer is sync: downstream nodes must wait for the
+	// think-time to complete before executing.
+	delayCfg, _ := json.Marshal(map[string]any{
+		"mode":  "delay",
+		"delay": 500,
 	})
-
-	node := &sceneNode{
-		id:       "timer-5",
-		nodeType: "timer",
-		config:   string(cfg),
+	delayNode := &sceneNode{
+		id:        "timer-delay",
+		nodeType:  "timer",
+		config:    string(delayCfg),
 		loopCount: 1,
-		mode:     dag.ExecAsync,
-		log:      newTestLogger(),
+		mode:      dag.ExecSync,
+		log:       newTestLogger(),
 	}
+	assert.Equal(t, dag.ExecSync, delayNode.Mode())
 
-	assert.Equal(t, dag.ExecAsync, node.Mode())
+	// Interval mode timer is async: it runs as a background heartbeat
+	// while downstream nodes proceed immediately.
+	intervalCfg, _ := json.Marshal(map[string]any{
+		"mode":     "interval",
+		"interval": 1000,
+		"duration": 5000,
+	})
+	intervalNode := &sceneNode{
+		id:        "timer-interval",
+		nodeType:  "timer",
+		config:    string(intervalCfg),
+		loopCount: 1,
+		mode:      dag.ExecAsync,
+		log:       newTestLogger(),
+	}
+	assert.Equal(t, dag.ExecAsync, intervalNode.Mode())
 }

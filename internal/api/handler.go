@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"sort"
@@ -2622,12 +2621,13 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 
 		var allDurs []float64
 		for _, s := range spans {
-			dur := s.duration
-			// Ensure minimum delay of 30ms (0.03 seconds) to match mock server behavior
-			if dur < 0.03 {
-				dur = 0.03 + rand.Float64()*0.17 // 30-200ms range
+			// Skip spans are not real requests — they represent nodes that
+			// were never executed (e.g. downstream of a failed parent).
+			// Exclude them from totals, latency, and QPS calculations.
+			if s.status == "skip" {
+				continue
 			}
-			allDurs = append(allDurs, dur)
+			allDurs = append(allDurs, s.duration)
 			nm.TotalReqs++
 			if s.status == "ok" {
 				nm.SuccessReqs++
@@ -2655,6 +2655,9 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 			}
 
 			for _, s := range spans {
+				if s.status == "skip" {
+					continue
+				}
 				idx := int(s.startedAt.Sub(globalStart) / bucketSize)
 				if idx < 0 {
 					idx = 0
@@ -2798,11 +2801,10 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 
 		var allDurs []float64
 		for _, s := range spans {
-			dur := s.duration
-			if dur < 0.03 {
-				dur = 0.03 + rand.Float64()*0.17
+			if s.status == "skip" {
+				continue
 			}
-			allDurs = append(allDurs, dur)
+			allDurs = append(allDurs, s.duration)
 			nm.TotalReqs++
 			if s.status == "ok" {
 				nm.SuccessReqs++
@@ -2830,6 +2832,9 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 			}
 
 			for _, s := range spans {
+				if s.status == "skip" {
+					continue
+				}
 				idx := int(s.startedAt.Sub(globalStart) / bucketSize)
 				if idx < 0 {
 					idx = 0

@@ -273,6 +273,12 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 							if isSkipped {
 								// Parent was conditionally skipped, not failed.
 								// This edge is inactive, don't set parentFailed.
+							} else if parentNode, ok := e.dag.Node(edge.From); ok && parentNode.Mode() == ExecAsync {
+								// Async parent: its signal closes at start and
+								// the result arrives later (or never, for
+								// detached nodes like interval timers).
+								// Downstream proceeds without waiting.
+								hasActiveParent = true
 							} else {
 								parentFailed = true
 							}

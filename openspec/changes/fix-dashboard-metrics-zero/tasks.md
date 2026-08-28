@@ -40,3 +40,21 @@
 - [ ] 6.3 端到端验证：导入 example-v2.yaml，时长模式运行 1 分钟，检查 Dashboard 所有指标正常
 - [ ] 6.4 端到端验证：导出 HTML 报告，检查时序图表和失败节点详情 section
 - [ ] 6.5 端到端验证：停止场景后观察 Dashboard 30 秒，确认延迟值不再变化
+
+## 7. 修复 Timer 节点强制 ExecAsync 导致下游全 skip（批跑问题 1/2 根因）
+
+- [x] 7.1 在 `internal/core/dag/trace.go` 中，async 父节点不再被标记为 `parentFailed`，下游节点可继续执行
+- [x] 7.2 在 `internal/runner/runner.go` 的 `buildDAGNode` 中，timer 不再硬编码 `ExecAsync`，改为按 mode 决定：`delay` → `ExecSync`（思考时间，下游等待），`interval` → `ExecAsync`（心跳，下游立即继续）
+- [x] 7.3 在 `internal/runner/runner.go` 的 `executeTimer` 中，统一 `delay`/`duration`/`interval` 字段为毫秒单位（此前 `delay: 500` 被解析为 500 秒）
+- [x] 7.4 interval 模式支持 `duration` 字段控制总运行时长，到期后正常返回成功
+- [x] 7.5 interval 模式被 ctx 取消时返回成功而非 error（心跳语义）
+- [x] 7.6 更新 `TestTimerNodeAlwaysAsync` 为 `TestTimerNodeModeBasedExec`，验证 delay=sync、interval=async
+
+## 8. 移除 handler.go 中的 rand 注入并过滤 skip span（批跑问题 3 根因）
+
+- [x] 8.1 移除 `aggregateNodeMetricsWithSceneID` 中对 dur<0.03 的 span 注入 30-200ms 随机值的逻辑
+- [x] 8.2 移除 `aggregateNodeMetrics` 中同样的 rand 注入逻辑
+- [x] 8.3 在两处聚合函数的 allDurs 计算循环中过滤 `status=="skip"` 的 span（0 时长非真实请求，不参与计数/延迟/QPS）
+- [x] 8.4 在两处聚合函数的时间序列 bucket 循环中过滤 skip span
+- [x] 8.5 移除未使用的 `math/rand/v2` import
+- [ ] 8.6 端到端验证：批跑后 Dashboard 节点 P50/P95/P99 显示真实值且停止后不再变化
