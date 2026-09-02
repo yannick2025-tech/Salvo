@@ -1126,6 +1126,7 @@ function getChartTheme() {
         danger: '#f85149',    // 红色系 — 失败/错误/P99
         info: '#58a6ff',      // 蓝色系 — 信息/辅助
         accent: '#58a6ff',    // 蓝色系 — P95
+        avg: '#f0883e',       // 橙色系 — Avg
       }
     }
   }
@@ -1140,6 +1141,7 @@ function getChartTheme() {
       danger: '#cf222e',    // 红色系
       info: '#0969da',      // 蓝色系
       accent: '#0969da',    // 蓝色系 — P95
+      avg: '#f0883e',       // 橙色系 — Avg
     }
   }
 }
@@ -1374,7 +1376,7 @@ function renderNodeDetailChart(nodeId: string) {
     const timestampsLength = node.timestamps?.length || 0
     const series: any[] = [
       { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
-      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: undefined },
+      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.avg, width: 2 }, itemStyle: { color: theme.colors.avg }, areaStyle: undefined },
       { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.accent, width: 2 }, itemStyle: { color: theme.colors.accent }, areaStyle: undefined },
       { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, areaStyle: undefined },
     ]
