@@ -3110,6 +3110,16 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 		}
 	}
 
+	// Trim trailing zero-value buckets (running tests: windowEnd=now
+	// but actual data may lag behind by a few seconds).
+	n := trimTrailingZeros(qps, p50, p95, p99, errRate)
+	timestamps = timestamps[:n]
+	qps = qps[:n]
+	p50 = p50[:n]
+	p95 = p95[:n]
+	p99 = p99[:n]
+	errRate = errRate[:n]
+
 	return &dto.TimeSeriesDTO{
 		Timestamps: timestamps,
 		QPS:        qps,
@@ -3118,6 +3128,29 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 		P99:        p99,
 		ErrorRate:  errRate,
 	}
+}
+
+// trimTrailingZeros returns the length after removing trailing entries
+// where ALL metric arrays are zero. Keeps at least 1 entry.
+func trimTrailingZeros(arrays ...[]float64) int {
+	if len(arrays) == 0 || len(arrays[0]) == 0 {
+		return 0
+	}
+	n := len(arrays[0])
+	for n > 1 {
+		allZero := true
+		for _, a := range arrays {
+			if a[n-1] != 0 {
+				allZero = false
+				break
+			}
+		}
+		if !allZero {
+			break
+		}
+		n--
+	}
+	return n
 }
 
 func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecordDTO, rangeSeconds int) *dto.TimeSeriesDTO {
@@ -3142,10 +3175,26 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 	}
 
 	if !hasRunning && !windowStart.IsZero() && !windowEnd.IsZero() {
-		windowStart = windowStart.Add(-time.Minute)
-		windowEnd = windowEnd.Add(time.Minute)
+		// Dynamic padding: 10% of test duration, min 10s, max 60s
+		padding := windowEnd.Sub(windowStart) / 10
+		if padding < 10*time.Second {
+			padding = 10 * time.Second
+		}
+		if padding > 60*time.Second {
+			padding = 60 * time.Second
+		}
+		windowStart = windowStart.Add(-padding)
+		windowEnd = windowEnd.Add(padding)
 	} else if hasRunning && !windowStart.IsZero() {
-		windowStart = windowStart.Add(-time.Minute)
+		// For running tests, only pad the start; end is "now"
+		padding := time.Since(windowStart) / 10
+		if padding < 10*time.Second {
+			padding = 10 * time.Second
+		}
+		if padding > 60*time.Second {
+			padding = 60 * time.Second
+		}
+		windowStart = windowStart.Add(-padding)
 		windowEnd = time.Now()
 	}
 
@@ -3223,6 +3272,16 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 			}
 		}
 	}
+
+	// Trim trailing zero-value buckets (running tests: windowEnd=now
+	// but actual data may lag behind by a few seconds).
+	n := trimTrailingZeros(qps, p50, p95, p99, errRate)
+	timestamps = timestamps[:n]
+	qps = qps[:n]
+	p50 = p50[:n]
+	p95 = p95[:n]
+	p99 = p99[:n]
+	errRate = errRate[:n]
 
 	return &dto.TimeSeriesDTO{
 		Timestamps:  timestamps,
