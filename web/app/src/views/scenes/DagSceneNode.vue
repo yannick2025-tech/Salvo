@@ -22,7 +22,10 @@
         {{ executionStatus.running }}
       </span>
       <span v-if="executionStatus.idle > 0" class="exec-badge idle">
-        <svg class="exec-icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>
+        <svg class="exec-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <polyline points="12,7 12,12 16,14"/>
+        </svg>
         {{ executionStatus.idle }}
       </span>
     </div>
