@@ -2316,6 +2316,11 @@ onMounted(() => {
   box-shadow: var(--shadow-sm);
   position: relative;
 }
+[data-theme='dark'] .dag-node {
+  background: #1c2333;
+  border-color: #3a4556;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
 .dag-node:hover {
   border-color: var(--accent-primary);
   box-shadow: 0 2px 12px rgba(0,229,255,0.08);
@@ -2372,12 +2377,14 @@ onMounted(() => {
   position: relative; padding: 6px 0;
 }
 .edge-line { width: 2px; height: 14px; background: var(--border-primary); border-radius: 1px; }
+[data-theme='dark'] .edge-line { background: #4a5568; }
 .edge-condition {
   font-size: 10px; font-weight: 600; padding: 2px 10px;
   border-radius: 100px; background: rgba(167,139,250,0.1);
   color: #a78bfa; margin: 4px 0; letter-spacing: 0.3px;
 }
 .edge-arrow { color: var(--text-tertiary); font-size: 10px; line-height: 1; }
+[data-theme='dark'] .edge-arrow { color: #718096; }
 .edge-delete {
   position: absolute; right: -24px; top: 50%; transform: translateY(-50%);
   border: none; background: transparent; color: var(--text-tertiary);
@@ -2386,6 +2393,14 @@ onMounted(() => {
 }
 .dag-edge:hover .edge-delete { opacity: 1; }
 .edge-delete:hover { color: var(--accent-danger); background: rgba(239,68,68,0.08); }
+
+/* 深色模式 DAG 连线增强 */
+[data-theme='dark'] .branch-item .dag-nodes-in-level::before {
+  background: #4a5568;
+}
+[data-theme='dark'] .split-svg path {
+  opacity: 0.85;
+}
 
 /* ---- 运行警告 / 弹窗 / Toast / 确认框 ---- */
 .run-warning {
