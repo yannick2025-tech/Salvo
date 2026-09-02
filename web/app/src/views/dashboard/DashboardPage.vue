@@ -1125,7 +1125,7 @@ function getChartTheme() {
         warning: '#e3b341',   // 黄色系 — 警告/P90
         danger: '#f85149',    // 红色系 — 失败/错误/P99
         info: '#58a6ff',      // 蓝色系 — 信息/辅助
-        accent: '#f0883e',    // 橙色系 — P95
+        accent: '#58a6ff',    // 蓝色系 — P95
       }
     }
   }
@@ -1139,7 +1139,7 @@ function getChartTheme() {
       warning: '#bf8700',   // 黄色系
       danger: '#cf222e',    // 红色系
       info: '#0969da',      // 蓝色系
-      accent: '#bc4c00',    // 橙色系
+      accent: '#0969da',    // 蓝色系 — P95
     }
   }
 }
@@ -2252,7 +2252,7 @@ onUnmounted(() => {
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .bar-fill.p50 { background: var(--accent-primary); }
-.bar-fill.p95 { background: var(--accent-warning); }
+.bar-fill.p95 { background: var(--accent-info); }
 .bar-fill.p99 { background: var(--accent-danger); }
 
 .bar-value {
@@ -2411,8 +2411,8 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .bar-fill.p95 {
-  background: linear-gradient(90deg, #bc4c00 0%, #973604 100%);
-  box-shadow: 0 1px 4px rgba(188, 76, 0, 0.4);
+  background: linear-gradient(90deg, #0969da 0%, #0550ae 100%);
+  box-shadow: 0 1px 4px rgba(9, 105, 218, 0.4);
 }
 
 [data-theme='light'] .bar-fill.p99 {
