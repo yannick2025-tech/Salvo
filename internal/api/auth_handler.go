@@ -12,6 +12,7 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/auth"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
@@ -45,7 +46,19 @@ func (h *Handler) Login(r *http.Request) dto.Response {
 		return dto.ErrorResp(401, "invalid email or password")
 	}
 
-	token, err := h.jwt.Generate(user.ID, user.RoleID)
+	role, _ := h.roles.GetByID(r.Context(), user.RoleID)
+	roleName := ""
+	if role != nil {
+		roleName = role.Name
+	}
+
+	h.log.Debug("login: generating token",
+		logger.F("user_id", user.ID),
+		logger.F("user_role_id", user.RoleID),
+		logger.F("role_name", roleName),
+	)
+
+	token, err := h.jwt.Generate(user.ID, roleName)
 	if err != nil {
 		return dto.ErrorResp(500, "failed to generate token")
 	}
@@ -54,11 +67,10 @@ func (h *Handler) Login(r *http.Request) dto.Response {
 	user.LastLoginAt = &now
 	_ = h.users.Update(r.Context(), user)
 
-	role, _ := h.roles.GetByID(r.Context(), user.RoleID)
-	roleName := ""
-	if role != nil {
-		roleName = role.Name
-	}
+	h.log.Debug("login: token generated successfully",
+		logger.F("user_id", user.ID),
+		logger.F("role_name", roleName),
+	)
 
 	return dto.OK(dto.LoginResponse{
 		Token: token,
@@ -74,7 +86,10 @@ func (h *Handler) Me(r *http.Request) dto.Response {
 
 	user, err := h.users.GetByID(r.Context(), userID)
 	if err != nil {
-		return dto.ErrorResp(404, "user not found")
+		// User not found: token references a user that no longer exists
+		// (e.g., after DB rebuild). Return 401 to trigger client-side
+		// token invalidation rather than 404 which is confusing.
+		return dto.ErrorResp(401, "invalid or expired token")
 	}
 
 	role, _ := h.roles.GetByID(r.Context(), user.RoleID)

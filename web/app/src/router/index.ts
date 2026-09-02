@@ -36,22 +36,28 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
+  console.log('[router] beforeEach:', to.path, 'token:', !!auth.token, 'validated:', auth.validated, 'isLoggedIn:', auth.isLoggedIn)
 
   if (auth.token && !auth.validated) {
+    console.log('[router] calling validateToken')
     await auth.validateToken()
+    console.log('[router] after validateToken: validated=', auth.validated, 'isLoggedIn=', auth.isLoggedIn)
   }
 
   if (to.meta.requiresAuth !== false && !auth.isLoggedIn) {
+    console.log('[router] redirecting to Login')
     next({ name: 'Login', query: { redirect: to.fullPath } })
     return
   }
 
   if (to.name === 'Login' && auth.isLoggedIn) {
+    console.log('[router] redirecting to Dashboard (already logged in)')
     next({ name: 'Dashboard' })
     return
   }
 
   if (to.meta.permission && !auth.canAccess([to.meta.permission as string])) {
+    console.log('[router] permission denied for', to.meta.permission)
     next({ name: 'Dashboard' })
     return
   }

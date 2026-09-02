@@ -18,9 +18,9 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/core/expr"
 	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
 	"github.com/yannick2025-tech/Salvo/internal/runner"
-	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -388,26 +388,42 @@ func (s *Server) handleAuth(h handlerFunc) http.HandlerFunc {
 
 		claims, err := s.jwt.Parse(tokenStr)
 		if err != nil {
+			s.logger.Debug("auth: JWT parse failed", logger.F("error", err))
 			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
 			return
 		}
 
+		// Resolve role_name → role_id from current DB (role_id may change
+		// after DB rebuild, but role_name is stable).
+		role, _ := s.handler.roles.GetByName(r.Context(), claims.RoleName)
+		var roleID snowflake.ID
+		if role != nil {
+			roleID = role.ID
+		}
+
+		s.logger.Debug("auth: token parsed",
+			logger.F("user_id", claims.UserID),
+			logger.F("role_name", claims.RoleName),
+			logger.F("resolved_role_id", roleID),
+			logger.F("path", r.URL.Path),
+		)
+
 		ctx := auth.WithUserID(r.Context(), claims.UserID)
-		ctx = auth.WithRoleID(ctx, claims.RoleID)
+		ctx = auth.WithRoleID(ctx, roleID)
 
 		perm, exists := routePermissions[r.URL.Path]
 		if exists && perm != "" {
 			parts := strings.SplitN(perm, ":", 2)
 			if len(parts) == 2 {
-				ok, err := s.rbac.HasPermission(ctx, claims.RoleID, parts[0], parts[1])
+				ok, err := s.rbac.HasPermission(ctx, roleID, parts[0], parts[1])
 				if err != nil {
-					s.logger.Error("rbac check failed", logger.F("error", err), logger.F("role_id", claims.RoleID), logger.F("path", r.URL.Path))
+					s.logger.Error("rbac check failed", logger.F("error", err), logger.F("role_name", claims.RoleName), logger.F("path", r.URL.Path))
 					writeJSON(w, dto.ErrorResp(500, "permission check failed"))
 					return
 				}
 				if !ok {
 					s.logger.Warn("permission denied",
-						logger.F("role_id", claims.RoleID),
+						logger.F("role_name", claims.RoleName),
 						logger.F("user_id", claims.UserID),
 						logger.F("required", perm),
 						logger.F("path", r.URL.Path),
@@ -440,12 +456,27 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		claims, err := s.jwt.Parse(tokenStr)
 		if err != nil {
+			s.logger.Debug("authMiddleware: JWT parse failed", logger.F("error", err))
 			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
 			return
 		}
 
+		// Resolve role_name → role_id from current DB.
+		role, _ := s.handler.roles.GetByName(r.Context(), claims.RoleName)
+		var roleID snowflake.ID
+		if role != nil {
+			roleID = role.ID
+		}
+
+		s.logger.Debug("authMiddleware: token parsed",
+			logger.F("user_id", claims.UserID),
+			logger.F("role_name", claims.RoleName),
+			logger.F("resolved_role_id", roleID),
+			logger.F("path", r.URL.Path),
+		)
+
 		ctx := auth.WithUserID(r.Context(), claims.UserID)
-		ctx = auth.WithRoleID(ctx, claims.RoleID)
+		ctx = auth.WithRoleID(ctx, roleID)
 
 		next(w, r.WithContext(ctx))
 	}
