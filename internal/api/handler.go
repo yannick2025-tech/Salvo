@@ -3205,8 +3205,8 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		if padding < paddingOffset {
 			padding = paddingOffset
 		}
-		if padding > 60*time.Second {
-			padding = 60 * time.Second
+		if padding > 1200*time.Second {
+			padding = 1200 * time.Second
 		}
 		windowStart = windowStart.Add(-padding)
 		// For finished tests, add extra 10 seconds after end time

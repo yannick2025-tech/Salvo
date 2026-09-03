@@ -349,7 +349,7 @@
         </div>
         <div class="form-group">
           <label>并发数</label>
-          <input v-model.number="runConfig.workers" type="number" min="1" max="1000" step="1" @input="normalizeNumber($event, 'workers')" />
+          <input v-model="runConfig.workers" type="number" min="1" max="1000" step="1" @input="normalizeNumber($event, 'workers')" />
         </div>
         <div class="form-group">
           <label>运行模式</label>
@@ -360,11 +360,11 @@
         </div>
         <div v-if="runConfig.run_mode === 'count'" class="form-group">
           <label>总次数</label>
-          <input v-model.number="runConfig.count" type="number" min="1" max="1000000" step="1" @input="normalizeNumber($event, 'count')" />
+          <input v-model="runConfig.count" type="number" min="1" max="1000000" step="1" @input="normalizeNumber($event, 'count')" />
         </div>
         <div v-if="runConfig.run_mode === 'duration'" class="form-group">
           <label>持续时间(秒)</label>
-          <input v-model.number="runConfig.duration" type="number" min="1" max="86400" step="1" @input="normalizeNumber($event, 'duration')" />
+          <input v-model="runConfig.duration" type="number" min="1" max="86400" step="1" @input="normalizeNumber($event, 'duration')" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
@@ -1263,48 +1263,48 @@ function showToast(msg: string, type = 'info') {
 
 function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') {
   const input = event.target as HTMLInputElement
-  const value = input.value
-  
-  // Allow empty input - user may be typing
-  if (!value) {
-    return
+  const cursorPos = input.selectionStart
+  const raw = input.value
+
+  // Strip non-digits
+  const cleaned = raw.replace(/[^0-9]/g, '')
+
+  // Only update if content actually changed (avoids cursor jump)
+  if (cleaned !== raw) {
+    input.value = cleaned
+    // Restore cursor position, clamped to new length
+    const newPos = Math.min(cursorPos, cleaned.length)
+    input.setSelectionRange(newPos, newPos)
   }
-  
-  // Allow single zero - user may be typing
-  if (value === '0') {
-    return
+
+  // Update reactive value as string (no auto-correction during typing)
+  if (field === 'workers') runConfig.workers = cleaned
+  else if (field === 'count') runConfig.count = cleaned
+  else if (field === 'duration') runConfig.duration = cleaned
+}
+
+function validateRunConfig(): string | null {
+  const limits: Record<string, { min: number; max: number; label: string }> = {
+    workers: { min: 1, max: 1000, label: '并发数' },
+    count: { min: 1, max: 1000000, label: '总次数' },
+    duration: { min: 1, max: 86400, label: '持续时间' },
   }
-  
-  const numValue = parseInt(value, 10)
-  if (isNaN(numValue)) {
-    // Remove non-numeric characters
-    input.value = value.replace(/[^0-9]/g, '')
-    return
-  }
-  
-  const limits: Record<string, { min: number; max: number }> = {
-    workers: { min: 1, max: 1000 },
-    count: { min: 1, max: 1000000 },
-    duration: { min: 1, max: 86400 },
-  }
-  
-  const limit = limits[field]
-  if (numValue < limit.min) {
-    input.value = String(limit.min)
-    if (field === 'workers') runConfig.workers = limit.min
-    else if (field === 'count') runConfig.count = limit.min
-    else if (field === 'duration') runConfig.duration = limit.min
-  } else if (numValue > limit.max) {
-    input.value = String(limit.max)
-    if (field === 'workers') runConfig.workers = limit.max
-    else if (field === 'count') runConfig.count = limit.max
-    else if (field === 'duration') runConfig.duration = limit.max
+
+  // Always validate workers
+  const w = parseInt(String(runConfig.workers), 10)
+  if (isNaN(w) || w < 1) return `${limits.workers.label}必须为大于0的整数`
+  if (w > limits.workers.max) return `${limits.workers.label}不能超过${limits.workers.max}`
+
+  if (runConfig.run_mode === 'count') {
+    const c = parseInt(String(runConfig.count), 10)
+    if (isNaN(c) || c < 1) return `${limits.count.label}必须为大于0的整数`
+    if (c > limits.count.max) return `${limits.count.label}不能超过${limits.count.max}`
   } else {
-    // Update the reactive value when valid input
-    if (field === 'workers') runConfig.workers = numValue
-    else if (field === 'count') runConfig.count = numValue
-    else if (field === 'duration') runConfig.duration = numValue
+    const d = parseInt(String(runConfig.duration), 10)
+    if (isNaN(d) || d < 1) return `${limits.duration.label}必须为大于0的整数`
+    if (d > limits.duration.max) return `${limits.duration.label}不能超过${limits.duration.max}`
   }
+  return null
 }
 
 async function fetchScene() {
@@ -1815,14 +1815,20 @@ async function handleStart() {
     showToast('请先添加 DAG 节点', 'error')
     return
   }
+  // Validate numeric inputs
+  const validationError = validateRunConfig()
+  if (validationError) {
+    showToast(validationError, 'error')
+    return
+  }
   const sceneId = route.params.id as string
   try {
     const resp = await startScene({
       scene_id: sceneId,
-      workers: runConfig.workers,
+      workers: parseInt(String(runConfig.workers), 10),
       run_mode: runConfig.run_mode,
-      count: runConfig.count,
-      duration: runConfig.duration,
+      count: parseInt(String(runConfig.count), 10),
+      duration: parseInt(String(runConfig.duration), 10),
     })
     if (resp.code === 0) {
       // Store run_id for execution status tracking
