@@ -15,44 +15,53 @@
 - [Salvo 场景 YAML 导入指南](#salvo-场景-yaml-导入指南)
   - [目录](#目录)
   - [1. YAML 顶层结构](#1-yaml-顶层结构)
-  - [2. 场景变量与数据源](#2-场景变量与数据源)
-    - [2.1 variables 场景变量](#21-variables-场景变量)
-    - [2.2 config\_params 配置参数](#22-config_params-配置参数)
-    - [2.3 derived\_params 派生参数](#23-derived_params-派生参数)
-    - [2.4 data\_sources CSV 数据源](#24-data_sources-csv-数据源)
-  - [3. 节点类型详解](#3-节点类型详解)
-    - [3.1 http HTTP 请求节点](#31-http-http-请求节点)
-    - [3.2 setup / teardown 生命周期节点](#32-setup--teardown-生命周期节点)
-    - [3.3 generator 生成器节点](#33-generator-生成器节点)
-    - [3.4 delay 延迟节点](#34-delay-延迟节点)
-    - [3.5 timer 定时器节点](#35-timer-定时器节点)
-    - [3.6 condition 条件判断节点](#36-condition-条件判断节点)
-    - [3.7 if-else 条件分支节点](#37-if-else-条件分支节点)
-    - [3.8 group 分组节点](#38-group-分组节点)
-    - [3.9 while 循环节点](#39-while-循环节点)
-    - [3.10 loop 循环节点](#310-loop-循环节点)
-    - [3.11 parallel 并行节点](#311-parallel-并行节点)
-    - [3.12 sub\_flow 子流程节点](#312-sub_flow-子流程节点)
-  - [4. 内置系统函数](#4-内置系统函数)
-    - [4.1 \_\_random 随机数](#41-__random-随机数)
-    - [4.2 \_\_weightedChoice 加权选择](#42-__weightedchoice-加权选择)
-    - [4.3 \_\_oneOf 等概率选择](#43-__oneof-等概率选择)
-    - [4.4 \_\_manOf 多选](#44-__manof-多选)
-    - [4.5 \_\_snowflakeId 雪花ID](#45-__snowflakeid-雪花id)
-  - [5. SO 插件](#5-so-插件)
-    - [5.1 通用调用语法](#51-通用调用语法)
-    - [5.2 login 插件](#52-login-插件)
-    - [5.3 aes 插件](#53-aes-插件)
-  - [6. 表达式与变量引用](#6-表达式与变量引用)
-    - [6.1 变量引用](#61-变量引用)
-    - [6.2 函数调用](#62-函数调用)
-    - [6.3 数学表达式](#63-数学表达式)
-    - [6.4 混合使用](#64-混合使用)
-    - [6.5 引号规则](#65-引号规则)
-  - [7. 节点通用字段](#7-节点通用字段)
-    - [7.1 block\_on\_error 错误阻断](#71-block_on_error-错误阻断)
-  - [8. 变量默认值与 Payload 类型匹配](#8-变量默认值与-payload-类型匹配)
-  - [9. 完整示例](#9-完整示例)
+  - [2. DAG 执行模型](#2-dag-执行模型)
+    - [2.1 拓扑排序与顺序执行](#21-拓扑排序与顺序执行)
+    - [2.2 独立分支并行](#22-独立分支并行)
+    - [2.3 边条件控制](#23-边条件控制)
+  - [3. 场景变量与数据源](#3-场景变量与数据源)
+    - [3.1 variables 场景变量](#31-variables-场景变量)
+    - [3.2 config\_params 配置参数](#32-config_params-配置参数)
+    - [3.3 derived\_params 派生参数](#33-derived_params-派生参数)
+    - [3.4 data\_sources CSV 数据源](#34-data_sources-csv-数据源)
+      - [2.4.1 YAML 与 CSV 数据源共存](#241-yaml-与-csv-数据源共存)
+  - [4. 节点类型详解](#4-节点类型详解)
+    - [4.1 http HTTP 请求节点](#41-http-http-请求节点)
+    - [4.2 setup / teardown 生命周期节点](#42-setup--teardown-生命周期节点)
+    - [4.3 generator 生成器节点](#43-generator-生成器节点)
+    - [4.4 delay 延迟节点](#44-delay-延迟节点)
+    - [4.5 timer 定时器节点](#45-timer-定时器节点)
+    - [4.6 condition 条件判断节点](#46-condition-条件判断节点)
+    - [4.7 if-else 条件分支节点](#47-if-else-条件分支节点)
+    - [4.8 group 分组节点](#48-group-分组节点)
+    - [4.9 while 循环节点](#49-while-循环节点)
+    - [4.10 loop 循环节点](#410-loop-循环节点)
+    - [4.11 parallel 并行节点](#411-parallel-并行节点)
+    - [4.12 sub\_flow 子流程节点](#412-sub_flow-子流程节点)
+  - [5. 内置系统函数](#5-内置系统函数)
+    - [5.1 \_\_random 随机数](#51-__random-随机数)
+    - [5.2 \_\_weightedChoice 加权选择](#52-__weightedchoice-加权选择)
+    - [5.3 \_\_oneOf 等概率选择](#53-__oneof-等概率选择)
+    - [5.4 \_\_manOf 多选](#54-__manof-多选)
+    - [5.5 \_\_snowflakeId 雪花ID](#55-__snowflakeid-雪花id)
+  - [6. SO 插件](#6-so-插件)
+    - [6.1 通用调用语法](#61-通用调用语法)
+    - [6.2 login 插件](#62-login-插件)
+    - [6.3 aes 插件](#63-aes-插件)
+  - [7. 表达式与变量引用](#7-表达式与变量引用)
+    - [7.1 变量引用](#71-变量引用)
+    - [7.2 函数调用](#72-函数调用)
+    - [7.3 数学表达式](#73-数学表达式)
+    - [7.4 混合使用](#74-混合使用)
+    - [7.5 引号规则](#75-引号规则)
+  - [8. 节点通用字段](#8-节点通用字段)
+    - [8.1 block\_on\_error 错误阻断](#81-block_on_error-错误阻断)
+  - [9. 变量默认值与 Payload 类型匹配](#9-变量默认值与-payload-类型匹配)
+    - [9.1 字符串字段（后端需要 `"value"`）](#91-字符串字段后端需要-value)
+    - [9.2 整数字段（后端需要 `123`）](#92-整数字段后端需要-123)
+    - [9.3 常见错误与排查](#93-常见错误与排查)
+    - [9.4 速查表](#94-速查表)
+  - [10. 完整示例](#10-完整示例)
   - [附：节点类型速查表](#附节点类型速查表)
 
 ---
@@ -100,9 +109,82 @@ edges:                          # 可选，DAG 边定义(省略时按 setup→no
 
 ---
 
-## 2. 场景变量与数据源
+## 2. DAG 执行模型
 
-### 2.1 variables 场景变量
+Salvo 的节点编排基于 **有向无环图（DAG）** 模型。每个节点是图中的一个顶点，`edges` 定义了顶点之间的有向边。执行引擎根据 DAG 拓扑排序决定执行顺序。
+
+### 2.1 拓扑排序与顺序执行
+
+当未定义 `edges` 时，Salvo 自动按 `setup → nodes → teardown` 顺序串联执行，等价于一条线性链。
+
+当定义了 `edges` 时，执行引擎对 DAG 进行**拓扑排序**，按依赖关系依次执行节点。只有当前驱节点全部执行完毕后，后续节点才会被触发。
+
+```yaml
+# 线性链：A → B → C → D
+edges:
+  - from: A
+    to: B
+  - from: B
+    to: C
+  - from: C
+    to: D
+```
+
+### 2.2 独立分支并行
+
+当 DAG 中存在**没有依赖关系的独立分支**时，执行引擎会**自动并行**执行这些分支，无需手动配置。
+
+```yaml
+# A → B → D
+# A → C → D
+# B 和 C 无依赖关系，会并行执行
+edges:
+  - from: A
+    to: B
+  - from: A
+    to: C
+  - from: B
+    to: D
+  - from: C
+    to: D
+```
+
+执行顺序：
+1. 执行 A
+2. A 完成后，B 和 C **并行**执行
+3. B 和 C 都完成后，执行 D
+
+> **注意**：如果 B 和 C 之间有数据依赖（如 B 提取的变量被 C 使用），则不能并行，必须通过边显式建立依赖关系。
+
+### 2.3 边条件控制
+
+`edges` 的 `condition` 字段可以控制分支走向，配合 `if-else` 节点实现条件分支：
+
+| condition 值 | 说明 |
+|-------------|------|
+| `__if_true__` | 当 if-else 节点的 `expr` 求值为 true 时走此边 |
+| `__if_false__` | 当 if-else 节点的 `expr` 求值为 false 时走此边 |
+| 省略 | 无条件执行（默认） |
+
+```yaml
+edges:
+  - from: 判断支付状态
+    to: 执行支付
+    condition: "__if_true__"
+  - from: 判断支付状态
+    to: 跳过支付
+    condition: "__if_false__"
+```
+
+参考实现：
+- DAG 拓扑排序：[dag.go]($PROJECT_HOME/salvo/internal/core/dag/dag.go)
+- 执行引擎：[executor.go]($PROJECT_HOME/salvo/internal/runner/runner.go)
+
+---
+
+## 3. 场景变量与数据源
+
+### 3.1 variables 场景变量
 
 场景变量在场景启动时初始化，所有节点共享。引用方式：`${var_name}`。
 
@@ -132,7 +214,7 @@ variables:
     value: "http://${api_host}/api"       # → "http://uat-api.example.com/api"
 ```
 
-### 2.2 config_params 配置参数
+### 3.2 config_params 配置参数
 
 `config_params` 是 map 形式的变量，导入时与 `variables` 合并存储，主要用于**业务配置参数**。
 
@@ -146,7 +228,7 @@ config_params:
 
 在节点中引用：`${charge_time}` / `${pay_type}` / `${env_type}`
 
-### 2.3 derived_params 派生参数
+### 3.3 derived_params 派生参数
 
 `derived_params` 同样合并到 `variables`，主要用于**派生/计算参数**。当前导入时不会执行表达式，仅作为普通字符串存储。
 
@@ -156,7 +238,7 @@ derived_params:
   charge_post_offline_time: "150"
 ```
 
-### 2.4 data_sources CSV 数据源
+### 3.4 data_sources CSV 数据源
 
 数据源用于参数化测试，每个虚拟用户从数据源中取一行数据，通过 `${数据源名.列名}` 引用。
 
@@ -227,7 +309,7 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 
 ---
 
-## 3. 节点类型详解
+## 4. 节点类型详解
 
 所有节点共享通用字段：
 
@@ -261,7 +343,7 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 | `parallel` | 并行 | 并发请求 |
 | `sub_flow` | 子流程 | 嵌套场景调用 |
 
-### 3.1 http HTTP 请求节点
+### 4.1 http HTTP 请求节点
 
 最常用的节点类型，执行一次 HTTP 请求。
 
@@ -296,9 +378,44 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 | `url` | 是 | 请求 URL，支持 `${var}` |
 | `headers` | 否 | 请求头 map |
 | `body` | 否 | 请求体字符串(JSON 字符串) |
+| `form` | 否 | multipart/form-data 表单字段，支持文件上传（见下方示例） |
 | `timeout` | 否 | 超时(秒为数字，毫秒为字符串) |
 | `expect_body` | 否 | 响应体 JSON 字段断言 |
 | `extract` | 否 | JSONPath 提取变量 |
+| `aes_decrypt` | 否 | AES 密钥（base64），用于解密加密的响应体 |
+| `aes_mode` | 否 | AES 模式：`0`=CBC，`1`=GCM（默认） |
+
+**form-data 文件上传**：
+
+```yaml
+- name: 上传文件
+  type: http
+  config:
+    method: POST
+    url: "${base_url}/upload"
+    form:
+      file:
+        file_path: "/path/to/test.pdf"
+        content_type: "application/pdf"
+      description: "测试文件上传"
+```
+
+> **注意**：`form` 和 `body` 互斥，使用 `form` 时自动设置 `Content-Type: multipart/form-data`。`file_path` 指向本地文件，`content_type` 可选。
+
+**aes_decrypt 响应解密**：
+
+```yaml
+# 步骤响应体是 AES-GCM 加密的，需要先解密再提取变量
+- name: 查询加密数据
+  type: http
+  config:
+    method: GET
+    url: "${base_url}/encrypted-data"
+    aes_decrypt: "${aes_key_base64}"     # base64 编码的 AES 密钥
+    aes_mode: 1                          # GCM 模式（默认）
+    extract:
+      secret_value: "$.data.value"
+```
 
 **extract 两种写法**：
 
@@ -316,13 +433,21 @@ extract:
     path: "$.data.token"
 ```
 
+**retry 重试配置**：
+
+```yaml
+retry:
+  count: 3           # 最大重试次数
+  interval: "500ms"  # 重试间隔
+```
+
 > **注意**：`body` 必须是字符串，内部 JSON 用单引号包裹。`extract` 仅在 http/setup/teardown 节点的 `config` 中有效；while/loop/parallel 内部 steps 的 extract 在 step 层级。
 
 参考实现：[runner.go#L1371-L1612]($PROJECT_HOME/salvo/internal/runner/runner.go#L1371-L1612)
 
 ---
 
-### 3.2 setup / teardown 生命周期节点
+### 4.2 setup / teardown 生命周期节点
 
 `setup` 和 `teardown` 在导入时被识别为生命周期节点，分别放入 Setup 阶段和 Teardown 阶段。它们本质上也是 HTTP 节点，配置完全相同。
 
@@ -361,7 +486,7 @@ teardown:
 
 ---
 
-### 3.3 generator 生成器节点
+### 4.3 generator 生成器节点
 
 执行表达式并将结果存入变量。主要用于：
 1. 调用内置函数（`__random`、`__snowflakeId` 等）
@@ -418,7 +543,7 @@ teardown:
 
 ---
 
-### 3.4 delay 延迟节点
+### 4.4 delay 延迟节点
 
 固定时间延迟，用于模拟用户操作间隔。
 
@@ -439,7 +564,7 @@ teardown:
 
 ---
 
-### 3.5 timer 定时器节点
+### 4.5 timer 定时器节点
 
 支持两种模式：延迟(delay)和间隔(interval)。
 
@@ -473,7 +598,7 @@ teardown:
 
 ---
 
-### 3.6 condition 条件判断节点
+### 4.6 condition 条件判断节点
 
 求值一个条件表达式，结果存入节点输出。**单纯求值，不影响分支**。若需分支，请用 `if-else`。
 
@@ -507,7 +632,7 @@ teardown:
 
 ---
 
-### 3.7 if-else 条件分支节点
+### 4.7 if-else 条件分支节点
 
 二选一分支。节点本身只求值 `expr`，**真正的分支由 edges 的 `condition` 字段控制**。
 
@@ -548,7 +673,7 @@ edges:
 
 ---
 
-### 3.8 group 分组节点
+### 4.8 group 分组节点
 
 将多个子节点组合成一个组，支持循环和异步执行。
 
@@ -587,7 +712,7 @@ nodes:
 
 ---
 
-### 3.9 while 循环节点
+### 4.9 while 循环节点
 
 条件退出循环，常用于轮询场景。
 
@@ -666,6 +791,8 @@ nodes:
 | `interval_seconds` | 否 | 每轮间隔秒数 |
 | `max_iterations` | 否 | 最大迭代次数 |
 | `max_duration_minutes` | 否 | 最大持续分钟数 |
+| `fail_on_max_iterations` | 否 | 达到最大迭代次数时是否视为失败，默认 `true`。设为 `false` 则视为成功退出（如轮询占位订单场景） |
+| `fail_on_max_duration` | 否 | 达到最大持续时间时是否视为失败，默认 `true`。设为 `false` 则视为成功退出 |
 | `fail_after_consecutive` | 否 | 连续失败次数阈值 |
 | `fail_message` | 否 | 失败消息 |
 | `steps` | 是 | 循环体步骤列表 |
@@ -675,20 +802,63 @@ nodes:
 | 字段 | 说明 |
 |------|------|
 | `name` | 步骤名称 |
+| `type` | 步骤类型：`"http"`（默认）或 `"generator"`（生成器步骤，使用 `config.expression` + `config.variable`） |
 | `condition` | 步骤执行条件 `{variable, operator, value}` |
-| `request` | HTTP 请求 `{method, url, headers, body}` |
+| `request` | HTTP 请求 `{method, url, headers, body, form, expect_body}` |
 | `extract` | 变量提取(列表形式) |
 | `think_time` | 思考时间 `{min, max}`(毫秒) |
 | `timed_trigger` | 定时触发 `{after_seconds, once}` |
 | `retry` | 重试 `{max_attempts, on_429}` |
+| `block_on_error` | 步骤失败时是否立即中断 while 循环（详见 [8.1 block_on_error](#81-block_on_error-错误阻断)） |
+| `aes_decrypt` | AES 密钥（base64），用于解密加密的响应体 |
+| `aes_mode` | AES 模式：`0`=CBC，`1`=GCM（默认）。nil 时默认 GCM |
 
 **operator 支持的值**：`equals` `not_equals` `greater_than` `greater_than_or_equal` `less_than` `less_than_or_equal` `empty` `not_empty`
+
+**fail_on_max_iterations 示例**：
+
+```yaml
+# 轮询占位订单场景：达到最大迭代视为成功（订单已占位即目标达成）
+- name: 轮询占位订单
+  type: while
+  config:
+    exit_conditions:
+      - variable: order_status
+        operator: equals
+        value: "PLACED"
+    max_iterations: 30
+    fail_on_max_iterations: false     # 达到 30 次视为成功，记录 WARN 日志
+    fail_message: "占位超时但可接受"
+    steps:
+      - name: 查询订单状态
+        request:
+          method: GET
+          url: "${base_url}/orders/${order_id}/status"
+        extract:
+          - variable: order_status
+            path: "$.data.status"
+```
+
+**aes_decrypt 响应解密示例**：
+
+```yaml
+# 步骤响应体是 AES-GCM 加密的，需要先解密再提取变量
+- name: 查询加密数据
+  aes_decrypt: "${aes_key_base64}"     # base64 编码的 AES 密钥
+  aes_mode: 1                          # GCM 模式（默认）
+  request:
+    method: GET
+    url: "${base_url}/encrypted-data"
+  extract:
+    - variable: secret_value
+      path: "$.data.value"
+```
 
 参考实现：[while_node.go#L1-L130]($PROJECT_HOME/salvo/internal/runner/while_node.go#L1-L130)
 
 ---
 
-### 3.10 loop 循环节点
+### 4.10 loop 循环节点
 
 固定次数循环，与 while 的区别是**无退出条件**，固定循环 N 次。
 
@@ -724,7 +894,7 @@ nodes:
 
 ---
 
-### 3.11 parallel 并行节点
+### 4.11 parallel 并行节点
 
 多个步骤并发执行，提取的变量合并回主作用域。
 
@@ -770,7 +940,7 @@ nodes:
 
 ---
 
-### 3.12 sub_flow 子流程节点
+### 4.12 sub_flow 子流程节点
 
 调用另一个场景作为子流程，支持同步/异步。
 
@@ -795,7 +965,7 @@ nodes:
 
 ---
 
-## 4. 内置系统函数
+## 5. 内置系统函数
 
 内置函数通过 `${__funcName(args)}` 语法调用，可在以下位置使用：
 - `generator` 节点的 `expression`
@@ -804,7 +974,7 @@ nodes:
 
 注册位置：[register.go]($PROJECT_HOME/salvo/internal/generator/builtin/register.go)
 
-### 4.1 \_\_random 随机数
+### 5.1 \_\_random 随机数
 
 生成随机数，支持整数和浮点数两种模式。
 
@@ -848,7 +1018,7 @@ nodes:
 
 ---
 
-### 4.2 \_\_weightedChoice 加权选择
+### 5.2 \_\_weightedChoice 加权选择
 
 按权重随机选择一个选项。
 
@@ -884,7 +1054,7 @@ nodes:
 
 ---
 
-### 4.3 \_\_oneOf 等概率选择
+### 5.3 \_\_oneOf 等概率选择
 
 从多个选项中随机选一个，每个选项等概率。
 
@@ -921,7 +1091,7 @@ nodes:
 
 ---
 
-### 4.4 \_\_manOf 多选
+### 5.4 \_\_manOf 多选
 
 从多个选项中**独立**以 50% 概率选择每个选项，返回逗号分隔的字符串。保证至少选一个。
 
@@ -949,7 +1119,7 @@ nodes:
 
 ---
 
-### 4.5 \_\_snowflakeId 雪花ID
+### 5.5 \_\_snowflakeId 雪花ID
 
 生成全局唯一的雪花 ID(19 位数字字符串)。
 
@@ -983,11 +1153,11 @@ nodes:
 
 ---
 
-## 5. SO 插件
+## 6. SO 插件
 
 SO 插件是编译为 `.so` 共享库的 Go 插件，通过 `__so` 函数调用。
 
-### 5.1 通用调用语法
+### 6.1 通用调用语法
 
 ```
 ${__so("pluginName", "operation", arg1, arg2, ...)}
@@ -1003,7 +1173,7 @@ ${__so("pluginName@version", "operation", arg1, ...)}   # 指定版本
 
 ---
 
-### 5.2 login 插件
+### 6.2 login 插件
 
 B 端登录插件，完整流程：AES-GCM 加密 → 获取 salt → bcrypt 哈希 → 登录 → 返回 JWT。
 
@@ -1059,7 +1229,7 @@ setup:
 
 ---
 
-### 5.3 aes 插件
+### 6.3 aes 插件
 
 AES-CBC 加密/解密插件。
 
@@ -1105,11 +1275,11 @@ AES-CBC 加密/解密插件。
 
 ---
 
-## 6. 表达式与变量引用
+## 7. 表达式与变量引用
 
 Salvo 表达式引擎支持三种 `${...}` 表达式：
 
-### 6.1 变量引用
+### 7.1 变量引用
 
 ```
 ${variable_name}
@@ -1117,14 +1287,14 @@ ${data_source.column}              # CSV 数据源列
 ${nested_var}                       # 嵌套变量(变量值中含 ${})
 ```
 
-### 6.2 函数调用
+### 7.2 函数调用
 
 ```
 ${__functionName(args)}
 ${__functionName("str_arg", 123, ${var})}
 ```
 
-### 6.3 数学表达式
+### 7.3 数学表达式
 
 ```
 ${max_charge_power} / 1000
@@ -1132,14 +1302,14 @@ ${price} * ${quantity}
 (${base} + ${tax}) * 1.1
 ```
 
-### 6.4 混合使用
+### 7.4 混合使用
 
 ```
 ${base_url}/orders/${__snowflakeId()}
 Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 ```
 
-### 6.5 引号规则
+### 7.5 引号规则
 
 | 场景 | 写法 | 说明 |
 |------|------|------|
@@ -1152,7 +1322,7 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 
 ---
 
-## 7. 节点通用字段
+## 8. 节点通用字段
 
 以下字段可应用于所有节点类型（在 `config` 之外）：
 
@@ -1176,7 +1346,7 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 
 参考实现：[handler.go#L485-L525]($PROJECT_HOME/salvo/internal/api/handler.go#L485-L525)
 
-### 7.1 block_on_error 错误阻断
+### 8.1 block_on_error 错误阻断
 
 默认情况下，节点执行失败（HTTP 非 2xx、`expect_body` 断言失败等）不会中断整个链路，后续节点继续执行。通过设置 `block_on_error: true`，可以让该节点失败时**立即取消整个 chain 的执行**。
 
@@ -1262,11 +1432,11 @@ while 循环内部的 steps 也支持 `block_on_error`，且**优先级高于 `f
 
 ---
 
-## 8. 变量默认值与 Payload 类型匹配
+## 9. 变量默认值与 Payload 类型匹配
 
 变量替换机制（`resolveWithVariables`）使用 `fmt.Sprintf("%v", v)` 将变量值直接替换到 body 模板中。因此，**变量的默认值必须与 body 模板中该字段的 JSON 类型匹配**，否则会产生无效 JSON。
 
-### 8.1 字符串字段（后端需要 `"value"`）
+### 9.1 字符串字段（后端需要 `"value"`）
 
 当后端 payload 中字段为字符串类型时，body 模板中用**双引号包裹**变量引用，默认值设为 `""`。
 
@@ -1289,7 +1459,7 @@ expr: '${order_no} != ""'
 | `order_no = "ORD123"` | `{"orderNo":"ORD123"}` | ✓ |
 | `order_no = ""` | `{"orderNo":""}` | ✓ |
 
-### 8.2 整数字段（后端需要 `123`）
+### 9.2 整数字段（后端需要 `123`）
 
 当后端 payload 中字段为整数类型时，body 模板中**不加引号**直接引用变量，默认值必须设为 `"0"`（字符串形式的数字）。
 
@@ -1313,7 +1483,7 @@ expr: '${order_id} != "0"'
 | `order_id = "0"` | `{"orderId":0}` | ✓ |
 | `order_id = ""` | `{"orderId":}` | ✗ **无效 JSON！** |
 
-### 8.3 常见错误与排查
+### 9.3 常见错误与排查
 
 **错误现象**：日志中出现 `body_preview: {"orderId":,"couponId":0}`，后端 JSON 反序列化失败。
 
@@ -1335,7 +1505,7 @@ variables:
 body: '{"orderId":${order_id}}'     # 替换后 → {"orderId":0}
 ```
 
-### 8.4 速查表
+### 9.4 速查表
 
 | 后端字段类型 | Go struct 示例 | 默认值 | body 模板 | IF-ELSE 条件 |
 |-------------|---------------|--------|-----------|-------------|
@@ -1347,7 +1517,7 @@ body: '{"orderId":${order_id}}'     # 替换后 → {"orderId":0}
 
 ---
 
-## 9. 完整示例
+## 10. 完整示例
 
 以下是一个综合示例，涵盖主要节点类型：
 

@@ -15,7 +15,56 @@ tags: [pitfalls, performance, layout, echarts, async, dom]
 ## Lesson 1: 前端首屏性能优化 — Runtime 图表加载卡顿 (2026-05-23)
 
 ### 现象
-Dashboard 页面首次加载时，从顶部滚动到 runtime 图表区域（页面底部），需要等待 **3~10 秒** 图表才显示出来，用户体验不丝滑。
+Dashboard 页面首次加载时，从顶部滚动到 runtime 图表区域（页面底部），需要等待 **3~10 秒** 图表才显示出来，用户体验不丝滑。而同页面的 Node 详情图（QPS/Latency/Error）却能即时显示。
+
+### 排查过程（5 轮迭代）
+
+#### 第 1 轮：怀疑是主题切换问题
+- **假设**：切换深浅主题时图表重建慢
+- **排查**：发现 `MutationObserver` dispose 了 5 个 runtime 小图但只重渲染了 3 个 Node 详情图
+- **修复**：补全 5 个 runtime 图表的重渲染调用
+- **结果**：❌ 问题依旧，只是修复了主题切换的子问题
+
+#### 第 2 轮：怀疑是 IntersectionObserver 懒加载延迟
+- **假设**：`rootMargin: 200px` 不够大，触发太晚
+- **优化**：增大到 `800px` + 数据到达后 `nextTick()` 预热渲染
+- **结果**：❌ 问题依旧，但方向对了
+
+#### 第 3 轮：怀疑是数据量门槛过高
+- **假设**：`sysMetricsHistory.length < 2` 导致首次只有 1 条数据时不渲染
+- **日志证据**：
+  ```
+  sysMetricsHistory = [1条] → length < 2 → return ❌
+  ```
+- **修复**：改为 `length === 0` 才跳过
+- **结果**：❌ 还是卡顿，但排除了这个因素
+
+#### 第 4 轮：怀疑是分帧渲染延迟
+- **假设**：4 层 `requestAnimationFrame` 嵌套导致 ~66ms+ 延迟
+- **对比**：Node 详情图是同步连续调用，runtime 是 rAF 分帧
+- **修复**：去掉分帧，改为同步连续调用
+- **结果**：❌ 还是卡顿，说明瓶颈不在渲染本身
+
+#### 第 5 轮：添加详细时间戳日志定位真因 ✅
+在所有关键节点添加 `[SYS-DEBUG]` 日志：
+
+```
+[SYS-DEBUG] onMounted | t=xxxms
+[SYS-DEBUG] fetchOverview start | t=xxxms
+[SYS-DEBUG] fetchOverview done | hasRunning=... | sysTimeSeriesLen=0/300
+[SYS-DEBUG] prewarmSysCharts | start | DOM not ready / no data / rendering...
+[SYS-DEBUG] prewarmSysCharts | done in xx.xms
+```
+
+**关键发现（日志铁证）**：
+
+```log
+T=0s      onMounted → fetchOverview(第1次)
+T=21ms    fetchOverview 返回: sysTimeSeriesLen=0 ❌ (无数据!)
+T=5s      pollTimer → fetchOverview(第2次): sysTimeSeriesLen=300 ✅
+T=5.1s    尝试渲染 → DOM not ready (ref=false) ❌
+T=5.2s    100ms 重试 → DOM ready! 渲染成功 (49ms) 🚀
+```
 
 ### 根因分析（3 层叠加）
 
@@ -99,58 +148,103 @@ function prewarmSysCharts(caller: string) {
 ## Lesson 2: 链路跟踪色块溢出边界问题 (2026-05)
 
 ### 现象
-Trace 详情页面的某个**色块组件（Span/时间线）一直超出画面右边界**。尝试了多种 CSS 修复均无效。
+Trace 详情页面的某个**色块组件（Span/时间线）一直超出画面右边界**。尝试了多种 CSS 修复均无效：
+- 设置 `overflow: hidden` → 色块被裁剪，但根因未解决
+- 调整 `max-width: 100%` → 无效
+- 检查父容器 `padding/margin` → 未发现异常
 
-### 排查方法对比
+### 排查过程
 
-| 方法 | 耗时 | 成功率 |
-|------|------|--------|
-| 传统目视+试错 | **2+ 小时** | ❌ 反复失败 |
-| 全局边框扫描 | **5 分钟** | ✅ 一次定位 |
+#### 传统方法（❌ 低效）
+1. **目视检查**：逐个查看 DOM 元素的 computed style → 无法定位
+2. **DevTools 盒模型**：检查每个元素的 width/padding/border → 正常
+3. **试错修改**：随机调整 CSS 属性 → 2+ 小时无果
 
-### 可视化调试方法
+#### 可视化调试方法（✅ 高效）
 
 **第 1 步：全局边框扫描**
+
+在浏览器控制台执行：
+
 ```javascript
+/* 一键全量诊断 */
 document.querySelectorAll('*').forEach(el => {
   el.style.outline = '1px solid rgba(255,0,0,0.2)'
 })
 ```
 
+**结果**：立即看到所有元素的边界盒模型，发现某个**中间层父容器宽度异常偏大**。
+
 **第 2 步：祖先链追踪**
+
 ```javascript
-let el = targetElement
+// 高亮目标元素及其所有祖先
+let el = document.querySelector('.target-span')
 const colors = ['red', 'orange', 'yellow', 'green', 'blue']
-while (el !== document.body) {
-  el.style.outline = `2px solid ${colors[depth++ % colors.length]}`
+
+while (el && el !== document.body) {
+  const depth = Math.min(getAncestorDepth(el), colors.length - 1)
+  el.style.outline = `2px solid ${colors[depth]}`
   el = el.parentElement
 }
 ```
 
-**第 3 步：检查 computed style**
+**颜色含义**：
+- 🔴 **红色**：目标元素本身
+- 🟠 **橙色**：直接父容器 ← **发现问题所在！**
+- 🟡 **黄色**：祖父容器
+- ...
+
+**第 3 步：定位根因**
+
+检查橙色边框的父容器样式：
+
 ```javascript
-getComputedStyle(el).width / maxWidth / boxSizing
+const parentEl = targetEl.parentElement
+console.log('Parent:', {
+  width: getComputedStyle(parentEl).width,
+  maxWidth: getComputedStyle(parentEl).maxWidth,
+  boxSizing: getComputedStyle(parentEl).boxSizing,
+})
 ```
+
+**发现**：该父容器的宽度被错误设置为 `width: calc(100% + XXpx)` 或类似值。
 
 ### 根因分析
 
-父容器的宽度被错误设置为 `width: calc(100% + XXpx)` 或类似值。
+| 层级 | 问题 | 影响 |
+|------|------|------|
+| **CSS 计算错误** | 父容器使用了错误的 `calc(100% + XXpx)` | 容器比预期宽 |
+| **嵌套传递** | 子元素继承父容器的 100% 宽度 | 错误宽度逐层放大 |
+| **难以察觉** | 没有明显的 overflow 报错 | DevTools 显示"正常" |
 
 ### 最终修复方案
 
 ```css
+/* ❌ 错误写法 */
+.parent-container {
+  width: calc(100% + 20px);  /* 多余的 padding/border 导致溢出 */
+}
+
 /* ✅ 正确写法 */
 .parent-container {
   width: 100%;
-  box-sizing: border-box;
+  box-sizing: border-box;  /* 让 padding/border 包含在 width 内 */
 }
 
 /* 或者使用更安全的方式 */
 .parent-container {
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: auto;  /* 允许横向滚动而非溢出 */
 }
 ```
+
+### 效果对比
+
+| 方法 | 耗时 | 成功率 |
+|------|------|--------|
+| 传统目视+试错 | **2+ 小时** | ❌ 反复失败 |
+| 全局边框扫描 | **5 分钟** | ✅ 一次定位 |
 
 ### Lessons Learned
 
