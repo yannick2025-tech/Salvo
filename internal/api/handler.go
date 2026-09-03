@@ -3068,6 +3068,15 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 	points := min(rangeSeconds, 120)
 	interval := float64(rangeSeconds) / float64(points)
 
+	// Check if any run is still running
+	hasRunning := false
+	for _, run := range runs {
+		if run.Status == "running" {
+			hasRunning = true
+			break
+		}
+	}
+
 	now := time.Now()
 	timestamps := make([]string, points)
 	qps := make([]float64, points)
@@ -3110,9 +3119,10 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 		}
 	}
 
-	// Trim trailing zero-value buckets (running tests: windowEnd=now
-	// but actual data may lag behind by a few seconds).
-	n := trimTrailingZeros(qps, p50, p95, p99, errRate)
+	// Trim trailing zero-value buckets.
+	// Running tests: trim all trailing zeros (chart ends at last data point).
+	// Finished tests: keep last 10 seconds of zeros (show curve dropping to zero).
+	n := trimTrailingZeros(!hasRunning, qps, p50, p95, p99, errRate)
 	timestamps = timestamps[:n]
 	qps = qps[:n]
 	p50 = p50[:n]
@@ -3132,10 +3142,22 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 
 // trimTrailingZeros returns the length after removing trailing entries
 // where ALL metric arrays are zero. Keeps at least 1 entry.
-func trimTrailingZeros(arrays ...[]float64) int {
+// When isFinished=true, preserves all entries (including trailing zeros)
+// so the chart can show the curve dropping to zero.
+// When isFinished=false (running test), trims all trailing zeros so the
+// chart ends at the last data point without showing future zero buckets.
+func trimTrailingZeros(isFinished bool, arrays ...[]float64) int {
 	if len(arrays) == 0 || len(arrays[0]) == 0 {
 		return 0
 	}
+
+	// For finished tests, keep all entries (including trailing zeros)
+	// to show the curve dropping to zero
+	if isFinished {
+		return len(arrays[0])
+	}
+
+	// For running tests, trim all trailing zeros
 	n := len(arrays[0])
 	for n > 1 {
 		allZero := true
@@ -3174,22 +3196,27 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		}
 	}
 
+	var paddingOffset time.Duration
+	paddingOffset = 5 * time.Second
+
 	if !hasRunning && !windowStart.IsZero() && !windowEnd.IsZero() {
 		// Dynamic padding: 10% of test duration, min 10s, max 60s
 		padding := windowEnd.Sub(windowStart) / 10
-		if padding < 10*time.Second {
-			padding = 10 * time.Second
+		if padding < paddingOffset {
+			padding = paddingOffset
 		}
 		if padding > 60*time.Second {
 			padding = 60 * time.Second
 		}
 		windowStart = windowStart.Add(-padding)
-		windowEnd = windowEnd.Add(padding)
+		// For finished tests, add extra 10 seconds after end time
+		// so the chart can show the curve dropping to zero
+		windowEnd = windowEnd.Add(padding + paddingOffset)
 	} else if hasRunning && !windowStart.IsZero() {
 		// For running tests, only pad the start; end is "now"
 		padding := time.Since(windowStart) / 10
-		if padding < 10*time.Second {
-			padding = 10 * time.Second
+		if padding < paddingOffset {
+			padding = paddingOffset
 		}
 		if padding > 60*time.Second {
 			padding = 60 * time.Second
@@ -3273,9 +3300,10 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		}
 	}
 
-	// Trim trailing zero-value buckets (running tests: windowEnd=now
-	// but actual data may lag behind by a few seconds).
-	n := trimTrailingZeros(qps, p50, p95, p99, errRate)
+	// Trim trailing zero-value buckets.
+	// Running tests: trim all trailing zeros (chart ends at last data point).
+	// Finished tests: keep last 10 seconds of zeros (show curve dropping to zero).
+	n := trimTrailingZeros(!hasRunning, qps, p50, p95, p99, errRate)
 	timestamps = timestamps[:n]
 	qps = qps[:n]
 	p50 = p50[:n]
