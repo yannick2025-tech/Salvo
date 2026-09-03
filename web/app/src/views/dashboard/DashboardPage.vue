@@ -724,7 +724,7 @@ const summaryMetrics = computed(() => {
       { label: '成功率', value: '-', color: 'var(--accent-success)', sub: '' },
       { label: 'P50 延迟', value: '-', color: 'var(--accent-info)', sub: '' },
       { label: 'P95 延迟', value: '-', color: 'var(--accent-warning)', sub: '' },
-      { label: 'P99 延迟', value: '-', color: 'var(--accent-danger)', sub: '' },
+      { label: 'P99 延迟', value: '-', color: '#f0883e', sub: '' },
       { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: null },
     ]
   }
@@ -742,7 +742,7 @@ const summaryMetrics = computed(() => {
     { label: '成功率', value: rate, color: 'var(--accent-success)', sub: '' },
     { label: 'P50 延迟', value: formatMs(d.p50_latency), color: 'var(--accent-info)', sub: '' },
     { label: 'P95 延迟', value: formatMs(d.p95_latency), color: 'var(--accent-warning)', sub: '' },
-    { label: 'P99 延迟', value: formatMs(d.p99_latency), color: 'var(--accent-danger)', sub: '' },
+    { label: 'P99 延迟', value: formatMs(d.p99_latency), color: '#f0883e', sub: '' },
     { label: '运行中', value: String(d.running), color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: timeInfo },
   ]
 })
@@ -1123,10 +1123,10 @@ function getChartTheme() {
         primary: '#2dd4bf',   // 蓝绿 Teal — 主指标/QPS
         success: '#3fb950',   // 绿色系 — 成功/P50
         warning: '#e3b341',   // 黄色系 — 警告/P90
-        danger: '#f85149',    // 红色系 — 失败/错误/P99
+        danger: '#f0883e',    // 橙色系 — P99
         info: '#58a6ff',      // 蓝色系 — 信息/辅助
         accent: '#58a6ff',    // 蓝色系 — P95
-        avg: '#f0883e',       // 橙色系 — Avg
+        avg: '#a371f7',       // 紫色系 — Avg
       }
     }
   }
@@ -1138,10 +1138,10 @@ function getChartTheme() {
       primary: '#0d9488',   // 蓝绿 Teal
       success: '#1a7f37',   // 绿色系
       warning: '#bf8700',   // 黄色系
-      danger: '#cf222e',    // 红色系
+      danger: '#f0883e',    // 橙色系 — P99
       info: '#0969da',      // 蓝色系
       accent: '#0969da',    // 蓝色系 — P95
-      avg: '#f0883e',       // 橙色系 — Avg
+      avg: '#8957e5',       // 紫色系 — Avg
     }
   }
 }
@@ -2255,7 +2255,7 @@ onUnmounted(() => {
 }
 .bar-fill.p50 { background: var(--accent-primary); }
 .bar-fill.p95 { background: var(--accent-info); }
-.bar-fill.p99 { background: var(--accent-danger); }
+.bar-fill.p99 { background: #f0883e; }
 
 .bar-value {
   font-size: 12px;
@@ -2418,8 +2418,7 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .bar-fill.p99 {
-  background: linear-gradient(90deg, #cf222e 0%, #a40e26 100%);
-  box-shadow: 0 1px 4px rgba(207, 34, 46, 0.4);
+  background: #f0883e;
 }
 
 [data-theme='light'] .node-qps {
