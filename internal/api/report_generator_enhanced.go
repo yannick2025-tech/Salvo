@@ -1443,9 +1443,9 @@ const tc = {
     lineColor: '#30363d',
     // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
     colors: ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8'],
-    // 延迟曲线语义色：P50 绿 → P90 黄 → P95 橙 → P99 红
-    latencyColors: ['#3fb950', '#e3b341', '#f0883e', '#f85149'],
-    dangerColor: '#f85149'
+    // 延迟曲线语义色：P50 绿 → P90 黄 → P95 蓝 → P99 橙
+    latencyColors: ['#3fb950', '#e3b341', '#58a6ff', '#f0883e'],
+    dangerColor: '#f0883e'
 };
 
 let errorRateType = 'smooth';
@@ -2354,11 +2354,11 @@ function applyDarkMode(isDark) {
     tc.colors = isDark
         ? ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8']
         : ['#0d9488', '#1a7f37', '#bf8700', '#bc4c00', '#cf222e', '#0969da', '#64748b'];
-    // 延迟曲线语义色：P50 绿(好) → P90 黄(注意) → P95 橙(警告) → P99 红(危险)
+    // 延迟曲线语义色：P50 绿(好) → P90 黄(注意) → P95 蓝(信息) → P99 橙(危险)
     tc.latencyColors = isDark
-        ? ['#3fb950', '#e3b341', '#f0883e', '#f85149']
-        : ['#1a7f37', '#bf8700', '#bc4c00', '#cf222e'];
-    tc.dangerColor = isDark ? '#f85149' : '#cf222e';
+        ? ['#3fb950', '#e3b341', '#58a6ff', '#f0883e']
+        : ['#1a7f37', '#bf8700', '#0969da', '#f0883e'];
+    tc.dangerColor = '#f0883e';
 
     var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
                      'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart', 'sysQueueChart'];
