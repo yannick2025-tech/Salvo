@@ -1495,7 +1495,7 @@ func TestYAMLExportCardYAMLRoundTrip(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)
 
-	yamlBytes, err := os.ReadFile(filepath.Join("..", "..", "docs", "biz-migration", "card.yaml"))
+	yamlBytes, err := os.ReadFile(filepath.Join("..", "..", "docs", "biz-migration", "examples", "card-recharge.yaml"))
 	require.NoError(t, err, "failed to read card.yaml")
 	originalYAML := string(yamlBytes)
 
