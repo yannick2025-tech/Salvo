@@ -288,6 +288,29 @@ func (n *slowNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
 	}
 }
 
+// timeoutNode is a slowNode with a custom timeout field for testing timeout scenarios.
+type timeoutNode struct {
+	id      string
+	mode    ExecMode
+	delay   time.Duration
+	timeout time.Duration
+}
+
+func (n *timeoutNode) ID() string             { return n.id }
+func (n *timeoutNode) Timeout() time.Duration { return n.timeout }
+func (n *timeoutNode) LoopCount() int         { return 1 }
+func (n *timeoutNode) Mode() ExecMode         { return n.mode }
+func (n *timeoutNode) BlockOnError() bool     { return false }
+
+func (n *timeoutNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
+	select {
+	case <-time.After(n.delay):
+		return &Output{Response: n.id}, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("node %s cancelled: %w", n.id, ctx.Err())
+	}
+}
+
 func TestExecutorAsyncNodeDoesNotBlock(t *testing.T) {
 	g := New()
 	a := &slowNode{id: "A", mode: ExecSync, delay: 10 * time.Millisecond}
@@ -491,4 +514,160 @@ func TestExecutorORJoin_AllBranchesSkipped(t *testing.T) {
 	assert.Equal(t, int32(1), aNode.ExecCount(), "A should execute")
 	assert.Equal(t, int32(0), b.ExecCount(), "B should be skipped")
 	assert.Equal(t, int32(0), c.ExecCount(), "C should be skipped (no active parent path)")
+}
+
+func TestExecutorWithInitialVars(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+
+	initialVars := map[string]any{
+		"base_url": "http://api.example.com",
+		"timeout":  30,
+	}
+
+	ex := NewExecutor(g, WithInitialVars(initialVars))
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+}
+
+func TestExecutorSetVariable(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	ex.SetVariable("token", "abc123")
+	ex.SetVariable("user_id", 12345)
+
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+}
+
+func TestExecutorNodeTimeout(t *testing.T) {
+	g := New()
+	a := &slowNode{id: "A", mode: ExecSync, delay: 10 * time.Millisecond}
+	// B will timeout: delay 500ms but timeout is 50ms (delay * 2 = 1000ms, but we set custom timeout)
+	b := &timeoutNode{id: "B", mode: ExecSync, delay: 500 * time.Millisecond, timeout: 50 * time.Millisecond}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	_, err := ex.Execute(context.Background())
+	assert.Error(t, err, "B should timeout")
+}
+
+func TestExecutorMultipleRoots(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	c := &recordingNode{id: "C", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(c))
+	require.NoError(t, g.AddEdge("A", "C", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("B", "C", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+	assert.Equal(t, int32(1), c.ExecCount())
+}
+
+func TestExecutorEmptyDAG(t *testing.T) {
+	g := New()
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestExecutorSingleNodeAsync(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecAsync}
+
+	require.NoError(t, g.AddNode(a))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	// Async node doesn't block, result may be nil
+	assert.Nil(t, result)
+}
+
+func TestExecutorChainWithMixedModes(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecAsync}
+	c := &recordingNode{id: "C", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(c))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("B", "C", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+	assert.Equal(t, int32(1), c.ExecCount())
+	assert.Equal(t, "C", result.Response)
+}
+
+func TestExecutorWithLoggers(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "test_condition"))
+
+	var warnLogs []string
+	var errorLogs []string
+
+	warnLogger := func(msg string, keysAndValues ...any) {
+		warnLogs = append(warnLogs, msg)
+	}
+	errorLogger := func(msg string, keysAndValues ...any) {
+		errorLogs = append(errorLogs, msg)
+	}
+
+	eval := func(_ context.Context, cond string, _ *Output) bool {
+		return cond == "test_condition"
+	}
+
+	ex := NewExecutor(g,
+		WithConditionEvaluator(eval),
+		WithConditionWarnLogger(warnLogger),
+		WithConditionErrorLogger(errorLogger),
+	)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Greater(t, len(warnLogs), 0, "should have warn logs")
 }

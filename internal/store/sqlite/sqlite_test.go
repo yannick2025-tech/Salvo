@@ -755,3 +755,651 @@ func TestReportRepoDeleteCascade(t *testing.T) {
 	_, err = rr.GetByID(ctx, report.ID)
 	assert.Equal(t, sql.ErrNoRows, err)
 }
+
+// --- UserRepo tests ---
+
+func TestUserRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "test@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Test User",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	err := ur.Create(ctx, user)
+	require.NoError(t, err)
+	assert.NotZero(t, user.ID)
+
+	found, err := ur.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, user.Email, found.Email)
+	assert.Equal(t, user.Nickname, found.Nickname)
+	assert.Equal(t, user.RoleID, found.RoleID)
+	assert.Equal(t, user.Status, found.Status)
+}
+
+func TestUserRepoGetByEmail(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "findme@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Find Me",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	found, err := ur.GetByEmail(ctx, "findme@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, user.ID, found.ID)
+	assert.Equal(t, "Find Me", found.Nickname)
+
+	// Not found
+	_, err = ur.GetByEmail(ctx, "notfound@example.com")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestUserRepoList(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		u := &model.User{
+			Email:        "user" + string(rune('A'+i)) + "@example.com",
+			PasswordHash: "$2a$10$hash",
+			Nickname:     "User " + string(rune('A'+i)),
+			RoleID:       snowflake.ID(100),
+			Status:       "active",
+		}
+		require.NoError(t, ur.Create(ctx, u))
+	}
+
+	users, err := ur.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, users, 3)
+
+	all, err := ur.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestUserRepoListByStatus(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "a@example.com", PasswordHash: "h", Nickname: "A", RoleID: 1, Status: "active"}))
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "b@example.com", PasswordHash: "h", Nickname: "B", RoleID: 1, Status: "disabled"}))
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "c@example.com", PasswordHash: "h", Nickname: "C", RoleID: 1, Status: "active"}))
+
+	active, err := ur.List(ctx, repo.Filter{Status: "active", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, active, 2)
+
+	disabled, err := ur.List(ctx, repo.Filter{Status: "disabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, disabled, 1)
+}
+
+func TestUserRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "update@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Old Name",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	user.Nickname = "New Name"
+	user.Status = "disabled"
+	err := ur.Update(ctx, user)
+	require.NoError(t, err)
+
+	found, err := ur.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New Name", found.Nickname)
+	assert.Equal(t, "disabled", found.Status)
+}
+
+func TestUserRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "delete@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Delete Me",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	err := ur.Delete(ctx, user.ID)
+	require.NoError(t, err)
+
+	_, err = ur.GetByID(ctx, user.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- RoleRepo tests ---
+
+func TestRoleRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{
+		Name:        "admin",
+		Description: "Administrator role",
+		IsBuiltin:   false,
+	}
+	err := rr.Create(ctx, role)
+	require.NoError(t, err)
+	assert.NotZero(t, role.ID)
+
+	found, err := rr.GetByID(ctx, role.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "admin", found.Name)
+	assert.Equal(t, "Administrator role", found.Description)
+	assert.False(t, found.IsBuiltin)
+}
+
+func TestRoleRepoGetByName(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "tester", Description: "Tester role", IsBuiltin: true}
+	require.NoError(t, rr.Create(ctx, role))
+
+	found, err := rr.GetByName(ctx, "tester")
+	require.NoError(t, err)
+	assert.Equal(t, role.ID, found.ID)
+	assert.True(t, found.IsBuiltin)
+
+	_, err = rr.GetByName(ctx, "notfound")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestRoleRepoList(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		r := &model.Role{Name: "role" + string(rune('A'+i)), Description: "Role " + string(rune('A'+i))}
+		require.NoError(t, rr.Create(ctx, r))
+	}
+
+	roles, err := rr.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, roles, 3)
+
+	all, err := rr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestRoleRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "old-name", Description: "Old description", IsBuiltin: false}
+	require.NoError(t, rr.Create(ctx, role))
+
+	role.Name = "new-name"
+	role.Description = "New description"
+	role.IsBuiltin = true
+	err := rr.Update(ctx, role)
+	require.NoError(t, err)
+
+	found, err := rr.GetByID(ctx, role.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "new-name", found.Name)
+	assert.Equal(t, "New description", found.Description)
+	assert.True(t, found.IsBuiltin)
+}
+
+func TestRoleRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "to-delete", Description: "Delete me"}
+	require.NoError(t, rr.Create(ctx, role))
+
+	err := rr.Delete(ctx, role.ID)
+	require.NoError(t, err)
+
+	_, err = rr.GetByID(ctx, role.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- PermissionRepo tests ---
+
+func TestPermissionRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{
+		Resource:    "scene",
+		Action:      "read",
+		Description: "Read scene permission",
+	}
+	err := pr.Create(ctx, perm)
+	require.NoError(t, err)
+	assert.NotZero(t, perm.ID)
+
+	found, err := pr.GetByID(ctx, perm.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "scene", found.Resource)
+	assert.Equal(t, "read", found.Action)
+	assert.Equal(t, "Read scene permission", found.Description)
+}
+
+func TestPermissionRepoGetByResourceAction(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "user", Action: "write", Description: "Write user"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	found, err := pr.GetByResourceAction(ctx, "user", "write")
+	require.NoError(t, err)
+	assert.Equal(t, perm.ID, found.ID)
+	assert.Equal(t, "Write user", found.Description)
+
+	_, err = pr.GetByResourceAction(ctx, "user", "delete")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestPermissionRepoList(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "scene", Action: "read"}))
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "scene", Action: "write"}))
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "user", Action: "read"}))
+
+	perms, err := pr.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, perms, 3)
+}
+
+func TestPermissionRepoListByRoleID(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm1 := &model.Permission{Resource: "scene", Action: "read"}
+	perm2 := &model.Permission{Resource: "scene", Action: "write"}
+	require.NoError(t, pr.Create(ctx, perm1))
+	require.NoError(t, pr.Create(ctx, perm2))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm1.ID))
+	require.NoError(t, rpr.Assign(ctx, roleID, perm2.ID))
+
+	perms, err := pr.ListByRoleID(ctx, roleID)
+	require.NoError(t, err)
+	assert.Len(t, perms, 2)
+}
+
+// --- RolePermissionRepo tests ---
+
+func TestRolePermissionRepoAssign(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "scene", Action: "read"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	roleID := snowflake.ID(100)
+	err := rpr.Assign(ctx, roleID, perm.ID)
+	require.NoError(t, err)
+
+	perms, err := rpr.ListPermissions(ctx, roleID)
+	require.NoError(t, err)
+	assert.Len(t, perms, 1)
+	assert.Equal(t, perm.ID, perms[0].ID)
+}
+
+func TestRolePermissionRepoRevoke(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "scene", Action: "read"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm.ID))
+
+	perms, _ := rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 1)
+
+	err := rpr.Revoke(ctx, roleID, perm.ID)
+	require.NoError(t, err)
+
+	perms, _ = rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 0)
+}
+
+func TestRolePermissionRepoRevokeAll(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm1 := &model.Permission{Resource: "scene", Action: "read"}
+	perm2 := &model.Permission{Resource: "scene", Action: "write"}
+	require.NoError(t, pr.Create(ctx, perm1))
+	require.NoError(t, pr.Create(ctx, perm2))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm1.ID))
+	require.NoError(t, rpr.Assign(ctx, roleID, perm2.ID))
+
+	perms, _ := rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 2)
+
+	err := rpr.RevokeAll(ctx, roleID)
+	require.NoError(t, err)
+
+	perms, _ = rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 0)
+}
+
+// --- DataSourceRepo tests ---
+
+func TestDataSourceRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{
+		SceneID:  scene.ID,
+		Name:     "users.csv",
+		FileName: "users.csv",
+		Columns:  `["id","name","email"]`,
+		Rows:     `[["1","Alice","alice@example.com"]]`,
+		RowCount: 1,
+		Source:   "csv",
+	}
+	err := dsr.Create(ctx, ds)
+	require.NoError(t, err)
+	assert.NotZero(t, ds.ID)
+
+	found, err := dsr.GetByID(ctx, ds.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "users.csv", found.Name)
+	assert.Equal(t, 1, found.RowCount)
+	assert.Equal(t, "csv", found.Source)
+}
+
+func TestDataSourceRepoGetBySceneIDAndName(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-find-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data.csv", FileName: "data.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data.yaml", FileName: "data.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	results, err := dsr.GetBySceneIDAndName(ctx, scene.ID, "data.csv")
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "csv", results[0].Source)
+}
+
+func TestDataSourceRepoGetBySceneIDAndNameAndSource(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-source-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data", FileName: "data.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data", FileName: "data.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	csv, err := dsr.GetBySceneIDAndNameAndSource(ctx, scene.ID, "data", "csv")
+	require.NoError(t, err)
+	assert.Equal(t, "data.csv", csv.FileName)
+
+	yaml, err := dsr.GetBySceneIDAndNameAndSource(ctx, scene.ID, "data", "yaml")
+	require.NoError(t, err)
+	assert.Equal(t, "data.yaml", yaml.FileName)
+}
+
+func TestDataSourceRepoListBySceneID(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-list-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "a.csv", FileName: "a.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "b.yaml", FileName: "b.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	sources, err := dsr.ListBySceneID(ctx, scene.ID)
+	require.NoError(t, err)
+	assert.Len(t, sources, 2)
+}
+
+func TestDataSourceRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-update-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{
+		SceneID:  scene.ID,
+		Name:     "update.csv",
+		FileName: "update.csv",
+		Columns:  `["id"]`,
+		Rows:     `[]`,
+		RowCount: 0,
+		Source:   "csv",
+	}
+	require.NoError(t, dsr.Create(ctx, ds))
+
+	ds.Columns = `["id","name"]`
+	ds.Rows = `[["1","Alice"],["2","Bob"]]`
+	ds.RowCount = 2
+	err := dsr.Update(ctx, ds)
+	require.NoError(t, err)
+
+	found, err := dsr.GetByID(ctx, ds.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, found.RowCount)
+	assert.Contains(t, found.Columns, "name")
+}
+
+func TestDataSourceRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-delete-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{SceneID: scene.ID, Name: "delete.csv", FileName: "delete.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}
+	require.NoError(t, dsr.Create(ctx, ds))
+
+	err := dsr.Delete(ctx, ds.ID)
+	require.NoError(t, err)
+
+	_, err = dsr.GetByID(ctx, ds.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- SOPluginRepo tests ---
+
+func TestSOPluginRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{
+		Name:     "test-plugin",
+		Version:  "1.0.0",
+		FilePath: "/path/to/plugin.so",
+		Status:   "enabled",
+		Config:   `{"key":"value"}`,
+	}
+	err := spr.Create(ctx, plugin)
+	require.NoError(t, err)
+	assert.NotZero(t, plugin.ID)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "test-plugin", found.Name)
+	assert.Equal(t, "1.0.0", found.Version)
+	assert.Equal(t, "enabled", found.Status)
+}
+
+func TestSOPluginRepoList(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		p := &model.SOPlugin{
+			Name:     "plugin-" + string(rune('A'+i)),
+			Version:  "1.0.0",
+			FilePath: "/path/to/plugin.so",
+			Status:   "enabled",
+		}
+		require.NoError(t, spr.Create(ctx, p))
+	}
+
+	plugins, err := spr.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, plugins, 3)
+
+	all, err := spr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestSOPluginRepoListByStatus(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p1", Version: "1.0.0", FilePath: "/p1.so", Status: "enabled"}))
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p2", Version: "1.0.0", FilePath: "/p2.so", Status: "disabled"}))
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p3", Version: "1.0.0", FilePath: "/p3.so", Status: "enabled"}))
+
+	enabled, err := spr.List(ctx, repo.Filter{Status: "enabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, enabled, 2)
+
+	disabled, err := spr.List(ctx, repo.Filter{Status: "disabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, disabled, 1)
+}
+
+func TestSOPluginRepoUpdateStatus(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "status-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.UpdateStatus(ctx, plugin.ID, "disabled")
+	require.NoError(t, err)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "disabled", found.Status)
+}
+
+func TestSOPluginRepoUpdateConfig(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "config-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled", Config: `{"old":"value"}`}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.UpdateConfig(ctx, plugin.ID, `{"new":"value"}`)
+	require.NoError(t, err)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, `{"new":"value"}`, found.Config)
+}
+
+func TestSOPluginRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "delete-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.Delete(ctx, plugin.ID)
+	require.NoError(t, err)
+
+	_, err = spr.GetByID(ctx, plugin.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestSOPluginRepoDedup(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	// Create first version
+	plugin1 := &model.SOPlugin{Name: "dedup-plugin", Version: "1.0.0", FilePath: "/v1.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin1))
+
+	// Create same name+version - should soft-delete the old one
+	plugin2 := &model.SOPlugin{Name: "dedup-plugin", Version: "1.0.0", FilePath: "/v2.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin2))
+
+	// Only the new one should be active
+	plugins, err := spr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, plugins, 1)
+	assert.Equal(t, "/v2.so", plugins[0].FilePath)
+}

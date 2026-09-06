@@ -1,6 +1,6 @@
 .PHONY: all help build-all rebuild start restart dev stop \
         clean clean-so clean-db clean-logs \
-        test lint \
+        test cover cover-html lint \
         plugins-build plugins-clean \
         plugin-upload plugin-list plugin-delete plugin-status
 
@@ -47,6 +47,8 @@ help:
 	@echo ""
 	@echo "Other:"
 	@echo "  test              Run all Go tests"
+	@echo "  cover             Run tests and show coverage summary"
+	@echo "  cover-html        Run tests and open HTML coverage report"
 	@echo "  lint              Run Go linter"
 	@echo "  assets            Fetch go:embed assets (echarts.min.js) required for build"
 	@echo "  frontend-deps     Install frontend npm dependencies (web/app/node_modules)"

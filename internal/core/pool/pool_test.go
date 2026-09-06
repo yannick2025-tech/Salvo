@@ -200,6 +200,68 @@ func TestPoolTaskWaitStatsEmpty(t *testing.T) {
 	assert.Equal(t, int64(0), stats.SampleCount)
 }
 
+func TestPoolActiveWorkers(t *testing.T) {
+	// Use duration mode so Wait() returns automatically.
+	p, err := New(4, Config{RunMode: RunModeDuration, Duration: 5 * time.Second})
+	require.NoError(t, err)
+
+	// Initially no active workers
+	assert.Equal(t, 0, p.ActiveWorkers())
+
+	// Submit tasks that block until done channel is closed.
+	started := make(chan struct{}, 4)
+	done := make(chan struct{})
+	for i := 0; i < 4; i++ {
+		p.Submit(func(ctx context.Context) error {
+			started <- struct{}{}
+			<-done
+			return nil
+		})
+	}
+
+	// Wait for at least 1 task to start executing.
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for task to start")
+	}
+
+	// At least 1 worker should be active.
+	assert.Greater(t, p.ActiveWorkers(), 0)
+
+	// Let tasks complete.
+	close(done)
+	p.Shutdown()
+}
+
+func TestPoolPendingQueueLen(t *testing.T) {
+	p, err := New(2, Config{RunMode: RunModeCount, Count: 5})
+	require.NoError(t, err)
+
+	// Initially queue is empty
+	assert.Equal(t, 0, p.PendingQueueLen())
+
+	// Submit all 5 tasks (they execute quickly)
+	for i := 0; i < 5; i++ {
+		p.Submit(func(ctx context.Context) error {
+			return nil
+		})
+	}
+
+	_ = p.Wait()
+	assert.Equal(t, 0, p.PendingQueueLen())
+}
+
+func TestNewWaitTimeTracker_InvalidCapacity(t *testing.T) {
+	tracker := NewWaitTimeTracker(0)
+	assert.NotNil(t, tracker)
+	assert.Equal(t, 1000, len(tracker.samples))
+
+	tracker2 := NewWaitTimeTracker(-5)
+	assert.NotNil(t, tracker2)
+	assert.Equal(t, 1000, len(tracker2.samples))
+}
+
 func BenchmarkPoolSubmit(b *testing.B) {
 	p, err := New(4, Config{RunMode: RunModeDuration, Duration: 30 * time.Second})
 	if err != nil {

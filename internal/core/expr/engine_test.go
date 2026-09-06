@@ -363,3 +363,296 @@ func TestResolveConcurrent(t *testing.T) {
 		<-done
 	}
 }
+
+func TestResolveBareVariables(t *testing.T) {
+	r := NewFunctionRegistry()
+	_ = r.Register("__add", func(args []string) (string, error) {
+		if len(args) != 2 {
+			return "", errors.New("need 2 args")
+		}
+		a, _ := strconv.Atoi(args[0])
+		b, _ := strconv.Atoi(args[1])
+		return strconv.Itoa(a + b), nil
+	})
+	_ = r.Register("__echo", echoFunc())
+
+	tests := []struct {
+		name      string
+		input     string
+		variables map[string]any
+		want      string
+	}{
+		{
+			name:      "bare variable in function arg",
+			input:     "${__echo(${name})}",
+			variables: map[string]any{"name": "Alice"},
+			want:      "Alice",
+		},
+		{
+			name:      "nested variable in math expression",
+			input:     "${${base}}",
+			variables: map[string]any{"base": "x", "x": "42"},
+			want:      "42",
+		},
+		{
+			name:      "nested variable in function args",
+			input:     "${__add(${x}, ${y})}",
+			variables: map[string]any{"x": 5, "y": 7},
+			want:      "12",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Resolve(tt.input, tt.variables, r)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestResolveMathExpressionEdgeCases(t *testing.T) {
+	r := NewFunctionRegistry()
+
+	tests := []struct {
+		name      string
+		input     string
+		variables map[string]any
+		want      string
+	}{
+		{
+			name:      "negative result",
+			input:     "${a} - ${b}",
+			variables: map[string]any{"a": 5, "b": 15},
+			want:      "-10",
+		},
+		{
+			name:      "decimal result",
+			input:     "${a} / ${b}",
+			variables: map[string]any{"a": 7, "b": 2},
+			want:      "3.5",
+		},
+		{
+			name:      "complex nested parentheses",
+			input:     "((${a} + ${b}) * (${c} - ${d})) / 2",
+			variables: map[string]any{"a": 10, "b": 5, "c": 8, "d": 3},
+			want:      "37.5",
+		},
+		{
+			name:      "power of two",
+			input:     "${a} * ${a}",
+			variables: map[string]any{"a": 4},
+			want:      "16",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Resolve(tt.input, tt.variables, r)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestResolveNestedInArgs(t *testing.T) {
+	r := NewFunctionRegistry()
+	_ = r.Register("__concat", func(args []string) (string, error) {
+		return strings.Join(args, ""), nil
+	})
+
+	tests := []struct {
+		name      string
+		input     string
+		variables map[string]any
+		want      string
+	}{
+		{
+			name:      "nested variable in function arg",
+			input:     "${__concat(${prefix}, ${suffix})}",
+			variables: map[string]any{"prefix": "Hello", "suffix": "World"},
+			want:      "HelloWorld",
+		},
+		{
+			name:      "multiple nested variables",
+			input:     "${__concat(${a}, ${b}, ${c})}",
+			variables: map[string]any{"a": "1", "b": "2", "c": "3"},
+			want:      "123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Resolve(tt.input, tt.variables, r)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestTrimQuotes(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{`"hello"`, "hello"},
+		{`'world'`, "world"},
+		{`no quotes`, "no quotes"},
+		{`"`, `"`},
+		{`""`, ""},
+		{`''`, ""},
+		{`"unclosed`, `"unclosed`},
+		{`unclosed"`, `unclosed"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := trimQuotes(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestToFloat(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  float64
+		ok    bool
+	}{
+		{"float64", float64(3.14), 3.14, true},
+		{"float32", float32(2.5), 2.5, true},
+		{"int", int(42), 42.0, true},
+		{"int64", int64(100), 100.0, true},
+		{"int32", int32(50), 50.0, true},
+		{"int16", int16(25), 25.0, true},
+		{"int8", int8(10), 10.0, true},
+		{"uint", uint(30), 30.0, true},
+		{"uint64", uint64(60), 60.0, true},
+		{"uint32", uint32(40), 40.0, true},
+		{"uint16", uint16(20), 20.0, true},
+		{"uint8", uint8(15), 15.0, true},
+		{"string valid", "3.14", 3.14, true},
+		{"string invalid", "abc", 0, false},
+		{"nil", nil, 0, false},
+		{"bool", true, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := toFloat(tt.input)
+			assert.Equal(t, tt.ok, ok)
+			if ok {
+				assert.InDelta(t, tt.want, got, 0.001)
+			}
+		})
+	}
+}
+
+func TestIsEmpty(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  bool
+	}{
+		{"nil", nil, true},
+		{"empty string", "", true},
+		{"non-empty string", "hello", false},
+		{"false bool", false, true},
+		{"true bool", true, false},
+		{"zero int", int(0), true},
+		{"non-zero int", int(5), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isEmpty(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestResolveMathExpressionPaths(t *testing.T) {
+	r := NewFunctionRegistry()
+
+	tests := []struct {
+		name      string
+		input     string
+		variables map[string]any
+		want      string
+	}{
+		{
+			name:      "simple math with variables",
+			input:     "${a} + ${b}",
+			variables: map[string]any{"a": 10, "b": 20},
+			want:      "30",
+		},
+		{
+			name:      "math with division",
+			input:     "${a} / ${b}",
+			variables: map[string]any{"a": 100, "b": 4},
+			want:      "25",
+		},
+		{
+			name:      "complex expression",
+			input:     "(${a} + ${b}) * ${c}",
+			variables: map[string]any{"a": 5, "b": 3, "c": 2},
+			want:      "16",
+		},
+		{
+			name:      "invalid math returns as-is",
+			input:     "${a} + ${b}",
+			variables: map[string]any{"a": "x", "b": "y"},
+			want:      "x + y",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Resolve(tt.input, tt.variables, r)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestReplaceBareVariables(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		variables map[string]any
+		want      string
+	}{
+		{
+			name:      "replace single variable",
+			input:     "x + 5",
+			variables: map[string]any{"x": 10},
+			want:      "10 + 5",
+		},
+		{
+			name:      "replace multiple variables",
+			input:     "a + b",
+			variables: map[string]any{"a": 5, "b": 3},
+			want:      "5 + 3",
+		},
+		{
+			name:      "nil variables",
+			input:     "x + 5",
+			variables: nil,
+			want:      "x + 5",
+		},
+		{
+			name:      "no match",
+			input:     "y + 5",
+			variables: map[string]any{"x": 10},
+			want:      "y + 5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replaceBareVariables(tt.input, tt.variables)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

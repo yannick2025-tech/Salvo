@@ -215,3 +215,152 @@ func TestAESLargeData(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, largeData, decResult)
 }
+
+// TestAESGCMEncryptDecryptRoundTrip tests GCM mode encryption/decryption.
+func TestAESGCMEncryptDecryptRoundTrip(t *testing.T) {
+	p := &aesPlugin{}
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" // 32 bytes = AES-256
+	iv := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef")) // 16 bytes nonce
+
+	plaintext := `{"errorCode":0,"data":{"orderId":"202607211619060001"}}`
+	encResult, err := p.Call("encrypt_gcm", []string{key, iv, plaintext})
+	require.NoError(t, err)
+	require.NotEmpty(t, encResult)
+
+	decResult, err := p.Call("decrypt_gcm", []string{key, iv, encResult})
+	require.NoError(t, err)
+	assert.Equal(t, plaintext, decResult)
+}
+
+// TestAESGCMDifferentIVs verifies GCM produces different ciphertexts with different IVs.
+func TestAESGCMDifferentIVs(t *testing.T) {
+	p := &aesPlugin{}
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	iv1 := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+	iv2 := base64.StdEncoding.EncodeToString([]byte("abcdef0123456789"))
+
+	plaintext := "test plaintext"
+	enc1, err := p.Call("encrypt_gcm", []string{key, iv1, plaintext})
+	require.NoError(t, err)
+
+	enc2, err := p.Call("encrypt_gcm", []string{key, iv2, plaintext})
+	require.NoError(t, err)
+
+	assert.NotEqual(t, enc1, enc2, "GCM with different IVs should produce different ciphertexts")
+}
+
+// TestAESGCMEncryptWrongArgCount tests error handling for insufficient arguments.
+func TestAESGCMEncryptWrongArgCount(t *testing.T) {
+	p := &aesPlugin{}
+	_, err := p.Call("encrypt_gcm", []string{"key", "iv"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "requires 3 args")
+}
+
+// TestAESGCMDecryptWrongArgCount tests error handling for insufficient arguments.
+func TestAESGCMDecryptWrongArgCount(t *testing.T) {
+	p := &aesPlugin{}
+	_, err := p.Call("decrypt_gcm", []string{"key"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "requires 3 args")
+}
+
+// TestAESGCMInvalidIV tests error handling for invalid base64 IV.
+func TestAESGCMInvalidIV(t *testing.T) {
+	p := &aesPlugin{}
+	_, err := p.Call("encrypt_gcm", []string{"key", "invalid-iv!!!", "data"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "decoding iv")
+}
+
+// TestAESGCMDecryptInvalidIV tests error handling for invalid base64 IV in decrypt.
+func TestAESGCMDecryptInvalidIV(t *testing.T) {
+	p := &aesPlugin{}
+	_, err := p.Call("decrypt_gcm", []string{"key", "invalid-iv!!!", "data"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "decoding iv")
+}
+
+// TestAESGCMDecryptInvalidCiphertext tests error handling for invalid base64 ciphertext.
+func TestAESGCMDecryptInvalidCiphertext(t *testing.T) {
+	p := &aesPlugin{}
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	iv := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+
+	_, err := p.Call("decrypt_gcm", []string{key, iv, "not-valid-base64!!"})
+	assert.Error(t, err)
+}
+
+// TestAESGCMDecryptWrongKey tests that decryption fails with wrong key.
+func TestAESGCMDecryptWrongKey(t *testing.T) {
+	p := &aesPlugin{}
+	key1 := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	key2 := "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+	iv := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+
+	plaintext := "test plaintext"
+	encResult, err := p.Call("encrypt_gcm", []string{key1, iv, plaintext})
+	require.NoError(t, err)
+
+	_, err = p.Call("decrypt_gcm", []string{key2, iv, encResult})
+	assert.Error(t, err, "decryption with wrong key should fail")
+}
+
+// TestAESGCMEmptyPlaint tests encryption of empty string.
+func TestAESGCMEmptyPlaint(t *testing.T) {
+	p := &aesPlugin{}
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	iv := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+
+	encResult, err := p.Call("encrypt_gcm", []string{key, iv, ""})
+	require.NoError(t, err)
+	require.NotEmpty(t, encResult)
+
+	decResult, err := p.Call("decrypt_gcm", []string{key, iv, encResult})
+	require.NoError(t, err)
+	assert.Equal(t, "", decResult)
+}
+
+// TestAESNewFactory tests the New() factory function.
+func TestAESNewFactory(t *testing.T) {
+	plugin, err := New()
+	require.NoError(t, err)
+	require.NotNil(t, plugin)
+
+	assert.Equal(t, "aes", plugin.Name())
+	assert.Equal(t, "1.0.0", plugin.Version())
+}
+
+// TestAESNewFactoryCall tests that plugin from New() can encrypt/decrypt.
+func TestAESNewFactoryCall(t *testing.T) {
+	plugin, err := New()
+	require.NoError(t, err)
+
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	iv := base64.StdEncoding.EncodeToString([]byte("1234567890123456"))
+
+	plaintext := "test from factory"
+	encResult, err := plugin.Call("encrypt", []string{key, iv, plaintext})
+	require.NoError(t, err)
+
+	decResult, err := plugin.Call("decrypt", []string{key, iv, encResult})
+	require.NoError(t, err)
+	assert.Equal(t, plaintext, decResult)
+}
+
+// TestAESNewFactoryGCM tests that plugin from New() can use GCM mode.
+func TestAESNewFactoryGCM(t *testing.T) {
+	plugin, err := New()
+	require.NoError(t, err)
+
+	key := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	iv := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+
+	plaintext := "GCM test from factory"
+	encResult, err := plugin.Call("encrypt_gcm", []string{key, iv, plaintext})
+	require.NoError(t, err)
+
+	decResult, err := plugin.Call("decrypt_gcm", []string{key, iv, encResult})
+	require.NoError(t, err)
+	assert.Equal(t, plaintext, decResult)
+}

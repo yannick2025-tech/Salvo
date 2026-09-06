@@ -197,3 +197,15 @@ func TestCipherPluginInterfaces(t *testing.T) {
 	var _ plugin.Plugin = NewEncryptorPlugin(a)
 	var _ plugin.Plugin = NewDecryptorPlugin(a)
 }
+
+func TestDecryptorPluginCustomPriority(t *testing.T) {
+	a := newTestAES(t, ModeGCM)
+	dp := NewDecryptorPlugin(a, WithDecryptorPriority(100))
+	assert.Equal(t, 100, dp.Priority())
+}
+
+func TestDecryptorPluginCustomName(t *testing.T) {
+	a := newTestAES(t, ModeGCM)
+	dp := NewDecryptorPlugin(a, WithDecryptorPluginName("my-decryptor"))
+	assert.Equal(t, "my-decryptor", dp.Name())
+}

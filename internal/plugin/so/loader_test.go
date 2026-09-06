@@ -1,6 +1,7 @@
 package so
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -160,4 +161,129 @@ func TestCompareVersions(t *testing.T) {
 		got := compareVersions(tt.a, tt.b)
 		assert.Equal(t, tt.want, got, "compareVersions(%q, %q)", tt.a, tt.b)
 	}
+}
+
+func TestLoaderRegister(t *testing.T) {
+	l := NewLoader()
+
+	p := &stubPlugin{name: "test-plugin", version: "1.0.0"}
+	err := l.Register(p)
+	require.NoError(t, err)
+
+	// Verify plugin was registered
+	assert.Equal(t, 1, l.Count())
+
+	// Verify we can retrieve it
+	retrieved, ok := l.Get("test-plugin", "1.0.0")
+	require.True(t, ok)
+	assert.Equal(t, p, retrieved)
+}
+
+func TestLoaderRegisterDuplicate(t *testing.T) {
+	l := NewLoader()
+
+	p1 := &stubPlugin{name: "test-plugin", version: "1.0.0"}
+	err := l.Register(p1)
+	require.NoError(t, err)
+
+	// Try to register the same plugin again
+	p2 := &stubPlugin{name: "test-plugin", version: "1.0.0"}
+	err = l.Register(p2)
+	assert.Error(t, err, "should not allow duplicate registration")
+	assert.Contains(t, err.Error(), "already registered")
+}
+
+func TestLoaderRegisterMultipleVersions(t *testing.T) {
+	l := NewLoader()
+
+	p1 := &stubPlugin{name: "test-plugin", version: "1.0.0"}
+	err := l.Register(p1)
+	require.NoError(t, err)
+
+	p2 := &stubPlugin{name: "test-plugin", version: "1.1.0"}
+	err = l.Register(p2)
+	require.NoError(t, err)
+
+	// Both versions should be registered
+	assert.Equal(t, 2, l.Count())
+
+	// Get specific versions
+	retrieved1, ok := l.Get("test-plugin", "1.0.0")
+	require.True(t, ok)
+	assert.Equal(t, p1, retrieved1)
+
+	retrieved2, ok := l.Get("test-plugin", "1.1.0")
+	require.True(t, ok)
+	assert.Equal(t, p2, retrieved2)
+
+	// Get latest version
+	latest, ok := l.Get("test-plugin", "")
+	require.True(t, ok)
+	assert.Equal(t, p2, latest, "should return latest version")
+}
+
+func TestLoaderPluginKey(t *testing.T) {
+	l := NewLoader()
+
+	key := l.pluginKey("my-plugin", "2.3.4")
+	assert.Equal(t, "my-plugin@2.3.4", key)
+
+	key = l.pluginKey("test", "1.0.0")
+	assert.Equal(t, "test@1.0.0", key)
+}
+
+func TestLoaderSplitKey(t *testing.T) {
+	l := NewLoader()
+
+	name, version := l.splitKey("my-plugin@2.3.4")
+	assert.Equal(t, "my-plugin", name)
+	assert.Equal(t, "2.3.4", version)
+
+	name, version = l.splitKey("test@1.0.0")
+	assert.Equal(t, "test", name)
+	assert.Equal(t, "1.0.0", version)
+
+	// Edge case: no @ symbol
+	name, version = l.splitKey("invalid-key")
+	assert.Equal(t, "invalid-key", name)
+	assert.Equal(t, "", version)
+}
+
+func TestLoaderLoadNonExistentFile(t *testing.T) {
+	l := NewLoader()
+
+	_, err := l.Load("/nonexistent/path/to/plugin.so")
+	assert.Error(t, err, "should fail to load non-existent file")
+	assert.Contains(t, err.Error(), "open")
+}
+
+func TestLoaderRegisterAndCall(t *testing.T) {
+	l := NewLoader()
+
+	// Create a plugin with a custom Call function
+	p := &stubPlugin{
+		name:    "calculator",
+		version: "1.0.0",
+		callFn: func(op string, args []string) (string, error) {
+			if op == "add" && len(args) == 2 {
+				return args[0] + "+" + args[1], nil
+			}
+			return "", fmt.Errorf("unsupported operation")
+		},
+	}
+
+	err := l.Register(p)
+	require.NoError(t, err)
+
+	// Retrieve and call the plugin
+	retrieved, ok := l.Get("calculator", "1.0.0")
+	require.True(t, ok)
+
+	result, err := retrieved.Call("add", []string{"1", "2"})
+	require.NoError(t, err)
+	assert.Equal(t, "1+2", result)
+
+	// Test error case
+	_, err = retrieved.Call("subtract", []string{"1", "2"})
+	assert.Error(t, err)
 }

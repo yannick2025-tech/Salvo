@@ -217,3 +217,27 @@ func TestVerifyHexDifferentLength(t *testing.T) {
 	h := NewHMACSHA256(testKey())
 	assert.False(t, VerifyHex(h, []byte("data"), "abc"))
 }
+
+func TestVerifierPluginCustomPriority(t *testing.T) {
+	v := NewHMACSHA256(testKey())
+	vp := NewVerifierPlugin(v, WithVerifierPriority(100))
+	assert.Equal(t, 100, vp.Priority())
+}
+
+func TestVerifierPluginCustomName(t *testing.T) {
+	v := NewHMACSHA256(testKey())
+	vp := NewVerifierPlugin(v, WithVerifierPluginName("my-verifier"))
+	assert.Equal(t, "my-verifier", vp.Name())
+}
+
+func TestVerifierPluginCustomHeaderName(t *testing.T) {
+	v := NewHMACSHA256(testKey())
+	vp := NewVerifierPlugin(v, WithVerifierHeaderName("X-Custom-Sig"))
+	assert.Equal(t, "X-Custom-Sig", vp.headerName)
+}
+
+func TestVerifierPluginAlgorithmName(t *testing.T) {
+	v := NewHMACSHA256(testKey())
+	vp := NewVerifierPlugin(v)
+	assert.Equal(t, "hmac-sha256", vp.AlgorithmName())
+}

@@ -289,3 +289,31 @@ func TestSendQueue_Close(t *testing.T) {
 	q.Push("a", []byte("msg"))
 	assert.Equal(t, 0, q.Len())
 }
+
+func TestWithSpanState_Option(t *testing.T) {
+	called := false
+	stateFn := func(runID string) []Message {
+		called = true
+		return []Message{{Type: "span_update", RunID: runID}}
+	}
+
+	hub := NewHub(WithSpanState(stateFn))
+	assert.NotNil(t, hub.spanState)
+
+	// Verify the option is applied by subscribing and checking state push.
+	go hub.Run()
+	client := &Client{hub: hub, outbox: NewSendQueue(), subscriptions: make(map[string]struct{})}
+	hub.Subscribe(client, "run-test")
+	assert.True(t, called, "SpanStateFunc should be called on Subscribe")
+}
+
+func TestMessage_DedupKey_NonSpanUpdate(t *testing.T) {
+	m := Message{Type: "status", RunID: "run-1"}
+	assert.Equal(t, "", m.dedupKey(), "non-span_update messages should return empty dedup key")
+}
+
+func TestHub_BroadcastToRun_NoSubscribers(t *testing.T) {
+	hub := newTestHub(t)
+	// Should not panic when no subscribers exist.
+	hub.BroadcastToRun("nonexistent", Message{Type: "span_update", RunID: "nonexistent"})
+}
