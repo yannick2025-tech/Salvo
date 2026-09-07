@@ -2,21 +2,21 @@
   <div class="dashboard-page">
     <div class="scene-selector">
       <div class="selector-header">
-        <h3>场景选择</h3>
+        <h3>运行选择</h3>
         <CustomSelect
-          v-model="selectedSceneId"
-          :options="sceneOptions"
-          placeholder="暂无场景"
-          @update:modelValue="onSceneChange"
-          style="min-width: 250px;"
+          v-model="selectedRunId"
+          :options="runOptions"
+          placeholder="暂无运行"
+          @update:modelValue="onRunChange"
+          style="min-width: 350px;"
         />
       </div>
-      <div v-if="selectedSceneId" class="time-window-row">
+      <div v-if="selectedRunId" class="time-window-row">
         <div class="time-window-info">
           <span class="window-label">时间范围:</span>
           <span class="window-value">{{ timeWindowDisplay }}</span>
           <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
-          <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
+          <span v-if="isRunRunning" class="live-indicator">● 实时</span>
         </div>
         <div v-if="showRefreshSelector" class="refresh-selector">
           <span class="refresh-label">刷新:</span>
@@ -355,6 +355,12 @@ let sysChartsRendered = false
 let prewarmRetryTimer: ReturnType<typeof setTimeout> | null = null
 function prewarmSysCharts() {
   if (sysMetricsHistory.value.length === 0 && sysMetricsTimeSeries.value.length === 0) return
+  // Skip if container is not yet visible (zero dimensions cause ECharts blank render).
+  // The IntersectionObserver will trigger prewarmSysCharts() once the section scrolls into view.
+  if (!sysChartsVisible.value && sysMonitorSectionRef.value) {
+    const rect = sysMonitorSectionRef.value.getBoundingClientRect()
+    if (rect.height === 0 || rect.top > window.innerHeight) return
+  }
   renderSysGoroutineChart()
   if (!sysGoroutineChart) {
     if (prewarmRetryTimer) clearTimeout(prewarmRetryTimer)
@@ -405,7 +411,7 @@ const overview = ref<DashboardOverviewDTO | null>(null)
 
 const historyData = ref<RunHistoryDTO[]>([])
 const pollCheckCounter = ref(0)
-const selectedSceneId = ref<string>('')
+const selectedRunId = ref<string>('')
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
 
@@ -421,6 +427,15 @@ interface SceneInfo {
   finished_at?: string
 }
 
+interface RunOption {
+  run_id: string
+  scene_id: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  started_at?: string
+  finished_at?: string
+  label: string
+}
+
 const runningScenes = computed<SceneInfo[]>(() => {
   return sceneList.value.filter(s => s.status === 'running')
 })
@@ -433,19 +448,23 @@ const allScenes = computed<SceneInfo[]>(() => {
   return [...runningScenes.value, ...historyScenes.value]
 })
 
-const sceneOptions = computed(() => {
-  if (allScenes.value.length === 0) {
+const runOptions = computed(() => {
+  const runs = overview.value?.recent_runs || []
+  if (runs.length === 0) {
     return []
   }
-  return allScenes.value.map(scene => ({
-    value: String(scene.scene_id),
-    label: `场景-${String(scene.scene_id).slice(-8)} ${scene.status === 'running' ? '(运行中)' : '(已结束)'}`,
-  }))
+  return runs
+    .filter((r: any) => r.id)  // Filter out runs without id
+    .map((r: any) => ({
+      value: String(r.id),
+      label: `运行-${String(r.id).slice(-8)} [场景-${String(r.scene_id).slice(-8)}] ${r.status === 'running' ? '(运行中)' : r.status === 'completed' ? '(已完成)' : `(${r.status})`}`
+    }))
 })
 
-const isSceneRunning = computed(() => {
-  if (!selectedSceneId.value) return runningScenes.value.length > 0
-  return runningScenes.value.some(s => s.scene_id === selectedSceneId.value)
+const isRunRunning = computed(() => {
+  if (!selectedRunId.value) return false
+  const run = overview.value?.recent_runs?.find(r => String(r.id) === selectedRunId.value)
+  return run?.status === 'running'
 })
 
 const showRefreshSelector = computed(() => {
@@ -453,16 +472,10 @@ const showRefreshSelector = computed(() => {
 })
 
 const timeWindowDisplay = computed(() => {
-  if (!selectedSceneId.value) return '全部场景'
+  if (!selectedRunId.value) return '全部运行'
 
-  const runs = overview.value?.recent_runs
-  if (!runs?.length) return '-'
-
-  const sceneRuns = runs.filter((r: any) => String(r.scene_id) === selectedSceneId.value)
-  if (!sceneRuns.length) return '-'
-
-  const run = sceneRuns[0]
-  if (!run.started_at) return '-'
+  const run = overview.value?.recent_runs?.find((r: any) => String(r.id) === selectedRunId.value)
+  if (!run || !run.started_at) return '-'
 
   const start = formatDateTime(run.started_at)
   if (run.status === 'running') {
@@ -475,28 +488,23 @@ const timeWindowDisplay = computed(() => {
 })
 
 const durationDisplay = computed(() => {
-  if (!selectedSceneId.value) return ''
+  if (!selectedRunId.value) return ''
 
-  const runs = overview.value?.recent_runs
-  if (!runs?.length) return ''
+  const run = overview.value?.recent_runs?.find((r: any) => String(r.id) === selectedRunId.value)
+  if (!run) return ''
 
-  const sceneRuns = runs.filter((r: any) => String(r.scene_id) === selectedSceneId.value)
-  if (!sceneRuns.length) return ''
-
-  const runningRun = sceneRuns.find((r: any) => r.status === 'running')
-  if (runningRun && runningRun.started_at) {
-    return formatDuration((Date.now() - new Date(runningRun.started_at).getTime()) / 1000)
+  if (run.status === 'running' && run.started_at) {
+    return formatDuration((Date.now() - new Date(run.started_at).getTime()) / 1000)
   }
 
-  const doneRun = sceneRuns[0]
-  if (doneRun && doneRun.finished_at && doneRun.started_at) {
-    return formatDuration((new Date(doneRun.finished_at).getTime() - new Date(doneRun.started_at).getTime()) / 1000)
+  if (run.finished_at && run.started_at) {
+    return formatDuration((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
   }
 
   return ''
 })
 
-function onSceneChange() {
+function onRunChange() {
   sysMetricsHistory.value = []
   sysMetricsTimeSeries.value = []
   sysQueueMax = 0
@@ -521,13 +529,13 @@ function restartPolling() {
 }
 
 async function loadHistoryData() {
-  if (!selectedSceneId.value) return
+  if (!selectedRunId.value) return
   try {
     const token = localStorage.getItem('salvo_token')
     const resp = await fetch('/api/v1/dashboard/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ scene_id: Number(selectedSceneId.value), limit: 5 })
+      body: JSON.stringify({ run_id: selectedRunId.value, limit: 5 })
     })
     const json = await resp.json()
     if (json.code === 0 && json.data?.history?.length) {
@@ -566,8 +574,8 @@ async function fetchSceneList() {
         finished_at: s.finished_at,
       }))
 
-      if (!selectedSceneId.value && sceneList.value.length > 0) {
-        // Try to find the scene with the most recent run by querying history (no scene filter)
+      if (!selectedRunId.value && sceneList.value.length > 0) {
+        // Try to find the most recent run by querying history (no scene filter)
         try {
           const historyResp = await fetch('/api/v1/dashboard/history', {
             method: 'POST',
@@ -580,22 +588,27 @@ async function fetchSceneList() {
           const historyJson = await historyResp.json()
           if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
             const latestRun = historyJson.data.history[0]
-            const latestSceneId = String(latestRun.scene_id)
-            // Only switch if the scene exists in the scene list
-            if (sceneList.value.some(s => s.scene_id === latestSceneId)) {
-              selectedSceneId.value = latestSceneId
-            } else {
-              const firstRunning = sceneList.value.find(s => s.status === 'running')
-              selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
-            }
+            const latestRunId = String(latestRun.run_id)
+            selectedRunId.value = latestRunId
           } else {
             const firstRunning = sceneList.value.find(s => s.status === 'running')
-            selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
+            if (firstRunning) {
+              // Select the most recent run for this scene
+              const runForScene = overview.value?.recent_runs?.find((r: any) => String(r.scene_id) === firstRunning.scene_id)
+              if (runForScene) {
+                selectedRunId.value = String(runForScene.id)
+              }
+            }
           }
         } catch {
-          // Fallback: select first running scene or first scene in list
+          // Fallback: select first running scene's most recent run
           const firstRunning = sceneList.value.find(s => s.status === 'running')
-          selectedSceneId.value = firstRunning ? firstRunning.scene_id : sceneList.value[0].scene_id
+          if (firstRunning) {
+            const runForScene = overview.value?.recent_runs?.find((r: any) => String(r.scene_id) === firstRunning.scene_id)
+            if (runForScene) {
+              selectedRunId.value = String(runForScene.id)
+            }
+          }
         }
       }
 
@@ -1447,15 +1460,14 @@ async function checkLatestRunScene() {
     })
     const historyJson = await historyResp.json()
     if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
-      const latestRunSceneId = String(historyJson.data.history[0].scene_id)
-      // Switch to the latest run's scene if different from current selection
-      // The next poll will automatically fetch overview for the new scene
-      if (latestRunSceneId !== selectedSceneId.value) {
-        selectedSceneId.value = latestRunSceneId
+      const latestRunId = String(historyJson.data.history[0].run_id)
+      // Switch to the latest run if different from current selection
+      if (latestRunId !== selectedRunId.value) {
+        selectedRunId.value = latestRunId
       }
     }
   } catch {
-    // Silently fail - keep current scene
+    // Silently fail - keep current selection
   }
 }
 
@@ -1469,8 +1481,13 @@ async function fetchOverview() {
       await checkLatestRunScene()
     }
 
-    const sceneId = selectedSceneId.value || undefined
-    const requestData = { range_seconds: 0, scene_id: sceneId }
+    const runId = selectedRunId.value || undefined
+    const requestData: any = { range_seconds: 0 }
+    if (runId) {
+      requestData.run_id = runId
+    }
+    // If no run_id selected yet, don't pass scene_id — backend will return all runs
+    // and auto-select logic below will pick the first one, triggering a second call with run_id
 
     const token = localStorage.getItem('salvo_token')
     const fetchResp = await fetch('/api/v1/dashboard/overview', {
@@ -1488,6 +1505,15 @@ async function fetchOverview() {
       overview.value = resp.data
       syncRunningStatus()
       initNodeChartTypes()
+
+      // Auto-select the most recent run if none selected, then re-fetch with run_id
+      if (!selectedRunId.value && resp.data?.recent_runs?.length) {
+        selectedRunId.value = String(resp.data.recent_runs[0].id)
+        console.log('🔄 Auto-selected run:', selectedRunId.value)
+        // Re-fetch with the selected run_id to get specific run data
+        await fetchOverview()
+        return
+      }
 
       const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
 
@@ -1540,7 +1566,7 @@ function handleResize() {
 
 onMounted(async () => {
   await fetchSceneList()
-  fetchOverview()
+  await fetchOverview()
   loadHistoryData()
 
   setTimeout(() => {
@@ -1581,13 +1607,11 @@ onMounted(async () => {
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
   
   watch(allScenes, (scenes) => {
-    if (scenes.length > 0 && !selectedSceneId.value) {
-      const firstRunning = scenes.find(s => s.status === 'running')
-      if (firstRunning) {
-        selectedSceneId.value = firstRunning.scene_id
-        console.log('🔄 Auto-selected running scene:', selectedSceneId.value)
-      } else {
-        selectedSceneId.value = scenes[0].scene_id
+    if (scenes.length > 0 && !selectedRunId.value && overview.value?.recent_runs?.length) {
+      // Auto-select the most recent run
+      const latestRun = overview.value.recent_runs[0]
+      if (latestRun) {
+        selectedRunId.value = String(latestRun.id)
       }
     }
   }, { immediate: true })

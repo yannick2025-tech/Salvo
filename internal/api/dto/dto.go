@@ -614,6 +614,7 @@ type ListRolesRequest struct {
 type DashboardOverviewRequest struct {
 	RangeSeconds int    `json:"range_seconds,omitempty"`
 	SceneID      string `json:"scene_id,omitempty"`
+	RunID        string `json:"run_id,omitempty"`
 }
 
 type DashboardOverviewDTO struct {
@@ -685,8 +686,9 @@ type TimeSeriesDTO struct {
 // --- Dashboard History DTOs ---
 
 type DashboardHistoryRequest struct {
-	SceneID int64 `json:"scene_id,omitempty"`
-	Limit   int   `json:"limit,omitempty"`
+	SceneID string `json:"scene_id,omitempty"`
+	RunID   string `json:"run_id,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
 }
 
 type DashboardHistoryDTO struct {

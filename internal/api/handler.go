@@ -1988,6 +1988,25 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			logger.F("scene_id", sceneID))
 	}
 
+	// If run_id is specified, fetch only that specific run
+	var targetRun *model.RunRecord
+	if req.RunID != "" {
+		runID, err := strconv.ParseInt(req.RunID, 10, 64)
+		if err != nil {
+			return dto.ErrorResp(400, "invalid run_id")
+		}
+		targetRun, err = h.runs.GetByID(r.Context(), snowflake.ID(runID))
+		if err != nil {
+			return dto.ErrorResp(404, "run not found")
+		}
+		// Override scene_id from the run record
+		sceneID = targetRun.SceneID.Int64()
+		// Set range based on this run's duration
+		if targetRun.Duration > 0 {
+			rangeSeconds = int(targetRun.Duration) + 300
+		}
+	}
+
 	filter := repo.Filter{Limit: 50}
 	if sceneID > 0 {
 		filter.SceneID = snowflake.ID(sceneID)
@@ -1996,6 +2015,15 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	runRecords, err := h.runs.List(r.Context(), filter)
 	if err != nil {
 		return dto.ErrorResp(500, "failed to list runs")
+	}
+
+	// Fallback: if no runs found and no scene_id specified, get the most recent run
+	if len(runRecords) == 0 && sceneID == 0 && req.RunID == "" {
+		filter = repo.Filter{Limit: 1}
+		runRecords, err = h.runs.List(r.Context(), filter)
+		if err != nil {
+			return dto.ErrorResp(500, "failed to list runs")
+		}
 	}
 
 	if len(runRecords) == 0 && sceneID > 0 {
@@ -2039,6 +2067,7 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	h.log.Debug("DashboardOverview debug",
 		logger.F("scene_id", sceneID),
+		logger.F("run_id", req.RunID),
 		logger.F("run_records_count", len(runRecords)),
 		logger.F("running_map_count", len(runningMap)))
 
@@ -2055,7 +2084,20 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
 
+	// Pre-populate recentRuns with all runs (for dropdown selection).
+	// When a specific run is selected, the main loop below only aggregates
+	// data for that run, but recentRuns still lists all runs so the user
+	// can switch between them in the dashboard dropdown.
 	for _, rr := range runRecords {
+		recentRuns = append(recentRuns, toRunRecordDTO(rr))
+	}
+
+	for _, rr := range runRecords {
+		// If targetRun is specified, only process that specific run
+		if targetRun != nil && rr.ID != targetRun.ID {
+			continue
+		}
+
 		dtoRR := toRunRecordDTO(rr)
 
 		if rr.Status == "running" {
@@ -2197,7 +2239,13 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			}
 		}
 
-		recentRuns = append(recentRuns, dtoRR)
+		// Update the pre-populated recentRuns entry with aggregated data
+		for i := range recentRuns {
+			if recentRuns[i].ID == dtoRR.ID {
+				recentRuns[i] = dtoRR
+				break
+			}
+		}
 		if rr.StartedAt != nil && rr.StartedAt.After(cutoff) {
 			seriesRuns = append(seriesRuns, dtoRR)
 		} else if rr.FinishedAt != nil && rr.FinishedAt.After(cutoff) {
@@ -2408,14 +2456,31 @@ func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 		limit = 20
 	}
 
-	filter := repo.Filter{Limit: limit}
-	if req.SceneID > 0 {
-		filter.SceneID = snowflake.ID(req.SceneID)
-	}
+	var runRecords []*model.RunRecord
+	if req.RunID != "" {
+		runID, parseErr := strconv.ParseInt(req.RunID, 10, 64)
+		if parseErr != nil {
+			return dto.ErrorResp(400, "invalid run_id")
+		}
+		rr, getErr := h.runs.GetByID(r.Context(), snowflake.ID(runID))
+		if getErr != nil {
+			return dto.ErrorResp(404, "run not found")
+		}
+		runRecords = []*model.RunRecord{rr}
+	} else {
+		filter := repo.Filter{Limit: limit}
+		if req.SceneID != "" {
+			sceneID, parseErr := strconv.ParseInt(req.SceneID, 10, 64)
+			if parseErr != nil {
+				return dto.ErrorResp(400, "invalid scene_id")
+			}
+			filter.SceneID = snowflake.ID(sceneID)
+		}
 
-	runRecords, err := h.runs.List(r.Context(), filter)
-	if err != nil {
-		return dto.ErrorResp(500, "failed to list runs")
+		runRecords, err = h.runs.List(r.Context(), filter)
+		if err != nil {
+			return dto.ErrorResp(500, "failed to list runs")
+		}
 	}
 
 	var history []dto.RunHistoryDTO
