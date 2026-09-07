@@ -2306,9 +2306,15 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			}
 		}
 	}
-	// If the scene is not running, fall back to the latest completed report.
+	// If the scene is not running, fall back to the completed report of the
+	// selected run (or the latest run when no specific run is selected).
 	if sceneID > 0 {
-		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
+		rn, sceneIsRunning := runningMap[strconv.FormatInt(sceneID, 10)]
+		// Use live metrics only when the selected run is the running one.
+		// Otherwise the user selected an older completed run and we must
+		// load that run's report from the DB instead of live data.
+		selectedRunIsRunning := targetRun == nil || targetRun.Status == "running"
+		if sceneIsRunning && selectedRunIsRunning {
 			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
 				last := snapshots[len(snapshots)-1]
 				response.SystemMetrics = &dto.RuntimeMetricsDTO{
@@ -2324,9 +2330,37 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 					TaskWaitP99Ms:   last.TaskWaitP99Ms,
 					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
 				}
+				// Return the live time series so the frontend can render charts
+				// immediately instead of accumulating one point per poll.
+				// Cap to the most recent 300 snapshots (2s sampling = ~10min
+				// window) to keep the payload bounded for long-running tests.
+				series := snapshots
+				if len(series) > 300 {
+					series = series[len(series)-300:]
+				}
+				for _, snap := range series {
+					response.SystemMetricsTimeSeries = append(response.SystemMetricsTimeSeries, dto.RuntimeMetricsDTO{
+						Timestamp:       snap.Timestamp.Format(time.RFC3339),
+						GoroutineCount:  snap.GoroutineCount,
+						HeapAllocMB:     snap.HeapAllocMB,
+						HeapSysMB:       snap.HeapSysMB,
+						CPUUsagePercent: snap.CPUUsagePercent,
+						RSSMemoryMB:     snap.RSSMemoryMB,
+						ActiveWorkers:   snap.ActiveWorkers,
+						PendingQueueLen: snap.PendingQueueLen,
+						TaskWaitP50Ms:   snap.TaskWaitP50Ms,
+						TaskWaitP95Ms:   snap.TaskWaitP95Ms,
+						TaskWaitP99Ms:   snap.TaskWaitP99Ms,
+						GCPauseLastMs:   float64(snap.GCPauseLastNs) / 1e6,
+					})
+				}
 			}
 		} else {
-			response.SystemMetrics, response.SystemMetricsTimeSeries = h.loadSystemMetricsFromDB(r.Context(), snowflake.ID(sceneID))
+			var dbRunID snowflake.ID
+			if targetRun != nil {
+				dbRunID = targetRun.ID
+			}
+			response.SystemMetrics, response.SystemMetricsTimeSeries = h.loadSystemMetricsFromDB(r.Context(), snowflake.ID(sceneID), dbRunID)
 		}
 	} else if len(runningMap) > 0 {
 		for _, rn := range runningMap {
@@ -2353,13 +2387,25 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 	return dto.OK(response)
 }
 
-func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake.ID) (*dto.RuntimeMetricsDTO, []dto.RuntimeMetricsDTO) {
-	filter := repo.Filter{SceneID: sceneID, Limit: 1}
-	runRecords, err := h.runs.List(ctx, filter)
-	if err != nil || len(runRecords) == 0 {
-		return nil, nil
+// loadSystemMetricsFromDB loads system metrics from the persisted report.
+// When runID > 0 it loads that specific run's report; otherwise it falls back
+// to the latest run of the scene.
+func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake.ID, runID snowflake.ID) (*dto.RuntimeMetricsDTO, []dto.RuntimeMetricsDTO) {
+	var latestRR *model.RunRecord
+	if runID > 0 {
+		rr, err := h.runs.GetByID(ctx, runID)
+		if err != nil || rr == nil || rr.ID == 0 {
+			return nil, nil
+		}
+		latestRR = rr
+	} else {
+		filter := repo.Filter{SceneID: sceneID, Limit: 1}
+		runRecords, err := h.runs.List(ctx, filter)
+		if err != nil || len(runRecords) == 0 {
+			return nil, nil
+		}
+		latestRR = runRecords[0]
 	}
-	latestRR := runRecords[0]
 	if latestRR.ID == 0 {
 		return nil, nil
 	}

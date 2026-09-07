@@ -353,26 +353,25 @@ const sysMetricsTimeSeries = ref<any[]>([])
 const sysChartsVisible = ref(false)
 let sysChartsRendered = false
 let prewarmRetryTimer: ReturnType<typeof setTimeout> | null = null
+
 function prewarmSysCharts() {
   if (sysMetricsHistory.value.length === 0 && sysMetricsTimeSeries.value.length === 0) return
-  // Skip if container is not yet visible (zero dimensions cause ECharts blank render).
-  // The IntersectionObserver will trigger prewarmSysCharts() once the section scrolls into view.
-  if (!sysChartsVisible.value && sysMonitorSectionRef.value) {
-    const rect = sysMonitorSectionRef.value.getBoundingClientRect()
-    if (rect.height === 0 || rect.top > window.innerHeight) return
-  }
-  renderSysGoroutineChart()
-  if (!sysGoroutineChart) {
+  // Wait until the container has actual dimensions before initializing ECharts.
+  // ECharts fails silently in zero-size containers and resize() cannot recover.
+  if (!sysMonitorSectionRef.value || sysMonitorSectionRef.value.getBoundingClientRect().height === 0) {
+    // Use requestAnimationFrame to wait for browser layout to complete, then retry
     if (prewarmRetryTimer) clearTimeout(prewarmRetryTimer)
-    prewarmRetryTimer = setTimeout(() => prewarmSysCharts(), 100)
+    prewarmRetryTimer = setTimeout(() => {
+      requestAnimationFrame(() => prewarmSysCharts())
+    }, 100)
     return
   }
-  if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
-  sysChartsRendered = true
+  renderSysGoroutineChart()
   renderSysHeapChart()
   renderSysCpuChart()
   renderSysTaskWaitChart()
   renderSysQueueChart()
+  sysChartsRendered = true
 }
 
 function refreshSysCharts() {
@@ -1517,17 +1516,19 @@ async function fetchOverview() {
 
       const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
 
-      if (hasRunning) {
-        sysMetricsTimeSeries.value = []
-        if (resp.data?.system_metrics) {
-          sysMetricsHistory.value.push(resp.data.system_metrics)
-          if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
-            sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
-          }
-        }
-      } else if (resp.data?.system_metrics_time_series?.length > 0) {
+      // Prefer the backend-provided time series (live snapshots for running
+      // runs, DB report data for completed runs) so charts render immediately
+      // with full history. Fall back to local accumulation only when the
+      // backend returns a bare snapshot without a time series.
+      if (resp.data?.system_metrics_time_series?.length > 0) {
         sysMetricsTimeSeries.value = resp.data.system_metrics_time_series
         sysMetricsHistory.value = []
+      } else if (hasRunning && resp.data?.system_metrics) {
+        sysMetricsTimeSeries.value = []
+        sysMetricsHistory.value.push(resp.data.system_metrics)
+        if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
+          sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
+        }
       }
 
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
@@ -1537,8 +1538,15 @@ async function fetchOverview() {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
-      prewarmSysCharts()
-      refreshSysCharts()
+      // Wait for DOM update AND browser paint so chart containers have actual dimensions.
+      // nextTick only waits for Vue's DOM update, but ECharts needs the browser to have
+      // actually painted (layout computed) for containers to have non-zero dimensions.
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          prewarmSysCharts()
+          refreshSysCharts()
+        })
+      })
       if (expandedNodeId.value) {
         renderNodeDetailChart(expandedNodeId.value)
       }
@@ -1630,6 +1638,7 @@ onMounted(async () => {
   watch(sysChartsVisible, (visible) => {
     if (!visible) return
     prewarmSysCharts()
+    refreshSysCharts()
   }, { once: true })
 
   nextTick(() => {
