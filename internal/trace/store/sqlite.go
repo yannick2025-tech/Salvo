@@ -199,6 +199,23 @@ func (s *Store) listSpans(ctx context.Context, traceID snowflake.ID) ([]*traceli
 	return spans, rows.Err()
 }
 
+// CountTraces returns the total number of traces, optionally filtered by scene ID.
+func (s *Store) CountTraces(ctx context.Context, sceneID snowflake.ID) (int, error) {
+	query := `SELECT COUNT(*) FROM traces`
+	args := []any{}
+
+	if sceneID != 0 {
+		query += ` WHERE scene_id = ?`
+		args = append(args, sceneID)
+	}
+
+	var count int
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("tracestore: count traces: %w", err)
+	}
+	return count, nil
+}
+
 // ListAllTraces returns all traces with their spans, ordered by started_at DESC.
 // Used for loading historical data into memory on startup.
 func (s *Store) ListAllTraces(ctx context.Context, limit int) ([]*tracelib.Trace, error) {

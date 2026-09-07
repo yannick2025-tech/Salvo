@@ -1722,11 +1722,17 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 		offset = 0
 	}
 
-	var traces []*tracelib.Trace
-	if req.SceneID != 0 {
-		traces = h.tracer.ListByScene(req.SceneID, limit, offset)
-	} else {
-		traces = h.tracer.List(limit, offset)
+	// Query from SQLite for full history instead of in-memory buffer (capped at 1000).
+	traces, err := h.traceStore.ListTraces(r.Context(), req.SceneID, limit, offset)
+	if err != nil {
+		h.log.Error("failed to list traces from db", logger.F("error", err))
+		return dto.ErrorResp(500, "failed to list traces")
+	}
+
+	total, err := h.traceStore.CountTraces(r.Context(), req.SceneID)
+	if err != nil {
+		h.log.Error("failed to count traces from db", logger.F("error", err))
+		return dto.ErrorResp(500, "failed to count traces")
 	}
 
 	items := make([]dto.TraceDTO, 0, len(traces))
@@ -1737,7 +1743,7 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 	return dto.OK(dto.ListResponse[[]dto.TraceDTO]{
 		Items: items,
 		Pagination: dto.Pagination{
-			Total:  h.tracer.Total(),
+			Total:  total,
 			Limit:  limit,
 			Offset: offset,
 		},
