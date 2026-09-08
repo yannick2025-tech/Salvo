@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">05</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold">体验一</text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 151.42 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 213.98 89.4 L 213.98 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">6 大痛点</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="64 170 1152 40" data-pptx-prst="roundRect" data-pptx-av-adj="val 10000" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 64 174 A 4 4 0 0 1 68 170 L 1212 170 A 4 4 0 0 1 1216 174 L 1216 206 A 4 4 0 0 1 1212 210 L 68 210 A 4 4 0 0 1 64 206 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="162.4 182.4 35.2 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 162.4 182.4 L 197.6 182.4 L 197.6 207.04 L 162.4 207.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="196" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">痛点</text>
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="438.13 182.4 83.73 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 438.13 182.4 L 521.87 182.4 L 521.87 201.73 L 438.13 201.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="196" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold"><tspan>Snailx</tspan><tspan> 问题</tspan></text>
+</g>
+<g id="shape-10" data-pptx-object="shape" data-pptx-frame="859.84 182.4 120.31 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
+<path d="M 859.84 182.4 L 980.16 182.4 L 980.16 207.04 L 859.84 207.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="196" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">Salvo 解决方案</text>
+</g>
+<g id="shape-11" data-pptx-object="shape" data-pptx-frame="64 210 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:11" data-pptx-semantic-object="shape">
+<path d="M 64 210 L 1216 210 L 1216 280 L 64 280 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-12" data-pptx-object="shape" data-pptx-frame="131.58 234.7 96.84 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:12" data-pptx-semantic-object="shape">
+<path d="M 131.58 234.7 L 228.42 234.7 L 228.42 262.42 L 131.58 262.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="250" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">场景不通用</text>
+</g>
+<g id="shape-13" data-pptx-object="shape" data-pptx-frame="377.34 236.4 205.33 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:13" data-pptx-semantic-object="shape">
+<path d="M 377.34 236.4 L 582.66 236.4 L 582.66 261.04 L 377.34 261.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="250" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">测试场景内置在 Go 代码中</text>
+</g>
+<g id="shape-14" data-pptx-object="shape" data-pptx-frame="805.57 236.4 228.86 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:14" data-pptx-semantic-object="shape">
+<path d="M 805.57 236.4 L 1034.43 236.4 L 1034.43 261.04 L 805.57 261.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="250" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">YAML 配置驱动，零代码适配</text>
+</g>
+<g id="shape-15" data-pptx-object="shape" data-pptx-frame="64 280 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:15" data-pptx-semantic-object="shape">
+<path d="M 64 280 L 1216 280 L 1216 350 L 64 350 Z" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-16" data-pptx-object="shape" data-pptx-frame="131.58 304.7 96.84 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:16" data-pptx-semantic-object="shape">
+<path d="M 131.58 304.7 L 228.42 304.7 L 228.42 332.42 L 131.58 332.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="320" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">资源消耗高</text>
+</g>
+<g id="shape-17" data-pptx-object="shape" data-pptx-frame="330.73 306.4 298.53 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:17" data-pptx-semantic-object="shape">
+<path d="M 330.73 306.4 L 629.27 306.4 L 629.27 325.73 L 330.73 325.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="320" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E"><tspan>12 万协程，4C8G </tspan><tspan>Linux</tspan><tspan>执行机</tspan><tspan>频繁</tspan><tspan>被打爆</tspan></text>
+</g>
+<g id="shape-18" data-pptx-object="shape" data-pptx-frame="826.08 306.4 187.84 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:18" data-pptx-semantic-object="shape">
+<path d="M 826.08 306.4 L 1013.92 306.4 L 1013.92 331.04 L 826.08 331.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="320" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">按需调度，精确控制并发</text>
+</g>
+<g id="shape-19" data-pptx-object="shape" data-pptx-frame="64 350 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:19" data-pptx-semantic-object="shape">
+<path d="M 64 350 L 1216 350 L 1216 420 L 64 420 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-20" data-pptx-object="shape" data-pptx-frame="131.58 374.7 96.84 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:20" data-pptx-semantic-object="shape">
+<path d="M 131.58 374.7 L 228.42 374.7 L 228.42 402.42 L 131.58 402.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="390" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">扩展成本高</text>
+</g>
+<g id="shape-21" data-pptx-object="shape" data-pptx-frame="327.97 376.4 304.07 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:21" data-pptx-semantic-object="shape">
+<path d="M 327.97 376.4 L 632.03 376.4 L 632.03 395.73 L 327.97 395.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="390" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E"><tspan>新增业务改 1</tspan><tspan>8</tspan><tspan> 文件</tspan><tspan> / 20+</tspan><tspan>结构体</tspan><tspan> / </tspan><tspan>6</tspan><tspan>0</tspan><tspan>+</tspan><tspan> 函数</tspan></text>
+</g>
+<g id="shape-22" data-pptx-object="shape" data-pptx-frame="859.33 376.4 121.34 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:22" data-pptx-semantic-object="shape">
+<path d="M 859.33 376.4 L 980.67 376.4 L 980.67 401.04 L 859.33 401.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="390" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">只改一个 YAML</text>
+</g>
+<g id="shape-23" data-pptx-object="shape" data-pptx-frame="64 420 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:23" data-pptx-semantic-object="shape">
+<path d="M 64 420 L 1216 420 L 1216 490 L 64 490 Z" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-24" data-pptx-object="shape" data-pptx-frame="141.12 444.7 77.76 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:24" data-pptx-semantic-object="shape">
+<path d="M 141.12 444.7 L 218.88 444.7 L 218.88 472.42 L 141.12 472.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="460" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">无法停止</text>
+</g>
+<g id="shape-25" data-pptx-object="shape" data-pptx-frame="420 446.4 120 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:25" data-pptx-semantic-object="shape">
+<path d="M 420 446.4 L 540 446.4 L 540 471.04 L 420 471.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="460" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">一旦运行不能停</text>
+</g>
+<g id="shape-26" data-pptx-object="shape" data-pptx-frame="673.3 446.4 493.4 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:26" data-pptx-semantic-object="shape">
+<path d="M 673.3 446.4 L 1166.7 446.4 L 1166.7 465.73 L 673.3 465.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="460" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0"><tspan>按次数 / 时长两种模式，随时停止，所有子携程自动取消，报告不</tspan><tspan>中断</tspan></text>
+</g>
+<g id="shape-27" data-pptx-object="shape" data-pptx-frame="64 490 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:27" data-pptx-semantic-object="shape">
+<path d="M 64 490 L 1216 490 L 1216 560 L 64 560 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-28" data-pptx-object="shape" data-pptx-frame="98.7 514.7 162.6 21.8" data-pptx-prst="rect" data-pptx-source-ref="slide:28" data-pptx-semantic-object="shape">
+<path d="M 98.7 514.7 L 261.3 514.7 L 261.3 536.5 L 98.7 536.5 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="530" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold"><tspan>报告分散，工作量</tspan><tspan>大</tspan></text>
+</g>
+<g id="shape-29" data-pptx-object="shape" data-pptx-frame="321.8 516.4 316.4 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:29" data-pptx-semantic-object="shape">
+<path d="M 321.8 516.4 L 638.2 516.4 L 638.2 535.73 L 321.8 535.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E"><tspan>AWK + EXCEL + Prometheus（报告约</tspan><tspan>1</tspan><tspan>周）</tspan></text>
+</g>
+<g id="shape-30" data-pptx-object="shape" data-pptx-frame="805.77 516.4 228.47 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:30" data-pptx-semantic-object="shape">
+<path d="M 805.77 516.4 L 1034.23 516.4 L 1034.23 535.73 L 805.77 535.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">自动生成 HTML 报告（分钟级）</text>
+</g>
+<g id="shape-31" data-pptx-object="shape" data-pptx-frame="64 560 1152 70" data-pptx-prst="rect" data-pptx-source-ref="slide:31" data-pptx-semantic-object="shape">
+<path d="M 64 560 L 1216 560 L 1216 630 L 64 630 Z" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-32" data-pptx-object="shape" data-pptx-frame="141.12 584.7 77.76 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:32" data-pptx-semantic-object="shape">
+<path d="M 141.12 584.7 L 218.88 584.7 L 218.88 612.42 L 141.12 612.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="180" y="600" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">并发崩溃</text>
+</g>
+<g id="shape-33" data-pptx-object="shape" data-pptx-frame="416 586.4 128 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:33" data-pptx-semantic-object="shape">
+<path d="M 416 586.4 L 544 586.4 L 544 605.73 L 416 605.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="600" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E"><tspan>多次出现并发</tspan><tspan>问题</tspan></text>
+</g>
+<g id="shape-34" data-pptx-object="shape" data-pptx-frame="860 586.4 120 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:34" data-pptx-semantic-object="shape">
+<path d="M 860 586.4 L 980 586.4 L 980 611.04 L 860 611.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="920" y="600" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">完善的并发控制</text>
+</g></svg>

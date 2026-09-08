@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">14</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold"><tspan>体验</tspan><tspan>四</tspan></text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 246.72 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 309.28 89.4 L 309.28 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">DAG 引擎案例</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="63.28 154.7 161.71 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 63.28 154.7 L 224.99 154.7 L 224.99 182.42 L 63.28 182.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="63.28" y="170" text-anchor="start" xml:space="preserve" font-size="18" fill="#59606E">4 个环节的 review</text>
+</g>
+<g id="shape-37" data-pptx-object="group" data-pptx-frame="64 200 1152 370" data-pptx-source-ref="slide:37">
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="64 200 1152 50" data-pptx-prst="roundRect" data-pptx-av-adj="val 8000" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 64 204 A 4 4 0 0 1 68 200 L 1212 200 A 4 4 0 0 1 1216 204 L 1216 246 A 4 4 0 0 1 1212 250 L 68 250 A 4 4 0 0 1 64 246 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="122.4 218.4 35.2 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 122.4 218.4 L 157.6 218.4 L 157.6 243.04 L 122.4 243.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="140" y="232" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">环节</text>
+</g>
+<g id="shape-10" data-pptx-object="shape" data-pptx-frame="282.4 218.4 35.2 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
+<path d="M 282.4 218.4 L 317.6 218.4 L 317.6 243.04 L 282.4 243.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="300" y="232" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">角色</text>
+</g>
+<g id="shape-11" data-pptx-object="shape" data-pptx-frame="450.79 218.4 98.42 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:11" data-pptx-semantic-object="shape">
+<path d="M 450.79 218.4 L 549.21 218.4 L 549.21 243.04 L 450.79 243.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="232" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">review 重点</text>
+</g>
+<g id="shape-12" data-pptx-object="shape" data-pptx-frame="842.27 218.4 115.46 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:12" data-pptx-semantic-object="shape">
+<path d="M 842.27 218.4 L 957.73 218.4 L 957.73 243.04 L 842.27 243.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="900" y="232" text-anchor="middle" xml:space="preserve" font-size="16" fill="#FFFFFF" font-weight="bold">产出（≥90分）</text>
+</g>
+<g id="shape-13" data-pptx-object="shape" data-pptx-frame="64 250 1152 80" data-pptx-prst="rect" data-pptx-source-ref="slide:13" data-pptx-semantic-object="shape">
+<path d="M 64 250 L 1216 250 L 1216 330 L 64 330 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-14" data-pptx-object="shape" data-pptx-frame="120.2 279.7 39.6 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:14" data-pptx-semantic-object="shape">
+<path d="M 120.2 279.7 L 159.8 279.7 L 159.8 307.42 L 120.2 307.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="140" y="295" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">架构</text>
+</g>
+<g id="shape-15" data-pptx-object="shape" data-pptx-frame="273.92 281.4 52.16 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:15" data-pptx-semantic-object="shape">
+<path d="M 273.92 281.4 L 326.08 281.4 L 326.08 306.04 L 273.92 306.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="300" y="295" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">架构师</text>
+</g>
+<g id="shape-16" data-pptx-object="shape" data-pptx-frame="452.79 273.1 94.42 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:16" data-pptx-semantic-object="shape">
+<path d="M 452.79 273.1 L 547.21 273.1 L 547.21 294.66 L 452.79 294.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="285" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">DAG 数据结构</text>
+</g>
+<g id="shape-17" data-pptx-object="shape" data-pptx-frame="469.76 298.1 60.48 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:17" data-pptx-semantic-object="shape">
+<path d="M 469.76 298.1 L 530.24 298.1 L 530.24 319.66 L 469.76 319.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="310" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">执行模型</text>
+</g>
+<g id="shape-18" data-pptx-object="shape" data-pptx-frame="848.48 281.4 103.04 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:18" data-pptx-semantic-object="shape">
+<path d="M 848.48 281.4 L 951.52 281.4 L 951.52 306.04 L 848.48 306.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="900" y="295" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">架构设计文档</text>
+</g>
+<g id="shape-19" data-pptx-object="shape" data-pptx-frame="64 330 1152 80" data-pptx-prst="rect" data-pptx-source-ref="slide:19" data-pptx-semantic-object="shape">
+<path d="M 64 330 L 1216 330 L 1216 410 L 64 410 Z" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-20" data-pptx-object="shape" data-pptx-frame="120.2 359.7 39.6 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:20" data-pptx-semantic-object="shape">
+<path d="M 120.2 359.7 L 159.8 359.7 L 159.8 387.42 L 120.2 387.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="140" y="375" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">产品</text>
+</g>
+<g id="shape-21" data-pptx-object="shape" data-pptx-frame="265.44 361.4 69.12 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:21" data-pptx-semantic-object="shape">
+<path d="M 265.44 361.4 L 334.56 361.4 L 334.56 386.04 L 265.44 386.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="300" y="375" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">产品经理</text>
+</g>
+<g id="shape-22" data-pptx-object="shape" data-pptx-frame="432.66 353.1 134.68 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:22" data-pptx-semantic-object="shape">
+<path d="M 432.66 353.1 L 567.34 353.1 L 567.34 374.66 L 432.66 374.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="365" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">节点类型、用户体验</text>
+</g>
+<g id="shape-23" data-pptx-object="shape" data-pptx-frame="469.76 378.1 60.48 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:23" data-pptx-semantic-object="shape">
+<path d="M 469.76 378.1 L 530.24 378.1 L 530.24 399.66 L 469.76 399.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="390" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">配置方式</text>
+</g>
+<g id="shape-24" data-pptx-object="shape" data-pptx-frame="848.48 361.4 103.04 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:24" data-pptx-semantic-object="shape">
+<path d="M 848.48 361.4 L 951.52 361.4 L 951.52 386.04 L 848.48 386.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="900" y="375" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">产品需求文档</text>
+</g>
+<g id="shape-25" data-pptx-object="shape" data-pptx-frame="64 410 1152 80" data-pptx-prst="rect" data-pptx-source-ref="slide:25" data-pptx-semantic-object="shape">
+<path d="M 64 410 L 1216 410 L 1216 490 L 64 490 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-26" data-pptx-object="shape" data-pptx-frame="120.2 439.7 39.6 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:26" data-pptx-semantic-object="shape">
+<path d="M 120.2 439.7 L 159.8 439.7 L 159.8 467.42 L 120.2 467.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="140" y="455" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">开发</text>
+</g>
+<g id="shape-27" data-pptx-object="shape" data-pptx-frame="256.96 441.4 86.08 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:27" data-pptx-semantic-object="shape">
+<path d="M 256.96 441.4 L 343.04 441.4 L 343.04 466.04 L 256.96 466.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="300" y="455" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">开发工程师</text>
+</g>
+<g id="shape-28" data-pptx-object="shape" data-pptx-frame="432.66 433.1 134.68 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:28" data-pptx-semantic-object="shape">
+<path d="M 432.66 433.1 L 567.34 433.1 L 567.34 454.66 L 432.66 454.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="445" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">拓扑排序、条件分支</text>
+</g>
+<g id="shape-29" data-pptx-object="shape" data-pptx-frame="447.5 458.1 105 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:29" data-pptx-semantic-object="shape">
+<path d="M 447.5 458.1 L 552.5 458.1 L 552.5 479.66 L 447.5 479.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="470" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">循环、并发控制</text>
+</g>
+<g id="shape-30" data-pptx-object="shape" data-pptx-frame="812.86 441.4 174.27 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:30" data-pptx-semantic-object="shape">
+<path d="M 812.86 441.4 L 987.14 441.4 L 987.14 466.04 L 812.86 466.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="900" y="455" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">dag.go, executor.go</text>
+</g>
+<g id="shape-31" data-pptx-object="shape" data-pptx-frame="64 490 1152 80" data-pptx-prst="rect" data-pptx-source-ref="slide:31" data-pptx-semantic-object="shape">
+<path d="M 64 490 L 1216 490 L 1216 570 L 64 570 Z" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-32" data-pptx-object="shape" data-pptx-frame="120.2 519.7 39.6 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:32" data-pptx-semantic-object="shape">
+<path d="M 120.2 519.7 L 159.8 519.7 L 159.8 547.42 L 120.2 547.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="140" y="535" text-anchor="middle" xml:space="preserve" font-size="18" fill="#1A1D26" font-weight="bold">测试</text>
+</g>
+<g id="shape-33" data-pptx-object="shape" data-pptx-frame="256.96 521.4 86.08 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:33" data-pptx-semantic-object="shape">
+<path d="M 256.96 521.4 L 343.04 521.4 L 343.04 546.04 L 256.96 546.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="300" y="535" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">测试工程师</text>
+</g>
+<g id="shape-34" data-pptx-object="shape" data-pptx-frame="432.66 513.1 134.68 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:34" data-pptx-semantic-object="shape">
+<path d="M 432.66 513.1 L 567.34 513.1 L 567.34 534.66 L 432.66 534.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="525" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">边界条件、并发安全</text>
+</g>
+<g id="shape-35" data-pptx-object="shape" data-pptx-frame="469.76 538.1 60.48 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:35" data-pptx-semantic-object="shape">
+<path d="M 469.76 538.1 L 530.24 538.1 L 530.24 559.66 L 469.76 559.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="500" y="550" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">异常处理</text>
+</g>
+<g id="shape-36" data-pptx-object="shape" data-pptx-frame="848.06 521.4 103.89 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:36" data-pptx-semantic-object="shape">
+<path d="M 848.06 521.4 L 951.94 521.4 L 951.94 546.04 L 848.06 546.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="900" y="535" text-anchor="middle" xml:space="preserve" font-size="16" fill="#3458B0">dag_test.go</text>
+</g>
+</g>
+<g id="shape-38" data-pptx-object="shape" data-pptx-frame="140 620 1000 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-source-ref="slide:38" data-pptx-semantic-object="shape">
+<path d="M 140 628 A 8 8 0 0 1 148 620 L 1132 620 A 8 8 0 0 1 1140 628 L 1140 672 A 8 8 0 0 1 1132 680 L 148 680 A 8 8 0 0 1 140 672 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-39" data-pptx-object="shape" data-pptx-frame="362.01 641.4 555.98 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:39" data-pptx-semantic-object="shape">
+<path d="M 362.01 641.4 L 917.99 641.4 L 917.99 666.04 L 362.01 666.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="655" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">每个环节 review 不合格，不往下传递 · 避免"AI 生成完就直接用"的陷阱</text>
+</g></svg>
