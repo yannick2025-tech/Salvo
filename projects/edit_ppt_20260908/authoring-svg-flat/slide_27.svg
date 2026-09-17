@@ -40,7 +40,7 @@
 <path d="M 486.64 244.7 L 793.36 244.7 L 793.36 272.42 L 486.64 272.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
 
 
-<text x="640" y="260" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF">每个模块都有对应的 _test.go 文件</text>
+<text x="640" y="260" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF">覆盖率 57.2% → 60.8%，核心引擎 77.6%</text>
 </g>
 <g id="shape-10" data-pptx-object="shape" data-pptx-frame="604.4 265.6 71.2 77.53" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
 <path d="M 604.4 265.6 L 675.6 265.6 L 675.6 343.13 L 604.4 343.13 Z" fill="none" stroke="none" data-pptx-part="geometry" />
