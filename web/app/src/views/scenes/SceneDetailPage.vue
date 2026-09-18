@@ -232,6 +232,25 @@
         </div>
       </div>
 
+      <!-- ➕ Generator 节点配置 -->
+      <div v-else-if="selectedNode.type === 'generator'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>表达式</label>
+          <input v-model="generatorConfig.expression" placeholder='${__random(1, 100)}' @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>变量名</label>
+          <input v-model="generatorConfig.variable" placeholder="my_var" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">表达式支持 ${generator.xxx}、${__so(...)}、${__random(...)} 及变量引用，求值结果将存入指定变量</label>
+        </div>
+      </div>
+
       <!-- ➕ While 节点配置 -->
       <div v-else-if="selectedNode.type === 'while'" class="config-form">
         <div class="form-row">
@@ -709,6 +728,8 @@ const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==',
 const parallelConfig = reactive({ async: false })
 const subFlowConfig = reactive({ scene_id: '', async: false })
 const loopConfig = reactive({ loop_count: '3' })
+// Generator node config
+const generatorConfig = reactive({ expression: '', variable: '' })
 
 function parseVariables(sceneVars: string): { key: string; value: string }[] {
   try {
@@ -1683,6 +1704,9 @@ function selectNode(node: NodeDTO | null) {
     groupConfig.async = cfg.async || false
     timerConfig.mode = cfg.mode || 'delay'
     timerConfig.seconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+
+    generatorConfig.expression = cfg.expression || ''
+    generatorConfig.variable = cfg.variable || ''
     
     // Parse configs for new node types
     whileConfig.exit_conditions = cfg.exit_conditions || [{ variable: '', operator: '==', value: '' }]
@@ -1791,6 +1815,8 @@ async function saveNodeConfig() {
     config = JSON.stringify(subFlowConfig)
   } else if (nodeType === 'loop') {
     config = JSON.stringify(loopConfig)
+  } else if (nodeType === 'generator') {
+    config = JSON.stringify({ expression: generatorConfig.expression, variable: generatorConfig.variable })
   }
 
   try {
