@@ -263,12 +263,12 @@
             <div v-for="(cond, idx) in whileConfig.exit_conditions" :key="idx" class="condition-row">
               <input v-model="cond.variable" placeholder="变量" class="cond-input" @change="saveNodeConfig" />
               <select v-model="cond.operator" class="cond-op" @change="saveNodeConfig">
-                <option value="==">==</option>
-                <option value="!=">!=</option>
-                <option value=">">&gt;</option>
-                <option value="<">&lt;</option>
-                <option value=">=">&gt;=</option>
-                <option value="<=">&lt;=</option>
+                <option value="equals">==</option>
+                <option value="not_equals">!=</option>
+                <option value="greater_than">&gt;</option>
+                <option value="less_than">&lt;</option>
+                <option value="greater_than_or_equal">&gt;=</option>
+                <option value="less_than_or_equal">&lt;=</option>
               </select>
               <input v-model="cond.value" placeholder="值" class="cond-input" @change="saveNodeConfig" />
               <button class="btn-icon btn-del-var" @click="removeWhileCondition(idx)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -729,7 +729,7 @@ const pagedRows = computed(() => {
 const groupConfig = reactive({ node_ids: [] as string[], loop_count: '1', async: false })
 // Timer node config
 const timerConfig = reactive({ mode: 'delay', seconds: '1' })
-const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: '==', value: '' }], interval_seconds: '1', max_iterations: '100', max_duration_minutes: '0', fail_after_consecutive: '0', fail_message: '' })
+const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: 'equals', value: '' }], interval_seconds: '1', max_iterations: '100', max_duration_minutes: '0', fail_after_consecutive: '0', fail_message: '' })
 const parallelConfig = reactive({ async: false })
 const subFlowConfig = reactive({ scene_id: '', async: false })
 const loopConfig = reactive({ loop_count: '3' })
@@ -982,7 +982,7 @@ const nodeForm = reactive({
   generatorVar: '',
   timerMode: 'delay',
   timerSeconds: '1',
-  whileExitConditions: [{ variable: '', operator: '==', value: '' }],
+  whileExitConditions: [{ variable: '', operator: 'equals', value: '' }],
   whileIntervalSeconds: '1',
   whileMaxIterations: '100',
   whileMaxDurationMinutes: '0',
@@ -1057,7 +1057,7 @@ function removeChild(childId: string) {
 }
 
 function addWhileCondition() {
-  whileConfig.exit_conditions.push({ variable: '', operator: '==', value: '' })
+  whileConfig.exit_conditions.push({ variable: '', operator: 'equals', value: '' })
   saveNodeConfig()
 }
 
@@ -1424,6 +1424,19 @@ function addNode(type: string) {
   showNodeEditor.value = true
 }
 
+// 归一化 while 退出条件 operator：旧数据可能存符号形式（==、!= 等），统一转为后端命名形式
+const SYMBOLIC_OPERATOR_MAP: Record<string, string> = {
+  '==': 'equals',
+  '!=': 'not_equals',
+  '>': 'greater_than',
+  '<': 'less_than',
+  '>=': 'greater_than_or_equal',
+  '<=': 'less_than_or_equal',
+}
+function normalizeWhileOperator(op: string): string {
+  return SYMBOLIC_OPERATOR_MAP[op] || op || 'equals'
+}
+
 function editNode(node: NodeDTO) {
   editingNode.value = node
   nodeForm.name = node.name
@@ -1449,7 +1462,7 @@ function editNode(node: NodeDTO) {
 
     // While - operator names match backend directly (equals, not_equals, etc.)
     nodeForm.whileExitConditions = cfg.exit_conditions && cfg.exit_conditions.length > 0
-      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: c.operator || 'equals', value: c.value != null ? String(c.value) : '' }))
+      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: normalizeWhileOperator(c.operator), value: c.value != null ? String(c.value) : '' }))
       : [{ variable: '', operator: 'equals', value: '' }]
     nodeForm.whileIntervalSeconds = cfg.interval_seconds != null ? String(cfg.interval_seconds) : '1'
     nodeForm.whileMaxIterations = cfg.max_iterations != null ? String(cfg.max_iterations) : '100'
@@ -1479,7 +1492,7 @@ function editNode(node: NodeDTO) {
     nodeForm.generatorVar = ''
     nodeForm.timerMode = 'delay'
     nodeForm.timerSeconds = '1'
-    nodeForm.whileExitConditions = [{ variable: '', operator: '==', value: '' }]
+    nodeForm.whileExitConditions = [{ variable: '', operator: 'equals', value: '' }]
     nodeForm.whileIntervalSeconds = '1'
     nodeForm.whileMaxIterations = '100'
     nodeForm.whileMaxDurationMinutes = '0'
@@ -1714,7 +1727,9 @@ function selectNode(node: NodeDTO | null) {
     generatorConfig.variable = cfg.variable || ''
     
     // Parse configs for new node types
-    whileConfig.exit_conditions = cfg.exit_conditions || [{ variable: '', operator: '==', value: '' }]
+    whileConfig.exit_conditions = (cfg.exit_conditions && cfg.exit_conditions.length > 0)
+      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: normalizeWhileOperator(c.operator), value: c.value != null ? String(c.value) : '' }))
+      : [{ variable: '', operator: 'equals', value: '' }]
     whileConfig.interval_seconds = cfg.interval_seconds || 1
     whileConfig.max_iterations = cfg.max_iterations || 100
     whileConfig.max_duration_minutes = cfg.max_duration_minutes || 0
