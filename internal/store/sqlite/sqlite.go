@@ -854,9 +854,9 @@ func (r *UserRepo) List(ctx context.Context, filter repo.Filter) ([]*model.User,
 func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
 	user.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE users SET email=?, nickname=?, role_id=?, status=?, last_login_at=?, updated_at=?
+		UPDATE users SET email=?, password_hash=?, nickname=?, role_id=?, status=?, last_login_at=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
-		user.Email, user.Nickname, user.RoleID, user.Status,
+		user.Email, user.PasswordHash, user.Nickname, user.RoleID, user.Status,
 		user.LastLoginAt, user.UpdatedAt, user.ID)
 	return err
 }

@@ -80,8 +80,9 @@ async function handleLogin() {
     } else {
       errorMsg.value = resp.message || '登录失败'
     }
-  } catch {
-    errorMsg.value = '网络错误，请稍后重试'
+  } catch (e: any) {
+    const msg = e?.message || ''
+    errorMsg.value = msg && msg !== 'Network Error' ? msg : '网络错误，请稍后重试'
   } finally {
     loading.value = false
   }

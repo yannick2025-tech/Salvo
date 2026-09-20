@@ -865,6 +865,7 @@ func TestUserRepoUpdate(t *testing.T) {
 
 	user.Nickname = "New Name"
 	user.Status = "disabled"
+	user.PasswordHash = "$2a$10$newhash"
 	err := ur.Update(ctx, user)
 	require.NoError(t, err)
 
@@ -872,6 +873,7 @@ func TestUserRepoUpdate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", found.Nickname)
 	assert.Equal(t, "disabled", found.Status)
+	assert.Equal(t, "$2a$10$newhash", found.PasswordHash)
 }
 
 func TestUserRepoDelete(t *testing.T) {
