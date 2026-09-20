@@ -97,6 +97,28 @@ func TestSceneRepoDelete(t *testing.T) {
 	assert.Equal(t, sql.ErrNoRows, err)
 }
 
+func TestSceneRepoUpdateStatusKeepsUpdatedAt(t *testing.T) {
+	db := openTestDB(t)
+	r := NewSceneRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "status-only", Status: "draft"}
+	require.NoError(t, r.Create(ctx, scene))
+	origUpdatedAt := scene.UpdatedAt
+
+	// Status transitions (running/completed on start/stop) must not touch
+	// updated_at: it should reflect configuration changes only.
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, r.UpdateStatus(ctx, scene.ID, "running"))
+
+	found, err := r.GetByID(ctx, scene.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "running", found.Status)
+	assert.True(t, found.UpdatedAt.Equal(origUpdatedAt),
+		"UpdateStatus must not modify updated_at, got %v want %v",
+		found.UpdatedAt, origUpdatedAt)
+}
+
 func TestSceneRepoList(t *testing.T) {
 	db := openTestDB(t)
 	r := NewSceneRepo(db)

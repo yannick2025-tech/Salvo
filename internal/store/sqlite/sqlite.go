@@ -124,11 +124,12 @@ func (r *SceneRepo) Update(ctx context.Context, scene *model.Scene) error {
 }
 
 func (r *SceneRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
-	now := time.Now().UTC()
+	// Status transitions (running/completed on start/stop) intentionally do
+	// not touch updated_at: it reflects configuration changes only.
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE scenes SET status=?, updated_at=?
+		UPDATE scenes SET status=?
 		WHERE id=? AND deleted_at IS NULL`,
-		status, now, id)
+		status, id)
 	return err
 }
 
