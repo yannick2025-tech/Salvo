@@ -6,6 +6,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -137,6 +138,236 @@ func (r *SceneRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `UPDATE scenes SET deleted_at=? WHERE id=?`, now, id)
 	return err
+}
+
+// CopyTx duplicates a scene with all its nodes, edges and data sources in a
+// single transaction. Node ID references (edges.from/to, group config
+// node_ids) are rewritten to the new node IDs. Run records and reports are
+// intentionally not copied.
+func (r *SceneRepo) CopyTx(ctx context.Context, srcID snowflake.ID, newName, newDesc string) (*model.Scene, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// 读源场景（同事务快照，避免复制期间被并发修改）
+	src, err := r.getSceneForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	copied := &model.Scene{
+		Name:          newName,
+		Description:   newDesc,
+		DAGJSON:       "",
+		Variables:     src.Variables,
+		ConfigParams:  src.ConfigParams,
+		DerivedParams: src.DerivedParams,
+		Plugins:       src.Plugins,
+		Status:        model.SceneStatusDraft,
+		DefaultTimeout: src.DefaultTimeout,
+	}
+	copied.CreatedAt = now
+	copied.UpdatedAt = now
+	copied.ID = r.db.NextID()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO scenes (id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		copied.ID, copied.Name, copied.Description, copied.DAGJSON,
+		copied.Variables, copied.ConfigParams, copied.DerivedParams, copied.Plugins,
+		copied.Status, copied.DefaultTimeout, copied.CreatedAt, copied.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	// 复制节点并建立 oldID→newID 映射
+	srcNodes, err := r.listNodesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	idMap := make(map[snowflake.ID]snowflake.ID, len(srcNodes))
+	for _, n := range srcNodes {
+		newID := r.db.NextID()
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			newID, copied.ID, n.Name, n.Type, n.Config, n.Position,
+			n.LoopCount, n.BlockOnError, n.Lifecycle, now, now); err != nil {
+			return nil, err
+		}
+		idMap[n.ID] = newID
+	}
+
+	// 复制连线：from/to 经映射重写，映射缺失（悬空边）则失败回滚
+	srcEdges, err := r.listEdgesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range srcEdges {
+		newFrom, ok := idMap[e.FromNode]
+		if !ok {
+			return nil, fmt.Errorf("edge %d references missing source node %d", e.ID, e.FromNode)
+		}
+		newTo, ok := idMap[e.ToNode]
+		if !ok {
+			return nil, fmt.Errorf("edge %d references missing target node %d", e.ID, e.ToNode)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO edges (id, scene_id, from_node, to_node, condition, priority, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			r.db.NextID(), copied.ID, newFrom, newTo, e.Condition, e.Priority, now, now); err != nil {
+			return nil, err
+		}
+	}
+
+	// 重写 group 节点 config.node_ids：未知引用则失败回滚
+	for _, n := range srcNodes {
+		if n.Type != model.NodeTypeGroup {
+			continue
+		}
+		rewritten, err := rewriteGroupNodeIDs(n.Config, idMap)
+		if err != nil {
+			return nil, fmt.Errorf("group node %q: %w", n.Name, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE nodes SET config=?, updated_at=? WHERE id=?`,
+			rewritten, now, idMap[n.ID]); err != nil {
+			return nil, err
+		}
+	}
+
+	// 复制数据源（rows 字符串整体搬运，不经反序列化）
+	srcDS, err := r.listDataSourcesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ds := range srcDS {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO data_sources (id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			r.db.NextID(), copied.ID, ds.Name, ds.FileName, ds.Columns, ds.Rows,
+			ds.RowCount, ds.Source, now, now); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return copied, nil
+}
+
+// rewriteGroupNodeIDs maps group config node_ids to the copied node IDs.
+func rewriteGroupNodeIDs(config string, idMap map[snowflake.ID]snowflake.ID) (string, error) {
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return "", fmt.Errorf("invalid config json: %w", err)
+	}
+	raw, ok := cfg["node_ids"]
+	if !ok {
+		return config, nil
+	}
+	var ids []string
+	if err := json.Unmarshal(raw, &ids); err != nil {
+		return "", fmt.Errorf("node_ids must be strings: %w", err)
+	}
+	mapped := make([]string, 0, len(ids))
+	for _, idStr := range ids {
+		var id snowflake.ID
+		if err := id.Parse(idStr); err != nil {
+			return "", fmt.Errorf("invalid node id %q: %w", idStr, err)
+		}
+		newID, ok := idMap[id]
+		if !ok {
+			return "", fmt.Errorf("node id %q not found in copied scene", idStr)
+		}
+		mapped = append(mapped, newID.String())
+	}
+	newRaw, err := json.Marshal(mapped)
+	if err != nil {
+		return "", err
+	}
+	cfg["node_ids"] = newRaw
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// getSceneForCopy reads the source scene inside the copy transaction.
+func (r *SceneRepo) getSceneForCopy(ctx context.Context, tx *sql.Tx, id snowflake.ID) (*model.Scene, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at
+		FROM scenes WHERE id = ? AND deleted_at IS NULL`, id)
+	return scanScene(row)
+}
+
+func (r *SceneRepo) listNodesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.Node, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at
+		FROM nodes WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY created_at ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var nodes []*model.Node
+	for rows.Next() {
+		n := &model.Node{}
+		if err := rows.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
+			&n.Position, &n.LoopCount, &n.BlockOnError, &n.Lifecycle, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}
+
+func (r *SceneRepo) listEdgesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.Edge, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, from_node, to_node, condition, priority, created_at, updated_at
+		FROM edges WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY priority ASC, created_at ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var edges []*model.Edge
+	for rows.Next() {
+		e := &model.Edge{}
+		if err := rows.Scan(&e.ID, &e.SceneID, &e.FromNode, &e.ToNode,
+			&e.Condition, &e.Priority, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		edges = append(edges, e)
+	}
+	return edges, rows.Err()
+}
+
+func (r *SceneRepo) listDataSourcesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.DataSource, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY name ASC, source ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sources []*model.DataSource
+	for rows.Next() {
+		ds := &model.DataSource{}
+		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sources = append(sources, ds)
+	}
+	return sources, rows.Err()
 }
 
 func scanScene(row interface {

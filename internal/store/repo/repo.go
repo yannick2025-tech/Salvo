@@ -41,6 +41,7 @@ type SceneRepo interface {
 	Update(ctx context.Context, scene *model.Scene) error
 	UpdateStatus(ctx context.Context, id snowflake.ID, status string) error
 	Delete(ctx context.Context, id snowflake.ID) error
+	CopyTx(ctx context.Context, srcID snowflake.ID, newName, newDesc string) (*model.Scene, error)
 }
 
 // NodeRepo provides persistence operations for Node entities.

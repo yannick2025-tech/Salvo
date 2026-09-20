@@ -79,6 +79,12 @@ type ImportYAMLRequest struct {
 	YAML        string `json:"yaml"`
 }
 
+// CopySceneRequest is the request body for POST /api/v1/scenes/copy.
+type CopySceneRequest struct {
+	SceneID snowflake.ID `json:"scene_id"`
+	Name    string       `json:"name"`
+}
+
 // ExportYAMLResponse is the response body for POST /api/v1/scenes/export.
 type ExportYAMLResponse struct {
 	YAML string `json:"yaml"`

@@ -12,7 +12,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           设置
         </button>
-        <button class="btn-outline btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCopyModal = true">复制</button>
+        <button class="btn-outline btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="openCopyModal">复制</button>
         <button class="btn-primary btn-sm" :disabled="!canRunScene" :title="canRunScene ? '' : '您当前的角色没有运行权限'" @click="showRunConfig = true">▶ 启动测试</button>
       </div>
     </div>
@@ -671,7 +671,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getScene, createScene, startScene, batchSetVariables, listScenes, sceneStatus, listRuns } from '@/api/scene'
+import { getScene, copyScene, startScene, batchSetVariables, listScenes, sceneStatus, listRuns } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
 import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
@@ -704,6 +704,11 @@ const showCopyModal = ref(false)
 const showNodeEditor = ref(false)
 const editingNode = ref<NodeDTO | null>(null)
 const copyName = ref('')
+
+function openCopyModal() {
+  copyName.value = `复制-${scene.value?.name ?? ''}`
+  showCopyModal.value = true
+}
 
 const showVarPanel = ref(false)
 const varEntries = ref<{ key: string; value: string }[]>([])
@@ -1880,19 +1885,16 @@ async function handleCopyScene() {
     return
   }
   try {
-    const resp = await createScene({
-      name: copyName.value,
-      description: scene.value?.description ? `复制自: ${scene.value.name}` : '',
-    })
+    const resp = await copyScene(route.params.id as string, copyName.value)
     if (resp.code === 0) {
       showToast('场景已复制')
       showCopyModal.value = false
-      router.push(`/scenes/${resp.data.id}`)
+      router.push('/scenes')
     } else {
       showToast(resp.message || '复制失败', 'error')
     }
   } catch (e: any) {
-    showToast('复制失败', 'error')
+    showToast(e?.message || '复制失败', 'error')
   }
 }
 

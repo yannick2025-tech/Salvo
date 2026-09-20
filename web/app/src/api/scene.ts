@@ -17,6 +17,10 @@ export function importYAML(req: { name: string; description?: string; yaml: stri
   return post<SceneDTO>('/scenes/import', req)
 }
 
+export function copyScene(sceneId: string, name: string) {
+  return post<SceneDTO>('/scenes/copy', { scene_id: sceneId, name })
+}
+
 export function exportYAML(id: string) {
   return post<ExportYAMLResponse>('/scenes/export', { id })
 }

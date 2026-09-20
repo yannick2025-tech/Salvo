@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -117,6 +119,190 @@ func TestSceneRepoUpdateStatusKeepsUpdatedAt(t *testing.T) {
 	assert.True(t, found.UpdatedAt.Equal(origUpdatedAt),
 		"UpdateStatus must not modify updated_at, got %v want %v",
 		found.UpdatedAt, origUpdatedAt)
+}
+
+// buildCopySourceScene creates a scene with http/delay/group nodes, edges
+// (with condition/priority), variables and a CSV data source for copy tests.
+func buildCopySourceScene(t *testing.T, db *DB) (*model.Scene, []*model.Node) {
+	t.Helper()
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+	dsRepo := NewDataSourceRepo(db)
+
+	scene := &model.Scene{
+		Name:          "copy-src",
+		Description:   "源场景描述",
+		Variables:     `{"host":"http://example.com","token":"abc"}`,
+		ConfigParams:  `{"duration":30}`,
+		DerivedParams: `{"qps":100}`,
+		Plugins:       `{"telemetry":{"enabled":true}}`,
+		Status:        "completed",
+		DefaultTimeout: 15,
+	}
+	require.NoError(t, sceneRepo.Create(ctx, scene))
+
+	httpNode := &model.Node{SceneID: scene.ID, Name: "login", Type: model.NodeTypeHTTP,
+		Config: `{"url":"${host}/login","method":"POST","body":"token=${token}"}`,
+		Position: `{"x":100,"y":50}`, Lifecycle: `{"setup":"A","teardown":"B"}`}
+	require.NoError(t, nodeRepo.Create(ctx, httpNode))
+
+	delayNode := &model.Node{SceneID: scene.ID, Name: "wait", Type: model.NodeTypeDelay,
+		Config: `{"delay_ms":500}`, Position: `{"x":300,"y":50}`, LoopCount: 2, BlockOnError: true}
+	require.NoError(t, nodeRepo.Create(ctx, delayNode))
+
+	groupNode := &model.Node{SceneID: scene.ID, Name: "grp", Type: model.NodeTypeGroup,
+		Config: `{"node_ids":[]}`, Position: `{"x":200,"y":200}`, LoopCount: 3}
+	// node_ids 引用旧节点 ID，复制后必须重写为新节点 ID
+	groupNode.Config = fmt.Sprintf(`{"node_ids":["%d","%d"]}`, httpNode.ID, delayNode.ID)
+	require.NoError(t, nodeRepo.Create(ctx, groupNode))
+
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: scene.ID,
+		FromNode: httpNode.ID, ToNode: delayNode.ID, Condition: "status==200", Priority: 1}))
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: scene.ID,
+		FromNode: delayNode.ID, ToNode: groupNode.ID, Priority: 2}))
+
+	require.NoError(t, dsRepo.Create(ctx, &model.DataSource{SceneID: scene.ID,
+		Name: "users", FileName: "users.csv", Columns: `["name","age"]`,
+		Rows: `[{"name":"alice","age":30},{"name":"bob","age":25}]`, RowCount: 2, Source: "csv"}))
+
+	return scene, []*model.Node{httpNode, delayNode, groupNode}
+}
+
+func TestSceneRepoCopyTx(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+	dsRepo := NewDataSourceRepo(db)
+
+	src, srcNodes := buildCopySourceScene(t, db)
+
+	copied, err := sceneRepo.CopyTx(ctx, src.ID, "copy-dst", src.Description)
+	require.NoError(t, err)
+
+	// 场景本体：新 ID、draft、dag_json 空、description 原样继承、字段原样
+	assert.NotEqual(t, src.ID, copied.ID)
+	assert.Equal(t, "copy-dst", copied.Name)
+	assert.Equal(t, "draft", copied.Status)
+	assert.Empty(t, copied.DAGJSON)
+	assert.Equal(t, "源场景描述", copied.Description)
+	assert.Equal(t, src.Variables, copied.Variables)
+	assert.Equal(t, src.ConfigParams, copied.ConfigParams)
+	assert.Equal(t, src.DerivedParams, copied.DerivedParams)
+	assert.Equal(t, src.Plugins, copied.Plugins)
+	assert.Equal(t, src.DefaultTimeout, copied.DefaultTimeout)
+	// 源场景不受影响
+	srcAfter, err := sceneRepo.GetByID(ctx, src.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", srcAfter.Status)
+
+	// 节点：数量一致、逐字段相等、全新 ID、ID 映射正确
+	newNodes, err := nodeRepo.List(ctx, repo.Filter{SceneID: copied.ID, Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	require.Len(t, newNodes, 3)
+	newIDs := map[snowflake.ID]bool{}
+	for i, n := range newNodes {
+		assert.NotEqual(t, srcNodes[i].ID, n.ID, "node must get a new ID")
+		assert.Equal(t, srcNodes[i].Name, n.Name)
+		assert.Equal(t, srcNodes[i].Type, n.Type)
+		assert.Equal(t, srcNodes[i].Position, n.Position)
+		assert.Equal(t, srcNodes[i].LoopCount, n.LoopCount)
+		assert.Equal(t, srcNodes[i].BlockOnError, n.BlockOnError)
+		assert.Equal(t, srcNodes[i].Lifecycle, n.Lifecycle)
+		newIDs[n.ID] = true
+	}
+	// http/delay 节点 config 逐字节原样（含 ${host}、${token} 名称引用）
+	assert.Equal(t, srcNodes[0].Config, newNodes[0].Config)
+	assert.Equal(t, srcNodes[1].Config, newNodes[1].Config)
+
+	// 连线：from/to 映射重写，condition/priority 保留
+	newEdges, err := edgeRepo.List(ctx, repo.Filter{SceneID: copied.ID, Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	require.Len(t, newEdges, 2)
+	for _, e := range newEdges {
+		assert.True(t, newIDs[e.FromNode], "edge from_node must reference a new-scene node")
+		assert.True(t, newIDs[e.ToNode], "edge to_node must reference a new-scene node")
+		assert.Equal(t, copied.ID, e.SceneID)
+	}
+	assert.Equal(t, "status==200", newEdges[0].Condition)
+	assert.Equal(t, 1, newEdges[0].Priority)
+	assert.Equal(t, 2, newEdges[1].Priority)
+
+	// group 节点 node_ids 重写为新节点 ID
+	groupNew := newNodes[2]
+	var cfg struct {
+		NodeIDs []string `json:"node_ids"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(groupNew.Config), &cfg))
+	require.Len(t, cfg.NodeIDs, 2)
+	for _, idStr := range cfg.NodeIDs {
+		var id snowflake.ID
+		require.NoError(t, id.Parse(idStr))
+		assert.True(t, newIDs[id], "group node_ids must reference new-scene node IDs, got %s", idStr)
+	}
+
+	// 数据源：含全部 rows
+	newDS, err := dsRepo.ListBySceneID(ctx, copied.ID)
+	require.NoError(t, err)
+	require.Len(t, newDS, 1)
+	assert.Equal(t, "users", newDS[0].Name)
+	assert.Equal(t, "csv", newDS[0].Source)
+	assert.Equal(t, `[{"name":"alice","age":30},{"name":"bob","age":25}]`, newDS[0].Rows)
+	assert.Equal(t, 2, newDS[0].RowCount)
+}
+
+func TestSceneRepoCopyTxSourceNotFound(t *testing.T) {
+	db := openTestDB(t)
+	_, err := NewSceneRepo(db).CopyTx(context.Background(), 99999, "ghost", "")
+	assert.Error(t, err)
+}
+
+func TestSceneRepoCopyTxRollbackOnDanglingEdge(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+
+	src, _ := buildCopySourceScene(t, db)
+	// 构造悬空边：引用不存在的节点
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: src.ID,
+		FromNode: 88888, ToNode: 99999, Priority: 9}))
+
+	_, err := sceneRepo.CopyTx(ctx, src.ID, "dangling-copy", "")
+	require.Error(t, err, "dangling edge must fail the copy")
+
+	// 回滚断言：无新场景残留
+	scenes, err := sceneRepo.List(ctx, repo.Filter{Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	for _, s := range scenes {
+		assert.NotEqual(t, "dangling-copy", s.Name, "failed copy must not leave a scene behind")
+	}
+}
+
+func TestSceneRepoCopyTxRollbackOnUnknownGroupRef(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+
+	src := &model.Scene{Name: "grp-src", Status: "draft"}
+	require.NoError(t, sceneRepo.Create(ctx, src))
+	// group 引用不存在的节点 ID
+	badGroup := &model.Node{SceneID: src.ID, Name: "bad-grp", Type: model.NodeTypeGroup,
+		Config: `{"node_ids":["12345"]}`}
+	require.NoError(t, nodeRepo.Create(ctx, badGroup))
+
+	_, err := sceneRepo.CopyTx(ctx, src.ID, "grp-copy", "")
+	assert.Error(t, err, "unknown group node_ids must fail the copy")
+
+	scenes, err := sceneRepo.List(ctx, repo.Filter{Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	for _, s := range scenes {
+		assert.NotEqual(t, "grp-copy", s.Name)
+	}
 }
 
 func TestSceneRepoList(t *testing.T) {

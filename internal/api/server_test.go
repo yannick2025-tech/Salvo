@@ -315,6 +315,76 @@ func TestListScenesWithLastRun(t *testing.T) {
 	assert.Equal(t, "completed", found.LastRunStatus)
 }
 
+func TestCopyScene(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// 准备源场景（含节点，验证复制完整性）
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name: "copy-source", Description: "源描述", Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	srcData, _ := json.Marshal(result.Data)
+	var srcScene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(srcData, &srcScene))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/add", dto.AddNodeRequest{
+		SceneID: srcScene.ID, Name: "login", Type: "http",
+		Config: `{"url":"http://example.com/login"}`,
+	})
+	require.Equal(t, 0, decodeResponse(t, resp).Code)
+
+	// 成功复制
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "copy-target",
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	copyData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var copied dto.SceneDTO
+	require.NoError(t, json.Unmarshal(copyData, &copied))
+	assert.NotEqual(t, srcScene.ID, copied.ID)
+	assert.Equal(t, "copy-target", copied.Name)
+	assert.Equal(t, "draft", copied.Status)
+	assert.Equal(t, "源描述", copied.Description)
+
+	// 复制后新场景含节点
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: copied.ID,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	nodesData, _ := json.Marshal(result.Data)
+	var nodesResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(nodesData, &nodesResp))
+	require.Len(t, nodesResp.Items, 1)
+	assert.Equal(t, "login", nodesResp.Items[0].Name)
+
+	// 失败：名称为空 → 400
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "",
+	})
+	errResult := decodeResponse(t, resp)
+	assert.Equal(t, 400, errResult.Code)
+
+	// 失败：源场景不存在 → 400
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: 99999, Name: "ghost-copy",
+	})
+	errResult = decodeResponse(t, resp)
+	assert.Equal(t, 400, errResult.Code)
+
+	// 失败：名称重复 → 409
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "copy-target",
+	})
+	errResult = decodeResponse(t, resp)
+	assert.Equal(t, 409, errResult.Code)
+}
+
 func TestAddAndListNode(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)

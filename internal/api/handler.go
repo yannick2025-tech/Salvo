@@ -60,6 +60,44 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	return dto.OK(toSceneDTO(scene))
 }
 
+// CopyScene duplicates a scene with all its nodes, edges and data sources.
+func (h *Handler) CopyScene(r *http.Request) dto.Response {
+	req, err := decode[dto.CopySceneRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.Name == "" {
+		return dto.ErrorResp(400, "name is required")
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	ctx := r.Context()
+	src, err := h.scenes.GetByID(ctx, req.SceneID)
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("scene not found: %v", err))
+	}
+
+	// 重名检查：场景名在系统内保持唯一
+	existing, err := h.scenes.List(ctx, repo.Filter{Limit: 1000, Offset: 0})
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("list scenes: %v", err))
+	}
+	for _, s := range existing {
+		if s.Name == req.Name {
+			return dto.ErrorResp(409, fmt.Sprintf("scene name %q already exists", req.Name))
+		}
+	}
+
+	copied, err := h.scenes.CopyTx(ctx, src.ID, req.Name, src.Description)
+	if err != nil {
+		return dto.ErrorResp(500, fmt.Sprintf("copy scene: %v", err))
+	}
+
+	return dto.OK(toSceneDTO(copied))
+}
+
 type yamlScene struct {
 	Name           string            `yaml:"name"`
 	DefaultTimeout int               `yaml:"default_timeout,omitempty"`
