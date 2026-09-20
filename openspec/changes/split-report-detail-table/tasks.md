@@ -7,8 +7,8 @@
 - [x] 1.3 Add migration script to drop `detail` column from `reports` table
 - [x] 1.4 Add rollback script to restore original schema
 - [x] 1.5 Create indexes on `reports` table (scene_id, run_id, status, started_at)
-- [ ] 1.6 Write unit tests for migration scripts
-- [ ] 1.7 Test migration on development database and verify data integrity
+- [x] 1.6 Write unit tests for migration scripts
+- [x] 1.7 Test migration on development database and verify data integrity
 
 ## 2. Backend Model and Repository Changes
 
@@ -30,7 +30,7 @@
 - [x] 3.4 Verify `GetReport` handler works with JOIN query (should already work)
 - [x] 3.5 Verify `ExportReport` handler works with JOIN query (should already work)
 - [x] 3.6 Write unit tests for API handlers
-- [ ] 3.7 Test API endpoints with HTTP client (Postman/curl)
+- [x] 3.7 Test API endpoints with HTTP client (Postman/curl)
 
 ## 4. Frontend API Client Changes
 
@@ -63,26 +63,26 @@
 
 ## 7. Frontend Tests
 
-- [ ] 7.1 Write unit tests for preloading logic
-- [ ] 7.2 Write unit tests for cache management
-- [ ] 7.3 Write integration tests for list page with new API
-- [ ] 7.4 Test E2E flow: list load → preload → view detail
-- [ ] 7.5 Test E2E flow: list load → click non-preloaded report → view detail
+- [x] 7.1 Write unit tests for preloading logic
+- [x] 7.2 Write unit tests for cache management
+- [x] 7.3 Write integration tests for list page with new API
+- [x] 7.4 Test E2E flow: list load → preload → view detail
+- [x] 7.5 Test E2E flow: list load → click non-preloaded report → view detail
 
 ## 8. Performance Testing
 
-- [ ] 8.1 Benchmark `ListReports` API response time (target: < 1 second)
-- [ ] 8.2 Benchmark `GetReport` API response time (target: < 100ms)
-- [ ] 8.3 Measure list response payload size (target: < 50KB for 50 reports)
-- [ ] 8.4 Compare performance before and after optimization
-- [ ] 8.5 Test with realistic data volume (100+ reports)
+- [x] 8.1 Benchmark `ListReports` API response time (target: < 1 second)
+- [x] 8.2 Benchmark `GetReport` API response time (target: < 100ms)
+- [x] 8.3 Measure list response payload size (target: < 50KB for 50 reports)
+- [x] 8.4 Compare performance before and after optimization
+- [x] 8.5 Test with realistic data volume (100+ reports)
 
 ## 9. Documentation and Finalization
 
-- [ ] 9.1 Update API documentation for `ListReports` endpoint
-- [ ] 9.2 Update database schema documentation
-- [ ] 9.3 Add migration guide for developers
-- [ ] 9.4 Document preloading behavior in frontend code comments
-- [ ] 9.5 Final code review and cleanup
-- [ ] 9.6 Run full test suite before deployment
-- [ ] 9.7 Create deployment checklist
+- [x] 9.1 Update API documentation for `ListReports` endpoint
+- [x] 9.2 Update database schema documentation
+- [x] 9.3 Add migration guide for developers
+- [x] 9.4 Document preloading behavior in frontend code comments
+- [x] 9.5 Final code review and cleanup
+- [x] 9.6 Run full test suite before deployment
+- [x] 9.7 Create deployment checklist
