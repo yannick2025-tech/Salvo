@@ -17,9 +17,9 @@
             <th>描述</th>
             <th>状态</th>
             <th>创建时间</th>
-            <th>测试开始时间</th>
-            <th>结束时间</th>
-            <th>持续时间</th>
+            <th>修改时间</th>
+            <th>最后一次运行时间</th>
+            <th>最后一次运行记录</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -33,9 +33,9 @@
             <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
-            <td class="time-cell">{{ getSceneLatestRun(s)?.started_at ? formatDateTime(getSceneLatestRun(s)!.started_at) : '-' }}</td>
-            <td class="time-cell">{{ getSceneLatestRun(s)?.finished_at ? formatDateTime(getSceneLatestRun(s)!.finished_at) : (isSceneRunning(s) ? '--' : '-') }}</td>
-            <td class="time-cell">{{ calculateSceneDuration(s) }}</td>
+            <td class="time-cell">{{ formatTime(s.updated_at) }}</td>
+            <td class="time-cell">{{ s.last_run_started_at ? formatTime(s.last_run_started_at) : '-' }}</td>
+            <td class="mono">{{ s.last_run_id || '-' }}</td>
             <td class="actions">
               <button class="btn-sm" :class="{ disabled: isSceneRunning(s) || !canWriteScene }" :disabled="isSceneRunning(s) || !canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="editScene(s)">编辑</button>
               <button class="btn-sm progress" :class="{ disabled: !isSceneRunning(s) }" :disabled="!isSceneRunning(s)" @click="viewProgress(s)">实时进度</button>
@@ -788,87 +788,12 @@ function formatTime(t: string) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function formatDateTime(timeStr?: string): string {
-  if (!timeStr) return '-'
-  const d = new Date(timeStr)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-interface SceneRunInfo {
-  started_at?: string
-  finished_at?: string
-  status?: string
-  duration?: number
-}
-
-const sceneRunsMap = ref<Map<string, SceneRunInfo[]>>(new Map())
-
-async function fetchSceneRuns() {
-  try {
-    const { dashboardOverview } = await import('@/api/dashboard')
-    const resp = await dashboardOverview(86400 * 7)
-    if (resp.code === 0 && resp.data?.recent_runs) {
-      const runsMap = new Map<string, SceneRunInfo[]>()
-      resp.data.recent_runs.forEach((run: any) => {
-        const sceneId = String(run.scene_id)
-        const info: SceneRunInfo = {
-          started_at: run.started_at,
-          finished_at: run.finished_at,
-          status: run.status,
-          duration: run.duration,
-        }
-        if (!runsMap.has(sceneId)) {
-          runsMap.set(sceneId, [])
-        }
-        runsMap.get(sceneId)!.push(info)
-      })
-      sceneRunsMap.value = runsMap
-    }
-  } catch (e) {
-    console.error('Failed to fetch scene runs:', e)
-  }
-}
-
-function getSceneLatestRun(scene: any): SceneRunInfo | undefined {
-  const runs = sceneRunsMap.value.get(scene.id)
-  if (!runs || runs.length === 0) return undefined
-  return runs[runs.length - 1]
-}
-
 function isSceneRunning(scene: any): boolean {
-  const latest = getSceneLatestRun(scene)
-  return latest?.status === 'running'
-}
-
-function calculateSceneDuration(scene: any): string {
-  const latest = getSceneLatestRun(scene)
-  if (!latest?.started_at) return '-'
-
-  const start = new Date(latest.started_at).getTime()
-  const end = latest.status === 'running' ? Date.now() : (latest.finished_at ? new Date(latest.finished_at).getTime() : Date.now())
-
-  const durationMs = end - start
-  if (durationMs <= 0) return '-'
-
-  const totalSeconds = Math.floor(durationMs / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  const pad = (n: number) => String(n).padStart(2, '0')
-
-  if (hours > 0) {
-    return `${pad(hours)}小时${pad(minutes)}分${pad(seconds)}秒`
-  } else if (minutes > 0) {
-    return `${pad(minutes)}分${pad(seconds)}秒`
-  } else {
-    return `${pad(seconds)}秒`
-  }
+  return scene.last_run_status === 'running'
 }
 
 onMounted(() => {
   fetchScenes()
-  fetchSceneRuns()
 })
 </script>
 

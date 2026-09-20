@@ -692,7 +692,9 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 
 	items := make([]dto.SceneDTO, 0, len(scenes))
 	for _, s := range scenes {
-		items = append(items, toSceneDTO(s))
+		item := toSceneDTO(s)
+		h.fillLastRun(r.Context(), &item)
+		items = append(items, item)
 	}
 
 	return dto.OK(dto.ListResponse[[]dto.SceneDTO]{
@@ -703,6 +705,19 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 			Total:  len(items),
 		},
 	})
+}
+
+// fillLastRun populates the last-run fields of a scene DTO with the most
+// recent run record of that scene (empty when the scene has never run).
+func (h *Handler) fillLastRun(ctx context.Context, item *dto.SceneDTO) {
+	runs, err := h.runs.List(ctx, repo.Filter{SceneID: item.ID, Limit: 1})
+	if err != nil || len(runs) == 0 {
+		return
+	}
+	last := runs[0]
+	item.LastRunID = strconv.FormatInt(int64(last.RunID), 10)
+	item.LastRunStartedAt = last.StartedAt
+	item.LastRunStatus = last.Status
 }
 
 // --- Node Handlers ---

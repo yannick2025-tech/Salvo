@@ -78,6 +78,9 @@ export interface SceneDTO {
   status: string
   created_at: string
   updated_at: string
+  last_run_id?: string
+  last_run_started_at?: string
+  last_run_status?: string
 }
 
 export interface CreateSceneRequest {

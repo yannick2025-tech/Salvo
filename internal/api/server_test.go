@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/migration"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 )
 
@@ -263,6 +265,54 @@ func TestCreateSceneValidation(t *testing.T) {
 	result := decodeResponse(t, resp)
 	assert.Equal(t, 400, result.Code)
 	assert.Contains(t, result.Message, "name is required")
+}
+
+func TestListScenesWithLastRun(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name: "scene-with-run", Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	sceneData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	node, err := snowflake.NewNode(1)
+	require.NoError(t, err)
+	runID := node.Generate()
+	startedAt := time.Now().UTC().Add(-time.Minute)
+	require.NoError(t, srv.handler.runs.Create(context.Background(), &model.RunRecord{
+		SceneID:   scene.ID,
+		RunID:     runID,
+		Status:    "completed",
+		StartedAt: &startedAt,
+	}))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/list", dto.ListScenesRequest{Limit: 10})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	listData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var listResp dto.ListResponse[[]dto.SceneDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+
+	var found *dto.SceneDTO
+	for i := range listResp.Items {
+		if listResp.Items[i].ID == scene.ID {
+			found = &listResp.Items[i]
+			break
+		}
+	}
+	require.NotNil(t, found, "created scene not found in list")
+	assert.Equal(t, strconv.FormatInt(int64(runID), 10), found.LastRunID)
+	require.NotNil(t, found.LastRunStartedAt)
+	assert.WithinDuration(t, startedAt, *found.LastRunStartedAt, time.Second)
+	assert.Equal(t, "completed", found.LastRunStatus)
 }
 
 func TestAddAndListNode(t *testing.T) {

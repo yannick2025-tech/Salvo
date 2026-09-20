@@ -117,6 +117,13 @@ type SceneDTO struct {
 	DefaultTimeout int          `json:"default_timeout"`
 	CreatedAt      time.Time    `json:"created_at"`
 	UpdatedAt      time.Time    `json:"updated_at"`
+	// LastRunID is the run_id of the most recent run of this scene,
+	// serialized as string to avoid JS precision loss with snowflake IDs.
+	LastRunID string `json:"last_run_id,omitempty"`
+	// LastRunStartedAt is the start time of the most recent run.
+	LastRunStartedAt *time.Time `json:"last_run_started_at,omitempty"`
+	// LastRunStatus is the status of the most recent run.
+	LastRunStatus string `json:"last_run_status,omitempty"`
 }
 
 // --- Node ---
