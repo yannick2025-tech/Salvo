@@ -366,8 +366,9 @@ onUnmounted(() => {
 .card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 20px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
 .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.form-group label { font-size: 12px; color: var(--text-secondary); }
+.form-group label { font-size: 12px; line-height: 16px; color: var(--text-secondary); }
 .form-group input, .form-group select { height: 34px; padding: 0 8px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; }
+.form-group :deep(.custom-select-trigger) { height: 34px; padding: 0 12px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .btn-primary { padding: 8px 20px; margin-top: 8px; }
@@ -513,8 +514,8 @@ onUnmounted(() => {
 .run-actions { display: flex; gap: 8px; }
 .run-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
 .metric { display: flex; flex-direction: column; gap: 2px; }
-.metric-label { font-size: 11px; color: var(--text-tertiary); }
-.metric-val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric-label { font-size: 11px; line-height: 16px; color: var(--text-tertiary); }
+.metric-val { font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .metric-val.success { color: var(--accent-success); }
 .metric-val.danger { color: var(--accent-danger); }
 

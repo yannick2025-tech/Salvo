@@ -141,6 +141,7 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   font-size: v-bind("fontSize || '13px'");
+  line-height: 1.2;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
