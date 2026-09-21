@@ -3,6 +3,20 @@
     <div class="page-header">
       <h2>链路追踪</h2>
     </div>
+
+    <div class="filters-bar">
+      <input v-model.trim="filters.trace_id" class="filter-input mono" placeholder="TraceID" @keyup.enter="applyFilters" />
+      <input v-model.trim="filters.scene_name" class="filter-input" placeholder="场景名称（模糊）" @keyup.enter="applyFilters" />
+      <CustomSelect v-model="filters.status" :options="statusOptions" placeholder="全部状态" min-width="130px" />
+      <div class="duration-range">
+        <input v-model="filters.min_ms" class="filter-input num" type="number" step="0.1" min="0" placeholder="耗时≥(ms)" @keyup.enter="applyFilters" />
+        <span class="range-sep">—</span>
+        <input v-model="filters.max_ms" class="filter-input num" type="number" step="0.1" min="0" placeholder="耗时≤(ms)" @keyup.enter="applyFilters" />
+      </div>
+      <button class="filter-btn" @click="applyFilters">查询</button>
+      <button class="filter-btn ghost" @click="resetFilters">重置</button>
+      <span v-if="filterError" class="filter-error">{{ filterError }}</span>
+    </div>
     <div class="table-wrapper">
       <table class="data-table">
         <thead>
@@ -51,8 +65,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { listTraces } from '@/api/trace'
+import type { TraceListQuery } from '@/api/trace'
+import CustomSelect from '@/components/CustomSelect.vue'
 import type { TraceDTO } from '@/types'
 
 const traces = ref<TraceDTO[]>([])
@@ -64,9 +80,68 @@ const pageSizes = [10, 20, 30, 50, 100]
 const currentPage = computed(() => Math.floor(offset.value / pageSize.value) + 1)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 
+// --- Filters ---
+const filters = reactive({
+  trace_id: '',
+  scene_name: '',
+  status: '',
+  // type="number" inputs make v-model produce numbers once filled.
+  min_ms: '' as string | number,
+  max_ms: '' as string | number,
+})
+const filterError = ref('')
+
+const statusOptions = [
+  { value: '', label: '全部状态' },
+  { value: 'ok', label: 'ok' },
+  { value: 'error', label: 'error' },
+  { value: 'skip', label: 'skip' },
+  { value: 'canceled', label: 'canceled' },
+]
+
+// Validates duration inputs; returns an error message or empty string.
+// NOTE: with type="number" inputs, v-model produces numbers (not strings),
+// so coerce before trimming.
+function validateFilters(): string {
+  const min = String(filters.min_ms ?? '').trim()
+  const max = String(filters.max_ms ?? '').trim()
+  if (min && (isNaN(Number(min)) || Number(min) < 0)) return '最小耗时必须为非负数字（ms）'
+  if (max && (isNaN(Number(max)) || Number(max) < 0)) return '最大耗时必须为非负数字（ms）'
+  if (min && max && Number(min) > Number(max)) return '最小耗时不能大于最大耗时'
+  return ''
+}
+
+function buildQuery(): TraceListQuery {
+  const q: TraceListQuery = { limit: pageSize.value, offset: offset.value }
+  if (filters.trace_id) q.trace_id = filters.trace_id
+  if (filters.scene_name) q.scene_name = filters.scene_name
+  if (filters.status) q.status = filters.status
+  if (filters.min_ms) q.min_duration_ms = Number(filters.min_ms)
+  if (filters.max_ms) q.max_duration_ms = Number(filters.max_ms)
+  return q
+}
+
+function applyFilters() {
+  filterError.value = validateFilters()
+  if (filterError.value) return
+  offset.value = 0
+  fetchTraces()
+}
+
+function resetFilters() {
+  filters.trace_id = ''
+  filters.scene_name = ''
+  filters.status = ''
+  filters.min_ms = ''
+  filters.max_ms = ''
+  filterError.value = ''
+  offset.value = 0
+  fetchTraces()
+}
+
 async function fetchTraces() {
   try {
-    const resp = await listTraces({ limit: pageSize.value, offset: offset.value })
+    const resp = await listTraces(buildQuery())
     if (resp.code === 0) {
       traces.value = resp.data.items || []
       total.value = resp.data.pagination?.total ?? traces.value.length
@@ -116,6 +191,20 @@ onMounted(fetchTraces)
 .page-header { display: flex; align-items: center; justify-content: space-between; }
 .page-header h2 { font-size: 18px; font-weight: 600; }
 .total-count { font-size: 13px; color: var(--text-tertiary); }
+
+.filters-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); }
+.filter-input { height: 32px; padding: 0 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color 0.15s; }
+.filter-input:focus { border-color: var(--accent-primary); }
+.filter-input.mono { font-family: var(--font-mono); width: 160px; }
+.filter-input:not(.mono):not(.num) { width: 180px; }
+.filter-input.num { width: 110px; font-family: var(--font-mono); }
+.duration-range { display: flex; align-items: center; gap: 6px; }
+.range-sep { color: var(--text-tertiary); }
+.filter-btn { padding: 6px 16px; border: 1px solid var(--accent-primary); border-radius: var(--radius-sm); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+.filter-btn:hover { opacity: 0.9; }
+.filter-btn.ghost { background: transparent; color: var(--text-secondary); border-color: var(--border-primary); }
+.filter-btn.ghost:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.filter-error { font-size: 12px; color: var(--accent-danger, #f85149); }
 .table-wrapper { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); overflow: auto; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }

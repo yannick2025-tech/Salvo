@@ -23,6 +23,7 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
 	"gopkg.in/yaml.v3"
 )
 
@@ -1801,14 +1802,50 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 		offset = 0
 	}
 
+	// Build the combined (AND) filter and validate the request fields.
+	filter := tracestore.TraceFilter{
+		SceneID:   req.SceneID,
+		SceneName: req.SceneName,
+	}
+	if req.TraceID != "" {
+		if _, err := strconv.ParseInt(req.TraceID, 10, 64); err != nil {
+			return dto.ErrorResp(400, "TraceID 必须为数字")
+		}
+		filter.TraceID = req.TraceID
+	}
+	if req.Status != "" {
+		switch req.Status {
+		case string(tracelib.SpanStatusOK), string(tracelib.SpanStatusError),
+			string(tracelib.SpanStatusSkip), string(tracelib.SpanStatusCanceled):
+			filter.Status = req.Status
+		default:
+			return dto.ErrorResp(400, "无效的状态值")
+		}
+	}
+	if req.MinDurationMs != nil && *req.MinDurationMs < 0 {
+		return dto.ErrorResp(400, "耗时不能为负数")
+	}
+	if req.MaxDurationMs != nil && *req.MaxDurationMs < 0 {
+		return dto.ErrorResp(400, "耗时不能为负数")
+	}
+	if req.MinDurationMs != nil {
+		filter.MinDuration = time.Duration(*req.MinDurationMs * float64(time.Millisecond))
+	}
+	if req.MaxDurationMs != nil {
+		filter.MaxDuration = time.Duration(*req.MaxDurationMs * float64(time.Millisecond))
+	}
+	if filter.MinDuration > 0 && filter.MaxDuration > 0 && filter.MinDuration > filter.MaxDuration {
+		return dto.ErrorResp(400, "最小耗时不能大于最大耗时")
+	}
+
 	// Query from SQLite for full history instead of in-memory buffer (capped at 1000).
-	traces, err := h.traceStore.ListTraces(r.Context(), req.SceneID, limit, offset)
+	traces, err := h.traceStore.ListTraces(r.Context(), filter, limit, offset)
 	if err != nil {
 		h.log.Error("failed to list traces from db", logger.F("error", err))
 		return dto.ErrorResp(500, "failed to list traces")
 	}
 
-	total, err := h.traceStore.CountTraces(r.Context(), req.SceneID)
+	total, err := h.traceStore.CountTraces(r.Context(), filter)
 	if err != nil {
 		h.log.Error("failed to count traces from db", logger.F("error", err))
 		return dto.ErrorResp(500, "failed to count traces")

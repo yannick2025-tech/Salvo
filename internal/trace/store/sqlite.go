@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
@@ -84,21 +85,71 @@ func (s *Store) GetTrace(ctx context.Context, id snowflake.ID) (*tracelib.Trace,
 	return tr, nil
 }
 
+// TraceFilter holds combined (AND) query conditions for listing traces.
+// All fields are optional; zero values are ignored.
+type TraceFilter struct {
+	TraceID     string        // exact match on traces.id
+	SceneID     snowflake.ID  // exact match on traces.scene_id
+	SceneName   string        // fuzzy (contains) match on scenes.name
+	Status      string        // exact match on traces.status (ok|error|skip|canceled)
+	MinDuration time.Duration // inclusive lower bound
+	MaxDuration time.Duration // inclusive upper bound
+}
+
+// escapeLike escapes LIKE wildcards so user input is matched literally.
+func escapeLike(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
+}
+
+// buildTraceWhere builds the shared WHERE clause (with LEFT JOIN on scenes)
+// for both ListTraces and CountTraces. Conditions are combined with AND.
+func buildTraceWhere(f TraceFilter) (string, []any) {
+	conds := []string{}
+	args := []any{}
+
+	if f.TraceID != "" {
+		conds = append(conds, "t.id = ?")
+		args = append(args, f.TraceID)
+	}
+	if f.SceneID != 0 {
+		conds = append(conds, "t.scene_id = ?")
+		args = append(args, f.SceneID)
+	}
+	if f.SceneName != "" {
+		conds = append(conds, `sc.name LIKE '%' || ? || '%' ESCAPE '\'`)
+		args = append(args, escapeLike(f.SceneName))
+	}
+	if f.Status != "" {
+		conds = append(conds, "t.status = ?")
+		args = append(args, f.Status)
+	}
+	if f.MinDuration > 0 {
+		conds = append(conds, "t.duration_ns >= ?")
+		args = append(args, f.MinDuration.Nanoseconds())
+	}
+	if f.MaxDuration > 0 {
+		conds = append(conds, "t.duration_ns <= ?")
+		args = append(args, f.MaxDuration.Nanoseconds())
+	}
+
+	where := ` FROM traces t LEFT JOIN scenes sc ON sc.id = t.scene_id`
+	if len(conds) > 0 {
+		where += ` WHERE ` + strings.Join(conds, " AND ")
+	}
+	return where, args
+}
+
 // ListTraces returns traces ordered by creation time descending.
-func (s *Store) ListTraces(ctx context.Context, sceneID snowflake.ID, limit, offset int) ([]*tracelib.Trace, error) {
+func (s *Store) ListTraces(ctx context.Context, filter TraceFilter, limit, offset int) ([]*tracelib.Trace, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 
-	query := `SELECT id, scene_id, run_id, status, error, started_at, finished_at, duration_ns
-		FROM traces`
-	args := []any{}
-
-	if sceneID != 0 {
-		query += ` WHERE scene_id = ?`
-		args = append(args, sceneID)
-	}
-	query += ` ORDER BY started_at DESC LIMIT ? OFFSET ?`
+	where, whereArgs := buildTraceWhere(filter)
+	query := `SELECT t.id, t.scene_id, t.run_id, t.status, t.error, t.started_at, t.finished_at, t.duration_ns` +
+		where + ` ORDER BY t.started_at DESC LIMIT ? OFFSET ?`
+	args := append([]any{}, whereArgs...)
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -199,15 +250,10 @@ func (s *Store) listSpans(ctx context.Context, traceID snowflake.ID) ([]*traceli
 	return spans, rows.Err()
 }
 
-// CountTraces returns the total number of traces, optionally filtered by scene ID.
-func (s *Store) CountTraces(ctx context.Context, sceneID snowflake.ID) (int, error) {
-	query := `SELECT COUNT(*) FROM traces`
-	args := []any{}
-
-	if sceneID != 0 {
-		query += ` WHERE scene_id = ?`
-		args = append(args, sceneID)
-	}
+// CountTraces returns the total number of traces matching the filter.
+func (s *Store) CountTraces(ctx context.Context, filter TraceFilter) (int, error) {
+	where, args := buildTraceWhere(filter)
+	query := `SELECT COUNT(*)` + where
 
 	var count int
 	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
