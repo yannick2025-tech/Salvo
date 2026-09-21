@@ -26,6 +26,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
@@ -89,6 +90,11 @@ type Context struct {
 	trace  *Trace
 	tracer *Tracer
 	node   *snowflake.Node
+
+	// finished guards Finish against double invocation. Callers may
+	// finish a trace explicitly (e.g. FinishWithError on failure) and
+	// again via defer; only the first call records the trace.
+	finished atomic.Bool
 }
 
 // TraceID returns the ID of the underlying trace.
@@ -116,7 +122,13 @@ func (c *Context) StartSpan(nodeID string) *SpanBuilder {
 }
 
 // Finish marks the trace as completed with the given status.
+// It is idempotent: only the first call takes effect, so an explicit
+// finish followed by a deferred finish records the trace exactly once.
 func (c *Context) Finish() {
+	if !c.finished.CompareAndSwap(false, true) {
+		return
+	}
+
 	c.trace.FinishedAt = time.Now().UTC()
 	c.trace.Duration = c.trace.FinishedAt.Sub(c.trace.StartedAt)
 

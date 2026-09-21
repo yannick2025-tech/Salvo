@@ -103,6 +103,24 @@ func TestTracerFinishWithError(t *testing.T) {
 	assert.Equal(t, "timeout exceeded", tr.Error)
 }
 
+func TestTracerFinishIsIdempotent(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	tctx := tracer.Start(context.Background(), newID(t), newID(t))
+	tctx.StartSpan("node-A").Finish(`{"status":200}`, nil)
+
+	// Mirror dag.ExecuteWithTrace: the error branch finishes the trace,
+	// then the deferred Finish runs a second time on the same context.
+	tctx.FinishWithError("boom")
+	tctx.Finish()
+
+	traces := tracer.List(10, 0)
+	require.Len(t, traces, 1, "double Finish must not record the trace twice")
+	assert.Equal(t, SpanStatusError, traces[0].Status)
+	assert.Equal(t, "boom", traces[0].Error)
+}
+
 func TestTracerSpanInput(t *testing.T) {
 	tracer, err := NewTracer(Config{BufferSize: 100})
 	require.NoError(t, err)

@@ -827,3 +827,32 @@ HTTP 返回 200 但 body 中 `errorCode != 0`（业务失败）时，节点配�
 
 #### 4. 命名改造要 UI/日志/API 三处联动
 - 只改 UI 不改日志键（或反之）都只修复一半；速查表沉淀到 `.knowledge/L2-business/id-system.md`
+
+---
+
+## Lesson 12: trace 双重 Finish 无幂等保护 — 失败链路在列表出现 2 条相同主键记录 (2026-09-21)
+
+### 现象
+commit 3960a12 下，失败用例在链路跟踪列表出现 2 条完全相同 traceID（数据库主键）的记录；成功用例不重复。
+
+### 根因分析（同一执行被记录两次）
+`dag.ExecuteWithTrace` 失败分支先调 `FinishTraceWithError`（第 1 次 Finish → record 入内存缓冲区），返回时 `defer tctx.FinishTrace()` 再次触发 Finish（第 2 次 record 追加同一 trace 指针）；`Tracer.record` 无去重，而该 commit 的 ListTraces 读内存缓冲区 → 返回 2 条相同主键记录。
+
+| 路径 | 成功用例 | 失败用例 |
+|------|---------|---------|
+| 错误分支 Finish | 不走 | 第 1 次 record |
+| defer Finish | 第 1 次 record | **第 2 次 record（重复）** |
+
+### 修复方案
+`Context.Finish` 加 `atomic.Bool` CAS 幂等保护，首次调用生效，后续（含 defer 兜底）直接返回；同时保证 panic 场景 defer 仍能兜底落账。
+
+### Lessons Learned
+
+#### 1. defer 兜底 + 显式收尾 = 必然双调用
+"错误分支显式 Finish + defer 兜底 Finish"的写法，失败路径必然调用两次；生命周期终结方法必须幂等
+
+#### 2. 幂等保护放在语义层，不依赖存储层
+后续 commit（7303f1c）改读 SQLite + traces.id PRIMARY KEY 只是在存储层挡住了重复行，内存缓冲区仍存重复指针、第二次 SaveTrace 因主键约束静默失败——症状被掩盖但 bug 仍在
+
+#### 3. "只有失败才复现"是强诊断信号
+同一份代码成功/失败行为分叉时，优先检查错误分支是否有额外的生命周期调用（Finish/close/flush 等）
