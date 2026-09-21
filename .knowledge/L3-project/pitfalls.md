@@ -1,9 +1,9 @@
 ---
 layer: L3
 maturity: verified
-last-verified: 2026-05-25
+last-verified: 2026-09-21
 source: docs/lessons-learned.md
-tags: [pitfalls, performance, layout, echarts, async, dom]
+tags: [pitfalls, performance, layout, echarts, async, dom, trace, error-handling]
 ---
 
 # 已知陷阱 (Lessons Learned)
@@ -687,3 +687,73 @@ function filterFailedNodes() {
 #### 5. 双套实现需保持逻辑一致
 - 前端 Vue computed 和导出 HTML JS 各自独立实现，但过滤逻辑必须一致
 - 修改时需同步更新两处，避免行为不一致
+
+---
+
+## Lesson 9: 软失败被 trace 吞没 — HTTP 200 业务失败链路显示成功 (2026-09-21)
+
+### 现象
+HTTP 返回 200 但 body 中 `errorCode != 0`（业务失败）时，节点配置了 `expect_body` 断言，DAG 节点层判定正确（nodeStats 计入 FailedReqs），但 trace 链路整体显示成功（ok），失败链路在 trace 列表不可见。
+
+### 根因分析（三条失败传递路径，两条断裂）
+
+| # | 失败路径 | 原行为 | 问题 |
+|---|---------|--------|------|
+| 1 | Execute 返回 err（硬失败） | span 标 error ✓ | 仅 `block_on_error=true` 或基础设施错误走此路径，覆盖不全 |
+| 2 | `Output.Error` 字段（软失败信号） | `SpanBuilder.Finish(output, err)` 只看 Execute 返回的 err | `Output.Error` 无任何消费者 → **死信号**，软失败被完全吞掉 |
+| 3 | while 容器吞错（step 失败仅 Warn） | `block_on_error=false` 时 `_ = stepErr` 吞掉 | while 输出无 Error → span ok，**完全不可见** |
+
+核心盲区：span 状态判定只依赖 Execute 的 err 返回值；`trace.Context.Finish()` 也不聚合子 span 状态，单节点失败不会让整条 Trace 标失败。
+
+### 修复方案（4 个修改点，openspec: trace-failure-semantics）
+
+1. **runner.go executeHTTP**：断言失败 / 非 2xx 在 `block_on_error=false` 时记录 `assertionErr` / `non2xxErr`，流程继续（extract/AES 照常），结尾写入 `Output.Error`；nodeStats 同步计失败（`ASSERT-FAIL` / `HTTP-<code>`）
+2. **dag/trace.go executeTraced**：`span.Finish(output, lastOutput.Error)` 感知软失败信号
+3. **trace/trace.go Context.Finish**：Trace 仍为 OK 时聚合任何 error span → 整条 Trace 标 error（canceled 优先级更高）
+4. **while_node.go**：吞掉的 step 失败保留首次（`firstStepErr`），三个正常退出路径统一写入 `Output.Error`
+
+### 语义变化（BREAKING）
+
+`block_on_error=false` 的节点失败行为：
+
+| 维度 | 旧行为 | 新行为（软失败） |
+|------|--------|----------------|
+| 下游节点 | errCh 报错 + SKIP | 照常执行，不 SKIP |
+| 节点 span | （吞掉时）ok | error（含断言详情） |
+| 整条 Trace | error（走 err 路径）或 ok（吞掉时） | 始终 error |
+| nodeStats | 计失败 | 计失败（口径对齐） |
+
+### 效果对比
+
+| 指标 | 修改前 | 修改后 |
+|------|--------|--------|
+| HTTP 200 + errorCode≠0 链路可见性 | trace 显示成功，不可见 | trace error，首个失败 span 详情可见 |
+| 断言软失败后下游节点 | SKIP | 照常执行 |
+| while step 失败可见性 | 完全吞掉 | while span error（记首次失败） |
+| trace 成败口径 | 仅 Execute err | 节点真实执行结果（与 nodeStats 一致） |
+
+### Lessons Learned
+
+#### 1. 吞错 ≠ 吞语义
+- 吞掉错误让流程继续（软失败）时，必须保留错误信息传递到可观测层（trace/统计）
+- 流程继续与失败记录不冲突，两者应同时成立
+
+#### 2. 死信号要么激活要么删除
+- `Output.Error` 原本无任何消费者，属于半成品 API
+- 本次将其激活为软失败的标准传递通道，统一三条失败路径
+
+#### 3. 可观测口径必须全链路对齐
+- nodeStats 计失败而 trace 计成功的口径分裂，是本类 bug 的本质
+- 判定失败的依据（断言/非 2xx）应一次计算、多处消费，而非各层各自判定
+
+#### 4. 两套同名配置语义必须统一
+- `block_on_error` 原有 step 级（吞错继续）与节点级（errCh+SKIP）两套语义，极易混淆
+- 统一为二分模型：false=软失败（流程继续+trace 失败）、true=硬失败（中断+SKIP）
+
+#### 5. span 状态判定要覆盖所有失败信号源
+- Execute err、`Output.Error`、容器吞错，三条路径任一遗漏都会造成"假成功"
+- 排查此类问题先列全失败传递路径，再逐一检查消费者
+
+#### 6. 改动前先写"红"测试
+- 软失败链路改动前先写失败测试：HTTP 200 业务失败 → span error + 下游不 skip + Trace error
+- 确认测试先红后绿，避免实现恰好碰巧通过

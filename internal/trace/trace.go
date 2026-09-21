@@ -124,6 +124,20 @@ func (c *Context) Finish() {
 		c.trace.Status = SpanStatusOK
 	}
 
+	// Aggregate: when the trace still carries the default OK status (no
+	// explicit FinishWithError/FinishWithCanceled was called), any error
+	// span — e.g. a soft-failed node — marks the whole trace as error so
+	// failed chains surface directly in the trace list.
+	if c.trace.Status == SpanStatusOK {
+		for _, s := range c.trace.Spans {
+			if s.Status == SpanStatusError {
+				c.trace.Status = SpanStatusError
+				c.trace.Error = fmt.Sprintf("span %s failed: %s", s.NodeID, s.Error)
+				break
+			}
+		}
+	}
+
 	c.tracer.record(c.trace)
 }
 

@@ -207,6 +207,10 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 	var triggeredMu sync.Mutex
 	var varsMu sync.RWMutex
 
+	// firstStepErr keeps the FIRST swallowed step failure (block_on_error
+	// = false) so the trace span reflects the real node outcome.
+	var firstStepErr error
+
 	iteration := 0
 	startTime := time.Now()
 
@@ -241,6 +245,7 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 					"iterations":  maxIterations,
 					"max_reached": true,
 				},
+				Error: firstStepErr,
 			}, nil
 		}
 
@@ -265,6 +270,7 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 					"iterations":  iteration,
 					"max_reached": true,
 				},
+				Error: firstStepErr,
 			}, nil
 		}
 
@@ -462,6 +468,9 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
 					}
 
+					if firstStepErr == nil {
+						firstStepErr = stepErr
+					}
 					consecutiveFailures[stepIdx]++
 					nodeLog.Warn("while generator step failed",
 						logger.F("step", step.Name),
@@ -529,7 +538,9 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
 					}
 
-					_ = stepErr // used for consecutive failure tracking below
+					if firstStepErr == nil {
+						firstStepErr = stepErr
+					}
 					consecutiveFailures[stepIdx]++
 					nodeLog.Warn("while step failed",
 						logger.F("step", step.Name),
@@ -602,6 +613,7 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 						"type":       "while",
 						"iterations": iteration,
 					},
+					Error: firstStepErr,
 				}, nil
 			}
 		}

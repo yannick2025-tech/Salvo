@@ -370,7 +370,11 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			}
 
 			outputJSON, _ := json.Marshal(lastOutput.Response)
-			span.Finish(string(outputJSON), nil)
+			// A node may report failure via Output.Error (soft failure:
+			// swallowed assertion, non-2xx status) without returning an error
+			// from Execute. The span status must reflect the node's real
+			// outcome, aligned with nodeStats.
+			span.Finish(string(outputJSON), lastOutput.Error)
 
 			e.mu.Lock()
 			e.results[n.ID()] = lastOutput

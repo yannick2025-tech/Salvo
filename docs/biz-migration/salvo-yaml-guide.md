@@ -56,6 +56,7 @@
     - [7.5 引号规则](#75-引号规则)
   - [8. 节点通用字段](#8-节点通用字段)
     - [8.1 block\_on\_error 错误阻断](#81-block_on_error-错误阻断)
+    - [8.2 软失败与 trace 链路成败](#82-软失败与-trace-链路成败)
   - [9. 变量默认值与 Payload 类型匹配](#9-变量默认值与-payload-类型匹配)
     - [9.1 字符串字段（后端需要 `"value"`）](#91-字符串字段后端需要-value)
     - [9.2 整数字段（后端需要 `123`）](#92-整数字段后端需要-123)
@@ -323,7 +324,7 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 | `condition` | string | 节点执行条件表达式 |
 | `timed_trigger` | string | 定时触发，如 `"@every 10s"` |
 | `loop_count` | int | 节点循环次数(顶层字段) |
-| `block_on_error` | bool | 节点失败时是否中断整个链路执行（默认 `false`） |
+| `block_on_error` | bool | 节点失败时是否中断整个链路执行（默认 `false`，失败不中断流程但 trace 链路标失败，见 [8.2](#82-软失败与-trace-链路成败)） |
 
 节点类型清单（共 13 种）：
 
@@ -1348,7 +1349,7 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 
 ### 8.1 block_on_error 错误阻断
 
-默认情况下，节点执行失败（HTTP 非 2xx、`expect_body` 断言失败等）不会中断整个链路，后续节点继续执行。通过设置 `block_on_error: true`，可以让该节点失败时**立即取消整个 chain 的执行**。
+默认情况下（`block_on_error: false`，软失败），节点执行失败（HTTP 非 2xx、`expect_body` 断言失败等）不会中断整个链路，后续节点照常执行，但该节点的 trace span 与整条链路都会标记为失败（详见 [8.2 软失败与 trace 链路成败](#82-软失败与-trace-链路成败)）。通过设置 `block_on_error: true`，可以让该节点失败时**立即取消整个 chain 的执行**（硬失败，下游节点 SKIP）。
 
 ```yaml
 # 示例：启动充电是关键步骤，失败后无需继续后续流程
@@ -1381,6 +1382,8 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 |------|----------|------|
 | HTTP 错误 | 响应状态码非 2xx（如 404、500） | 网络层/网关层错误 |
 | 业务断言失败 | `expect_body` 中定义的字段值不匹配 | 业务层错误，如 `errorCode != 0` |
+
+两种场景在 `block_on_error: false` 时均为软失败：流程继续、trace 标失败；`true` 时均为硬失败：中断 chain、下游节点 SKIP。
 
 **与 while 循环的交互**：
 
@@ -1426,9 +1429,47 @@ while 循环内部的 steps 也支持 `block_on_error`，且**优先级高于 `f
 
 参考实现：
 - DAG 接口：[dag.go#L79-L82]($PROJECT_HOME/salvo/internal/core/dag/dag.go#L79-L82)
-- Executor 链取消：[executor.go#L239-L250]($PROJECT_HOME/salvo/internal/runner/runner.go#L239-L250)
-- HTTP 错误阻断：[runner.go#L1596-L1612]($PROJECT_HOME/salvo/internal/runner/runner.go#L1596-L1612)
-- while 步骤阻断：[while_node.go#L314-L321]($PROJECT_HOME/salvo/internal/runner/while_node.go#L314-L321)
+- Executor 链取消：[executor.go#L295-L327]($PROJECT_HOME/salvo/internal/core/dag/executor.go#L295-L327)
+- HTTP 错误阻断：[runner.go#L1787-L1792]($PROJECT_HOME/salvo/internal/runner/runner.go#L1787-L1792)
+- while 步骤阻断：[while_node.go#L463-L471]($PROJECT_HOME/salvo/internal/runner/while_node.go#L463-L471)
+
+### 8.2 软失败与 trace 链路成败
+
+trace 链路的成败**以节点真实执行结果为准**，与节点统计（nodeStats）口径一致，不受"流程是否继续"影响。
+
+**软失败（`block_on_error: false`，默认）**——节点失败（HTTP 非 2xx / `expect_body` 断言失败）时：
+
+1. 流程继续：后续节点（含 while、group、普通节点等）照常执行，不会 SKIP
+2. 变量提取（`extract`）、AES 解密等后续处理照常进行
+3. 该节点 span 标记 `error`，错误信息含断言详情
+4. 节点统计计入失败（`FailedReqs`+1，错误原因 `ASSERT-FAIL` 或 `HTTP-<code>`）
+5. 整条 trace 链路标记为失败
+
+**硬失败（`block_on_error: true`）**——节点失败时立即取消 chain，下游节点 SKIP（span 标 `skip`），整条链路失败。
+
+**while 节点的软失败**：
+
+while 内部 step 失败被吞（step 的 `block_on_error=false`）时，循环继续执行，但**首次 step 失败**会记录到 while 节点输出——while 的 span 标 `error`，trace 链路失败。即使后续迭代全部成功，链路仍以首次失败为准。
+
+**Trace 聚合规则**：
+
+| 情况 | 链路状态 |
+|------|---------|
+| 所有节点成功 | `ok` |
+| 任一节点软失败（span error） | `error`，错误信息指向首个失败节点 |
+| chain 被取消（`block_on_error=true` 硬失败） | `canceled`（优先级高于 error） |
+
+**典型场景**：A→B→C，B 配置 `expect_body` 断言且 `block_on_error: false`，B 业务失败（HTTP 200 但 `errorCode != 0`）：
+
+- B、C 照常执行（C 不 SKIP）
+- B 的 span 标 `error`（含断言失败详情），C 的 span 标 `ok`
+- 整条链路 trace 标 `error`，失败链路在 trace 列表直接可见
+
+参考实现：
+- HTTP 软失败/断言判定：[runner.go#L1541]($PROJECT_HOME/salvo/internal/runner/runner.go#L1541)（executeHTTP 内 soft-failure 处理）
+- span 感知 Output.Error：[trace.go#L372-L377]($PROJECT_HOME/salvo/internal/core/dag/trace.go#L372-L377)
+- Trace 聚合 error span：[trace.go#L127-L136]($PROJECT_HOME/salvo/internal/trace/trace.go#L127-L136)
+- while 首次失败记录：[while_node.go#L210-L212]($PROJECT_HOME/salvo/internal/runner/while_node.go#L210-L212)
 
 ---
 

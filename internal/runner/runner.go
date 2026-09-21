@@ -1536,6 +1536,11 @@ func (n *sceneNode) executeNodeLogic(ctx context.Context, input *dag.Input, node
 }
 
 func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	// Soft-failure errors (block_on_error=false): carried on the output so
+	// downstream nodes keep executing while the trace span marks failure.
+	var assertionErr error // first expect_body assertion failure
+	var non2xxErr string  // non-2xx HTTP status when not blocking
+
 	var cfg struct {
 		Method     string            `json:"method"`
 		URL        string            `json:"url"`
@@ -1793,6 +1798,9 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 
 		// Record failed node details even without block_on_error
 		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
+		// Soft failure: carry the HTTP error on the output so the trace span
+		// reflects the real node outcome while the chain continues.
+		non2xxErr = errMsg
 	}
 
 	// AES decrypt: if aes_decrypt is configured and the response body is
@@ -1856,7 +1864,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("field", key),
 								logger.F("error", errMsg),
 							)
-							return nil, fmt.Errorf("%s", errMsg)
+							if n.blockOnError {
+								return nil, fmt.Errorf("%s", errMsg)
+							}
+							assertionErr = fmt.Errorf("%s", errMsg)
+							break
 						}
 					} else {
 						var exists bool
@@ -1867,7 +1879,11 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("field", key),
 								logger.F("error", errMsg),
 							)
-							return nil, fmt.Errorf("%s", errMsg)
+							if n.blockOnError {
+								return nil, fmt.Errorf("%s", errMsg)
+							}
+							assertionErr = fmt.Errorf("%s", errMsg)
+							break
 						}
 					}
 					if !compareJSONValues(actualVal, expectedVal) {
@@ -1877,26 +1893,51 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("expected", expectedVal),
 							logger.F("actual", actualVal),
 						)
-						return nil, fmt.Errorf("%s", errMsg)
+						if n.blockOnError {
+							return nil, fmt.Errorf("%s", errMsg)
+						}
+						assertionErr = fmt.Errorf("%s", errMsg)
+						break
 					}
 				}
-				nodeLog.Info("expect_body validation passed",
-					logger.F("assertions", cfg.ExpectBody),
-				)
+				if assertionErr == nil {
+					nodeLog.Info("expect_body validation passed",
+						logger.F("assertions", cfg.ExpectBody),
+					)
+				} else {
+					nodeLog.Warn("expect_body validation failed (soft failure, continuing)",
+						logger.F("error", assertionErr),
+					)
+				}
 			}
 		}
 	}
+
+	softFailed := assertionErr != nil || non2xxErr != ""
 
 	if n.nodeStats != nil {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
-			n.nodeStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
-			if !httpResp.IsSuccess() {
-				n.nodeStats.RecordError(fmt.Sprintf("HTTP-%d", httpResp.StatusCode))
+			// Node stats must reflect the real outcome: a soft failure
+			// (assertion or non-2xx) counts as failed even when HTTP 200.
+			success := httpResp.IsSuccess() && !softFailed
+			n.nodeStats.RecordLatency(httpResp.Latency, success)
+			if !success {
+				reason := fmt.Sprintf("HTTP-%d", httpResp.StatusCode)
+				if assertionErr != nil {
+					reason = "ASSERT-FAIL"
+				}
+				n.nodeStats.RecordError(reason)
 			}
 		}
 	}
 
-	return &dag.Output{Response: resp}, nil
+	out := &dag.Output{Response: resp}
+	if assertionErr != nil {
+		out.Error = assertionErr
+	} else if non2xxErr != "" {
+		out.Error = fmt.Errorf("%s", non2xxErr)
+	}
+	return out, nil
 }
 
 // compareJSONValues compares an actual value from a JSON response body (decoded
