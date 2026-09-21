@@ -2212,6 +2212,11 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 		logger.F("async", cfg.Async),
 	)
 
+	// firstChildSoftErr keeps the FIRST child soft failure (reported via
+	// Output.Error with no Execute error) so the group's span and stats
+	// reflect the real outcome; execution still continues within the group.
+	var firstChildSoftErr error
+
 	var lastOutput *dag.Output
 	startTime := time.Now()
 	for i := 0; i < loopCount; i++ {
@@ -2246,6 +2251,13 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 					)
 					return nil, fmt.Errorf("group child %s loop %d: %w", child.ID(), i, err)
 				}
+				// Soft failure: the child reports failure via Output.Error
+				// (swallowed assertion, non-2xx status) while the group
+				// continues executing its remaining children. Keep the
+				// first one so the span and stats reflect the real outcome.
+				if output != nil && output.Error != nil && firstChildSoftErr == nil {
+					firstChildSoftErr = output.Error
+				}
 				lastOutput = output
 			}
 		}
@@ -2253,7 +2265,7 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 
 	if n.nodeStats != nil {
 		elapsed := time.Since(startTime)
-		n.nodeStats.RecordLatency(elapsed, true)
+		n.nodeStats.RecordLatency(elapsed, firstChildSoftErr == nil)
 	}
 
 	return &dag.Output{Response: map[string]any{
@@ -2261,7 +2273,7 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 		"type":       "group",
 		"iterations": loopCount,
 		"last_child": lastOutput,
-	}}, nil
+	}, Error: firstChildSoftErr}, nil
 }
 
 func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {

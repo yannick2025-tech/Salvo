@@ -1451,6 +1451,10 @@ trace 链路的成败**以节点真实执行结果为准**，与节点统计（n
 
 while 内部 step 失败被吞（step 的 `block_on_error=false`）时，循环继续执行，但**首次 step 失败**会记录到 while 节点输出——while 的 span 标 `error`，trace 链路失败。即使后续迭代全部成功，链路仍以首次失败为准。
 
+**group 节点的软失败**：
+
+group 子节点软失败（子节点断言失败且其 `block_on_error=false`）时，组内其余子节点与下游节点照常执行，**首个软失败的子节点**记录到 group 节点输出——group 的 span 标 `error`，trace 链路失败。注意：group 自身的 `block_on_error` 仅对 group 自身失败（子节点硬失败、配置错误）生效，对子节点软失败无影响——软失败语义下流程总是继续。
+
 **Trace 聚合规则**：
 
 | 情况 | 链路状态 |
@@ -1470,6 +1474,7 @@ while 内部 step 失败被吞（step 的 `block_on_error=false`）时，循环�
 - span 感知 Output.Error：[trace.go#L372-L377]($PROJECT_HOME/salvo/internal/core/dag/trace.go#L372-L377)
 - Trace 聚合 error span：[trace.go#L127-L136]($PROJECT_HOME/salvo/internal/trace/trace.go#L127-L136)
 - while 首次失败记录：[while_node.go#L210-L212]($PROJECT_HOME/salvo/internal/runner/while_node.go#L210-L212)
+- group 首次子节点软失败：[runner.go#L2215-L2218]($PROJECT_HOME/salvo/internal/runner/runner.go#L2215-L2218)（executeGroup 内 firstChildSoftErr）
 
 ---
 

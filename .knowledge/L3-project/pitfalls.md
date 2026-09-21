@@ -705,12 +705,13 @@ HTTP 返回 200 但 body 中 `errorCode != 0`（业务失败）时，节点配�
 
 核心盲区：span 状态判定只依赖 Execute 的 err 返回值；`trace.Context.Finish()` 也不聚合子 span 状态，单节点失败不会让整条 Trace 标失败。
 
-### 修复方案（4 个修改点，openspec: trace-failure-semantics）
+### 修复方案（5 个修改点，openspec: trace-failure-semantics）
 
 1. **runner.go executeHTTP**：断言失败 / 非 2xx 在 `block_on_error=false` 时记录 `assertionErr` / `non2xxErr`，流程继续（extract/AES 照常），结尾写入 `Output.Error`；nodeStats 同步计失败（`ASSERT-FAIL` / `HTTP-<code>`）
 2. **dag/trace.go executeTraced**：`span.Finish(output, lastOutput.Error)` 感知软失败信号
 3. **trace/trace.go Context.Finish**：Trace 仍为 OK 时聚合任何 error span → 整条 Trace 标 error（canceled 优先级更高）
 4. **while_node.go**：吞掉的 step 失败保留首次（`firstStepErr`），三个正常退出路径统一写入 `Output.Error`
+5. **runner.go executeGroup**（链路级场景测试 A→B→LOOPS(C→D→E)→F 暴露的补充修复）：group 子节点软失败同样被容器吞掉，记录首个子节点软失败（`firstChildSoftErr`）写入 group `Output.Error`；group 自身的 `block_on_error` 对子节点软失败无触发时机（仅对 group 自身失败生效）
 
 ### 语义变化（BREAKING）
 

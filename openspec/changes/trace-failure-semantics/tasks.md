@@ -37,3 +37,10 @@
 - [x] 5.2 codegraph sync
 - [x] 5.3 评估并更新 salvo-yaml-guide.md 的 block_on_error 语义（软失败描述）与 trace 行为说明（8.1 更新 + 新增 8.2 软失败与 trace 链路成败 + 参考行号修正）
 - [x] 5.4 评估 .knowledge/ 知识库是否需要更新（pitfalls.md 新增 Lesson 9：软失败被 trace 吞没；debugging-playbook.md 触发条件表补索引行）
+
+## 6. 补充：group 容器吞子节点软失败（A→B→LOOPS(C→D→E)→F 场景验证暴露）
+
+- [x] 6.1 写链路级测试（chain_soft_fail_test.go，9 个用例）：A 硬失败 SKIP / A 软失败继续 / A 无断言成功 / D 软失败（红）/ D 硬失败中断 / D 无断言 / block 在 A 上（红）/ block 在 LOOPS 上 + D 软失败（红）/ block 在 LOOPS 上 + D 硬失败
+- [x] 6.2 实现：executeGroup 记录首个子节点软失败（firstChildSoftErr），正常退出写入 Output.Error；nodeStats RecordLatency success 参数对齐
+- [x] 6.3 确认 block_on_error 在 group 上仅对 group 自身失败生效（子节点硬失败/配置错误），对子节点软失败无效（无触发时机）
+- [x] 6.4 go test ./... 全量回归零失败 + 更新 salvo-yaml-guide.md 8.2 group 说明 + Lesson 9 补充
