@@ -3,6 +3,7 @@
     <button
       type="button"
       class="custom-select-trigger"
+      :title="displayLabel"
       @click="toggle"
       :disabled="disabled"
     >
@@ -24,6 +25,7 @@
           :key="opt.value"
           class="custom-select-option"
           :class="{ selected: opt.value === String(modelValue) }"
+          :title="opt.label"
           @click="select(opt.value)"
         >
           <span v-if="opt.value === String(modelValue)" class="check-mark">✓</span>
@@ -187,6 +189,7 @@ onUnmounted(() => {
   max-height: 280px;
   overflow-y: auto;
   padding: 4px 0;
+  max-width: min(480px, 90vw);
 }
 
 .custom-select-option {
@@ -216,5 +219,12 @@ onUnmounted(() => {
   width: 14px;
   text-align: center;
   flex-shrink: 0;
+}
+
+.option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

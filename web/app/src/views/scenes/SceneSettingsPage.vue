@@ -39,7 +39,7 @@
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">场景名称</span>
-                <span class="info-value">{{ scene.name }}</span>
+                <span class="info-value truncate-text" :title="scene.name">{{ scene.name }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">状态</span>
@@ -47,7 +47,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">描述</span>
-                <span class="info-value">{{ scene.description || '-' }}</span>
+                <span class="info-value truncate-text" :title="scene.description || '-'">{{ scene.description || '-' }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">创建时间</span>
@@ -88,9 +88,9 @@
             </div>
             <div v-if="varEntries.length === 0" class="var-empty">暂无变量，点击下方按钮添加</div>
             <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
-              <input v-model="entry.key" placeholder="变量名" class="var-input" :disabled="!canWriteScene" @blur="saveVariables" />
+              <input v-model="entry.key" placeholder="变量名" class="var-input" maxlength="64" :disabled="!canWriteScene" @blur="saveVariables" />
               <span class="var-eq">=</span>
-              <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input" :disabled="!canWriteScene" @blur="saveVariables" />
+              <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input" maxlength="4096" :disabled="!canWriteScene" @blur="saveVariables" />
               <button v-if="canWriteScene" class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -799,6 +799,13 @@ onMounted(() => {
   font-weight: 400;
   text-align: left;
   word-break: break-all;
+}
+.info-value.truncate-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 .info-value.status-badge {
   flex: none;

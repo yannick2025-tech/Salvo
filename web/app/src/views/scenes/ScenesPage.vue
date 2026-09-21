@@ -29,7 +29,7 @@
           </tr>
           <tr v-for="s in scenes" :key="s.id">
             <td class="mono">{{ s.id }}</td>
-            <td><router-link :to="`/scenes/${s.id}`" class="link">{{ s.name }}</router-link></td>
+            <td><router-link :to="`/scenes/${s.id}`" class="link name-cell" :title="s.name">{{ s.name }}</router-link></td>
             <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
@@ -51,11 +51,11 @@
         <h3>新建场景</h3>
         <div class="form-group">
           <label>名称</label>
-          <input v-model="createForm.name" placeholder="场景名称" />
+          <input v-model="createForm.name" placeholder="场景名称" maxlength="64" />
         </div>
         <div class="form-group">
           <label>描述</label>
-          <input v-model="createForm.description" placeholder="场景描述" />
+          <input v-model="createForm.description" placeholder="场景描述" maxlength="256" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreate = false">取消</button>
@@ -88,7 +88,7 @@
         <p class="import-hint">粘贴 YAML 配置内容，系统将自动创建场景和 DAG 请求流节点。支持 setup/teardown 生命周期、参数生成器 (generator)、参数关联 (extract)、条件判断 (condition) 和延迟 (delay) 等节点类型。可点击"加载示例"查看完整电商全链路配置模板。</p>
         <div class="form-group">
           <label>场景名称</label>
-          <input v-model="importForm.name" placeholder="留空则使用 YAML 中的 name 字段" />
+          <input v-model="importForm.name" placeholder="留空则使用 YAML 中的 name 字段" maxlength="64" />
         </div>
         <div class="form-group">
           <label>YAML 内容</label>
@@ -883,6 +883,7 @@ onMounted(() => {
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
 .mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
 .desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
+.name-cell { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .time-cell { font-size: 13px; color: var(--text-primary); white-space: nowrap; }

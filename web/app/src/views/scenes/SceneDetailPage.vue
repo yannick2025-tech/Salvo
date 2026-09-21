@@ -4,7 +4,7 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <button class="btn-back" @click="$router.push('/scenes')">← 返回</button>
-        <h2 v-if="scene">{{ scene.name }}</h2>
+        <h2 v-if="scene" class="scene-title" :title="scene.name">{{ scene.name }}</h2>
         <span v-if="scene" :class="['status-badge', scene.status]">{{ scene.status }}</span>
       </div>
       <div class="toolbar-right">
@@ -414,7 +414,7 @@
         <h3>{{ editingNode ? '编辑节点' : '添加节点' }}</h3>
         <div class="form-group">
           <label>节点名称</label>
-          <input v-model="nodeForm.name" placeholder="如: Login / GetUsers / CreateOrder" />
+          <input v-model="nodeForm.name" placeholder="如: Login / GetUsers / CreateOrder" maxlength="50" />
         </div>
         <div class="form-group">
           <label>节点类型</label>

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
@@ -29,6 +30,19 @@ const defaultLimit = 20
 
 // --- Scene Handlers ---
 
+// validateSceneMeta checks scene name/description length limits shared by
+// create, update, copy and import handlers. Lengths are counted in runes
+// (not bytes) to match the frontend maxlength semantics for CJK input.
+func validateSceneMeta(name, description string) error {
+	if utf8.RuneCountInString(name) > 64 {
+		return fmt.Errorf("scene name must be at most 64 characters")
+	}
+	if utf8.RuneCountInString(description) > 256 {
+		return fmt.Errorf("scene description must be at most 256 characters")
+	}
+	return nil
+}
+
 func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	req, err := decode[dto.CreateSceneRequest](r)
 	if err != nil {
@@ -36,6 +50,9 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	}
 	if req.Name == "" {
 		return dto.ErrorResp(400, "name is required")
+	}
+	if err := validateSceneMeta(req.Name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
 	}
 
 	status := req.Status
@@ -68,6 +85,9 @@ func (h *Handler) CopyScene(r *http.Request) dto.Response {
 	}
 	if req.Name == "" {
 		return dto.ErrorResp(400, "name is required")
+	}
+	if err := validateSceneMeta(req.Name, ""); err != nil {
+		return dto.ErrorResp(400, err.Error())
 	}
 	if req.SceneID == 0 {
 		return dto.ErrorResp(400, "scene_id is required")
@@ -165,6 +185,9 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	}
 	if name == "" {
 		return dto.ErrorResp(400, "scene name is required")
+	}
+	if err := validateSceneMeta(name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
 	}
 
 	// Store variables, config_params, derived_params as separate JSON fields
@@ -439,6 +462,9 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	}
 	if req.ID == 0 {
 		return dto.ErrorResp(400, "id is required")
+	}
+	if err := validateSceneMeta(req.Name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
 	}
 
 	scene, err := h.scenes.GetByID(r.Context(), req.ID)
@@ -767,7 +793,7 @@ func validateNodeName(name string) error {
 	if name == "" {
 		return fmt.Errorf("node name is required")
 	}
-	if len(name) > 50 {
+	if utf8.RuneCountInString(name) > 50 {
 		return fmt.Errorf("node name must be at most 50 characters")
 	}
 	if sqlInjectionPattern.MatchString(name) {
