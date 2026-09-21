@@ -25,6 +25,7 @@
           <div class="dag-actions">
             <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('setup')">+ 初始化</button>
             <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('http')">+ HTTP</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('generator')">+ 生成器</button>
             <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('delay')">+ 延迟</button>
             <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('condition')">+ 条件</button>
             <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('if-else')">+ IF-ELSE</button>
@@ -420,6 +421,7 @@
           <select v-model="nodeForm.type" :disabled="!!editingNode">
             <option value="setup">Setup (初始化)</option>
             <option value="http">HTTP 请求</option>
+            <option value="generator">Generator (变量生成)</option>
             <option value="delay">延迟</option>
             <option value="condition">条件判断</option>
             <option value="if-else">IF-ELSE 分支</option>
@@ -1269,6 +1271,7 @@ function nodeTypeLabel(type: string) {
   switch (type) {
     case 'setup': return 'SETUP'
     case 'http': return 'HTTP'
+    case 'generator': return 'GENERATOR'
     case 'delay': return 'DELAY'
     case 'condition': return 'CONDITION'
     case 'if-else': return 'IF-ELSE'
@@ -1276,6 +1279,8 @@ function nodeTypeLabel(type: string) {
     case 'while': return 'WHILE'
     case 'parallel': return 'PARALLEL'
     case 'sub_flow': return 'SUBFLOW'
+    case 'group': return 'GROUP'
+    case 'timer': return 'TIMER'
     case 'teardown': return 'TEARDOWN'
     default: return type.toUpperCase()
   }
