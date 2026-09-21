@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -1038,6 +1039,48 @@ func (r *UserRepo) Create(ctx context.Context, user *model.User) error {
 		user.RoleID, user.Status, user.LastLoginAt,
 		user.CreatedAt, user.UpdatedAt)
 	return err
+}
+
+// CreateOrRestore inserts a new user, or — when a soft-deleted user with
+// the same email exists — restores that row with the new values (keeping
+// the original id and created_at so the UNIQUE constraint is respected
+// without leaking soft-deleted rows into normal queries).
+func (r *UserRepo) CreateOrRestore(ctx context.Context, user *model.User) error {
+	var existingID snowflake.ID
+	var isDeleted bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, deleted_at IS NOT NULL FROM users WHERE email=?`, user.Email,
+	).Scan(&existingID, &isDeleted)
+	switch {
+	case err == nil:
+		if !isDeleted {
+			// An active user already owns this email.
+			return repo.ErrEmailTaken
+		}
+		// Restore the soft-deleted row: keep id/created_at, reset the
+		// business fields, clear deleted_at and last_login_at.
+		now := time.Now().UTC()
+		user.ID = existingID
+		user.UpdatedAt = now
+		_, err = r.db.ExecContext(ctx, `
+			UPDATE users SET password_hash=?, nickname=?, role_id=?, status=?,
+				last_login_at=NULL, updated_at=?, deleted_at=NULL
+			WHERE id=?`,
+			user.PasswordHash, user.Nickname, user.RoleID, user.Status, now, existingID)
+		return err
+	case errors.Is(err, sql.ErrNoRows):
+		// No row at all — insert a new one. A concurrent insert racing us
+		// still hits the UNIQUE constraint; map it to ErrEmailTaken.
+		if err := r.Create(ctx, user); err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				return repo.ErrEmailTaken
+			}
+			return err
+		}
+		return nil
+	default:
+		return err
+	}
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.User, error) {

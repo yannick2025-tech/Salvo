@@ -295,6 +295,66 @@ func TestDeleteUserMissingID(t *testing.T) {
 	assert.Equal(t, 400, result.Code)
 }
 
+// --- CreateUser: email uniqueness with soft delete ---
+
+func TestCreateUser_DuplicateActiveEmailFails(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/users/create", dto.CreateUserRequest{
+		Email:    "dup@example.com",
+		Password: "pass123",
+	})
+	require.Equal(t, 0, decodeResponse(t, resp).Code)
+
+	// Creating another user with the same ACTIVE email must fail with a
+	// friendly 409 instead of a raw database error.
+	resp = postJSONAuth(t, srv, token, "/api/v1/users/create", dto.CreateUserRequest{
+		Email:    "dup@example.com",
+		Password: "pass456",
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 409, result.Code)
+	assert.Contains(t, result.Message, "邮箱已被使用")
+}
+
+func TestCreateUser_AfterSoftDeleteRestoresSameEmail(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Create a user, then soft-delete it.
+	resp := postJSONAuth(t, srv, token, "/api/v1/users/create", dto.CreateUserRequest{
+		Email:    "reuse@example.com",
+		Password: "pass123",
+		Nickname: "Old Nick",
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	data, _ := json.Marshal(result.Data)
+	var first dto.UserDTO
+	require.NoError(t, json.Unmarshal(data, &first))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/users/delete", dto.IDRequest{ID: first.ID})
+	require.Equal(t, 0, decodeResponse(t, resp).Code)
+
+	// Creating the same email again must succeed — the soft-deleted row is
+	// restored (same id, new values) instead of hitting the UNIQUE constraint.
+	resp = postJSONAuth(t, srv, token, "/api/v1/users/create", dto.CreateUserRequest{
+		Email:    "reuse@example.com",
+		Password: "newpass456",
+		Nickname: "New Nick",
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	data, _ = json.Marshal(result.Data)
+	var second dto.UserDTO
+	require.NoError(t, json.Unmarshal(data, &second))
+	assert.Equal(t, "reuse@example.com", second.Email)
+	assert.Equal(t, "New Nick", second.Nickname)
+	assert.Equal(t, first.ID, second.ID, "restored user should keep the original id")
+}
+
 // --- ListRoles ---
 
 func TestListRoles(t *testing.T) {

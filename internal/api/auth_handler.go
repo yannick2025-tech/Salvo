@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -35,7 +34,7 @@ func (h *Handler) Login(r *http.Request) dto.Response {
 		return dto.ErrorResp(401, "邮箱或密码错误")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get user: %v", err))
+		return h.internalErr("get user", err)
 	}
 
 	if user.Status != model.UserStatusActive {
@@ -142,7 +141,7 @@ func (h *Handler) ChangePassword(r *http.Request) dto.Response {
 
 	user.PasswordHash = string(hash)
 	if err := h.users.Update(r.Context(), user); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("更新用户失败: %v", err))
+		return h.internalErr("更新用户失败", err)
 	}
 
 	return dto.OK(nil)
@@ -162,7 +161,7 @@ func (h *Handler) ResetPassword(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "用户不存在")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("获取用户失败: %v", err))
+		return h.internalErr("获取用户失败", err)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
@@ -172,7 +171,7 @@ func (h *Handler) ResetPassword(r *http.Request) dto.Response {
 
 	user.PasswordHash = string(hash)
 	if err := h.users.Update(r.Context(), user); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update user: %v", err))
+		return h.internalErr("update user", err)
 	}
 
 	return dto.OK(nil)
@@ -195,7 +194,7 @@ func (h *Handler) ListUsers(r *http.Request) dto.Response {
 		Limit:  limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list users: %v", err))
+		return h.internalErr("list users", err)
 	}
 
 	items := make([]dto.UserDTO, 0, len(users))
@@ -242,8 +241,8 @@ func (h *Handler) CreateUser(r *http.Request) dto.Response {
 		user.Nickname = strings.Split(req.Email, "@")[0]
 	}
 
-	if err := h.users.Create(r.Context(), user); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create user: %v", err))
+	if err := h.users.CreateOrRestore(r.Context(), user); err != nil {
+		return h.internalErr("create user", err)
 	}
 
 	role, _ := h.roles.GetByID(r.Context(), user.RoleID)
@@ -269,7 +268,7 @@ func (h *Handler) UpdateUser(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "user not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get user: %v", err))
+		return h.internalErr("get user", err)
 	}
 
 	if req.Nickname != "" {
@@ -283,7 +282,7 @@ func (h *Handler) UpdateUser(r *http.Request) dto.Response {
 	}
 
 	if err := h.users.Update(r.Context(), user); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update user: %v", err))
+		return h.internalErr("update user", err)
 	}
 
 	role, _ := h.roles.GetByID(r.Context(), user.RoleID)
@@ -305,7 +304,7 @@ func (h *Handler) DeleteUser(r *http.Request) dto.Response {
 	}
 
 	if err := h.users.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete user: %v", err))
+		return h.internalErr("delete user", err)
 	}
 
 	return dto.OK(nil)
@@ -327,7 +326,7 @@ func (h *Handler) ListRoles(r *http.Request) dto.Response {
 		Limit:  limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list roles: %v", err))
+		return h.internalErr("list roles", err)
 	}
 
 	items := make([]dto.RoleDTO, 0, len(roles))
@@ -358,7 +357,7 @@ func (h *Handler) CreateRole(r *http.Request) dto.Response {
 	}
 
 	if err := h.roles.Create(r.Context(), role); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create role: %v", err))
+		return h.internalErr("create role", err)
 	}
 
 	return dto.OK(toRoleDTO(role, nil))
@@ -378,7 +377,7 @@ func (h *Handler) UpdateRole(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "role not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get role: %v", err))
+		return h.internalErr("get role", err)
 	}
 
 	if role.IsBuiltin {
@@ -393,7 +392,7 @@ func (h *Handler) UpdateRole(r *http.Request) dto.Response {
 	}
 
 	if err := h.roles.Update(r.Context(), role); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update role: %v", err))
+		return h.internalErr("update role", err)
 	}
 
 	if req.Permissions != nil {
@@ -429,7 +428,7 @@ func (h *Handler) DeleteRole(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "role not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get role: %v", err))
+		return h.internalErr("get role", err)
 	}
 
 	if role.IsBuiltin {
@@ -437,7 +436,7 @@ func (h *Handler) DeleteRole(r *http.Request) dto.Response {
 	}
 
 	if err := h.roles.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete role: %v", err))
+		return h.internalErr("delete role", err)
 	}
 
 	return dto.OK(nil)

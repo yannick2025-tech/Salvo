@@ -8,10 +8,15 @@ package repo
 
 import (
 	"context"
+	"errors"
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 )
+
+// ErrEmailTaken indicates an active user already owns the email, so a new
+// user cannot be created with it.
+var ErrEmailTaken = errors.New("email already in use")
 
 // Filter holds common pagination and filtering parameters for List queries.
 type Filter struct {
@@ -101,6 +106,11 @@ type RunRecordRepo interface {
 
 type UserRepo interface {
 	Create(ctx context.Context, user *model.User) error
+	// CreateOrRestore inserts a new user; if a soft-deleted user with the
+	// same email exists, it restores that row with the new values (keeping
+	// the original id and created_at). Returns ErrEmailTaken when an
+	// active user already owns the email.
+	CreateOrRestore(ctx context.Context, user *model.User) error
 	GetByID(ctx context.Context, id snowflake.ID) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	List(ctx context.Context, filter Filter) ([]*model.User, error)

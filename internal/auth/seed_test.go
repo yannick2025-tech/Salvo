@@ -152,6 +152,10 @@ type mockUserRepo struct {
 	users []*model.User
 }
 
+func (m *mockUserRepo) CreateOrRestore(ctx context.Context, user *model.User) error {
+	return m.Create(ctx, user)
+}
+
 func (m *mockUserRepo) Create(ctx context.Context, user *model.User) error {
 	m.users = append(m.users, user)
 	return nil
