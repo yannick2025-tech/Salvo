@@ -12,7 +12,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>数据KEY</th>
             <th>名称</th>
             <th>描述</th>
             <th>状态</th>
@@ -28,14 +28,17 @@
             <td colspan="9" class="empty">暂无场景</td>
           </tr>
           <tr v-for="s in scenes" :key="s.id">
-            <td class="mono">{{ s.id }}</td>
+            <td class="mono" :title="'数据库主键：' + s.id">{{ s.id }}</td>
             <td><router-link :to="`/scenes/${s.id}`" class="link name-cell" :title="s.name">{{ s.name }}</router-link></td>
             <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
             <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
             <td>{{ formatTime(s.created_at) }}</td>
             <td class="time-cell">{{ formatTime(s.updated_at) }}</td>
             <td class="time-cell">{{ s.last_run_started_at ? formatTime(s.last_run_started_at) : '-' }}</td>
-            <td class="mono">{{ s.last_run_id || '-' }}</td>
+            <td class="mono">
+              <router-link v-if="s.last_run_id" :to="'/runner'" class="link" :title="'运行ID：' + s.last_run_id + '，点击跳转运行控制页面'">{{ s.last_run_id }}</router-link>
+              <span v-else>-</span>
+            </td>
             <td class="actions">
               <button class="btn-sm" :class="{ disabled: isSceneRunning(s) || !canWriteScene }" :disabled="isSceneRunning(s) || !canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="editScene(s)">编辑</button>
               <button class="btn-sm progress" :class="{ disabled: !isSceneRunning(s) }" :disabled="!isSceneRunning(s)" @click="viewProgress(s)">实时进度</button>

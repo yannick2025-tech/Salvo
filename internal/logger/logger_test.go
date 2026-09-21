@@ -176,6 +176,17 @@ func TestLoggerWithContextSceneID(t *testing.T) {
 	assert.Equal(t, "with scene id", entry["msg"])
 }
 
+func TestLoggerWithContextRunID(t *testing.T) {
+	l, buf := newTestLogger(t, FormatJSON)
+	ctx := ContextWithRunID(context.Background(), "run-9001")
+	child := l.WithContext(ctx)
+	child.Info("with run id")
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &entry))
+	assert.Equal(t, "run-9001", entry["run_id"])
+	assert.Equal(t, "with run id", entry["msg"])
+}
+
 func TestLoggerWithContextMultipleFields(t *testing.T) {
 	l, buf := newTestLogger(t, FormatJSON)
 	ctx := ContextWithTraceID(context.Background(), "trace-abc")

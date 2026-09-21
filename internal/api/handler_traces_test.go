@@ -77,6 +77,30 @@ func TestListTraces_TraceIDExact(t *testing.T) {
 	assert.EqualValues(t, 1, data.Pagination.Total) // total reflects the filtered count
 }
 
+func TestListTraces_TraceIDMatchesRunID(t *testing.T) {
+	srv := newTestServer(t)
+	seedTracesForFilter(t, srv)
+
+	// A trace whose run_id differs from its DB primary key.
+	extra := &tracelib.Trace{
+		ID:        snowflake.ID(1004),
+		SceneID:   snowflake.ID(102),
+		RunID:     snowflake.ID(9001),
+		Status:    tracelib.SpanStatusOK,
+		StartedAt: time.Now(),
+		Duration:  800 * time.Millisecond,
+	}
+	require.NoError(t, srv.handler.traceStore.SaveTrace(context.Background(), extra))
+
+	// The trace_id param smart-matches traces.id OR traces.run_id.
+	resp := srv.handler.ListTraces(tracesReq(t, map[string]any{"trace_id": "9001"}))
+	require.Equal(t, 0, resp.Code)
+	data := resp.Data.(dto.ListResponse[[]dto.TraceDTO])
+	require.Len(t, data.Items, 1)
+	assert.EqualValues(t, 1004, data.Items[0].ID)
+	assert.EqualValues(t, 9001, data.Items[0].RunID)
+}
+
 func TestListTraces_DurationRange(t *testing.T) {
 	srv := newTestServer(t)
 	seedTracesForFilter(t, srv)

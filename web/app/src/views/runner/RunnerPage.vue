@@ -49,7 +49,7 @@
         <div v-if="activeRuns.length === 0 && recentFinishedRuns.length === 0" class="empty">暂无运行中的场景</div>
         <div v-for="run in activeRuns" :key="run.id" class="run-item">
           <div class="run-header">
-            <span class="run-name">Scene #{{ run.scene_id }}</span>
+            <router-link :to="'/scenes'" class="run-name link" :title="'跳转到场景列表'">Scene #{{ run.scene_id }}</router-link>
             <span class="status running">运行中</span>
           </div>
           <div class="run-footer">
@@ -93,7 +93,7 @@
         </div>
         <div v-for="run in recentFinishedRuns" :key="'fin-'+run.id" :class="['run-item', run.status === 'failed' ? 'failed-item' : 'completed-item']">
           <div class="run-header">
-            <span class="run-name">Scene #{{ run.scene_id }}</span>
+            <router-link :to="'/scenes'" class="run-name link" :title="'跳转到场景列表'">Scene #{{ run.scene_id }}</router-link>
             <span :class="['status', run.status === 'failed' ? 'failed' : 'completed']">{{ run.status === 'failed' ? '已失败' : '已完成' }}</span>
           </div>
           <div v-if="run.error_msg" class="error-msg">{{ run.error_msg }}</div>
@@ -125,14 +125,15 @@
             <th>P99</th>
             <th>开始时间</th>
             <th>结束时间</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="runs.length === 0"><td colspan="12" class="empty">暂无运行记录</td></tr>
+          <tr v-if="runs.length === 0"><td colspan="13" class="empty">暂无运行记录</td></tr>
           <tr v-for="r in runs" :key="r.id">
-            <td class="mono">{{ r.id }}</td>
-            <td class="mono">{{ r.run_id }}</td>
-            <td>{{ r.scene_id }}</td>
+            <td class="mono" :title="'数据库主键：' + r.id">{{ r.id }}</td>
+            <td class="mono copyable" :title="'运行ID，检索后端日志用此 ID，点击复制'" @click="copyWithToast(r.run_id)">{{ r.run_id }}</td>
+            <td><router-link :to="'/scenes'" class="link" :title="'跳转到场景列表'">{{ r.scene_id }}</router-link></td>
             <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
             <td>{{ Math.round(r.worker_count || 0) }}</td>
             <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? '持续时间' : '请求数' }}</span></td>
@@ -142,13 +143,12 @@
             <td>{{ formatMs(r.p99_latency) }}</td>
             <td>{{ formatTime(r.started_at) }}</td>
             <td>{{ r.status === 'running' ? '--' : formatTime(r.finished_at) }}</td>
+            <td><router-link :to="`/traces?trace_id=${r.run_id}`" class="link" :title="'在链路列表中按运行ID ' + r.run_id + ' 过滤'">链路</router-link></td>
           </tr>
         </tbody>
       </table>
       </div>
     </div>
-
-    <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
   </div>
 </template>
 
@@ -157,6 +157,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
+import { copyWithToast } from '@/utils/clipboard'
+import { showToast } from '@/utils/toast'
 import { useAuthStore } from '@/stores/auth'
 import type { SceneDTO, RunRecordDTO } from '@/types'
 import CustomSelect from '@/components/CustomSelect.vue'
@@ -182,8 +184,6 @@ const runModeOptions = [
 ]
 const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
-const toastMsg = ref('')
-const toastType = ref('info')
 
 const stopConfirm = reactive({
   visible: false,
@@ -252,12 +252,6 @@ const recentFinishedRuns = computed(() => {
     })
     .slice(0, 10)
 })
-
-function showToast(msg: string, type = 'info') {
-  toastMsg.value = msg
-  toastType.value = type
-  setTimeout(() => { toastMsg.value = '' }, 5000)
-}
 
 async function handleStart() {
   if (!form.scene_id) return
@@ -524,6 +518,10 @@ onUnmounted(() => {
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); white-space: nowrap; }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .mono { font-family: var(--font-mono); font-size: 12px; }
+.copyable { cursor: pointer; }
+.copyable:hover { color: var(--accent-primary); }
+.link { color: var(--accent-primary); text-decoration: none; }
+.link:hover { text-decoration: underline; }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
@@ -536,14 +534,4 @@ onUnmounted(() => {
 .failed-item { border-left: 3px solid var(--accent-danger); }
 .completed-item { border-left: 3px solid var(--accent-success); }
 .error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }
-
-.toast {
-  position: fixed; bottom: 24px; right: 24px; padding: 10px 20px;
-  border-radius: var(--radius-md); font-size: 13px; z-index: 200;
-  animation: slideIn 0.3s ease;
-}
-.toast.info { background: var(--accent-primary); color: #fff; }
-.toast.success { background: var(--accent-success); color: #fff; }
-.toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
-@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>

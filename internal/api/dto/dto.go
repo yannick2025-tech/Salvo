@@ -456,7 +456,7 @@ type RunRecordDTO struct {
 // ListTracesRequest is the request for listing traces.
 type ListTracesRequest struct {
 	SceneID      snowflake.ID `json:"scene_id,omitempty"`
-	TraceID      string       `json:"trace_id,omitempty"`     // exact trace id match
+	TraceID      string       `json:"trace_id,omitempty"`     // smart match: trace id OR run id
 	SceneName    string       `json:"scene_name,omitempty"`   // fuzzy scene name match
 	Status       string       `json:"status,omitempty"`       // ok|error|skip|canceled
 	MinDurationMs *float64   `json:"min_duration_ms,omitempty"` // inclusive, milliseconds

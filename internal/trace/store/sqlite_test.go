@@ -27,20 +27,20 @@ func insertScene(t *testing.T, s *Store, id int64, name string) {
 	require.NoError(t, err)
 }
 
-func insertTrace(t *testing.T, s *Store, id, sceneID int64, status string, durMs float64) {
+func insertTrace(t *testing.T, s *Store, id, sceneID, runID int64, status string, durMs float64) {
 	t.Helper()
 	_, err := s.db.Exec(`INSERT INTO traces (id, scene_id, run_id, status, error, started_at, duration_ns) VALUES (?,?,?,?,?,?,?)`,
-		id, sceneID, id, status, "", time.Now(), int64(durMs*1e6))
+		id, sceneID, runID, status, "", time.Now(), int64(durMs*1e6))
 	require.NoError(t, err)
 }
 
 func seedTraceFilters(t *testing.T, s *Store) {
 	insertScene(t, s, 101, "电商下单场景")
 	insertScene(t, s, 102, "支付链路")
-	insertTrace(t, s, 1001, 101, "ok", 1200)
-	insertTrace(t, s, 1002, 101, "error", 5500)
-	insertTrace(t, s, 1003, 102, "ok", 300)
-	insertTrace(t, s, 1004, 102, "canceled", 4000)
+	insertTrace(t, s, 1001, 101, 1001, "ok", 1200)
+	insertTrace(t, s, 1002, 101, 1002, "error", 5500)
+	insertTrace(t, s, 1003, 102, 1003, "ok", 300)
+	insertTrace(t, s, 1004, 102, 1004, "canceled", 4000)
 }
 
 func TestListTraces_NoFilter(t *testing.T) {
@@ -58,6 +58,35 @@ func TestListTraces_FilterByTraceID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, traces, 1)
 	assert.EqualValues(t, 1002, traces[0].ID)
+}
+
+func TestListTraces_FilterByRunID(t *testing.T) {
+	s := newTestStore(t)
+	seedTraceFilters(t, s)
+	// A trace whose business run_id differs from its DB primary key.
+	insertTrace(t, s, 1005, 102, 9001, "ok", 800)
+
+	// Filtering by run_id finds the trace even though no trace has id 9001.
+	traces, err := s.ListTraces(context.Background(), TraceFilter{TraceID: "9001"}, 50, 0)
+	require.NoError(t, err)
+	require.Len(t, traces, 1)
+	assert.EqualValues(t, 1005, traces[0].ID)
+
+	// Filtering by DB primary key still matches exactly that trace.
+	traces, err = s.ListTraces(context.Background(), TraceFilter{TraceID: "1005"}, 50, 0)
+	require.NoError(t, err)
+	require.Len(t, traces, 1)
+	assert.EqualValues(t, 1005, traces[0].ID)
+
+	// OR matching composes with other AND conditions (status).
+	traces, err = s.ListTraces(context.Background(), TraceFilter{TraceID: "9001", Status: "error"}, 50, 0)
+	require.NoError(t, err)
+	assert.Empty(t, traces)
+
+	// CountTraces applies the same smart matching.
+	total, err := s.CountTraces(context.Background(), TraceFilter{TraceID: "9001"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, total)
 }
 
 func TestListTraces_FilterBySceneNameFuzzy(t *testing.T) {

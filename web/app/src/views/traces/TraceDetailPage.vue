@@ -6,8 +6,8 @@
     </div>
 
     <div v-if="trace" class="detail-card">
-      <div class="detail-row"><span class="label">TraceID</span><span class="value mono" :title="'数据库Trace主键'">{{ trace.id }}</span></div>
-      <div class="detail-row"><span class="label">RunID</span><span class="value mono" :title="'可在日志中搜索此ID'">{{ trace.run_id }}</span></div>
+      <div class="detail-row"><span class="label">数据KEY</span><span class="value mono" :title="'数据库主键：' + trace.id">{{ trace.id }}</span></div>
+      <div class="detail-row"><span class="label">运行ID</span><span class="value mono copyable" :title="'运行ID，检索后端日志用此 ID，点击复制'" @click="copyWithToast(trace.run_id)">{{ trace.run_id }}</span></div>
       <div class="detail-row"><span class="label">场景</span><span class="value">{{ trace.scene_name || trace.scene_id }}</span></div>
       <div class="detail-row"><span class="label">状态</span><span :class="['status-badge', 'st-' + trace.status]">{{ trace.status.toUpperCase() }}</span></div>
       <div class="detail-row"><span class="label">耗时</span><span class="value">{{ formatDuration(trace.duration_ns) }}</span></div>
@@ -45,29 +45,34 @@
         </div>
       </div>
     </div>
-    <div v-else-if="!trace" class="empty">加载中...</div>
+    <div v-else-if="!trace && !loadFailed" class="empty">加载中...</div>
+    <div v-else-if="!trace" class="empty">未找到链路记录</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { getTrace } from '@/api/trace'
+import { copyWithToast } from '@/utils/clipboard'
 import type { TraceDTO, SpanDTO } from '@/types'
 
-const route = useRoute()
+const props = defineProps<{ id?: string }>()
 const trace = ref<TraceDTO | null>(null)
+const loadFailed = ref(false)
 
 async function fetchTrace() {
-  const id = route.params.id as string
-  if (!id) return
+  if (!props.id) return
   try {
-    const resp = await getTrace(id)
+    const resp = await getTrace(props.id)
     if (resp.code === 0) {
       trace.value = resp.data
       calculateContainerWidth()
+    } else {
+      loadFailed.value = true
     }
-  } catch { /* ignore */ }
+  } catch {
+    loadFailed.value = true
+  }
 }
 
 function formatDuration(ns: number): string {
@@ -235,6 +240,8 @@ function formatDurationMs(ns: number): string {
 .label { font-size: 13px; color: var(--text-secondary); }
 .value { font-size: 14px; color: var(--text-primary); }
 .mono { font-family: var(--font-mono); font-size: 12px; cursor: default; }
+.copyable { cursor: pointer; }
+.copyable:hover { color: var(--accent-primary); }
 
 .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; min-width: auto; max-width: fit-content; }
 .st-ok { background: rgba(163,230,53,0.12); color: #65a30d; border: 1px solid rgba(163,230,53,0.2); }

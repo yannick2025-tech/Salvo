@@ -1809,7 +1809,7 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 	}
 	if req.TraceID != "" {
 		if _, err := strconv.ParseInt(req.TraceID, 10, 64); err != nil {
-			return dto.ErrorResp(400, "TraceID 必须为数字")
+			return dto.ErrorResp(400, "TraceID/RunID 必须为数字")
 		}
 		filter.TraceID = req.TraceID
 	}

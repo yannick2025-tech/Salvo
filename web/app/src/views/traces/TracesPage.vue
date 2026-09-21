@@ -5,7 +5,7 @@
     </div>
 
     <div class="filters-bar">
-      <input v-model.trim="filters.trace_id" class="filter-input mono" placeholder="TraceID" @keyup.enter="applyFilters" />
+      <input v-model.trim="filters.trace_id" class="filter-input mono" placeholder="链路/运行ID" @keyup.enter="applyFilters" />
       <input v-model.trim="filters.scene_name" class="filter-input" placeholder="场景名称（模糊）" @keyup.enter="applyFilters" />
       <CustomSelect v-model="filters.status" :options="statusOptions" placeholder="全部状态" min-width="130px" />
       <div class="duration-range">
@@ -21,8 +21,8 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>TraceID</th>
-            <th>RunID</th>
+            <th>数据KEY</th>
+            <th>运行ID</th>
             <th>场景</th>
             <th>状态</th>
             <th>Span数</th>
@@ -34,8 +34,8 @@
         <tbody>
           <tr v-if="traces.length === 0"><td colspan="8" class="empty">暂无追踪数据</td></tr>
           <tr v-for="t in traces" :key="t.id">
-            <td class="mono" :title="'数据库中的Trace主键ID'">{{ t.id }}</td>
-            <td class="mono" :title="'运行记录ID，可在日志中搜索'">{{ t.run_id }}</td>
+            <td class="mono" :title="'数据库主键：' + t.id">{{ t.id }}</td>
+            <td class="mono copyable" :title="'运行ID，检索后端日志用此 ID，点击复制'" @click="copyWithToast(t.run_id)">{{ t.run_id }}</td>
             <td>{{ t.scene_name || t.scene_id }}</td>
             <td><span :class="['status-badge', t.status]">{{ t.status }}</span></td>
             <td>{{ t.spans?.length || 0 }}</td>
@@ -66,10 +66,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { listTraces } from '@/api/trace'
 import type { TraceListQuery } from '@/api/trace'
+import { copyWithToast } from '@/utils/clipboard'
 import CustomSelect from '@/components/CustomSelect.vue'
 import type { TraceDTO } from '@/types'
+
+const route = useRoute()
 
 const traces = ref<TraceDTO[]>([])
 const total = ref(0)
@@ -183,7 +187,12 @@ function formatTime(t: string) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-onMounted(fetchTraces)
+onMounted(() => {
+  // Pre-fill the ID filter when navigated with ?trace_id= (e.g. from the runner page).
+  const q = route.query.trace_id
+  if (typeof q === 'string' && q) filters.trace_id = q
+  fetchTraces()
+})
 </script>
 
 <style scoped>
@@ -211,6 +220,8 @@ onMounted(fetchTraces)
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); white-space: nowrap; }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
 .mono { font-family: var(--font-mono); font-size: 12px; cursor: default; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copyable { cursor: pointer; }
+.copyable:hover { color: var(--accent-primary); }
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 

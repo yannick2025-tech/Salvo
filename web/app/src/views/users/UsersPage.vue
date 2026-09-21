@@ -9,7 +9,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>数据KEY</th>
             <th>邮箱</th>
             <th>昵称</th>
             <th>角色</th>
@@ -21,7 +21,7 @@
         <tbody>
           <tr v-if="users.length === 0"><td colspan="7" class="empty">暂无用户</td></tr>
           <tr v-for="u in users" :key="u.id">
-            <td class="mono">{{ u.id }}</td>
+            <td class="mono" :title="'数据库主键：' + u.id">{{ u.id }}</td>
             <td>{{ u.email }}</td>
             <td>{{ u.nickname || '-' }}</td>
             <td><span class="role-badge">{{ u.role_name }}</span></td>

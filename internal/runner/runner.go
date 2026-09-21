@@ -328,10 +328,9 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.startedAt = time.Now().UTC()
 	r.mu.Unlock()
 
-	traceID := r.runID.String()
-
-	// Create a context with trace context for logging
-	runCtx := logger.ContextWithTraceID(r.ctx, traceID)
+	// Create a context with run context for logging. run_id is the business
+	// run identifier users search backend logs with (not the trace DB key).
+	runCtx := logger.ContextWithRunID(r.ctx, r.runID.String())
 	runCtx = logger.ContextWithSceneID(runCtx, r.cfg.SceneID.String())
 
 	runLog := r.log.WithContext(runCtx)
@@ -949,7 +948,7 @@ func (r *Runner) Duration() time.Duration {
 }
 
 func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Scene) error {
-	execCtx := logger.ContextWithTraceID(r.ctx, r.runID.String())
+	execCtx := logger.ContextWithRunID(r.ctx, r.runID.String())
 	execCtx = logger.ContextWithSceneID(execCtx, r.cfg.SceneID.String())
 	execLog := r.log.WithContext(execCtx)
 
@@ -1108,7 +1107,7 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	dagObj := dag.New()
 	buildLog := r.log.With(
-		logger.F("trace_id", r.runID.String()),
+		logger.F("run_id", r.runID.String()),
 		logger.F("scene_id", r.cfg.SceneID.String()),
 	)
 
@@ -2545,7 +2544,7 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 
 func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 	scopeLog := r.log.With(
-		logger.F("trace_id", r.runID.String()),
+		logger.F("run_id", r.runID.String()),
 		logger.F("scene_id", r.cfg.SceneID.String()),
 	)
 

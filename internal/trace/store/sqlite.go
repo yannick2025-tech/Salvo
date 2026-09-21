@@ -88,7 +88,7 @@ func (s *Store) GetTrace(ctx context.Context, id snowflake.ID) (*tracelib.Trace,
 // TraceFilter holds combined (AND) query conditions for listing traces.
 // All fields are optional; zero values are ignored.
 type TraceFilter struct {
-	TraceID     string        // exact match on traces.id
+	TraceID     string        // smart match: exact on traces.id OR traces.run_id
 	SceneID     snowflake.ID  // exact match on traces.scene_id
 	SceneName   string        // fuzzy (contains) match on scenes.name
 	Status      string        // exact match on traces.status (ok|error|skip|canceled)
@@ -109,8 +109,10 @@ func buildTraceWhere(f TraceFilter) (string, []any) {
 	args := []any{}
 
 	if f.TraceID != "" {
-		conds = append(conds, "t.id = ?")
-		args = append(args, f.TraceID)
+		// Smart match: the input may be either the trace DB primary key
+		// (traces.id) or the business run ID (traces.run_id) used for log search.
+		conds = append(conds, "(t.id = ? OR t.run_id = ?)")
+		args = append(args, f.TraceID, f.TraceID)
 	}
 	if f.SceneID != 0 {
 		conds = append(conds, "t.scene_id = ?")

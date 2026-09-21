@@ -22,6 +22,9 @@ const (
 	nodeIDKey contextKey = "node_id"
 	// sceneIDKey is the context key for the scene identifier.
 	sceneIDKey contextKey = "scene_id"
+	// runIDKey is the context key for the business run identifier — the ID
+	// users search backend logs with (not the traces.id DB primary key).
+	runIDKey contextKey = "run_id"
 )
 
 // ContextWithTraceID returns a copy of ctx that carries the given traceID.
@@ -59,6 +62,24 @@ func ContextWithNodeID(ctx context.Context, nodeID string) context.Context {
 // The scene ID will be automatically injected into log entries via WithContext.
 func ContextWithSceneID(ctx context.Context, sceneID string) context.Context {
 	return context.WithValue(ctx, sceneIDKey, sceneID)
+}
+
+// ContextWithRunID returns a copy of ctx that carries the given runID.
+// The run ID will be automatically injected into log entries via WithContext.
+func ContextWithRunID(ctx context.Context, runID string) context.Context {
+	return context.WithValue(ctx, runIDKey, runID)
+}
+
+// RunIDFromContext extracts the run ID from ctx.
+// Returns an empty string if ctx is nil or no run ID is present.
+func RunIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(runIDKey).(string); ok {
+		return v
+	}
+	return ""
 }
 
 // zapLogger is the zap-backed implementation of the Logger interface.
@@ -148,7 +169,7 @@ func (l *zapLogger) With(fields ...Field) Logger {
 }
 
 // WithContext returns a child Logger that injects trace context (trace_id,
-// chain_id, node_id, scene_id) from ctx into every subsequent log entry.
+// chain_id, node_id, scene_id, run_id) from ctx into every subsequent log entry.
 func (l *zapLogger) WithContext(ctx context.Context) Logger {
 	if ctx == nil {
 		return l
@@ -157,6 +178,9 @@ func (l *zapLogger) WithContext(ctx context.Context) Logger {
 	var fields []Field
 	if traceID := TraceIDFromContext(ctx); traceID != "" {
 		fields = append(fields, F("trace_id", traceID))
+	}
+	if runID := RunIDFromContext(ctx); runID != "" {
+		fields = append(fields, F("run_id", runID))
 	}
 	if v, ok := ctx.Value(chainIDKey).(string); ok && v != "" {
 		fields = append(fields, F("chain_id", v))

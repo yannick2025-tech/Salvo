@@ -7,7 +7,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>数据KEY</th>
             <th>场景</th>
             <th>状态</th>
             <th>总请求</th>
@@ -24,8 +24,8 @@
         <tbody>
           <tr v-if="reports.length === 0"><td colspan="12" class="empty">暂无报告</td></tr>
           <tr v-for="r in reports" :key="r.id">
-            <td class="mono">{{ r.id }}</td>
-            <td>{{ r.scene_id }}</td>
+            <td class="mono" :title="'数据库主键：' + r.id">{{ r.id }}</td>
+            <td><router-link :to="'/scenes'" class="link" :title="'跳转到场景列表'">{{ r.scene_id }}</router-link></td>
             <td><span :class="['status-badge', r.status]" class="tooltip-wrapper" :data-tooltip="getReportStatusTooltip(r.status)">{{ r.status }}</span></td>
             <td>{{ extractMetric(r, 'total_reqs') }}</td>
             <td>{{ extractMetric(r, 'success_rate') }}</td>
