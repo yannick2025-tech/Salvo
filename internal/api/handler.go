@@ -71,7 +71,7 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	}
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+		return h.internalErr("create scene", err)
 	}
 
 	return dto.OK(toSceneDTO(scene))
@@ -102,7 +102,7 @@ func (h *Handler) CopyScene(r *http.Request) dto.Response {
 	// 重名检查：场景名在系统内保持唯一
 	existing, err := h.scenes.List(ctx, repo.Filter{Limit: 1000, Offset: 0})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list scenes: %v", err))
+		return h.internalErr("list scenes", err)
 	}
 	for _, s := range existing {
 		if s.Name == req.Name {
@@ -112,7 +112,7 @@ func (h *Handler) CopyScene(r *http.Request) dto.Response {
 
 	copied, err := h.scenes.CopyTx(ctx, src.ID, req.Name, src.Description)
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("copy scene: %v", err))
+		return h.internalErr("copy scene", err)
 	}
 
 	return dto.OK(toSceneDTO(copied))
@@ -228,7 +228,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	}
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+		return h.internalErr("create scene", err)
 	}
 
 	// Import data sources: create DataSource records and build name→ID map.
@@ -260,7 +260,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			Source:   "yaml",
 		}
 		if err := h.dataSources.Create(r.Context(), ds); err != nil {
-			return dto.ErrorResp(500, fmt.Sprintf("create data source %q: %v", yds.Name, err))
+			return h.internalErr(fmt.Sprintf("create data source %s", yds.Name), err)
 		}
 		dsNameToID[yds.Name] = ds.ID
 	}
@@ -318,7 +318,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			Lifecycle:    item.lifecycle,
 		}
 		if err := h.nodes.Create(r.Context(), node); err != nil {
-			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
+			return h.internalErr(fmt.Sprintf("create node %s", yn.Name), err)
 		}
 		nodeNameToID[yn.Name] = node.ID
 	}
@@ -351,11 +351,11 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		configBytes, _ := json.Marshal(yn.Config)
 		node, err := h.nodes.GetByID(r.Context(), nodeID)
 		if err != nil {
-			return dto.ErrorResp(500, fmt.Sprintf("get group node %q: %v", yn.Name, err))
+			return h.internalErr(fmt.Sprintf("get group node %s", yn.Name), err)
 		}
 		node.Config = string(configBytes)
 		if err := h.nodes.Update(r.Context(), node); err != nil {
-			return dto.ErrorResp(500, fmt.Sprintf("update group node %q: %v", yn.Name, err))
+			return h.internalErr(fmt.Sprintf("update group node %s", yn.Name), err)
 		}
 	}
 
@@ -376,7 +376,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 				Condition: ye.Condition,
 			}
 			if err := h.edges.Create(r.Context(), edge); err != nil {
-				return dto.ErrorResp(500, fmt.Sprintf("create edge: %v", err))
+				return h.internalErr("create edge", err)
 			}
 		}
 	} else {
@@ -449,7 +449,7 @@ func (h *Handler) GetScene(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+		return h.internalErr("get scene", err)
 	}
 
 	return dto.OK(toSceneDTO(scene))
@@ -472,7 +472,7 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+		return h.internalErr("get scene", err)
 	}
 
 	if req.Name != "" {
@@ -498,7 +498,7 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	}
 
 	if err := h.scenes.Update(r.Context(), scene); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update scene: %v", err))
+		return h.internalErr("update scene", err)
 	}
 
 	return dto.OK(toSceneDTO(scene))
@@ -514,7 +514,7 @@ func (h *Handler) DeleteScene(r *http.Request) dto.Response {
 	}
 
 	if err := h.scenes.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete scene: %v", err))
+		return h.internalErr("delete scene", err)
 	}
 
 	return dto.OK(nil)
@@ -536,19 +536,19 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+		return h.internalErr("get scene", err)
 	}
 
 	// Fetch all nodes.
 	nodes, err := h.nodes.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list nodes: %v", err))
+		return h.internalErr("list nodes", err)
 	}
 
 	// Fetch all edges.
 	edges, err := h.edges.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
+		return h.internalErr("list edges", err)
 	}
 
 	// Fetch data sources with source=yaml for YAML export.
@@ -724,7 +724,7 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err := enc.Encode(ys); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("marshal yaml: %v", err))
+		return h.internalErr("marshal yaml", err)
 	}
 	enc.Close()
 	yamlBytes := buf.Bytes()
@@ -751,7 +751,7 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 		Limit:  limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list scenes: %v", err))
+		return h.internalErr("list scenes", err)
 	}
 
 	items := make([]dto.SceneDTO, 0, len(scenes))
@@ -831,7 +831,7 @@ func (h *Handler) AddNode(r *http.Request) dto.Response {
 	}
 
 	if err := h.nodes.Create(r.Context(), node); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("add node: %v", err))
+		return h.internalErr("add node", err)
 	}
 
 	return dto.OK(toNodeDTO(node))
@@ -851,7 +851,7 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "node not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get node: %v", err))
+		return h.internalErr("get node", err)
 	}
 
 	if req.Name != "" {
@@ -877,7 +877,7 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 	}
 
 	if err := h.nodes.Update(r.Context(), node); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update node: %v", err))
+		return h.internalErr("update node", err)
 	}
 
 	return dto.OK(toNodeDTO(node))
@@ -893,7 +893,7 @@ func (h *Handler) DeleteNode(r *http.Request) dto.Response {
 	}
 
 	if err := h.nodes.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete node: %v", err))
+		return h.internalErr("delete node", err)
 	}
 
 	return dto.OK(nil)
@@ -919,7 +919,7 @@ func (h *Handler) ListNodes(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list nodes: %v", err))
+		return h.internalErr("list nodes", err)
 	}
 
 	items := make([]dto.NodeDTO, 0, len(nodes))
@@ -963,7 +963,7 @@ func (h *Handler) AddEdge(r *http.Request) dto.Response {
 	}
 
 	if err := h.edges.Create(r.Context(), edge); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("add edge: %v", err))
+		return h.internalErr("add edge", err)
 	}
 
 	return dto.OK(toEdgeDTO(edge))
@@ -989,7 +989,7 @@ func (h *Handler) ListEdges(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
+		return h.internalErr("list edges", err)
 	}
 
 	items := make([]dto.EdgeDTO, 0, len(edges))
@@ -1017,7 +1017,7 @@ func (h *Handler) DeleteEdge(r *http.Request) dto.Response {
 	}
 
 	if err := h.edges.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete edge: %v", err))
+		return h.internalErr("delete edge", err)
 	}
 
 	return dto.OK(nil)
@@ -1045,7 +1045,7 @@ func (h *Handler) ListVariables(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list variables: %v", err))
+		return h.internalErr("list variables", err)
 	}
 
 	items := make([]dto.VariableDTO, 0, len(vars))
@@ -1086,7 +1086,7 @@ func (h *Handler) SetVariable(r *http.Request) dto.Response {
 	}
 
 	if err := h.variables.Create(r.Context(), v); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("set variable: %v", err))
+		return h.internalErr("set variable", err)
 	}
 
 	return dto.OK(toVariableDTO(v))
@@ -1108,17 +1108,17 @@ func (h *Handler) BatchSetVariables(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+		return h.internalErr("get scene", err)
 	}
 
 	varsJSON, err := json.Marshal(req.Variables)
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("marshal variables: %v", err))
+		return h.internalErr("marshal variables", err)
 	}
 	scene.Variables = string(varsJSON)
 
 	if err := h.scenes.Update(r.Context(), scene); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update scene variables: %v", err))
+		return h.internalErr("update scene variables", err)
 	}
 
 	return dto.OK(dto.BatchSetVariablesResponse{Variables: req.Variables})
@@ -1145,7 +1145,7 @@ func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
 	if _, err := h.scenes.GetByID(r.Context(), req.SceneID); err == sql.ErrNoRows {
 		return dto.ErrorResp(404, "scene not found")
 	} else if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+		return h.internalErr("get scene", err)
 	}
 
 	// Parse CSV (empty rows are automatically removed)
@@ -1163,7 +1163,7 @@ func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
 	}
 
 	if err := h.dataSources.Create(r.Context(), dsModel); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create data source: %v", err))
+		return h.internalErr("create data source", err)
 	}
 
 	return dto.OK(dto.DataSourceDTO{
@@ -1191,7 +1191,7 @@ func (h *Handler) ListDataSources(r *http.Request) dto.Response {
 
 	sources, err := h.dataSources.ListBySceneID(r.Context(), req.SceneID)
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list data sources: %v", err))
+		return h.internalErr("list data sources", err)
 	}
 
 	var items []dto.DataSourceDTO
@@ -1232,7 +1232,7 @@ func (h *Handler) PreviewDataSource(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "data source not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get data source: %v", err))
+		return h.internalErr("get data source", err)
 	}
 
 	var columns []string
@@ -1281,7 +1281,7 @@ func (h *Handler) UpdateDataSource(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "data source not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get data source: %v", err))
+		return h.internalErr("get data source", err)
 	}
 
 	// Parse the updated CSV content
@@ -1298,7 +1298,7 @@ func (h *Handler) UpdateDataSource(r *http.Request) dto.Response {
 	existing.RowCount = len(rows)
 
 	if err := h.dataSources.Update(r.Context(), existing); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update data source: %v", err))
+		return h.internalErr("update data source", err)
 	}
 
 	return dto.OK(dto.DataSourceDTO{
@@ -1325,7 +1325,7 @@ func (h *Handler) DeleteDataSource(r *http.Request) dto.Response {
 	}
 
 	if err := h.dataSources.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete data source: %v", err))
+		return h.internalErr("delete data source", err)
 	}
 	return dto.OK(nil)
 }
@@ -1346,7 +1346,7 @@ func (h *Handler) ListPlugins(r *http.Request) dto.Response {
 		Limit:   100,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list plugins: %v", err))
+		return h.internalErr("list plugins", err)
 	}
 
 	items := make([]dto.PluginConfigDTO, 0, len(plugins))
@@ -1383,7 +1383,7 @@ func (h *Handler) UpdatePluginConfig(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "plugin config not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get plugin config: %v", err))
+		return h.internalErr("get plugin config", err)
 	}
 
 	if req.Name != "" {
@@ -1406,7 +1406,7 @@ func (h *Handler) UpdatePluginConfig(r *http.Request) dto.Response {
 	}
 
 	if err := h.plugins.Update(r.Context(), pc); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update plugin config: %v", err))
+		return h.internalErr("update plugin config", err)
 	}
 
 	return dto.OK(toPluginConfigDTO(pc))
@@ -1432,7 +1432,7 @@ func (h *Handler) ListReports(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list reports: %v", err))
+		return h.internalErr("list reports", err)
 	}
 
 	items := make([]dto.ReportListItemDTO, 0, len(reports))
@@ -1464,7 +1464,7 @@ func (h *Handler) GetReport(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "report not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get report: %v", err))
+		return h.internalErr("get report", err)
 	}
 
 	return dto.OK(toReportDTO(report))
@@ -1593,7 +1593,7 @@ func (h *Handler) ListRunRecords(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list run records: %v", err))
+		return h.internalErr("list run records", err)
 	}
 
 	items := make([]dto.RunRecordDTO, 0, len(runs))
@@ -1648,7 +1648,7 @@ func (h *Handler) GetRunRecord(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "run record not found")
 	}
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("get run record: %v", err))
+		return h.internalErr("get run record", err)
 	}
 
 	return dto.OK(toRunRecordDTO(run))

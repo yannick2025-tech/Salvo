@@ -758,3 +758,37 @@ HTTP 返回 200 但 body 中 `errorCode != 0`（业务失败）时，节点配�
 #### 6. 改动前先写"红"测试
 - 软失败链路改动前先写失败测试：HTTP 200 业务失败 → span error + 下游不 skip + Trace error
 - 确认测试先红后绿，避免实现恰好碰巧通过
+
+---
+
+## Lesson 10: 软删除与唯一约束冲突 + 后端错误透传前端 (2026-09-21)
+
+### 现象
+1. 删除用户后再创建相同邮箱用户报错 `create user: UNIQUE constraint failed: user.email`
+2. 各类后端异常（SQLite 原始错误、内部细节）直接返回给前端展示给用户
+
+### 根因分析
+
+| # | 问题 | 根因 |
+|---|------|------|
+| 1 | 软删除后同邮箱重建失败 | `users.email` 表级 UNIQUE 覆盖所有行（含软删除行），软删除 `SET deleted_at` 后该行仍占用邮箱唯一性 |
+| 2 | 技术错误直达用户 | 70 处 `dto.ErrorResp(500, fmt.Sprintf("op: %v", err))` 模式，无统一错误分类与脱敏 |
+
+### 修复方案
+
+1. **软删除重建（恢复复用模式）**：`UserRepo.CreateOrRestore` —— 预检同邮箱行：活跃 → `repo.ErrEmailTaken`；软删除 → 恢复原行（保留 id/created_at，更新业务字段，清 deleted_at）；无行 → INSERT，并发撞 UNIQUE 兜底映射哨兵。**否决部分唯一索引方案**：SQLite 无法 DROP 列级 UNIQUE 约束，需 12 步重建表，成本/风险过高
+2. **统一错误处理（openspec: unified-error-handling）**：`Handler.internalErr(op, err)` 三档映射——参数 400（不变）/ 业务哨兵 4xx 中文提示 / 未知 500 "服务器内部错误"，原始错误仅进日志（Error 级 + op 前缀）；全量替换 70 处透传
+
+### Lessons Learned
+
+#### 1. 软删除与 UNIQUE 约束天然冲突
+- 表级/列级唯一约束不感知 deleted_at，软删除设计上线时必须审计所有唯一字段的"删除后重建"路径
+- SQLite 修复路径选应用层恢复复用（CreateOrRestore），数据库层方案（部分索引）在 SQLite 下因无法删内联约束而不划算
+
+#### 2. 哨兵错误是业务冲突的标准表达
+- store 层识别驱动错误（含字符串匹配 `UNIQUE constraint failed`）包装为 `repo.ErrXxx` 哨兵，handler 用 `errors.Is` 映射语义化 4xx
+- 响应与日志分工：响应给用户可读信息，日志给工程师完整原始错误（op 前缀定位）
+
+#### 3. 透传模式是横切债，修复必须一次性收口
+- 70 处 sprintf 透传是逐处复制出来的横切债，逐处修必然遗漏；以 helper 一次性收口 + 机械替换（perl 正则）
+- 机械替换后必须立即编译+全量测试：本次捕获组正则引入引号错位（`h.internalErr("op, err)`），靠编译检查当场发现并修正

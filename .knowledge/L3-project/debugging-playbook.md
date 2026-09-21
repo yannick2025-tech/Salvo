@@ -26,6 +26,7 @@ tags: [debugging, troubleshooting, performance, layout, workflow]
 | **DAG/条件边问题** | "流程停顿"、"汇合阻塞"、"节点不应执行"、"OR-join" | Lesson 4: DAG AND-join 阻塞 |
 | **异步/时序问题** | "数据没到"、"顺序错误"、"竞态"、"依赖" | Lesson 1: 异步依赖链 |
 | **trace 成败与实际不符** | "trace 显示成功"、"失败链路不可见"、"软失败"、"断言失败但链路成功" | Lesson 9: 软失败被 trace 吞没 |
+| **软删除后唯一字段重建失败** | "UNIQUE constraint failed"、"删除后不能重建"、"邮箱已占用" | Lesson 10: 软删除与唯一约束冲突 |
 
 ## 排查顺序（强制执行）
 

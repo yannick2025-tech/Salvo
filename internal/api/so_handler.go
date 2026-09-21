@@ -46,19 +46,19 @@ func (h *Handler) UploadSOPluginFile(r *http.Request) dto.Response {
 	// Create plugins directory if it doesn't exist.
 	dir := pluginsDir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create plugins dir: %v", err))
+		return h.internalErr("create plugins dir", err)
 	}
 
 	// Save file with original name.
 	destPath := filepath.Join(dir, header.Filename)
 	dest, err := os.Create(destPath)
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create file: %v", err))
+		return h.internalErr("create file", err)
 	}
 	defer dest.Close()
 
 	if _, err := io.Copy(dest, file); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("save file: %v", err))
+		return h.internalErr("save file", err)
 	}
 
 	return dto.OK(map[string]string{
@@ -94,7 +94,7 @@ func (h *Handler) UploadSOPlugin(r *http.Request) dto.Response {
 	}
 
 	if err := h.soPlugins.Create(r.Context(), p); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("create so plugin: %v", err))
+		return h.internalErr("create so plugin", err)
 	}
 
 	// Hot-load the plugin into memory if status is enabled
@@ -133,7 +133,7 @@ func (h *Handler) ListSOPlugins(r *http.Request) dto.Response {
 		Limit:  limit,
 	})
 	if err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("list so plugins: %v", err))
+		return h.internalErr("list so plugins", err)
 	}
 
 	items := make([]dto.SOPluginDTO, 0, len(plugins))
@@ -158,7 +158,7 @@ func (h *Handler) GetSOPlugin(r *http.Request) dto.Response {
 		if err == sql.ErrNoRows {
 			return dto.ErrorResp(404, "so plugin not found")
 		}
-		return dto.ErrorResp(500, fmt.Sprintf("get so plugin: %v", err))
+		return h.internalErr("get so plugin", err)
 	}
 
 	return dto.OK(toSOPluginDTO(p))
@@ -175,7 +175,7 @@ func (h *Handler) UpdateSOPluginStatus(r *http.Request) dto.Response {
 	}
 
 	if err := h.soPlugins.UpdateStatus(r.Context(), req.ID, req.Status); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update so plugin status: %v", err))
+		return h.internalErr("update so plugin status", err)
 	}
 
 	return dto.OK(nil)
@@ -188,7 +188,7 @@ func (h *Handler) UpdateSOPluginConfig(r *http.Request) dto.Response {
 	}
 
 	if err := h.soPlugins.UpdateConfig(r.Context(), req.ID, req.Config); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("update so plugin config: %v", err))
+		return h.internalErr("update so plugin config", err)
 	}
 
 	return dto.OK(nil)
@@ -208,7 +208,7 @@ func (h *Handler) DeleteSOPlugin(r *http.Request) dto.Response {
 			// This handles the case where the plugin was already soft-deleted
 			return dto.OK(nil)
 		}
-		return dto.ErrorResp(500, fmt.Sprintf("get so plugin for delete: %v", err))
+		return h.internalErr("get so plugin for delete", err)
 	}
 
 	// Delete the .so file from disk (best-effort, don't fail if file is missing).
@@ -221,7 +221,7 @@ func (h *Handler) DeleteSOPlugin(r *http.Request) dto.Response {
 
 	// Soft-delete the DB record.
 	if err := h.soPlugins.Delete(r.Context(), req.ID); err != nil {
-		return dto.ErrorResp(500, fmt.Sprintf("delete so plugin: %v", err))
+		return h.internalErr("delete so plugin", err)
 	}
 
 	return dto.OK(nil)
