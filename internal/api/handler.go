@@ -166,6 +166,13 @@ type yamlVarItem struct {
 	Value string `yaml:"value"`
 }
 
+// rollbackImport best-effort deletes the scene created by a partially
+// failed YAML import so no orphan scene is left behind. Errors ignored:
+// the original import failure is the one reported to the user.
+func (h *Handler) rollbackImport(ctx context.Context, sceneID snowflake.ID) {
+	_ = h.scenes.Delete(ctx, sceneID)
+}
+
 func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	req, err := decode[dto.ImportYAMLRequest](r)
 	if err != nil {
@@ -228,6 +235,64 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		scene.DefaultTimeout = ys.DefaultTimeout
 	}
 
+	// Build a tagged list so each node carries the YAML section (setup/nodes/teardown)
+	// it came from. Lifecycle is orthogonal to Type and stored on the Node for
+	// lossless reconstruction of setup/teardown sections on export.
+	type taggedNode struct {
+		yn        yamlNode
+		lifecycle string
+	}
+	allNodes := make([]taggedNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
+	for _, yn := range ys.Setup {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleSetup})
+	}
+	for _, yn := range ys.Nodes {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleMain})
+	}
+	for _, yn := range ys.Teardown {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleTeardown})
+	}
+
+	// Validate all node references BEFORE creating the scene: an invalid
+	// YAML must be rejected without leaving a partially-imported orphan
+	// scene behind (the import dialog allows retrying, and each retry
+	// used to create another scene row with the same name).
+	nodeNames := make(map[string]bool, len(allNodes))
+	for _, item := range allNodes {
+		if err := validateNodeName(item.yn.Name); err != nil {
+			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", item.yn.Name, err))
+		}
+		nodeNames[item.yn.Name] = true
+	}
+	for _, yds := range ys.DataSources {
+		if yds.Name == "" {
+			return dto.ErrorResp(400, "data source name is required")
+		}
+	}
+	for _, item := range allNodes {
+		if item.yn.Type != model.NodeTypeGroup {
+			continue
+		}
+		childRefs, _ := item.yn.Config["node_ids"].([]any)
+		for _, nameVal := range childRefs {
+			child, ok := nameVal.(string)
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: node_ids must be strings", item.yn.Name))
+			}
+			if !nodeNames[child] {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: child node %q not found", item.yn.Name, child))
+			}
+		}
+	}
+	for _, ye := range ys.Edges {
+		if !nodeNames[ye.From] {
+			return dto.ErrorResp(400, fmt.Sprintf("edge from node %q not found", ye.From))
+		}
+		if !nodeNames[ye.To] {
+			return dto.ErrorResp(400, fmt.Sprintf("edge to node %q not found", ye.To))
+		}
+	}
+
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
 		return h.internalErr("create scene", err)
 	}
@@ -235,9 +300,6 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	// Import data sources: create DataSource records and build name→ID map.
 	dsNameToID := make(map[string]snowflake.ID)
 	for _, yds := range ys.DataSources {
-		if yds.Name == "" {
-			return dto.ErrorResp(400, "data source name is required")
-		}
 		// Skip if a CSV-uploaded data source with same name already exists
 		existingCSV, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), scene.ID, yds.Name, "csv")
 		if existingCSV != nil {
@@ -261,30 +323,13 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			Source:   "yaml",
 		}
 		if err := h.dataSources.Create(r.Context(), ds); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
 			return h.internalErr(fmt.Sprintf("create data source %s", yds.Name), err)
 		}
 		dsNameToID[yds.Name] = ds.ID
 	}
 
 	nodeNameToID := make(map[string]snowflake.ID)
-
-	// Build a tagged list so each node carries the YAML section (setup/nodes/teardown)
-	// it came from. Lifecycle is orthogonal to Type and stored on the Node for
-	// lossless reconstruction of setup/teardown sections on export.
-	type taggedNode struct {
-		yn        yamlNode
-		lifecycle string
-	}
-	allNodes := make([]taggedNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
-	for _, yn := range ys.Setup {
-		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleSetup})
-	}
-	for _, yn := range ys.Nodes {
-		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleMain})
-	}
-	for _, yn := range ys.Teardown {
-		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleTeardown})
-	}
 
 	for _, item := range allNodes {
 		yn := item.yn
@@ -319,6 +364,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 			Lifecycle:    item.lifecycle,
 		}
 		if err := h.nodes.Create(r.Context(), node); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
 			return h.internalErr(fmt.Sprintf("create node %s", yn.Name), err)
 		}
 		nodeNameToID[yn.Name] = node.ID
@@ -352,10 +398,12 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		configBytes, _ := json.Marshal(yn.Config)
 		node, err := h.nodes.GetByID(r.Context(), nodeID)
 		if err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
 			return h.internalErr(fmt.Sprintf("get group node %s", yn.Name), err)
 		}
 		node.Config = string(configBytes)
 		if err := h.nodes.Update(r.Context(), node); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
 			return h.internalErr(fmt.Sprintf("update group node %s", yn.Name), err)
 		}
 	}
@@ -377,6 +425,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 				Condition: ye.Condition,
 			}
 			if err := h.edges.Create(r.Context(), edge); err != nil {
+				h.rollbackImport(r.Context(), scene.ID)
 				return h.internalErr("create edge", err)
 			}
 		}

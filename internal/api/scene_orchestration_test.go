@@ -868,6 +868,53 @@ nodes:
 	result := decodeResponse(t, resp)
 	assert.Equal(t, 400, result.Code, "should reject import with non-existent child")
 	assert.Contains(t, result.Message, "not found")
+
+	// A failed import must not leave a scene behind.
+	assertNoSceneNamed(t, srv, token, "Invalid Group Test")
+}
+
+func TestYAMLImportInvalidEdgeNoSceneCreated(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// YAML whose edge references a non-existent node (the reported bug:
+	// each retry created another orphan scene with the same name).
+	yamlContent := `
+name: invalid-edge-test
+nodes:
+  - name: Real Node
+    type: http
+    config:
+      url: /api/test
+edges:
+  - from: Ghost Node
+    to: Real Node
+`
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/import", dto.ImportYAMLRequest{
+		Name: "导入测试",
+		YAML: yamlContent,
+	})
+	result := decodeResponse(t, resp)
+	assert.Equal(t, 400, result.Code, "should reject import with unknown edge endpoint")
+	assert.Contains(t, result.Message, "not found")
+
+	assertNoSceneNamed(t, srv, token, "导入测试")
+}
+
+// assertNoSceneNamed fails the test when the scene list still contains a
+// scene with the given name (e.g. left behind by a partially failed import).
+func assertNoSceneNamed(t *testing.T, srv *Server, token, name string) {
+	t.Helper()
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/list", dto.ListScenesRequest{})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	listData, _ := json.Marshal(result.Data)
+	var list dto.ListResponse[[]dto.SceneDTO]
+	require.NoError(t, json.Unmarshal(listData, &list))
+	for _, sc := range list.Items {
+		assert.NotEqual(t, name, sc.Name, "failed import must not create a scene")
+	}
 }
 
 func TestYAMLImportEmptyName(t *testing.T) {
