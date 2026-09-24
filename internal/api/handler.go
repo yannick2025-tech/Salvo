@@ -488,6 +488,12 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	if req.Variables != "" {
 		scene.Variables = req.Variables
 	}
+	if req.ConfigParams != "" {
+		scene.ConfigParams = req.ConfigParams
+	}
+	if req.DerivedParams != "" {
+		scene.DerivedParams = req.DerivedParams
+	}
 	if req.Plugins != "" {
 		scene.Plugins = req.Plugins
 	}

@@ -77,9 +77,9 @@ description: |                  # 可选，场景描述
 variables:                      # 可选，场景变量(运行时常量)
   - key: var_name
     value: "var_value"
-config_params:                  # 可选，配置参数(与 variables 合并存储)
+config_params:                  # 可选，配置参数(独立分列存储，导出还原此段)
   param1: "value1"
-derived_params:                 # 可选，派生参数(与 variables 合并存储)
+derived_params:                 # 可选，派生参数(独立分列存储，导出还原此段)
   param2: "value2"
 data_sources:                   # 可选，CSV 数据源
   - name: source_name
@@ -105,7 +105,7 @@ edges:                          # 可选，DAG 边定义(省略时按 setup→no
     condition: "__if_true__"    # 可选，边条件
 ```
 
-> **关键说明**：`variables` / `config_params` / `derived_params` 三者在导入时合并为同一个 `Variables` JSON 对象存储，无功能差异，仅用于组织来源不同的变量。
+> **关键说明**：`variables` / `config_params` / `derived_params` 三者在导入时**分别存入独立的数据库列**（`Variables` / `ConfigParams` / `DerivedParams`），以便导出 YAML 时无损还原原始分段；**运行时三者合并进同一变量作用域**，节点中引用方式完全相同（`${name}`，无功能差异）。前端"场景变量"页签按来源标签统一展示与编辑三者。
 
 参考实现：[handler.go#L129-L144]($PROJECT_HOME/salvo/internal/api/handler.go#L129-L144)
 
@@ -218,7 +218,7 @@ variables:
 
 ### 3.2 config_params 配置参数
 
-`config_params` 是 map 形式的变量，导入时与 `variables` 合并存储，主要用于**业务配置参数**。
+`config_params` 是 map 形式的变量，导入时存入独立的 `ConfigParams` 列，主要用于**业务配置参数**（如充电时长、支付类型等），运行时与 `variables` 合并进同一作用域。
 
 ```yaml
 config_params:
@@ -232,7 +232,7 @@ config_params:
 
 ### 3.3 derived_params 派生参数
 
-`derived_params` 同样合并到 `variables`，主要用于**派生/计算参数**。当前导入时不会执行表达式，仅作为普通字符串存储。
+`derived_params` 存入独立的 `DerivedParams` 列，主要用于**派生/计算参数**（承接旧系统数据工厂中由表达式计算出的参数；Salvo 导入时不会执行表达式，仅作为普通字符串存储，需在 YAML 中写死计算结果值）。
 
 ```yaml
 derived_params:

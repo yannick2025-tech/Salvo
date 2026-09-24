@@ -221,6 +221,46 @@ func TestUpdateScene(t *testing.T) {
 	assert.Equal(t, "ready", updated.Status)
 }
 
+func TestUpdateSceneConfigParams(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "cfg-scene",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// The frontend variables editor saves config_params and derived_params
+	// (stored separately from variables for YAML export fidelity) through
+	// the same scene update endpoint.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/update", dto.UpdateSceneRequest{
+		ID:            scene.ID,
+		ConfigParams:  `{"charge_time":"300","pay_type":"1"}`,
+		DerivedParams: `{"max_charge_power_kw":"30"}`,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	updatedData, _ := json.Marshal(result.Data)
+	var updated dto.SceneDTO
+	require.NoError(t, json.Unmarshal(updatedData, &updated))
+	assert.Equal(t, `{"charge_time":"300","pay_type":"1"}`, updated.ConfigParams)
+	assert.Equal(t, `{"max_charge_power_kw":"30"}`, updated.DerivedParams)
+
+	// Re-get to confirm persistence.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/get", dto.IDRequest{ID: scene.ID})
+	result = decodeResponse(t, resp)
+	fetchedData, _ := json.Marshal(result.Data)
+	var fetched dto.SceneDTO
+	require.NoError(t, json.Unmarshal(fetchedData, &fetched))
+	assert.Equal(t, `{"charge_time":"300","pay_type":"1"}`, fetched.ConfigParams)
+	assert.Equal(t, `{"max_charge_power_kw":"30"}`, fetched.DerivedParams)
+}
+
 func TestDeleteScene(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)

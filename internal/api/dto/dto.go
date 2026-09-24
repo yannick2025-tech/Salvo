@@ -97,6 +97,8 @@ type UpdateSceneRequest struct {
 	Description    string       `json:"description,omitempty"`
 	DAGJSON        string       `json:"dag_json,omitempty"`
 	Variables      string       `json:"variables,omitempty"`
+	ConfigParams   string       `json:"config_params,omitempty"`
+	DerivedParams  string       `json:"derived_params,omitempty"`
 	Plugins        string       `json:"plugins,omitempty"`
 	Status         string       `json:"status,omitempty"`
 	DefaultTimeout *int         `json:"default_timeout,omitempty"`

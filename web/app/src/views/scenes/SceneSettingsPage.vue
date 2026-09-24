@@ -77,26 +77,30 @@
         <template v-if="activeTab === 'variables'">
           <div class="section-header">
             <h3 class="section-title">场景变量</h3>
-            <p class="section-desc">定义场景级别的变量，可在请求配置中通过 ${variable} 引用</p>
+            <p class="section-desc">变量 / 配置参数 / 派生参数 三来源统一管理，均可在请求配置中通过 ${variable} 引用；点击来源标签切换归类（导出 YAML 按来源分段还原）</p>
           </div>
           <div class="card">
             <div class="var-table-header">
               <span>变量名</span>
-              <span></span>
+              <span>来源</span>
               <span>值</span>
               <span></span>
             </div>
             <div v-if="varEntries.length === 0" class="var-empty">暂无变量，点击下方按钮添加</div>
             <div v-for="(entry, idx) in varEntries" :key="idx" class="var-row">
               <input v-model="entry.key" placeholder="变量名" class="var-input" maxlength="64" :disabled="!canWriteScene" @blur="saveVariables" />
-              <span class="var-eq">=</span>
+              <button class="var-source" :class="entry.source" :disabled="!canWriteScene" :title="'点击切换来源（当前：' + sourceLabels[entry.source] + '）'" @click="cycleVarSource(idx)">{{ sourceLabels[entry.source] }}</button>
               <input v-model="entry.value" placeholder="值（支持 ${other_var} 引用）" class="var-input" maxlength="4096" :disabled="!canWriteScene" @blur="saveVariables" />
               <button v-if="canWriteScene" class="btn-icon btn-del-var" @click="removeVariableRow(idx)" title="删除">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <div class="var-footer">
-              <button v-if="canWriteScene" class="btn-add-var" @click="addVariableRow">+ 添加变量</button>
+              <div class="var-add-group">
+                <button v-if="canWriteScene" class="btn-add-var" @click="addVariableRow('var')">+ 变量</button>
+                <button v-if="canWriteScene" class="btn-add-var" @click="addVariableRow('config')">+ 配置参数</button>
+                <button v-if="canWriteScene" class="btn-add-var" @click="addVariableRow('derived')">+ 派生参数</button>
+              </div>
             </div>
           </div>
         </template>
@@ -259,9 +263,11 @@ async function fetchScene() {
     const resp = await getScene(id)
     if (resp.code === 0) {
       scene.value = resp.data
-      if (resp.data.variables) {
-        varEntries.value = parseVariables(resp.data.variables)
-      }
+      varEntries.value = [
+        ...parseVariables(resp.data.variables || ''),
+        ...parseVarMap(resp.data.config_params, 'config'),
+        ...parseVarMap(resp.data.derived_params, 'derived'),
+      ]
     }
   } catch { /* ignore */ }
 }
@@ -301,21 +307,44 @@ const navTabs = [
   },
 ]
 
-// ---- Variables ----
-const varEntries = ref<{ key: string; value: string }[]>([])
+// ---- Variables (three sources: variables / config_params / derived_params) ----
+type VarSource = 'var' | 'config' | 'derived'
+interface VarEntry { key: string; value: string; source: VarSource }
 
-function parseVariables(sceneVars: string): { key: string; value: string }[] {
+const varEntries = ref<VarEntry[]>([])
+const sourceLabels: Record<VarSource, string> = { var: '变量', config: '配置', derived: '派生' }
+const sourceOrder: VarSource[] = ['var', 'config', 'derived']
+
+function parseVarMap(json: string | undefined, source: VarSource): VarEntry[] {
+  if (!json) return []
   try {
-    const obj = JSON.parse(sceneVars)
+    const obj = JSON.parse(json)
     if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-      return Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v) }))
+      return Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v), source }))
     }
   } catch { /* ignore */ }
   return []
 }
 
-function addVariableRow() {
-  varEntries.value.push({ key: '', value: '' })
+function parseVariables(sceneVars: string): VarEntry[] {
+  try {
+    const obj = JSON.parse(sceneVars)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v), source: 'var' as VarSource }))
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function addVariableRow(source: VarSource = 'var') {
+  varEntries.value.push({ key: '', value: '', source })
+}
+
+function cycleVarSource(idx: number) {
+  const entry = varEntries.value[idx]
+  if (!entry) return
+  entry.source = sourceOrder[(sourceOrder.indexOf(entry.source) + 1) % sourceOrder.length]
+  saveVariables()
 }
 
 function removeVariableRow(idx: number) {
@@ -329,12 +358,33 @@ async function saveVariables() {
   const sceneId = route.params.id as string
   if (!sceneId) return
   const vars: Record<string, string> = {}
+  const config: Record<string, string> = {}
+  const derived: Record<string, string> = {}
   for (const e of varEntries.value) {
-    if (e.key.trim()) {
-      vars[e.key.trim()] = e.value
-    }
+    const k = e.key.trim()
+    if (!k) continue
+    if (e.source === 'config') config[k] = e.value
+    else if (e.source === 'derived') derived[k] = e.value
+    else vars[k] = e.value
   }
   try {
+    // config_params/derived_params go through the scene update endpoint.
+    // Send them even when empty if the scene already had that section, so
+    // removing the last row fully clears it (empty means "not provided").
+    const req: Record<string, string> = { id: sceneId }
+    if (scene.value?.config_params || Object.keys(config).length > 0) {
+      req.config_params = JSON.stringify(config)
+    }
+    if (scene.value?.derived_params || Object.keys(derived).length > 0) {
+      req.derived_params = JSON.stringify(derived)
+    }
+    if (Object.keys(req).length > 1) {
+      await updateScene(req)
+      if (scene.value) {
+        if (req.config_params !== undefined) scene.value.config_params = req.config_params
+        if (req.derived_params !== undefined) scene.value.derived_params = req.derived_params
+      }
+    }
     await batchSetVariables(sceneId, vars)
   } catch { /* ignore */ }
 }
@@ -862,7 +912,7 @@ onMounted(() => {
 /* Variable table */
 .var-table-header {
   display: grid;
-  grid-template-columns: 160px 28px 1fr 36px;
+  grid-template-columns: 160px 56px 1fr 36px;
   gap: 6px;
   padding: 9px 14px;
   font-size: 11px;
@@ -875,7 +925,7 @@ onMounted(() => {
 }
 .var-row {
   display: grid;
-  grid-template-columns: 160px 28px 1fr 36px;
+  grid-template-columns: 160px 56px 1fr 36px;
   gap: 6px;
   align-items: center;
   padding: 5px 14px;
@@ -909,11 +959,33 @@ onMounted(() => {
   color: var(--text-tertiary);
   font-size: 12px;
 }
-.var-eq {
-  color: var(--text-tertiary);
-  font-size: 14px;
-  text-align: center;
+.var-source {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
   user-select: none;
+  transition: all 0.15s;
+}
+.var-source:hover {
+  border-color: var(--accent-primary);
+}
+.var-source:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.var-source.config {
+  color: #f5a623;
+  border-color: rgba(245, 166, 35, 0.4);
+}
+.var-source.derived {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.4);
 }
 .var-empty {
   padding: 28px;
@@ -923,6 +995,14 @@ onMounted(() => {
 }
 .var-footer {
   padding: 10px 14px;
+}
+.var-add-group {
+  display: flex;
+  gap: 8px;
+}
+.var-add-group .btn-add-var {
+  flex: 1;
+  width: auto;
 }
 .btn-add-var {
   display: inline-flex;

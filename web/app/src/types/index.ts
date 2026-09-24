@@ -74,6 +74,8 @@ export interface SceneDTO {
   description: string
   dag_json: string
   variables: string
+  config_params: string
+  derived_params: string
   plugins: string
   status: string
   created_at: string
