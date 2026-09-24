@@ -389,7 +389,12 @@ const expandedSysChartId = ref<string | null>(null)
 
 function initNodeChartTypes() {
   overview.value?.node_metrics?.forEach(node => {
-    chartTypes.value[`node-${node.node_id}`] = 'smooth'
+    const key = `node-${node.node_id}`
+    // Only initialize new node keys: polling calls this on every refresh and
+    // must not reset the user's smooth/step choice for already-rendered charts.
+    if (chartTypes.value[key] === undefined) {
+      chartTypes.value[key] = 'smooth'
+    }
   })
 }
 
