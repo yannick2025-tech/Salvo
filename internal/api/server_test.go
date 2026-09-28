@@ -355,6 +355,63 @@ func TestListScenesWithLastRun(t *testing.T) {
 	assert.Equal(t, "completed", found.LastRunStatus)
 }
 
+func TestDashboardOverviewRunDropdownListsAllScenes(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	node, err := snowflake.NewNode(1)
+	require.NoError(t, err)
+
+	// Two scenes, one run each: the running run belongs to a DIFFERENT scene
+	// than the completed one. Selecting a run must not filter the dropdown
+	// (recent_runs) down to that run's scene.
+	createRun := func(sceneName, status string) *model.RunRecord {
+		resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+			Name: sceneName, Status: "draft",
+		})
+		result := decodeResponse(t, resp)
+		require.Equal(t, 0, result.Code)
+		sceneData, _ := json.Marshal(result.Data)
+		var scene dto.SceneDTO
+		require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+		startedAt := time.Now().UTC().Add(-2 * time.Minute)
+		rec := &model.RunRecord{
+			SceneID:   scene.ID,
+			RunID:     node.Generate(),
+			Status:    status,
+			StartedAt: &startedAt,
+		}
+		require.NoError(t, srv.handler.runs.Create(context.Background(), rec))
+		return rec
+	}
+
+	completedRun := createRun("dropdown-scene-a", "completed")
+	runningRun := createRun("dropdown-scene-b", "running")
+
+	// The dashboard polls overview with run_id set to the selected run.
+	resp := postJSONAuth(t, srv, token, "/api/v1/dashboard/overview", dto.DashboardOverviewRequest{
+		RunID: strconv.FormatInt(int64(runningRun.ID), 10),
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	data, _ := json.Marshal(result.Data)
+	var overview dto.DashboardOverviewDTO
+	require.NoError(t, json.Unmarshal(data, &overview))
+
+	// recent_runs feeds the run selector: it must list runs from ALL
+	// scenes so the user can switch between them.
+	ids := map[string]bool{}
+	for _, rr := range overview.RecentRuns {
+		ids[strconv.FormatInt(int64(rr.ID), 10)] = true
+	}
+	assert.True(t, ids[strconv.FormatInt(int64(completedRun.ID), 10)],
+		"completed run from another scene must stay in the dropdown")
+	assert.True(t, ids[strconv.FormatInt(int64(runningRun.ID), 10)],
+		"selected running run must be in the dropdown")
+}
+
 func TestCopyScene(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)

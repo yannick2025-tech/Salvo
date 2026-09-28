@@ -2178,8 +2178,12 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		}
 	}
 
+	// Only filter runs by scene when the caller explicitly passed scene_id.
+	// When a specific run is selected, its scene must NOT filter the runs
+	// query: recent_runs feeds the run selector dropdown and must list runs
+	// from ALL scenes so the user can switch between them.
 	filter := repo.Filter{Limit: 50}
-	if sceneID > 0 {
+	if req.SceneID != "" && sceneID > 0 {
 		filter.SceneID = snowflake.ID(sceneID)
 	}
 
@@ -2202,7 +2206,10 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			logger.F("scene_id", sceneID))
 	}
 
-	if sceneID > 0 && len(runRecords) > 0 {
+	// Scene range widening only applies to explicit scene mode; with a
+	// selected run, runRecords spans all scenes and rangeSeconds is already
+	// derived from the run's duration above.
+	if req.SceneID != "" && len(runRecords) > 0 {
 		var earliest, latest time.Time
 		for _, rr := range runRecords {
 			if rr.StartedAt != nil && (earliest.IsZero() || rr.StartedAt.Before(earliest)) {
