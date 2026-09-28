@@ -416,6 +416,9 @@ const overview = ref<DashboardOverviewDTO | null>(null)
 const historyData = ref<RunHistoryDTO[]>([])
 const pollCheckCounter = ref(0)
 const selectedRunId = ref<string>('')
+// Set when the user picks a run in the dropdown; disables auto-following
+// the latest run in checkLatestRunScene until the page is reloaded.
+const userSelectedRun = ref(false)
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
 
@@ -509,6 +512,7 @@ const durationDisplay = computed(() => {
 })
 
 function onRunChange() {
+  userSelectedRun.value = true
   sysMetricsHistory.value = []
   sysMetricsTimeSeries.value = []
   sysQueueMax = 0
@@ -1452,6 +1456,10 @@ function renderNodeDetailChart(nodeId: string) {
 }
 
 async function checkLatestRunScene() {
+  // Respect the user's manual run selection: once they pick a run in the
+  // dropdown (e.g. to inspect a finished one), stop auto-following the
+  // latest run so the selection survives later polls.
+  if (userSelectedRun.value) return
   try {
     const token = localStorage.getItem('salvo_token')
     const historyResp = await fetch('/api/v1/dashboard/history', {
