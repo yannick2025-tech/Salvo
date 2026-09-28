@@ -1,5 +1,5 @@
 <template>
-  <div :class="['scene-node', data.nodeType, chainStatusClass, { selected, expanded: isGroupExpanded || isWhileExpanded }]" :style="expandableNodeStyle">
+  <div :class="['scene-node', data.nodeType, chainStatusClass, { selected, expanded: isExpanded }]" :style="expandableNodeStyle">
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-top" :position="Position.Top" class="handle-target handle-top" />
     <Handle v-if="data.nodeType !== 'timer'" type="target" id="t-bottom" :position="Position.Bottom" class="handle-target handle-bottom" />
 
@@ -47,14 +47,18 @@
         <div class="node-meta-row">
           <span :class="['type-badge', data.nodeType]">{{ data.typeLabel }}</span>
           <span v-if="data.loopCount && data.loopCount > 1" class="loop-badge">x{{ data.loopCount }}</span>
-          <span v-if="isWhileType && whileStepCount > 0 && !isWhileExpanded" class="steps-badge">{{ whileStepCount }}步</span>
+          <span v-if="isWhileType && !hasChildren && whileStepCount > 0 && !isExpanded" class="steps-badge">{{ whileStepCount }}步</span>
+          <span v-if="hasChildren && !isGroupType && !isExpanded" class="steps-badge">{{ childCount }}子节点</span>
         </div>
       </div>
-      <button v-if="isGroupType && hasChildren" class="action-btn expand-btn expand-btn-group" @click.stop="toggleExpand" :title="isGroupExpanded ? '折叠' : '展开'">
-        {{ isGroupExpanded ? '−' : '+' }}
+      <button v-if="isGroupType && hasChildren" class="action-btn expand-btn expand-btn-group" @click.stop="toggleExpand" :title="isExpanded ? '折叠' : '展开'">
+        {{ isExpanded ? '−' : '+' }}
       </button>
-      <button v-if="isWhileType && whileStepCount > 0" class="action-btn expand-btn expand-btn-while" @click.stop="toggleExpand" :title="isWhileExpanded ? '折叠' : '展开步骤'">
-        {{ isWhileExpanded ? '−' : '+' }}
+      <button v-if="isWhileType && (hasChildren || whileStepCount > 0)" class="action-btn expand-btn expand-btn-while" @click.stop="toggleExpand" :title="isExpanded ? '折叠' : '展开步骤'">
+        {{ isExpanded ? '−' : '+' }}
+      </button>
+      <button v-if="isLoopType && hasChildren" class="action-btn expand-btn expand-btn-loop" @click.stop="toggleExpand" :title="isExpanded ? '折叠' : '展开'">
+        {{ isExpanded ? '−' : '+' }}
       </button>
       <div class="node-actions">
         <button class="action-btn edit" @click.stop="$emit('edit', data.originalNode)" title="编辑">✎</button>
@@ -65,7 +69,8 @@
     <!-- Loop progress badge (bottom-right) -->
     <div v-if="loopProgress" class="loop-progress-badge">L{{ loopProgress.current }}/{{ loopProgress.total }}</div>
 
-    <div v-if="isGroupType && isGroupExpanded && hasChildren" ref="groupChildrenRef" class="group-children" @click.stop>
+    <!-- 复合节点（group/while/loop）引用子节点渲染：复用 group-children 样式与交互 -->
+    <div v-if="isExpanded && hasChildren" ref="groupChildrenRef" class="group-children" @click.stop>
       <div
         v-for="(child, idx) in sortedChildNodes"
         :key="child.id"
@@ -90,7 +95,8 @@
       <div class="resize-handle" @mousedown.prevent="startResize">↘</div>
     </div>
 
-    <div v-if="isWhileType && isWhileExpanded && whileStepCount > 0" class="while-steps" @click.stop>
+    <!-- While 内嵌步骤只读展示：仅当没有引用子节点时显示（引用模式优先生效） -->
+    <div v-if="isWhileType && isExpanded && !hasChildren && whileStepCount > 0" class="while-steps" @click.stop>
       <div class="while-loop-indicator">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e44ad" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
         <span class="while-loop-label">循环体</span>
@@ -155,28 +161,42 @@ const groupChildrenRef = ref<HTMLDivElement | null>(null)
 
 const isGroupType = computed(() => props.data.nodeType === 'group')
 const isWhileType = computed(() => props.data.nodeType === 'while')
+const isLoopType = computed(() => props.data.nodeType === 'loop')
 
 const chainStatusClass = computed(() => {
   if (!props.chainStatus || props.viewMode !== 'chain') return ''
   return `exec-chain-${props.chainStatus}`
 })
 
+// 三类复合节点（group/while/loop）统一：node_ids 引用子节点挂载在 childNodes 上
 const hasChildren = computed(() =>
-  isGroupType.value &&
+  (isGroupType.value || isWhileType.value || isLoopType.value) &&
   Array.isArray(props.data.childNodes) &&
   props.data.childNodes.length > 0
 )
 
+const childCount = computed(() => (props.data.childNodes || []).length)
+
 const whileStepsList = computed(() => props.data.whileSteps || [])
 const whileStepCount = computed(() => whileStepsList.value.length)
 
+// 统一展开状态：group/loop 需有子节点，while 有子节点或内嵌步骤即可展开
+const isExpanded = computed(() => {
+  if (isGroupType.value || isLoopType.value) return isGroupExpanded.value
+  if (isWhileType.value) return isWhileExpanded.value
+  return false
+})
+
 function toggleExpand() {
-  if (isGroupType.value && hasChildren.value) {
+  if (isGroupType.value || isLoopType.value) {
+    if (!hasChildren.value) return
     isGroupExpanded.value = !isGroupExpanded.value
     selectedChildId.value = null
     nextTick(() => refreshDimensions())
-  } else if (isWhileType.value && whileStepCount.value > 0) {
+  } else if (isWhileType.value) {
+    if (!hasChildren.value && whileStepCount.value === 0) return
     isWhileExpanded.value = !isWhileExpanded.value
+    selectedChildId.value = null
     nextTick(() => refreshDimensions())
   }
 }
@@ -188,10 +208,10 @@ function selectChild(child: NodeDTO) {
 const sortedChildNodes = computed(() => props.data.childNodes || [])
 
 const expandableNodeStyle = computed(() => {
-  if (isGroupType.value && isGroupExpanded.value && hasChildren.value) {
+  if (isExpanded.value && hasChildren.value) {
     return { minWidth: '320px', maxWidth: '600px', width: 'auto', overflow: 'visible' }
   }
-  if (isWhileType.value && isWhileExpanded.value && whileStepCount.value > 0) {
+  if (isWhileType.value && isExpanded.value && whileStepCount.value > 0) {
     return { minWidth: '300px', maxWidth: '500px', width: 'auto', overflow: 'visible' }
   }
   return {}
@@ -294,6 +314,7 @@ function getNodeTypeLabel(type: string): string {
 .scene-node.parallel { border-left: 3.5px solid #16a085; }
 .scene-node.sub_flow { border-left: 3.5px solid #2980b9; }
 .scene-node.loop { border-left: 3.5px solid #d35400; }
+.scene-node.loop.expanded { border-style: solid; border-color: rgba(211,84,0,0.4); background: var(--bg-secondary); }
 .scene-node.generator { border-left: 3.5px solid #00bcd4; }
 
 /* ====== Execution Status Overlays ====== */
@@ -521,6 +542,12 @@ function getNodeTypeLabel(type: string): string {
   background: rgba(142,68,173,0.1);
   color: #8e44ad;
   border-color: #8e44ad;
+}
+
+.expand-btn-loop:hover {
+  background: rgba(211,84,0,0.1);
+  color: #d35400;
+  border-color: #d35400;
 }
 
 .steps-badge {

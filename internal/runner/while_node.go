@@ -175,6 +175,12 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 		return nil, fmt.Errorf("parse while config: %w", err)
 	}
 
+	// Reference mode: children resolved from config.node_ids (mounted by
+	// buildDAG) take precedence over the embedded steps fallback.
+	if len(n.childNodes) > 0 {
+		return n.executeWhileRefMode(ctx, input, &cfg, nodeLog)
+	}
+
 	if len(cfg.Steps) == 0 {
 		nodeLog.Warn("while node has no steps, skipping")
 		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": "while", "iterations": 0}}, nil
@@ -614,6 +620,168 @@ func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog 
 						"iterations": iteration,
 					},
 					Error: firstStepErr,
+				}, nil
+			}
+		}
+
+		// Wait for interval before next iteration.
+		if cfg.IntervalSeconds > 0 {
+			if maxIterations == 0 || iteration < maxIterations {
+				nodeLog.Debug("waiting interval before next iteration",
+					logger.F("interval_seconds", cfg.IntervalSeconds))
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("while loop cancelled during interval: %w", ctx.Err())
+				case <-time.After(time.Duration(cfg.IntervalSeconds) * time.Second):
+				}
+			}
+		}
+	}
+}
+
+// executeWhileRefMode runs the while loop with children mounted from
+// config.node_ids (the unified composite child-reference model). It preserves
+// the full while skeleton — exit conditions, max_iterations, max_duration,
+// fail_on_max_iterations, fail_on_max_duration and interval_seconds — but each
+// iteration executes the child chain via runChildChain instead of embedded
+// steps. Exit conditions are evaluated against input.Variables, which
+// runChildChain refreshes from the executor's shared scope after every child
+// step, so variables extracted by a child drive the exit condition.
+func (n *sceneNode) executeWhileRefMode(ctx context.Context, input *dag.Input, cfg *whileConfig, nodeLog logger.Logger) (*dag.Output, error) {
+	if input == nil {
+		return nil, fmt.Errorf("while node %s: nil input in reference mode", n.id)
+	}
+	if len(cfg.ExitConditions) == 0 && cfg.MaxIterations <= 0 && cfg.MaxDurationMinutes <= 0 {
+		return nil, fmt.Errorf("while node %s: must have exit_conditions or max_iterations (infinite loop protection)", n.id)
+	}
+
+	// Ensure input carries an executor so runChildChain can refresh variables.
+	if input.Variables == nil {
+		input.Variables = make(map[string]any)
+	}
+
+	maxIterations := cfg.MaxIterations
+	if maxIterations <= 0 {
+		maxIterations = 0 // unlimited
+	}
+	var maxDuration time.Duration
+	if cfg.MaxDurationMinutes > 0 {
+		maxDuration = time.Duration(cfg.MaxDurationMinutes) * time.Minute
+	}
+
+	// firstChildErr keeps the FIRST child soft failure (Output.Error) so the
+	// trace span reflects the real node outcome while the loop continues.
+	var firstChildErr error
+
+	iteration := 0
+	startTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			nodeLog.Warn("while loop cancelled", logger.F("iteration", iteration), logger.F("error", ctx.Err()))
+			return nil, fmt.Errorf("while loop cancelled at iteration %d: %w", iteration, ctx.Err())
+		default:
+		}
+
+		iteration++
+
+		// Check max iterations.
+		if maxIterations > 0 && iteration > maxIterations {
+			failOnMax := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxIterations != nil {
+				failOnMax = *cfg.FailOnMaxIterations
+			}
+			nodeLog.Warn("while loop reached max iterations",
+				logger.F("max_iterations", maxIterations),
+				logger.F("iteration", iteration),
+				logger.F("fail_on_max_iterations", failOnMax))
+			if failOnMax {
+				return nil, fmt.Errorf("while loop reached max iterations (%d)", maxIterations)
+			}
+			// Not a failure: return success with iteration info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  maxIterations,
+					"max_reached": true,
+				},
+				Error: firstChildErr,
+			}, nil
+		}
+
+		// Check max duration.
+		if maxDuration > 0 && time.Since(startTime) > maxDuration {
+			failOnMaxDur := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxDuration != nil {
+				failOnMaxDur = *cfg.FailOnMaxDuration
+			}
+			nodeLog.Warn("while loop exceeded max duration",
+				logger.F("max_duration", maxDuration),
+				logger.F("elapsed", time.Since(startTime)),
+				logger.F("fail_on_max_duration", failOnMaxDur))
+			if failOnMaxDur {
+				return nil, fmt.Errorf("while loop exceeded max duration (%v)", maxDuration)
+			}
+			// Not a failure: return success with elapsed info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  iteration,
+					"max_reached": true,
+				},
+				Error: firstChildErr,
+			}, nil
+		}
+
+		nodeLog.Info("while loop iteration",
+			logger.F("iteration", iteration),
+			logger.F("max_iterations", maxIterations),
+			logger.F("elapsed", time.Since(startTime).Round(time.Second).String()),
+			logger.F("mode", "ref"))
+
+		// Execute the child chain for this iteration. runChildChain refreshes
+		// input.Variables from the shared scope after every child step.
+		res, err := n.runChildChain(ctx, input, nodeLog)
+		if err != nil {
+			return nil, fmt.Errorf("while ref-mode iteration %d: %w", iteration, err)
+		}
+		if res.FirstSoftErr != nil && firstChildErr == nil {
+			firstChildErr = res.FirstSoftErr
+		}
+
+		// Check exit conditions after each iteration, against the refreshed
+		// input.Variables (extracts performed by children are visible here).
+		if len(cfg.ExitConditions) > 0 {
+			allMet := true
+			for _, ec := range cfg.ExitConditions {
+				condExpr := fmt.Sprintf("${%s} %s \"%s\"", ec.Variable, ec.Operator, ec.Value)
+				ecMet := expr.EvaluateConditionExpr(condExpr, input.Variables)
+				currentVal := input.Variables[ec.Variable]
+				nodeLog.Info("exit condition evaluated",
+					logger.F("variable", ec.Variable),
+					logger.F("current_value", currentVal),
+					logger.F("operator", ec.Operator),
+					logger.F("target", ec.Value),
+					logger.F("result", ecMet))
+				if !ecMet {
+					allMet = false
+					break
+				}
+			}
+			if allMet {
+				nodeLog.Info("while loop exit conditions met",
+					logger.F("iteration", iteration),
+					logger.F("elapsed", time.Since(startTime).Round(time.Second).String()))
+				return &dag.Output{
+					Response: map[string]any{
+						"node_id":    n.id,
+						"type":       "while",
+						"iterations": iteration,
+					},
+					Error: firstChildErr,
 				}, nil
 			}
 		}

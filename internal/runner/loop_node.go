@@ -26,6 +26,12 @@ func (n *sceneNode) executeLoop(ctx context.Context, input *dag.Input, nodeLog l
 		return nil, fmt.Errorf("parse loop config: %w", err)
 	}
 
+	// Reference mode: children resolved from config.node_ids (mounted by
+	// buildDAG) take precedence over the embedded steps fallback.
+	if len(n.childNodes) > 0 {
+		return n.executeLoopRefMode(ctx, input, &cfg, nodeLog)
+	}
+
 	if cfg.LoopCount <= 0 || len(cfg.Steps) == 0 {
 		nodeLog.Warn("loop node has no iterations (loop_count=0 or no steps), skipping")
 		return &dag.Output{
@@ -159,5 +165,59 @@ func (n *sceneNode) executeLoop(ctx context.Context, input *dag.Input, nodeLog l
 			"iterations":  cfg.LoopCount,
 			"merged_vars": mergedVars,
 		},
+	}, nil
+}
+
+// executeLoopRefMode runs the loop node with children mounted from
+// config.node_ids (the unified composite child-reference model): the child
+// chain executes loop_count times via runChildChain with group-style soft
+// failure semantics — a child reporting failure via Output.Error does not
+// abort the chain, and the first child soft failure surfaces on the loop
+// node's Output.Error. Variables are refreshed after each child step so
+// extracts performed by one child are visible to the next.
+func (n *sceneNode) executeLoopRefMode(ctx context.Context, input *dag.Input, cfg *loopConfig, nodeLog logger.Logger) (*dag.Output, error) {
+	if input == nil {
+		return nil, fmt.Errorf("loop node %s: nil input in reference mode", n.id)
+	}
+	if input.Variables == nil {
+		input.Variables = make(map[string]any)
+	}
+
+	loopCount := cfg.LoopCount
+	if loopCount <= 0 {
+		loopCount = 1
+	}
+
+	// firstChildErr keeps the FIRST child soft failure so the trace span
+	// reflects the real node outcome while the loop continues.
+	var firstChildErr error
+	var lastOutput *dag.Output
+
+	for i := 0; i < loopCount; i++ {
+		nodeLog.Info("loop iteration", logger.F("iteration", i+1), logger.F("total", loopCount), logger.F("mode", "ref"))
+
+		res, err := n.runChildChain(ctx, input, nodeLog)
+		if err != nil {
+			return nil, fmt.Errorf("loop ref-mode iteration %d: %w", i+1, err)
+		}
+		if res.FirstSoftErr != nil && firstChildErr == nil {
+			firstChildErr = res.FirstSoftErr
+		}
+		lastOutput = res.LastOutput
+	}
+
+	resp := map[string]any{
+		"node_id":    n.id,
+		"type":       "loop",
+		"iterations": loopCount,
+	}
+	if lastOutput != nil && lastOutput.Response != nil {
+		if m, ok := lastOutput.Response.(map[string]any); ok {
+			resp["last_output"] = m
+		}
+	}
+	return &dag.Output{
+		Response: resp,
+		Error:    firstChildErr,
 	}, nil
 }

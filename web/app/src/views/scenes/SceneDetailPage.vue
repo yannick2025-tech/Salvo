@@ -57,7 +57,7 @@
             @add-edge="onDagAddEdge"
             @delete-edge="handleDeleteEdge"
             @update-edge="handleUpdateEdge"
-            @node-select="selectNode"
+            @node-select="onCanvasNodeSelect"
             @node-position-update="saveNodePosition"
           />
         </div>
@@ -67,8 +67,13 @@
       <div v-if="selectedNode" class="config-sidebar">
         <div class="node-config-panel">
           <div class="panel-header">
-            <h4>{{ selectedNode.name }} - 配置</h4>
-            <button class="btn-close" @click="selectedNode = null"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <div class="panel-header-left">
+              <button v-if="returnToStack.length > 0" class="btn-panel-back" @click="goBackToParent" title="返回上级节点">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              </button>
+              <h4>{{ selectedNode.name }} - 配置</h4>
+            </div>
+            <button class="btn-close" @click="closeConfigPanel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
 
       <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
@@ -198,9 +203,10 @@
               <span class="order-arrow" v-if="idx < groupConfig.node_ids.length - 1">↓</span>
               <span class="order-name">{{ getNodeName(childId) }}</span>
               <div class="order-actions">
-                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(idx)" title="上移">↑</button>
-                <button class="order-btn" :disabled="idx === groupConfig.node_ids.length - 1" @click="moveChildDown(idx)" title="下移">↓</button>
-                <button class="order-btn remove-btn" @click="removeChild(childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(groupConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === groupConfig.node_ids.length - 1" @click="moveChildDown(groupConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(groupConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
             </div>
           </div>
@@ -297,6 +303,32 @@
           <label>失败消息</label>
           <input v-model="whileConfig.fail_message" placeholder="可选" @change="saveNodeConfig" />
         </div>
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
+            <div v-for="n in availableCycleChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="whileConfig.node_ids" @change="onGroupChildrenChange" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <div v-if="whileConfig.node_ids.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in whileConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < whileConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(whileConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === whileConfig.node_ids.length - 1" @click="moveChildDown(whileConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(whileConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选的子节点按顺序循环执行，直到退出条件满足或达到上限；复合节点不可作为子节点</label>
+        </div>
+        <div v-if="whileConfig.steps.length > 0" class="form-row">
+          <label class="hint-label">{{ whileConfig.steps.length }} 个 YAML 内嵌步骤（引用子节点优先生效）</label>
+        </div>
         <div class="form-row">
           <label class="hint-label">While 节点会循环执行子步骤，直到条件满足或达到上限</label>
         </div>
@@ -348,6 +380,32 @@
         <div class="form-row inline">
           <label>循环次数</label>
           <input v-model.number="loopConfig.loop_count" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
+            <div v-for="n in availableCycleChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="loopConfig.node_ids" @change="onGroupChildrenChange" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <div v-if="loopConfig.node_ids.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in loopConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < loopConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(loopConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === loopConfig.node_ids.length - 1" @click="moveChildDown(loopConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(loopConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选的子节点按顺序重复执行指定的循环次数；复合节点不可作为子节点</label>
+        </div>
+        <div v-if="loopConfig.steps.length > 0" class="form-row">
+          <label class="hint-label">{{ loopConfig.steps.length }} 个 YAML 内嵌步骤（引用子节点优先生效）</label>
         </div>
         <div class="form-row">
           <label class="hint-label">循环节点会重复执行子步骤指定的次数。</label>
@@ -731,10 +789,22 @@ const pagedRows = computed(() => {
 const groupConfig = reactive({ node_ids: [] as string[], loop_count: '1', async: false })
 // Timer node config
 const timerConfig = reactive({ mode: 'delay', seconds: '1' })
-const whileConfig = reactive({ exit_conditions: [{ variable: '', operator: 'equals', value: '' }], interval_seconds: '1', max_iterations: '100', max_duration_minutes: '0', fail_after_consecutive: '0', fail_message: '' })
+const whileConfig = reactive({
+  exit_conditions: [{ variable: '', operator: 'equals', value: '' }],
+  interval_seconds: '1',
+  max_iterations: '100',
+  max_duration_minutes: '0',
+  fail_after_consecutive: '0',
+  fail_message: '',
+  // 引用子节点模式：勾选的子节点 ID（引用模式优先生效）；steps 为 YAML 导入的内嵌步骤（只读展示）
+  node_ids: [] as string[],
+  steps: [] as any[],
+  fail_on_max_iterations: true,
+  fail_on_max_duration: true,
+})
 const parallelConfig = reactive({ async: false })
 const subFlowConfig = reactive({ scene_id: '', async: false })
-const loopConfig = reactive({ loop_count: '3' })
+const loopConfig = reactive({ loop_count: '3', node_ids: [] as string[], steps: [] as any[] })
 // Generator node config
 const generatorConfig = reactive({ expression: '', variable: '' })
 
@@ -1037,25 +1107,58 @@ function getNodeName(nodeId: string): string {
 
 function onGroupChildrenChange() { saveNodeConfig() }
 
-function moveChildUp(idx: number) {
+// 复合节点（group/while/loop）统一的已选子节点操作：直接操作传入的 node_ids 数组
+function moveChildUp(list: string[], idx: number) {
   if (idx <= 0) return
-  const arr = [...groupConfig.node_ids]
-  ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
-  groupConfig.node_ids = arr
+  ;[list[idx - 1], list[idx]] = [list[idx], list[idx - 1]]
   saveNodeConfig()
 }
 
-function moveChildDown(idx: number) {
-  if (idx >= groupConfig.node_ids.length - 1) return
-  const arr = [...groupConfig.node_ids]
-  ;[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
-  groupConfig.node_ids = arr
+function moveChildDown(list: string[], idx: number) {
+  if (idx >= list.length - 1) return
+  ;[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]]
   saveNodeConfig()
 }
 
-function removeChild(childId: string) {
-  groupConfig.node_ids = groupConfig.node_ids.filter(id => id !== childId)
+function removeChild(list: string[], childId: string) {
+  const idx = list.indexOf(childId)
+  if (idx >= 0) list.splice(idx, 1)
   saveNodeConfig()
+}
+
+// while/loop 子节点候选：排除自身与所有复合类型（与后端 YAML 导入嵌套校验一致，复合节点不可进循环体）
+const COMPOSITE_NODE_TYPES = new Set(['group', 'while', 'loop'])
+const availableCycleChildren = computed(() => {
+  if (!selectedNode.value) return []
+  return nodes.value.filter(n => n.id !== selectedNode.value?.id && !COMPOSITE_NODE_TYPES.has(n.type))
+})
+
+// 面板内"编辑子节点 → 返回"导航栈：只存节点 id，返回时按 id 现查，不持有节点对象引用
+const returnToStack = ref<string[]>([])
+
+function editChildNode(childId: string) {
+  const child = nodes.value.find(n => n.id === childId)
+  if (!child) return
+  if (selectedNode.value) returnToStack.value.push(selectedNode.value.id)
+  selectNode(child)
+}
+
+function goBackToParent() {
+  const parentId = returnToStack.value.pop()
+  if (!parentId) return
+  const parent = nodes.value.find(n => n.id === parentId)
+  if (parent) selectNode(parent)
+}
+
+function closeConfigPanel() {
+  selectedNode.value = null
+  returnToStack.value = []
+}
+
+// 画布直接选节点时清空面板内导航栈（返回栈仅由面板"编辑子节点"按钮建立）
+function onCanvasNodeSelect(node: NodeDTO | null) {
+  returnToStack.value = []
+  selectNode(node)
 }
 
 function addWhileCondition() {
@@ -1562,7 +1665,10 @@ async function handleSaveNode() {
     const exitConditions = nodeForm.whileExitConditions
       .filter(c => c.variable !== '')
       .map(c => ({ variable: c.variable, operator: c.operator, value: c.value }))
+    // 浅合并原始 config：未在弹窗表单中的键（node_ids/steps/fail_on_max_* 等）全部保留
+    const base = editingNode.value ? parseRawConfig(editingNode.value.config) : {}
     config = JSON.stringify({
+      ...base,
       exit_conditions: exitConditions,
       interval_seconds: nodeForm.whileIntervalSeconds,
       max_iterations: nodeForm.whileMaxIterations,
@@ -1573,7 +1679,8 @@ async function handleSaveNode() {
   } else if (nodeForm.type === 'sub_flow') {
     config = JSON.stringify(subFlowConfig)
   } else if (nodeForm.type === 'loop') {
-    config = JSON.stringify({ loop_count: nodeForm.loop_count })
+    const base = editingNode.value ? parseRawConfig(editingNode.value.config) : {}
+    config = JSON.stringify({ ...base, loop_count: nodeForm.loop_count })
   }
 
   // Add loop_count for types that support it (except group/timer/while/loop which handle it themselves)
@@ -1740,6 +1847,10 @@ function selectNode(node: NodeDTO | null) {
     whileConfig.max_duration_minutes = cfg.max_duration_minutes || 0
     whileConfig.fail_after_consecutive = cfg.fail_after_consecutive || 0
     whileConfig.fail_message = cfg.fail_message || ''
+    whileConfig.node_ids = Array.isArray(cfg.node_ids) ? cfg.node_ids : []
+    whileConfig.steps = Array.isArray(cfg.steps) ? cfg.steps : []
+    whileConfig.fail_on_max_iterations = cfg.fail_on_max_iterations != null ? !!cfg.fail_on_max_iterations : true
+    whileConfig.fail_on_max_duration = cfg.fail_on_max_duration != null ? !!cfg.fail_on_max_duration : true
     
     parallelConfig.async = cfg.async ?? false
     
@@ -1747,6 +1858,8 @@ function selectNode(node: NodeDTO | null) {
     subFlowConfig.async = cfg.async ?? false
     
     loopConfig.loop_count = cfg.loop_count || 3
+    loopConfig.node_ids = Array.isArray(cfg.node_ids) ? cfg.node_ids : []
+    loopConfig.steps = Array.isArray(cfg.steps) ? cfg.steps : []
     
     if (node.type === 'if-else') {
       const nodeEdges = edges.value.filter(e => e.from_node === node.id)
@@ -1792,6 +1905,15 @@ async function saveNodePosition(id: string, x: number, y: number) {
   await apiUpdateNode({ id, position: JSON.stringify({ x: Math.round(x), y: Math.round(y) }) })
 }
 
+// 解析节点 config JSON 为对象；解析失败或非对象时返回空对象（供浅合并保留未知键）
+function parseRawConfig(raw: string | null | undefined): Record<string, any> {
+  try {
+    const obj = JSON.parse(raw || '{}')
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj
+  } catch { /* ignore */ }
+  return {}
+}
+
 async function saveNodeConfig() {
   if (!selectedNode.value) return
 
@@ -1833,13 +1955,28 @@ async function saveNodeConfig() {
   } else if (nodeType === 'timer') {
     config = JSON.stringify(timerConfig)
   } else if (nodeType === 'while') {
-    config = JSON.stringify(whileConfig)
+    // 基于原始 config 浅合并：表单未覆盖的键（内嵌 steps、fail_on_max_* 等未知键）全部保留，杜绝保存丢字段
+    const base = parseRawConfig(selectedNode.value.config)
+    config = JSON.stringify({
+      ...base,
+      exit_conditions: whileConfig.exit_conditions.filter(c => c.variable !== '').map(c => ({ variable: c.variable, operator: c.operator, value: c.value })),
+      interval_seconds: whileConfig.interval_seconds,
+      max_iterations: whileConfig.max_iterations,
+      max_duration_minutes: whileConfig.max_duration_minutes,
+      fail_after_consecutive: whileConfig.fail_after_consecutive,
+      fail_message: whileConfig.fail_message,
+      fail_on_max_iterations: whileConfig.fail_on_max_iterations,
+      fail_on_max_duration: whileConfig.fail_on_max_duration,
+      node_ids: [...whileConfig.node_ids],
+    })
   } else if (nodeType === 'parallel') {
     config = JSON.stringify(parallelConfig)
   } else if (nodeType === 'sub_flow') {
     config = JSON.stringify(subFlowConfig)
   } else if (nodeType === 'loop') {
-    config = JSON.stringify(loopConfig)
+    // 同 while：浅合并原始 config，保留 steps 及未知键
+    const base = parseRawConfig(selectedNode.value.config)
+    config = JSON.stringify({ ...base, loop_count: loopConfig.loop_count, node_ids: [...loopConfig.node_ids] })
   } else if (nodeType === 'generator') {
     config = JSON.stringify({ expression: generatorConfig.expression, variable: generatorConfig.variable })
   }
@@ -1852,7 +1989,13 @@ async function saveNodeConfig() {
     })
     if (resp.code === 0) {
       showToast('配置已保存')
-      fetchNodes()
+      await fetchNodes()
+      // 按 id 重同步面板节点，避免 selectedNode 持有保存前的陈旧 config（浅合并基准会读到旧值）
+      const currentId = selectedNode.value?.id
+      if (currentId) {
+        const fresh = nodes.value.find(n => n.id === currentId)
+        if (fresh) selectedNode.value = fresh
+      }
     } else {
       showToast(resp.message || '保存失败', 'error')
     }
@@ -2079,6 +2222,16 @@ onMounted(() => {
   border-radius: var(--radius-sm); transition: all 0.2s ease;
 }
 .btn-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* 面板头部：左侧（返回按钮 + 标题）。注意：独立类名，避免与顶栏 .btn-back（← 返回）冲突 */
+.panel-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.btn-panel-back {
+  border: 1px solid var(--border-primary); background: transparent; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; cursor: pointer; flex-shrink: 0;
+  border-radius: var(--radius-sm); transition: all 0.2s ease;
+}
+.btn-panel-back:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0,229,255,0.06); }
 
 /* 无样式图标按钮（用于操作列表中的小按钮） */
 .btn-icon {

@@ -1104,6 +1104,14 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 	return err
 }
 
+// isCompositeType reports whether the node type is a composite node whose
+// children are referenced via config.node_ids (group/while/loop). Composite
+// children are excluded from the main DAG topology and executed by their
+// parent composite node instead.
+func isCompositeType(t string) bool {
+	return t == model.NodeTypeGroup || t == model.NodeTypeWhile || t == model.NodeTypeLoop
+}
+
 func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	dagObj := dag.New()
 	buildLog := r.log.With(
@@ -1117,19 +1125,20 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 
-	// Collect nodes that are referenced as children of any Group node,
-	// so they are NOT added as independent DAG nodes — the Group executes them.
-	// node_ids in YAML may contain either node names or snowflake IDs (depends
-	// on how the scene was imported/saved), so we resolve both to actual Node models.
-	groupChildIDs := make(map[string]bool)        // key = node.Name (for skip check)
-	groupChildRef := make(map[string]*model.Node) // key = raw value from YAML (name or ID) → resolved Node
+	// Collect nodes that are referenced as children of any composite node
+	// (group/while/loop), so they are NOT added as independent DAG nodes —
+	// the composite node executes them. node_ids in YAML may contain either
+	// node names or snowflake IDs (depends on how the scene was
+	// imported/saved), so we resolve both to actual Node models.
+	compositeChildIDs := make(map[string]bool)        // key = node.Name (for skip check)
+	compositeChildRef := make(map[string]*model.Node) // key = raw value from YAML (name or ID) → resolved Node
 	for _, n := range nodeList {
-		if n.Type == model.NodeTypeGroup {
-			var gcfg struct {
+		if isCompositeType(n.Type) {
+			var ccfg struct {
 				NodeIDs []string `json:"node_ids"`
 			}
-			if json.Unmarshal([]byte(n.Config), &gcfg) == nil {
-				for _, ref := range gcfg.NodeIDs {
+			if json.Unmarshal([]byte(n.Config), &ccfg) == nil {
+				for _, ref := range ccfg.NodeIDs {
 					// Resolve ref → actual Node: try name first, then ID
 					var child *model.Node
 					for _, cn := range nodeList {
@@ -1139,32 +1148,34 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 						}
 					}
 					if child != nil {
-						groupChildIDs[child.Name] = true
-						groupChildRef[ref] = child
+						compositeChildIDs[child.Name] = true
+						compositeChildRef[ref] = child
 					} else {
-						buildLog.Warn("group child reference could not be resolved",
-							logger.F("group_name", n.Name),
+						buildLog.Warn("composite child reference could not be resolved",
+							logger.F("node_name", n.Name),
+							logger.F("node_type", n.Type),
 							logger.F("ref", ref))
 					}
 				}
 			}
 		}
 	}
-	if len(groupChildIDs) > 0 {
-		names := make([]string, 0, len(groupChildIDs))
-		for name := range groupChildIDs {
+	if len(compositeChildIDs) > 0 {
+		names := make([]string, 0, len(compositeChildIDs))
+		for name := range compositeChildIDs {
 			names = append(names, name)
 		}
-		buildLog.Debug("excluding group child nodes from DAG",
+		buildLog.Debug("excluding composite child nodes from DAG",
 			logger.F("excluded_nodes", names))
 	}
 
 	nodeMap := make(map[string]snowflake.ID)
 	dagNodeMap := make(map[string]string) // nodeID → nodeName, for diagnostics
 	for _, n := range nodeList {
-		// Skip Group child nodes — they are executed by their parent Group, not by the DAG directly.
-		if groupChildIDs[n.Name] {
-			buildLog.Debug("skipping group child node from DAG",
+		// Skip composite child nodes — they are executed by their parent
+		// composite node (group/while/loop), not by the DAG directly.
+		if compositeChildIDs[n.Name] {
+			buildLog.Debug("skipping composite child node from DAG",
 				logger.F("node_id", n.ID.String()),
 				logger.F("node_name", n.Name),
 				logger.F("node_type", n.Type))
@@ -1224,11 +1235,13 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		}
 	}
 
-	// Resolve Group node children: look up child nodes by name from nodeList
-	// (not from DAG, since Group children are intentionally excluded from DAG topology)
-	// and build sceneNode instances for them.
+	// Resolve composite node (group/while/loop) children: look up child nodes
+	// by name/ID from nodeList (not from DAG, since composite children are
+	// intentionally excluded from DAG topology) and build sceneNode instances
+	// for them. Composite children nested inside a group (e.g. a while node
+	// selected as a group child) get their own children resolved recursively.
 	for _, n := range nodeList {
-		if n.Type != model.NodeTypeGroup {
+		if !isCompositeType(n.Type) {
 			continue
 		}
 		var cfg struct {
@@ -1236,69 +1249,52 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 			LoopCount int      `json:"loop_count"`
 		}
 		if err := json.Unmarshal([]byte(n.Config), &cfg); err != nil {
-			buildLog.Error("failed to parse group node config",
+			buildLog.Error("failed to parse composite node config",
 				logger.F("node_id", n.ID.String()),
 				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
 				logger.F("error", err))
-			return nil, fmt.Errorf("parse group node %s config: %w", n.ID, err)
+			return nil, fmt.Errorf("parse %s node %s config: %w", n.Type, n.ID, err)
 		}
-		groupNode, ok := dagObj.Node(n.ID.String())
+		compositeDagNode, ok := dagObj.Node(n.ID.String())
 		if !ok {
+			// This composite node is itself a child of another composite
+			// node; its children are resolved recursively when the parent
+			// mounts it (see buildCompositeChildSN).
 			continue
 		}
-		sn, ok := groupNode.(*sceneNode)
+		sn, ok := compositeDagNode.(*sceneNode)
 		if !ok {
 			continue
 		}
 		for _, childRef := range cfg.NodeIDs {
 			// Use pre-resolved reference (supports both name and ID as ref)
-			childModel := groupChildRef[childRef]
+			childModel := compositeChildRef[childRef]
 			if childModel == nil {
-				buildLog.Error("group node references non-existent child",
-					logger.F("group_node_id", n.ID.String()),
-					logger.F("group_name", n.Name),
+				buildLog.Error("composite node references non-existent child",
+					logger.F("node_id", n.ID.String()),
+					logger.F("node_name", n.Name),
+					logger.F("node_type", n.Type),
 					logger.F("child_ref", childRef))
-				return nil, fmt.Errorf("group node %s references non-existent child %s", n.ID, childRef)
+				return nil, fmt.Errorf("%s node %s references non-existent child %s", n.Type, n.ID, childRef)
 			}
-			// Build sceneNode for this child (same as buildDAGNode but not added to DAG)
-			childStatKey := childModel.ID.String()
-			if _, exists := r.nodeStats[childStatKey]; !exists {
-				r.nodeStats[childStatKey] = NewNodeStats(10000)
-			}
-			childSN := &sceneNode{
-				id:            childModel.ID.String(),
-				name:          childModel.Name,
-				nodeType:      childModel.Type,
-				config:        childModel.Config,
-				loopCount:     childModel.LoopCount,
-				mode:          dag.ExecSync,
-				stats:         r.stats,
-				httpOnlyStats: r.httpOnlyStats,
-				nodeStats:     r.nodeStats[childStatKey],
-				log:           r.log,
-				traceID:       r.runID.String(),
-			}
-			if childSN.loopCount <= 0 {
-				childSN.loopCount = 1
-			}
-			// Validate: Group cannot contain another Group
-			if childModel.Type == model.NodeTypeGroup {
-				buildLog.Error("group node cannot contain another group",
-					logger.F("group_node_id", n.ID.String()),
-					logger.F("child_ref", childRef))
-				return nil, fmt.Errorf("group node %s cannot contain group child %s", n.ID, childRef)
+			childSN, buildErr := r.buildCompositeChildSN(buildLog, compositeChildRef, n, childModel)
+			if buildErr != nil {
+				return nil, buildErr
 			}
 			sn.childNodes = append(sn.childNodes, childSN)
-			buildLog.Debug("resolved group child",
-				logger.F("group_name", n.Name),
+			buildLog.Debug("resolved composite child",
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
 				logger.F("child_ref", childRef),
 				logger.F("child_name", childModel.Name),
 				logger.F("child_id", childModel.ID.String()),
 				logger.F("child_type", childModel.Type))
 		}
 		if len(sn.childNodes) > 0 {
-			buildLog.Info("group node resolved",
-				logger.F("group_name", n.Name),
+			buildLog.Info("composite node resolved",
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
 				logger.F("child_count", len(sn.childNodes)),
 				logger.F("loop_count", cfg.LoopCount))
 		}
@@ -1310,6 +1306,93 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		logger.F("dag_nodes", dagNodeMap))
 
 	return dagObj, nil
+}
+
+// buildCompositeChildSN builds a sceneNode for a node referenced as a child of
+// a composite node (group/while/loop). The sceneNode is NOT added to the DAG —
+// the parent composite executes it. When the child is itself composite (a
+// while/loop nested inside a group), its own node_ids children are resolved
+// recursively, subject to the same nesting rules.
+func (r *Runner) buildCompositeChildSN(buildLog logger.Logger, refMap map[string]*model.Node, parent *model.Node, childModel *model.Node) (*sceneNode, error) {
+	// Nesting validation: group cannot contain another group (existing rule);
+	// while/loop cannot contain composite nodes at all (composite types are
+	// not allowed inside a loop body).
+	if parent.Type == model.NodeTypeGroup && childModel.Type == model.NodeTypeGroup {
+		buildLog.Error("group node cannot contain another group",
+			logger.F("group_node_id", parent.ID.String()),
+			logger.F("child_name", childModel.Name))
+		return nil, fmt.Errorf("group node %s cannot contain group child %s", parent.ID, childModel.Name)
+	}
+	if parent.Type != model.NodeTypeGroup && isCompositeType(childModel.Type) {
+		buildLog.Error("while/loop node cannot contain composite child",
+			logger.F("node_id", parent.ID.String()),
+			logger.F("node_type", parent.Type),
+			logger.F("child_name", childModel.Name),
+			logger.F("child_type", childModel.Type))
+		return nil, fmt.Errorf("%s node %s cannot contain %s child %s", parent.Type, parent.ID, childModel.Type, childModel.Name)
+	}
+
+	childStatKey := childModel.ID.String()
+	if _, exists := r.nodeStats[childStatKey]; !exists {
+		r.nodeStats[childStatKey] = NewNodeStats(10000)
+	}
+	childSN := &sceneNode{
+		id:            childModel.ID.String(),
+		name:          childModel.Name,
+		nodeType:      childModel.Type,
+		config:        childModel.Config,
+		loopCount:     childModel.LoopCount,
+		mode:          dag.ExecSync,
+		stats:         r.stats,
+		httpOnlyStats: r.httpOnlyStats,
+		nodeStats:     r.nodeStats[childStatKey],
+		log:           r.log,
+		traceID:       r.runID.String(),
+	}
+	if childSN.loopCount <= 0 {
+		childSN.loopCount = 1
+	}
+
+	// Recursively resolve the child's own children when it is composite
+	// (e.g. a while/loop node nested inside a group). Recursion is bounded:
+	// while/loop may not contain composite children, so nesting depth is at
+	// most group → while/loop → plain nodes.
+	if isCompositeType(childModel.Type) {
+		var ccfg struct {
+			NodeIDs []string `json:"node_ids"`
+		}
+		if err := json.Unmarshal([]byte(childModel.Config), &ccfg); err != nil {
+			buildLog.Error("failed to parse composite child node config",
+				logger.F("node_id", childModel.ID.String()),
+				logger.F("node_name", childModel.Name),
+				logger.F("node_type", childModel.Type),
+				logger.F("error", err))
+			return nil, fmt.Errorf("parse %s node %s config: %w", childModel.Type, childModel.ID, err)
+		}
+		for _, ref := range ccfg.NodeIDs {
+			grandChildModel := refMap[ref]
+			if grandChildModel == nil {
+				buildLog.Error("composite node references non-existent child",
+					logger.F("node_id", childModel.ID.String()),
+					logger.F("node_name", childModel.Name),
+					logger.F("node_type", childModel.Type),
+					logger.F("child_ref", ref))
+				return nil, fmt.Errorf("%s node %s references non-existent child %s", childModel.Type, childModel.ID, ref)
+			}
+			grandChildSN, err := r.buildCompositeChildSN(buildLog, refMap, childModel, grandChildModel)
+			if err != nil {
+				return nil, err
+			}
+			childSN.childNodes = append(childSN.childNodes, grandChildSN)
+			buildLog.Debug("resolved nested composite child",
+				logger.F("parent_name", childModel.Name),
+				logger.F("child_ref", ref),
+				logger.F("child_name", grandChildModel.Name),
+				logger.F("child_id", grandChildModel.ID.String()),
+				logger.F("child_type", grandChildModel.Type))
+		}
+	}
+	return childSN, nil
 }
 
 type sceneNode struct {
@@ -2201,6 +2284,70 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
 }
 
+// childChainResult carries the outcome of one pass of runChildChain.
+type childChainResult struct {
+	// LastOutput is the output of the last executed child step (may be nil).
+	LastOutput *dag.Output
+	// FirstSoftErr is the first child soft failure (failure reported via
+	// Output.Error without aborting the chain), nil when all children
+	// succeeded.
+	FirstSoftErr error
+}
+
+// runChildChain executes the composite node's child nodes sequentially for
+// one pass. It is shared by group/while/loop composite execution.
+//
+// Variable freshness: after each child step, input.Variables is refreshed
+// from the executor's shared variable scope via SnapshotVariables(), so
+// variables extracted by one child (via SetVariable) are immediately visible
+// to the next child and — for while/loop — to exit-condition evaluation.
+// Without the refresh, children would keep reading the stale snapshot taken
+// when the parent composite node's input was built.
+//
+// A non-nil return error is a hard failure that aborts the whole chain.
+func (n *sceneNode) runChildChain(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (childChainResult, error) {
+	var res childChainResult
+	for _, child := range n.childNodes {
+		select {
+		case <-ctx.Done():
+			nodeLog.Error("child chain execution cancelled by context",
+				logger.F("error", ctx.Err()),
+				logger.F("child_id", child.ID()))
+			return res, fmt.Errorf("child chain cancelled: %w", ctx.Err())
+		default:
+		}
+
+		childLoopCount := child.LoopCount()
+		if childLoopCount <= 0 {
+			childLoopCount = 1
+		}
+
+		for j := 0; j < childLoopCount; j++ {
+			output, err := child.Execute(ctx, input)
+			if err != nil {
+				nodeLog.Error("child execution failed",
+					logger.F("child_id", child.ID()),
+					logger.F("error", err),
+				)
+				return res, fmt.Errorf("child %s: %w", child.ID(), err)
+			}
+			// Soft failure: the child reports failure via Output.Error while
+			// the chain continues executing its remaining children. Keep the
+			// first one so the span and stats reflect the real outcome.
+			if output != nil && output.Error != nil && res.FirstSoftErr == nil {
+				res.FirstSoftErr = output.Error
+			}
+			res.LastOutput = output
+			// Refresh variables so later children (and loop exit conditions)
+			// see values extracted by earlier children.
+			if input != nil && input.Executor != nil {
+				input.Variables = input.Executor.SnapshotVariables()
+			}
+		}
+	}
+	return res, nil
+}
+
 func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
 		NodeIDs   []string `json:"node_ids"`
@@ -2241,42 +2388,14 @@ func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog 
 				logger.F("iteration", i+1),
 				logger.F("total", loopCount))
 		}
-		for _, child := range n.childNodes {
-			select {
-			case <-ctx.Done():
-				nodeLog.Error("group execution cancelled by context",
-					logger.F("error", ctx.Err()),
-					logger.F("loop", i),
-					logger.F("child_id", child.ID()))
-				return nil, fmt.Errorf("group execution cancelled: %w", ctx.Err())
-			default:
-			}
-
-			childLoopCount := child.LoopCount()
-			if childLoopCount <= 0 {
-				childLoopCount = 1
-			}
-
-			for j := 0; j < childLoopCount; j++ {
-				output, err := child.Execute(ctx, input)
-				if err != nil {
-					nodeLog.Error("group child execution failed",
-						logger.F("child_id", child.ID()),
-						logger.F("loop", i),
-						logger.F("error", err),
-					)
-					return nil, fmt.Errorf("group child %s loop %d: %w", child.ID(), i, err)
-				}
-				// Soft failure: the child reports failure via Output.Error
-				// (swallowed assertion, non-2xx status) while the group
-				// continues executing its remaining children. Keep the
-				// first one so the span and stats reflect the real outcome.
-				if output != nil && output.Error != nil && firstChildSoftErr == nil {
-					firstChildSoftErr = output.Error
-				}
-				lastOutput = output
-			}
+		res, err := n.runChildChain(ctx, input, nodeLog)
+		if err != nil {
+			return nil, err
 		}
+		if res.FirstSoftErr != nil && firstChildSoftErr == nil {
+			firstChildSoftErr = res.FirstSoftErr
+		}
+		lastOutput = res.LastOutput
 	}
 
 	if n.nodeStats != nil {

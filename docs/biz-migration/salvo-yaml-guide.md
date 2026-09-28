@@ -339,11 +339,24 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 | `timer` | 定时器 | 延迟/间隔触发 |
 | `condition` | 条件判断 | 单纯条件求值 |
 | `if-else` | 条件分支 | 二选一路径 |
-| `group` | 分组 | 子节点循环 |
-| `while` | 循环(条件退出) | 轮询充电状态 |
-| `loop` | 循环(固定次数) | 批量执行 |
+| `group` | 分组(复合节点) | 子节点循环 |
+| `while` | 循环(条件退出，复合节点) | 轮询充电状态 |
+| `loop` | 循环(固定次数，复合节点) | 批量执行 |
 | `parallel` | 并行 | 并发请求 |
 | `sub_flow` | 子流程 | 嵌套场景调用 |
+
+**复合节点与子节点引用模型**（group / while / loop）：
+
+三类复合节点统一使用 `config.node_ids` 引用场景内**真实节点**作为子节点：
+
+- 子节点在 `nodes` 中正常定义（有自己的 name/type/config），复合节点通过 `node_ids` 按名字或 ID 引用
+- 被引用的子节点从主 DAG 拓扑中排除，由复合节点按 `node_ids` 顺序执行
+- 嵌套规则：group 可包含 while/loop；**group 不能包含 group；while/loop 不能包含任何复合节点**（导入时校验，违反报 400）
+- while/loop 兼容旧版 `config.steps` 内嵌步骤写法（见 4.9/4.10）：**`node_ids` 引用子节点优先生效**，同时配置时 `steps` 不执行
+- GUI 行为：`node_ids` 子节点可在面板勾选/排序/编辑属性（它们是真实节点）；`steps` 内嵌步骤仅保留（面板显示计数提示，画布在有子节点时不显示），修改只能通过导出 YAML → 编辑 → 再导入
+- 导入时 `node_ids` 自动从名称解析为节点 ID，导出时自动转回名称（名字和 ID 均可写）
+
+> 注意：`parallel` 和 `sub_flow` **不是**复合节点——parallel 只有内嵌 `steps` 写法（无 node_ids），sub_flow 引用的是另一个场景而非子节点。
 
 ### 4.1 http HTTP 请求节点
 
@@ -701,7 +714,7 @@ nodes:
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `node_ids` | 是 | 子节点名称列表 |
+| `node_ids` | 是 | 子节点名称列表（也可写节点 ID） |
 | `loop_count` | 否 | 循环次数，默认 1 |
 | `async` | 否 | 是否异步执行，默认 false |
 
@@ -709,6 +722,8 @@ nodes:
 - 子节点在 `nodes` 中正常定义，group 通过 `node_ids` 引用
 - `async: true` 时子节点在后台执行，group 立即返回
 - 导入时会自动将 `node_ids` 从名称解析为节点 ID
+- 嵌套规则：group 可包含普通节点和 while/loop；**不能包含 group**
+- 子节点软失败（如断言失败）不中断子链，首个软失败上浮记录到 group 的执行结果；每步执行后刷新变量快照，子节点的 extract 对后续子节点可见
 
 参考实现：[runner.go#L1783-L1859]($PROJECT_HOME/salvo/internal/runner/runner.go#L1783-L1859)
 
@@ -716,7 +731,35 @@ nodes:
 
 ### 4.9 while 循环节点
 
-条件退出循环，常用于轮询场景。
+条件退出循环，常用于轮询场景。**推荐用 `node_ids` 引用场景内真实节点作为循环体**（复合节点统一模型，可在 GUI 面板勾选/排序/编辑子节点）：
+
+```yaml
+nodes:
+  - name: 查询充电状态
+    type: http
+    config:
+      method: POST
+      url: "${base_url}/charge/status"
+      headers: { Authorization: "${token}" }
+      body: '{"seq":"${start_charge_seq}"}'
+      extract:
+        - variable: charging_status
+          path: "$.result.status"
+
+  - name: 轮询充电状态
+    type: while
+    config:
+      exit_conditions:             # 退出条件(任一满足即退出)
+        - variable: charging_status
+          operator: equals
+          value: "4"
+      interval_seconds: 30         # 每轮间隔(秒)
+      max_iterations: 100          # 最大迭代次数
+      node_ids:                    # 循环体：引用子节点(按顺序执行)
+        - 查询充电状态
+```
+
+也兼容旧版 `config.steps` 内嵌步骤写法（子步骤定义在 while 自己的 config 里，不是场景节点，GUI 不可编辑）。**两种写法同时配置时 `node_ids` 优先生效，`steps` 不执行**：
 
 ```yaml
 - name: 轮询充电状态
@@ -731,7 +774,7 @@ nodes:
     max_duration_minutes: 60     # 最大持续时间(分钟)
     fail_after_consecutive: 10   # 连续失败 N 次则失败
     fail_message: "启动超时"
-    steps:                       # 循环体内步骤
+    steps:                       # 循环体内步骤(内嵌写法)
       - name: 查询充电状态
         request:
           method: POST
@@ -790,6 +833,7 @@ nodes:
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | `exit_conditions` | 是 | 退出条件列表 |
+| `node_ids` | 否 | 引用子节点列表（推荐写法，与 `steps` 二选一，同时存在时优先生效）。子节点不能是复合节点（group/while/loop） |
 | `interval_seconds` | 否 | 每轮间隔秒数 |
 | `max_iterations` | 否 | 最大迭代次数 |
 | `max_duration_minutes` | 否 | 最大持续分钟数 |
@@ -797,7 +841,12 @@ nodes:
 | `fail_on_max_duration` | 否 | 达到最大持续时间时是否视为失败，默认 `true`。设为 `false` 则视为成功退出 |
 | `fail_after_consecutive` | 否 | 连续失败次数阈值 |
 | `fail_message` | 否 | 失败消息 |
-| `steps` | 是 | 循环体步骤列表 |
+| `steps` | 否 | 内嵌循环体步骤列表（兜底写法，GUI 不可编辑） |
+
+**node_ids 模式执行语义**（与 group 一致）：
+- 每轮按 `node_ids` 顺序执行子节点链，每步执行后刷新变量快照（子节点的 extract 立即对后续子节点和退出条件可见）
+- 退出条件在每轮结束后用**刷新后的变量**评估
+- 子节点软失败不中断循环，首个软失败上浮记录到 while 的执行结果
 
 **step 字段**：
 
@@ -862,7 +911,28 @@ nodes:
 
 ### 4.10 loop 循环节点
 
-固定次数循环，与 while 的区别是**无退出条件**，固定循环 N 次。
+固定次数循环，与 while 的区别是**无退出条件**，固定循环 N 次。与 while 一样支持两种循环体写法：**推荐 `node_ids` 引用子节点**（复合节点统一模型，GUI 可勾选/排序/编辑），兼容 `steps` 内嵌写法（同时配置时 `node_ids` 优先生效）。
+
+```yaml
+nodes:
+  - name: 生成订单ID
+    type: http
+    config:
+      method: GET
+      url: "${base_url}/gen-id"
+      extract:
+        - variable: order_id
+          path: "$.data.id"
+
+  - name: 批量创建订单
+    type: loop
+    config:
+      loop_count: 5               # 循环 5 次
+      node_ids:                   # 引用子节点(按顺序执行)
+        - 生成订单ID
+```
+
+内嵌写法示例：
 
 ```yaml
 - name: 批量创建订单
@@ -889,8 +959,11 @@ nodes:
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `loop_count` | 是 | 循环次数 |
-| `steps` | 是 | 步骤列表(语法同 while) |
+| `loop_count` | 是 | 循环次数（node_ids 模式下省略时默认 1） |
+| `node_ids` | 否 | 引用子节点列表（推荐写法，与 `steps` 二选一，同时存在时优先生效）。子节点不能是复合节点（group/while/loop） |
+| `steps` | 否 | 内嵌步骤列表（兜底写法，语法同 while，GUI 不可编辑） |
+
+node_ids 模式执行语义与 group/while 一致：按顺序执行子节点链、每步刷新变量快照、子节点软失败不中断且首个上浮。
 
 参考实现：[loop_node.go#L1-L100]($PROJECT_HOME/salvo/internal/runner/loop_node.go#L1-L100)
 
@@ -899,6 +972,8 @@ nodes:
 ### 4.11 parallel 并行节点
 
 多个步骤并发执行，提取的变量合并回主作用域。
+
+> **注意**：parallel **不是复合节点**——只支持 `config.steps` 内嵌写法，没有 `node_ids` 引用模式（GUI 不可编辑步骤，修改只能通过导出 YAML → 编辑 → 再导入）。
 
 ```yaml
 - name: 并行查询用户和订单
@@ -1750,8 +1825,8 @@ edges:
 | `condition` | `expr` | 条件求值 |
 | `if-else` | `expr` + 边条件 | 二分支 |
 | `group` | `node_ids,loop_count` | 子流程循环 |
-| `while` | `exit_conditions,steps` | 条件循环 |
-| `loop` | `loop_count,steps` | 定数循环 |
+| `while` | `exit_conditions,node_ids`（兼容 `steps`） | 条件循环 |
+| `loop` | `loop_count,node_ids`（兼容 `steps`） | 定数循环 |
 | `parallel` | `steps` | 并发执行 |
 | `sub_flow` | `scene_id` | 嵌套场景 |
 

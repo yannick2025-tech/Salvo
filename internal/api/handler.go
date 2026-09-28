@@ -258,11 +258,13 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	// scene behind (the import dialog allows retrying, and each retry
 	// used to create another scene row with the same name).
 	nodeNames := make(map[string]bool, len(allNodes))
+	nodeTypes := make(map[string]string, len(allNodes))
 	for _, item := range allNodes {
 		if err := validateNodeName(item.yn.Name); err != nil {
 			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", item.yn.Name, err))
 		}
 		nodeNames[item.yn.Name] = true
+		nodeTypes[item.yn.Name] = item.yn.Type
 	}
 	for _, yds := range ys.DataSources {
 		if yds.Name == "" {
@@ -270,17 +272,27 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		}
 	}
 	for _, item := range allNodes {
-		if item.yn.Type != model.NodeTypeGroup {
+		if !isCompositeNodeType(item.yn.Type) {
 			continue
 		}
 		childRefs, _ := item.yn.Config["node_ids"].([]any)
 		for _, nameVal := range childRefs {
 			child, ok := nameVal.(string)
 			if !ok {
-				return dto.ErrorResp(400, fmt.Sprintf("group node %q: node_ids must be strings", item.yn.Name))
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: node_ids must be strings", item.yn.Type, item.yn.Name))
 			}
 			if !nodeNames[child] {
-				return dto.ErrorResp(400, fmt.Sprintf("group node %q: child node %q not found", item.yn.Name, child))
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: child node %q not found", item.yn.Type, item.yn.Name, child))
+			}
+			// Nesting rules (aligned with buildDAG/buildCompositeChildSN):
+			// group cannot contain another group; while/loop cannot contain
+			// any composite node (group/while/loop).
+			childType := nodeTypes[child]
+			if item.yn.Type == model.NodeTypeGroup && childType == model.NodeTypeGroup {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: cannot contain another group node %q", item.yn.Name, child))
+			}
+			if item.yn.Type != model.NodeTypeGroup && isCompositeNodeType(childType) {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: cannot contain composite child %q (type %s)", item.yn.Type, item.yn.Name, child, childType))
 			}
 		}
 	}
@@ -370,11 +382,11 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		nodeNameToID[yn.Name] = node.ID
 	}
 
-	// Resolve group node_ids from names to IDs.
-	// Group config stores node_ids as string IDs; in YAML they are node names.
+	// Resolve composite node (group/while/loop) node_ids from names to IDs.
+	// Composite config stores node_ids as string IDs; in YAML they are node names.
 	for _, item := range allNodes {
 		yn := item.yn
-		if yn.Type != model.NodeTypeGroup {
+		if !isCompositeNodeType(yn.Type) {
 			continue
 		}
 		nodeID, ok := nodeNameToID[yn.Name]
@@ -386,11 +398,11 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		for _, nameVal := range nodeNames {
 			name, ok := nameVal.(string)
 			if !ok {
-				return dto.ErrorResp(400, fmt.Sprintf("group node %q: node_ids must be strings", yn.Name))
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: node_ids must be strings", yn.Type, yn.Name))
 			}
 			childID, ok := nodeNameToID[name]
 			if !ok {
-				return dto.ErrorResp(400, fmt.Sprintf("group node %q: child node %q not found", yn.Name, name))
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: child node %q not found", yn.Type, yn.Name, name))
 			}
 			resolvedIDs = append(resolvedIDs, childID.String())
 		}
@@ -399,12 +411,12 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		node, err := h.nodes.GetByID(r.Context(), nodeID)
 		if err != nil {
 			h.rollbackImport(r.Context(), scene.ID)
-			return h.internalErr(fmt.Sprintf("get group node %s", yn.Name), err)
+			return h.internalErr(fmt.Sprintf("get %s node %s", yn.Type, yn.Name), err)
 		}
 		node.Config = string(configBytes)
 		if err := h.nodes.Update(r.Context(), node); err != nil {
 			h.rollbackImport(r.Context(), scene.ID)
-			return h.internalErr(fmt.Sprintf("update group node %s", yn.Name), err)
+			return h.internalErr(fmt.Sprintf("update %s node %s", yn.Type, yn.Name), err)
 		}
 	}
 
@@ -667,6 +679,13 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 	var yamlSetup []yamlNode
 	var yamlTeardown []yamlNode
 	nodeNameMap := make(map[string]*model.Node)
+	// nodeIDNameMap resolves snowflake ID → node name so that composite
+	// node_ids can be exported as names (import validation matches by name,
+	// so exporting raw IDs would break the export→import round trip).
+	nodeIDNameMap := make(map[string]string, len(nodes))
+	for _, n := range nodes {
+		nodeIDNameMap[n.ID.String()] = n.Name
+	}
 
 	for _, n := range nodes {
 		nodeNameMap[n.Name] = n
@@ -716,6 +735,33 @@ func (h *Handler) ExportYAML(r *http.Request) dto.Response {
 				case "timed_trigger":
 					if s, ok := v.(string); ok {
 						yn.TimedTrigger = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "node_ids":
+					// Composite nodes (group/while/loop) store child refs as
+					// snowflake IDs; convert them back to node names so the
+					// exported YAML re-imports cleanly (import validates by
+					// name). Values already stored as names pass through;
+					// unresolvable values are kept as-is.
+					if isCompositeNodeType(n.Type) {
+						if refs, ok := v.([]any); ok {
+							namedRefs := make([]string, 0, len(refs))
+							for _, rv := range refs {
+								ref, ok := rv.(string)
+								if !ok {
+									continue
+								}
+								if name, ok := nodeIDNameMap[ref]; ok {
+									namedRefs = append(namedRefs, name)
+								} else {
+									namedRefs = append(namedRefs, ref)
+								}
+							}
+							extraConfig[k] = namedRefs
+						} else {
+							extraConfig[k] = v
+						}
 					} else {
 						extraConfig[k] = v
 					}
@@ -856,6 +902,14 @@ func validateNodeName(name string) error {
 		return fmt.Errorf("node name contains invalid characters")
 	}
 	return nil
+}
+
+// isCompositeNodeType reports whether the node type is a composite node whose
+// children are referenced via config.node_ids (group/while/loop). Used by YAML
+// import validation and name→ID resolution, which apply the same rules as the
+// runner's buildDAG composite handling.
+func isCompositeNodeType(t string) bool {
+	return t == model.NodeTypeGroup || t == model.NodeTypeWhile || t == model.NodeTypeLoop
 }
 
 func (h *Handler) AddNode(r *http.Request) dto.Response {

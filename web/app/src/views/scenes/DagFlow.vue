@@ -327,6 +327,15 @@ function getNodeDimensions(n: NodeDTO): { width: number; height: number } {
       // header (56) + children area (each child ~40px + 22px arrow) + padding
       return { width: 320, height: DEFAULT_H + childCount * 62 + 24 }
     }
+    // while/loop 引用子节点：高度按 node_ids 子节点数计算（while 与内嵌 steps 取较大者）
+    if ((n.type === 'while' || n.type === 'loop') && Array.isArray(cfg.node_ids) && cfg.node_ids.length > 0) {
+      const childH = DEFAULT_H + cfg.node_ids.length * 62 + 24
+      if (n.type === 'while' && Array.isArray(cfg.steps)) {
+        const stepH = DEFAULT_H + cfg.steps.length * 62 + 54
+        return { width: 300, height: Math.max(childH, stepH) }
+      }
+      return { width: 300, height: childH }
+    }
     if (n.type === 'while' && cfg.steps && Array.isArray(cfg.steps)) {
       const stepCount = cfg.steps.length
       // header (56) + loop indicator (30) + steps (each step ~40px + 22px arrow) + padding
@@ -395,7 +404,8 @@ async function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
     try {
       const cfg = JSON.parse(n.config || '{}')
       loopCount = cfg.loop_count || 1
-      if (n.type === 'group' && cfg.node_ids && Array.isArray(cfg.node_ids)) {
+      // 三类复合节点统一：config.node_ids 引用子节点 → 反查 NodeDTO 挂 childNodes（与 group 既有逻辑一致）
+      if ((n.type === 'group' || n.type === 'while' || n.type === 'loop') && Array.isArray(cfg.node_ids)) {
         const childIdSet = new Set(cfg.node_ids as string[])
         const childMap = new Map(newNodes.filter(cn => childIdSet.has(cn.id)).map(cn => [cn.id, cn]))
         childNodes = (cfg.node_ids as string[]).map(id => childMap.get(id)).filter(Boolean) as NodeDTO[]
@@ -414,7 +424,7 @@ async function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       originalNode: n,
     }
 
-    if (n.type === 'group') {
+    if (n.type === 'group' || n.type === 'while' || n.type === 'loop') {
       baseData.childNodes = childNodes
     }
     if (n.type === 'while') {

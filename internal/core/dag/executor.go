@@ -446,3 +446,18 @@ func (e *Executor) SetVariable(key string, value any) {
 	e.initialVars[key] = value
 	e.varsMu.Unlock()
 }
+
+// SnapshotVariables returns a copy of the current shared variables.
+// Composite nodes (group/while/loop) refresh the input variable map from
+// this snapshot after each child step so that variables extracted by one
+// child (via SetVariable) are immediately visible to the next child and
+// to loop exit conditions.
+func (e *Executor) SnapshotVariables() map[string]any {
+	e.varsMu.Lock()
+	defer e.varsMu.Unlock()
+	vars := make(map[string]any, len(e.initialVars))
+	for k, v := range e.initialVars {
+		vars[k] = v
+	}
+	return vars
+}
