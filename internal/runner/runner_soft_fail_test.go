@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,52 @@ func TestExecuteHTTP_AssertionHardFail(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, out)
 	assert.Contains(t, err.Error(), "errorCode")
+}
+
+// TestExecuteHTTP_AssertionFailRecordsFailureDetails verifies that an
+// expect_body failure on an HTTP 200 response lands in failedNodes (the
+// data source of the report's failure-record section) with full
+// request/response context — for both soft and block_on_error modes.
+func TestExecuteHTTP_AssertionFailRecordsFailureDetails(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028, "msg": "biz error"}`))
+	}))
+	defer ts.Close()
+
+	run := func(blockOnError bool) []FailedNodeDetail {
+		var failed []FailedNodeDetail
+		var mu sync.Mutex
+		node := newHTTPTestNode(
+			`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+			blockOnError, nil,
+		)
+		node.failedNodes = &failed
+		node.failedNodesMu = &mu
+		_, _ = node.Execute(context.Background(), &dag.Input{})
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]FailedNodeDetail(nil), failed...)
+	}
+
+	t.Run("soft", func(t *testing.T) {
+		details := run(false)
+		require.Len(t, details, 1, "assertion failure must appear in failure records")
+		assert.Equal(t, "ASSERT-FAIL", details[0].ErrorCode)
+		assert.Contains(t, details[0].ErrorMessage, "errorCode")
+		assert.Equal(t, 200, details[0].ResponseStatus)
+		assert.Contains(t, details[0].ResponseBody, "50028")
+		assert.Equal(t, "POST", details[0].RequestMethod)
+		assert.Contains(t, details[0].RequestURL, ts.URL)
+	})
+
+	t.Run("block_on_error", func(t *testing.T) {
+		details := run(true)
+		require.Len(t, details, 1, "hard assertion failure must appear in failure records")
+		assert.Equal(t, "ASSERT-FAIL", details[0].ErrorCode)
+		assert.Equal(t, 200, details[0].ResponseStatus)
+		assert.Contains(t, details[0].ResponseBody, "50028")
+	})
 }
 
 // TestExecuteHTTP_Non2xxSoftFailCarriesError verifies that a non-2xx response

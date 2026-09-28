@@ -1347,21 +1347,25 @@ func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 func (n *sceneNode) BlockOnError() bool     { return n.blockOnError }
 
-// recordFailedNode records detailed information about a failed node execution
+// recordFailedNode records detailed information about a failed node execution.
+// errCode overrides the derived error code when non-empty (e.g. "ASSERT-FAIL"
+// for expect_body failures on HTTP 2xx responses).
 func (n *sceneNode) recordFailedNode(method, url string, reqHeaders map[string]string, reqBody string,
-	respStatus int, respHeaders map[string][]string, respBody string, errMsg string) {
+	respStatus int, respHeaders map[string][]string, respBody string, errMsg string, errCode string) {
 	if n.failedNodes == nil || n.failedNodesMu == nil {
 		return
 	}
 
 	// Derive error code from response status or error message
-	errorCode := ""
-	if respStatus > 0 {
-		errorCode = fmt.Sprintf("%d", respStatus)
-	} else if strings.Contains(errMsg, "timeout") {
-		errorCode = "timeout"
-	} else if strings.Contains(errMsg, "connection refused") {
-		errorCode = "connection_refused"
+	errorCode := errCode
+	if errorCode == "" {
+		if respStatus > 0 {
+			errorCode = fmt.Sprintf("%d", respStatus)
+		} else if strings.Contains(errMsg, "timeout") {
+			errorCode = "timeout"
+		} else if strings.Contains(errMsg, "connection refused") {
+			errorCode = "connection_refused"
+		}
 	}
 
 	detail := FailedNodeDetail{
@@ -1538,7 +1542,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	// Soft-failure errors (block_on_error=false): carried on the output so
 	// downstream nodes keep executing while the trace span marks failure.
 	var assertionErr error // first expect_body assertion failure
-	var non2xxErr string  // non-2xx HTTP status when not blocking
+	var non2xxErr string   // non-2xx HTTP status when not blocking
 
 	var cfg struct {
 		Method     string            `json:"method"`
@@ -1736,7 +1740,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		}
 
 		// Record failed node details
-		n.recordFailedNode(method, url, req.Headers, string(req.Body), 0, nil, "", err.Error())
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), 0, nil, "", err.Error(), "")
 
 		return &dag.Output{Error: err}, nil
 	}
@@ -1791,12 +1795,12 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 				logger.F("block_on_error", true),
 			)
 			// Record failed node details
-			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
+			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "")
 			return nil, fmt.Errorf("%s", errMsg)
 		}
 
 		// Record failed node details even without block_on_error
-		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg)
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "")
 		// Soft failure: carry the HTTP error on the output so the trace span
 		// reflects the real node outcome while the chain continues.
 		non2xxErr = errMsg
@@ -1864,6 +1868,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("error", errMsg),
 							)
 							if n.blockOnError {
+								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 								return nil, fmt.Errorf("%s", errMsg)
 							}
 							assertionErr = fmt.Errorf("%s", errMsg)
@@ -1879,6 +1884,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("error", errMsg),
 							)
 							if n.blockOnError {
+								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 								return nil, fmt.Errorf("%s", errMsg)
 							}
 							assertionErr = fmt.Errorf("%s", errMsg)
@@ -1893,6 +1899,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("actual", actualVal),
 						)
 						if n.blockOnError {
+							n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 							return nil, fmt.Errorf("%s", errMsg)
 						}
 						assertionErr = fmt.Errorf("%s", errMsg)
@@ -1909,6 +1916,16 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 					)
 				}
 			}
+		}
+	}
+
+	// Body-assertion failure on an HTTP 2xx response: capture the full
+	// request/response context for the report's failure-record section,
+	// mirroring the non-2xx path above (which already recorded). The
+	// non2xxErr guard prevents double-recording when both checks fail.
+	if assertionErr != nil && non2xxErr == "" {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), assertionErr.Error(), "ASSERT-FAIL")
 		}
 	}
 
