@@ -114,8 +114,9 @@ func New(cfg Config) *Server {
 		if !ok {
 			return nil
 		}
-		msgs := make([]ws.Message, 0, len(tr.Spans))
-		for _, span := range tr.Spans {
+		spans := tr.SnapshotSpans()
+		msgs := make([]ws.Message, 0, len(spans))
+		for _, span := range spans {
 			msgs = append(msgs, ws.Message{
 				Type:       "span_update",
 				RunID:      runID,

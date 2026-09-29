@@ -83,6 +83,18 @@ func (t *Trace) AddSpan(s *Span) {
 	t.mu.Unlock()
 }
 
+// SnapshotSpans returns a copy of the current spans. Readers that may run
+// concurrently with an in-flight run (e.g. the WebSocket subscribe snapshot
+// or the trace REST API) must use this instead of reading t.Spans directly:
+// for an active run the trace is being mutated by AddSpan.
+func (t *Trace) SnapshotSpans() []*Span {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]*Span, len(t.Spans))
+	copy(out, t.Spans)
+	return out
+}
+
 // Context is a handle for recording spans within a single trace.
 // It is created by Tracer.Start and must be closed with Finish
 // when the DAG run completes.
@@ -274,6 +286,7 @@ type TracePersister interface {
 type Tracer struct {
 	cfg       Config
 	buffer    []*Trace
+	active    map[snowflake.ID]*Trace // runID → in-flight trace, registered at Start
 	mu        sync.RWMutex
 	node      *snowflake.Node
 	persister TracePersister
@@ -294,6 +307,7 @@ func NewTracer(cfg Config) (*Tracer, error) {
 	return &Tracer{
 		cfg:       cfg,
 		buffer:    make([]*Trace, 0, cfg.BufferSize),
+		active:    make(map[snowflake.ID]*Trace),
 		node:      n,
 		persister: cfg.Persister,
 		broadcast: cfg.Broadcast,
@@ -302,6 +316,9 @@ func NewTracer(cfg Config) (*Tracer, error) {
 
 // Start creates a new trace for the given scene and run IDs.
 // The returned Context must be closed with Finish or FinishWithError.
+// The trace is registered in the active map immediately so that ByRunID
+// can find it while the run is still in flight (e.g. for the WebSocket
+// subscribe snapshot and the live trace REST endpoint).
 func (t *Tracer) Start(ctx context.Context, sceneID, runID snowflake.ID) *Context {
 	now := time.Now().UTC()
 	tr := &Trace{
@@ -312,6 +329,10 @@ func (t *Tracer) Start(ctx context.Context, sceneID, runID snowflake.ID) *Contex
 		Spans:     make([]*Span, 0),
 		StartedAt: now,
 	}
+
+	t.mu.Lock()
+	t.active[runID] = tr
+	t.mu.Unlock()
 
 	return &Context{
 		trace:  tr,
@@ -325,6 +346,8 @@ func (t *Tracer) Start(ctx context.Context, sceneID, runID snowflake.ID) *Contex
 func (t *Tracer) record(tr *Trace) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	delete(t.active, tr.RunID)
 
 	if len(t.buffer) >= t.cfg.BufferSize {
 		t.buffer = t.buffer[1:]
@@ -442,10 +465,17 @@ func (t *Tracer) ListByScene(sceneID snowflake.ID, limit int, offset int) []*Tra
 	return all[offset:end]
 }
 
-// ByRunID returns a trace for a specific run ID.
+// ByRunID returns a trace for a specific run ID. It finds in-flight traces
+// first (registered at Start, before any span is recorded) and falls back
+// to the completed-trace buffer. This lets live viewers (WebSocket
+// subscribe snapshot, trace REST API) see the run while it executes.
 func (t *Tracer) ByRunID(runID snowflake.ID) (*Trace, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
+	if tr, ok := t.active[runID]; ok {
+		return tr, true
+	}
 
 	for _, tr := range t.buffer {
 		if tr.RunID == runID {

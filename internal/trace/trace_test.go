@@ -421,3 +421,68 @@ func TestTracer_BroadcastOnCanceled(t *testing.T) {
 	assert.Equal(t, "manual stop", calls[0].errMsg)
 	assert.Equal(t, 0, calls[0].loopIndex)
 }
+
+func TestByRunIDFindsInFlightTrace(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	sceneID := newID(t)
+	runID := newID(t)
+
+	tctx := tracer.Start(context.Background(), sceneID, runID)
+
+	// The trace must be discoverable BEFORE the run finishes — this is
+	// what the WebSocket subscribe snapshot and the live trace endpoint
+	// rely on to show a running scene's history.
+	tr, ok := tracer.ByRunID(runID)
+	require.True(t, ok, "ByRunID must find the in-flight trace")
+	assert.Equal(t, runID, tr.RunID)
+
+	// Finished spans recorded on the live trace are visible via the
+	// locked snapshot, while concurrent AddSpan calls are safe.
+	tctx.StartSpan("node-A").Finish("ok", nil)
+	spans := tr.SnapshotSpans()
+	assert.Len(t, spans, 1)
+	assert.Equal(t, "node-A", spans[0].NodeID)
+
+	// After Finish the trace moves from active to the completed buffer
+	// and remains discoverable.
+	tctx.Finish()
+	tr, ok = tracer.ByRunID(runID)
+	require.True(t, ok, "ByRunID must still find the completed trace")
+	assert.Equal(t, SpanStatusOK, tr.Status)
+
+	// A different run ID must not resolve.
+	_, ok = tracer.ByRunID(newID(t))
+	assert.False(t, ok)
+}
+
+func TestSnapshotSpansConcurrentWithAddSpan(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				tctx.StartSpan("node").Finish("ok", nil)
+			}
+		}(i)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for j := 0; j < 100; j++ {
+			_ = tctx.trace.SnapshotSpans()
+		}
+	}()
+	wg.Wait()
+
+	assert.Len(t, tctx.trace.SnapshotSpans(), 400)
+	tctx.Finish()
+}

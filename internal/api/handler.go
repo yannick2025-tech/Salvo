@@ -2041,7 +2041,7 @@ func (h *Handler) resolveTraceNames(ctx context.Context, sceneID snowflake.ID, t
 	}
 
 	nodeNameMap := make(map[string]string)
-	for _, sp := range tr.Spans {
+	for _, sp := range tr.SnapshotSpans() {
 		if _, exists := nodeNameMap[sp.NodeID]; exists {
 			continue
 		}
@@ -2057,8 +2057,9 @@ func (h *Handler) resolveTraceNames(ctx context.Context, sceneID snowflake.ID, t
 }
 
 func toTraceDTO(tr *tracelib.Trace, sceneName string, nodeNameMap map[string]string) dto.TraceDTO {
-	spans := make([]dto.SpanDTO, 0, len(tr.Spans))
-	for _, sp := range tr.Spans {
+	snapSpans := tr.SnapshotSpans()
+	spans := make([]dto.SpanDTO, 0, len(snapSpans))
+	for _, sp := range snapSpans {
 		spans = append(spans, dto.SpanDTO{
 			ID:           sp.ID,
 			TraceID:      sp.TraceID,
