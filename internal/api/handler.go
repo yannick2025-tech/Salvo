@@ -875,15 +875,26 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 
 // fillLastRun populates the last-run fields of a scene DTO with the most
 // recent run record of that scene (empty when the scene has never run).
+// The in-memory runner manager is the single source of truth for liveness:
+// when an active runner exists the status is forced to running so that a
+// transient run-record query/write failure cannot make a live run look
+// idle on the scene list (实时进度 button stays clickable).
 func (h *Handler) fillLastRun(ctx context.Context, item *dto.SceneDTO) {
 	runs, err := h.runs.List(ctx, repo.Filter{SceneID: item.ID, Limit: 1})
-	if err != nil || len(runs) == 0 {
-		return
+	if err != nil {
+		h.log.Warn("failed to load last run for scene list",
+			logger.F("scene_id", item.ID.String()),
+			logger.F("error", err))
 	}
-	last := runs[0]
-	item.LastRunID = strconv.FormatInt(int64(last.RunID), 10)
-	item.LastRunStartedAt = last.StartedAt
-	item.LastRunStatus = last.Status
+	if len(runs) > 0 {
+		last := runs[0]
+		item.LastRunID = strconv.FormatInt(int64(last.RunID), 10)
+		item.LastRunStartedAt = last.StartedAt
+		item.LastRunStatus = last.Status
+	}
+	if _, running := h.runnerMgr.Get(item.ID); running {
+		item.LastRunStatus = model.RunStatusRunning
+	}
 }
 
 // --- Node Handlers ---

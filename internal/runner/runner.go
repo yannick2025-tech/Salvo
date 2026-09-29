@@ -453,6 +453,15 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := r.runs.Create(r.ctx, runRecord); err != nil {
 		runLog.Error("failed to create run record", logger.F("error", err))
 		r.status.Store(StatusFailed)
+		// Restore the scene status: the setup hook already marked the scene
+		// running, and the teardown hook at the end of Run is unreachable on
+		// this early-return path — without this reset the scene list would
+		// show 实时 forever while no run record exists.
+		if err := r.scenes.UpdateStatus(context.Background(), r.cfg.SceneID, model.SceneStatusCompleted); err != nil {
+			runLog.Error("failed to restore scene status after run-record create failure",
+				logger.F("scene_id", r.cfg.SceneID.String()),
+				logger.F("error", err))
+		}
 		return fmt.Errorf("runner: create run record: %w", err)
 	}
 
@@ -534,7 +543,11 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 	}
 
-	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
+	if err := lc.Run(context.Background(), lifecycle.HookSceneTeardown); err != nil {
+		runLog.Error("scene teardown lifecycle hook failed",
+			logger.F("scene_id", r.cfg.SceneID.String()),
+			logger.F("error", err))
+	}
 
 	r.stopWg.Wait()
 
