@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestHub(t *testing.T) *Hub {
@@ -310,6 +311,52 @@ func TestWithSpanState_Option(t *testing.T) {
 func TestMessage_DedupKey_NonSpanUpdate(t *testing.T) {
 	m := Message{Type: "status", RunID: "run-1"}
 	assert.Equal(t, "", m.dedupKey(), "non-span_update messages should return empty dedup key")
+}
+
+func TestMessage_DedupKey_SpanStatsNotDeduped(t *testing.T) {
+	m := Message{Type: "span_stats", RunID: "run-1", ChainID: "c1", NodeID: "n1"}
+	assert.Equal(t, "", m.dedupKey(), "span_stats snapshot must never be deduplicated")
+}
+
+func TestMessage_DedupKey_IncludesLoopIndex(t *testing.T) {
+	base := Message{Type: "span_update", RunID: "run-1", ChainID: "c1", NodeID: "n1"}
+
+	iter0 := base
+	iter0.LoopIndex = 0
+	iter1 := base
+	iter1.LoopIndex = 1
+	iter0b := base
+	iter0b.LoopIndex = 0
+
+	assert.NotEqual(t, iter0.dedupKey(), iter1.dedupKey(),
+		"different iterations of the same node must not coalesce")
+	assert.Equal(t, iter0.dedupKey(), iter0b.dedupKey(),
+		"same iteration of the same node must share a key")
+}
+
+func TestHub_BroadcastToRun_IterationsNotCoalesced(t *testing.T) {
+	hub := newTestHub(t)
+	go hub.Run()
+
+	client := &Client{hub: hub, outbox: NewSendQueue(), subscriptions: make(map[string]struct{})}
+	hub.Register(client)
+	// Wait for registration to be processed.
+	time.Sleep(10 * time.Millisecond)
+	hub.Subscribe(client, "run-iter")
+
+	// Same node, two iterations: both must be delivered independently.
+	hub.BroadcastToRun("run-iter", Message{Type: "span_update", RunID: "run-iter", ChainID: "c1", NodeID: "n1", Status: "error", LoopIndex: 0})
+	hub.BroadcastToRun("run-iter", Message{Type: "span_update", RunID: "run-iter", ChainID: "c1", NodeID: "n1", Status: "ok", LoopIndex: 1})
+
+	assert.Equal(t, 2, client.outbox.Len(),
+		"both iterations must survive the deduplicating outbox")
+
+	first, ok := client.outbox.TryPop()
+	require.True(t, ok)
+	assert.Contains(t, string(first), `"error"`)
+	second, ok := client.outbox.TryPop()
+	require.True(t, ok)
+	assert.Contains(t, string(second), `"ok"`)
 }
 
 func TestHub_BroadcastToRun_NoSubscribers(t *testing.T) {

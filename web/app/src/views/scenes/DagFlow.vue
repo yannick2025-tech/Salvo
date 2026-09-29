@@ -130,7 +130,7 @@ const nodeTypes: Record<string, any> = {
 const { fitView } = useVueFlow()
 
 // ===== Execution status composables =====
-const { spanUpdates, isConnected: wsConnected, connect: wsConnect, disconnect: wsDisconnect } = useExecutionWs()
+const { spanUpdates, statsEvents, isConnected: wsConnected, connect: wsConnect, disconnect: wsDisconnect } = useExecutionWs()
 const {
   aggregateStatus,
   chainStatuses,
@@ -142,7 +142,7 @@ const {
   selectChain,
   initFromSpans,
   version: execVersion,
-} = useExecutionStatus(spanUpdates)
+} = useExecutionStatus(spanUpdates, statsEvents)
 
 const chainIds = computed(() => {
   // Depend on version to react to shallowRef changes
@@ -234,7 +234,15 @@ function getNodeChainStatus(nodeId: string) {
   void execVersion.value // depend on version for shallowRef reactivity
   const chainMap = chainStatuses.value.get(selectedChainId.value)
   if (!chainMap) return undefined
-  return chainMap.get(nodeId) ?? null
+  const state = chainMap.get(nodeId)
+  if (!state) return null
+  // Derive a single display status from the cumulative chain state:
+  // in-flight first, then any historical failure, pass, skip.
+  if (state.runningIdx.size > 0) return 'running'
+  if (state.fail > 0) return 'fail'
+  if (state.pass > 0) return 'pass'
+  if (state.skip > 0) return 'skip'
+  return null
 }
 
 function getNodeLoopProgress(nodeId: string) {
@@ -288,8 +296,8 @@ const runningChainEdgeIds = computed(() => {
   const chainMap = chainStatuses.value.get(selectedChainId.value)
   if (!chainMap) return new Set<string>()
   const runningNodeIds = new Set<string>()
-  for (const [nodeId, status] of chainMap) {
-    if (status === 'running') runningNodeIds.add(nodeId)
+  for (const [nodeId, state] of chainMap) {
+    if (state.runningIdx.size > 0) runningNodeIds.add(nodeId)
   }
   const runningIds = new Set<string>()
   for (const e of props.edges) {

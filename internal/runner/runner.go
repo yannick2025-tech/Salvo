@@ -1110,6 +1110,12 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 	}
 
 	err = p.Wait()
+	if r.tracer != nil {
+		// The run is over: no chain is in flight anymore. Drop running
+		// markers while keeping the cumulative counters, so subscribers
+		// opening the page after the run still see the final totals.
+		r.tracer.FinishRun(r.runID)
+	}
 	execLog.Info("worker pool stopped",
 		logger.F("submitted", p.Submitted()),
 		logger.F("completed", p.Completed()),

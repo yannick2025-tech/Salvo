@@ -3,6 +3,7 @@ package trace
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -183,6 +184,168 @@ func TestTracerByRunID(t *testing.T) {
 
 	_, ok = tracer.ByRunID(newID(t))
 	assert.False(t, ok)
+}
+
+func TestNodeStatsCumulativeAcrossIterations(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	span := tctx.StartSpan("node-iter")
+	span.SetChainID("chain-1")
+
+	// Simulate 3 loop iterations: fail, fail, success. Cumulative counters
+	// must keep both failures; running markers must be cleared per iteration.
+	span.BroadcastRunning(0)
+	span.BroadcastIterationResult(0, true)
+	span.BroadcastRunning(1)
+	span.BroadcastIterationResult(1, true)
+	span.BroadcastRunning(2)
+	span.BroadcastIterationResult(2, false)
+	span.Finish(`{"status":200}`, nil)
+	tctx.Finish()
+
+	stats := tracer.SnapshotRunStats(runID)
+	ns := stats["chain-1"]["node-iter"]
+	require.NotNil(t, ns)
+	assert.Equal(t, 2, ns.Fail, "both failed iterations must be counted")
+	assert.Equal(t, 1, ns.Pass, "final iteration success must be counted once")
+	assert.Equal(t, 0, ns.Skip)
+	assert.Empty(t, ns.RunningIdx, "no in-flight iterations after finish")
+	assert.Equal(t, 2, ns.LastIndex)
+}
+
+// TestRunStatsAggregateAcrossChains reproduces the page re-entry bug: the
+// runner spawns each chain as its own trace under the same run ID, so the
+// run-level snapshot must aggregate every chain — not just the latest one.
+func TestRunStatsAggregateAcrossChains(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	runID := newID(t)
+
+	// Simulate 45 finished chains, each executing one node iteration.
+	for c := 0; c < 45; c++ {
+		tctx := tracer.Start(context.Background(), newID(t), runID)
+		span := tctx.StartSpan("node-group")
+		span.SetChainID(fmt.Sprintf("chain-%d", c))
+		span.BroadcastRunning(0)
+		span.BroadcastIterationResult(0, c%7 == 0) // every 7th chain fails
+		span.Finish("ok", nil)
+		tctx.Finish()
+	}
+
+	stats := tracer.SnapshotRunStats(runID)
+	require.Len(t, stats, 45)
+	var pass, fail int
+	for _, nodes := range stats {
+		ns := nodes["node-group"]
+		require.NotNil(t, ns)
+		pass += ns.Pass
+		fail += ns.Fail
+	}
+	assert.Equal(t, 38, pass, "snapshot must aggregate all chains, not just the latest")
+	assert.Equal(t, 7, fail)
+}
+
+func TestNodeStatsFinishDoesNotDoubleCount(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	tctx := tracer.Start(context.Background(), newID(t), newID(t))
+	span := tctx.StartSpan("node-dbl")
+	span.SetChainID("chain-1")
+
+	// The executor broadcasts the final iteration result, then Finish
+	// repeats the same loop index: the duplicate must be ignored.
+	span.BroadcastRunning(0)
+	span.BroadcastIterationResult(0, false)
+	span.Finish("ok", nil)
+	tctx.Finish()
+
+	ns := tracer.SnapshotRunStats(tctx2RunID(tctx))["chain-1"]["node-dbl"]
+	require.NotNil(t, ns)
+	assert.Equal(t, 1, ns.Pass, "Finish broadcast must not double-count the final iteration")
+}
+
+func TestNodeStatsCanceledClearsRunning(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	tctx := tracer.Start(context.Background(), newID(t), newID(t))
+	span := tctx.StartSpan("node-cancel")
+	span.SetChainID("chain-1")
+
+	// Iteration 4 is in flight when the run is manually stopped.
+	span.BroadcastRunning(4)
+	span.FinishCanceled("", errors.New("context canceled"))
+	tctx.Finish()
+
+	ns := tracer.SnapshotRunStats(tctx2RunID(tctx))["chain-1"]["node-cancel"]
+	require.NotNil(t, ns)
+	assert.Empty(t, ns.RunningIdx, "canceled iteration must not stay running")
+	assert.Equal(t, 1, ns.Skip, "canceled iteration counts as skip")
+}
+
+func TestFinishRunClearsAllRunning(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+	spanA := tctx.StartSpan("node-a")
+	spanA.SetChainID("chain-1")
+	spanB := tctx.StartSpan("node-b")
+	spanB.SetChainID("chain-2")
+	spanA.BroadcastRunning(0)
+	spanB.BroadcastRunning(3)
+	// Neither node finishes: the run-level finish must clear both markers
+	// while keeping the chains visible for the snapshot.
+	tctx.Finish()
+	tracer.FinishRun(runID)
+
+	stats := tracer.SnapshotRunStats(runID)
+	assert.Empty(t, stats["chain-1"]["node-a"].RunningIdx)
+	assert.Empty(t, stats["chain-2"]["node-b"].RunningIdx)
+}
+
+func TestSnapshotStatsConcurrentWithBroadcast(t *testing.T) {
+	tracer, err := NewTracer(Config{BufferSize: 100})
+	require.NoError(t, err)
+
+	runID := newID(t)
+	tctx := tracer.Start(context.Background(), newID(t), runID)
+
+	var wg sync.WaitGroup
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			span := tctx.StartSpan("node-race")
+			span.SetChainID("chain-race")
+			for i := 0; i < 50; i++ {
+				span.BroadcastRunning(i)
+				span.BroadcastIterationResult(i, i%2 == 0)
+			}
+		}()
+	}
+	for r := 0; r < 4; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				_ = tracer.SnapshotRunStats(runID)
+			}
+		}()
+	}
+	wg.Wait()
+	tctx.Finish()
+}
+
+// tctx2RunID extracts the run ID from a trace context for assertions.
+func tctx2RunID(c *Context) snowflake.ID {
+	return c.trace.RunID
 }
 
 func TestTracerBufferEviction(t *testing.T) {

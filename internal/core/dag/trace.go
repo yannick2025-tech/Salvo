@@ -63,6 +63,9 @@ type SpanContext interface {
 	Skip(reason string)
 	// Running broadcasts a "running" event for the given loop iteration.
 	Running(nodeID string, loopIndex int)
+	// IterationResult broadcasts the outcome of a single loop iteration so
+	// subscribers can maintain cumulative per-iteration counters.
+	IterationResult(loopIndex int, failed bool)
 }
 
 // --- Adapters for the trace package ---
@@ -144,6 +147,11 @@ func (s *spanAdapter) Skip(reason string) {
 // Running broadcasts a "running" event for the given loop iteration.
 func (s *spanAdapter) Running(nodeID string, loopIndex int) {
 	s.builder.BroadcastRunning(loopIndex)
+}
+
+// IterationResult broadcasts the outcome of a single loop iteration.
+func (s *spanAdapter) IterationResult(loopIndex int, failed bool) {
+	s.builder.BroadcastIterationResult(loopIndex, failed)
 }
 
 // WithTraceHook adds a trace hook to the executor. When set, the executor
@@ -359,6 +367,9 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 				output, err := n.Execute(ctx, input)
 				if err != nil {
+					// Broadcast the failed iteration before the span-level
+					// Finish so cumulative counters record it.
+					span.IterationResult(i, true)
 					span.Finish("", err)
 					errCh <- fmt.Errorf("node %s execute: %w", n.ID(), err)
 					if isSync {
@@ -366,6 +377,9 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 					}
 					return
 				}
+				// Soft failure (Output.Error) counts as a failed iteration
+				// even though execution continues to the next one.
+				span.IterationResult(i, output.Error != nil)
 				lastOutput = output
 			}
 

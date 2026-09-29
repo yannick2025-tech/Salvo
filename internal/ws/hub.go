@@ -36,17 +36,32 @@ type Message struct {
 	DurationNs int64  `json:"duration_ns,omitempty"`
 	Error      string `json:"error,omitempty"`
 	LoopIndex  int    `json:"loop_index,omitempty"`
+
+	// Span stats snapshot fields (Type == "span_stats"). Carried per
+	// (chain, node): cumulative counters plus current in-flight iterations,
+	// used by clients to rebuild state after a page reload.
+	Pass       int   `json:"pass,omitempty"`
+	Fail       int   `json:"fail,omitempty"`
+	Skip       int   `json:"skip,omitempty"`
+	RunningIdx []int `json:"running_idx,omitempty"`
+	// LastIndex is always serialized (-1 = no finished iteration) so
+	// clients can distinguish "iteration 0 applied" from "nothing applied".
+	LastIndex int `json:"last_index"`
 }
 
 // dedupKey returns a deduplication key for span_update messages.
-// Two messages with the same key represent the same (run, chain, node)
-// triple, and the later one supersedes the earlier.
-// Returns "" for non-span_update messages (no dedup).
+// Two messages with the same key represent the same (run, chain, node,
+// iteration) tuple, and the later one supersedes the earlier — e.g. an
+// in-flight "running" event superseded by the iteration's final result.
+// Distinct iterations of the same node have different keys so cumulative
+// counters never lose an iteration to coalescing.
+// Returns "" for non-span_update messages (no dedup), including the
+// span_stats snapshot which must always be delivered in full.
 func (m Message) dedupKey() string {
 	if m.Type != "span_update" {
 		return ""
 	}
-	return fmt.Sprintf("%s/%s/%s", m.RunID, m.ChainID, m.NodeID)
+	return fmt.Sprintf("%s/%s/%s/%d", m.RunID, m.ChainID, m.NodeID, m.LoopIndex)
 }
 
 // Hub manages connected WebSocket clients and their subscriptions by run_id.

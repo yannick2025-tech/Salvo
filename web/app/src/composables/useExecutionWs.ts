@@ -11,12 +11,24 @@ export interface SpanUpdateEvent {
   loop_index?: number
 }
 
+export interface SpanStatsEvent {
+  type: 'span_stats'
+  run_id: string
+  chain_id: string
+  node_id: string
+  pass?: number
+  fail?: number
+  skip?: number
+  running_idx?: number[]
+  last_index: number
+}
+
 export interface SubscribeMessage {
   type: 'subscribe'
   run_id: string
 }
 
-type WsInMessage = SpanUpdateEvent
+type WsInMessage = SpanUpdateEvent | SpanStatsEvent
 
 const MAX_BACKOFF = 30_000
 const BASE_DELAY = 1_000
@@ -30,6 +42,7 @@ function getWsUrl(): string {
 
 export function useExecutionWs() {
   const spanUpdates = ref<SpanUpdateEvent[]>([])
+  const statsEvents = ref<SpanStatsEvent[]>([])
   const isConnected = ref(false)
 
   let ws: WebSocket | null = null
@@ -66,6 +79,8 @@ export function useExecutionWs() {
       const msg: WsInMessage = JSON.parse(event.data)
       if (msg.type === 'span_update') {
         spanUpdates.value = [...spanUpdates.value, msg]
+      } else if (msg.type === 'span_stats') {
+        statsEvents.value = [...statsEvents.value, msg]
       }
     } catch {
       // ignore malformed messages
@@ -135,6 +150,7 @@ export function useExecutionWs() {
 
   return {
     spanUpdates,
+    statsEvents,
     isConnected,
     connect,
     disconnect,

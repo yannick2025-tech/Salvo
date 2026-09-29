@@ -71,9 +71,102 @@ type Trace struct {
 	Error     string       `json:"error,omitempty"`
 	Spans     []*Span      `json:"spans"`
 	StartedAt time.Time    `json:"started_at"`
-	FinishedAt time.Time   `json:"finished_at"`
+	FinishedAt time.Time    `json:"finished_at"`
 	Duration  time.Duration `json:"duration"`
-	mu        sync.Mutex
+
+	mu sync.Mutex
+}
+
+// NodeStats holds cumulative execution counters for one (chain_id, node_id)
+// pair within a trace. Pass/Fail/Skip count finished iterations and only
+// grow; RunningIdx tracks in-flight iteration indexes; LastIndex is the
+// highest iteration index already applied (for idempotent dedup).
+type NodeStats struct {
+	Pass       int
+	Fail       int
+	Skip       int
+	RunningIdx map[int]struct{} // in-flight loop indexes
+	LastIndex  int              // highest applied iteration index; -1 = none
+}
+
+// applyTerminal records a finished iteration idempotently: iterations at or
+// below LastIndex have already been counted (e.g. the per-iteration event
+// followed by the span-level Finish broadcast) and are skipped.
+func (ns *NodeStats) applyTerminal(counter *int, loopIndex int) {
+	if loopIndex <= ns.LastIndex {
+		return
+	}
+	*counter++
+	delete(ns.RunningIdx, loopIndex)
+	ns.LastIndex = loopIndex
+}
+
+// clearRunning drops all in-flight iteration markers. Called when the trace
+// finishes so subscribers never see stale running counts after a run ends.
+func (ns *NodeStats) clearRunning() {
+	ns.RunningIdx = make(map[int]struct{})
+}
+
+// RunStats holds the cumulative per-node counters of one run. The runner
+// spawns chains continuously (each chain executes the DAG once and gets its
+// own Trace), so counters must aggregate at the run level — a per-Trace
+// snapshot would only cover the most recently started chain.
+type RunStats struct {
+	chains map[string]map[string]*NodeStats // chainID → nodeID → counters
+	order  []string                         // insertion order of real chains (FIFO merge eviction)
+}
+
+const (
+	// maxTrackedRuns bounds how many finished runs keep their stats in
+	// memory for late subscribers (page re-entry after the run ended).
+	maxTrackedRuns = 32
+	// maxChainsPerRun bounds per-chain detail for long duration runs.
+	// Older chains are folded into mergedChainID so run-level totals stay
+	// exact while memory stays bounded.
+	maxChainsPerRun = 2048
+	// mergedChainID is the pseudo chain that accumulates evicted chains.
+	mergedChainID = "_merged"
+)
+
+// mergeOldestChain folds the oldest tracked chain into the merged pseudo
+// chain. Per-chain detail is lost for the evicted chain but run-level
+// totals (what the aggregate view shows) stay exact. In-flight markers of
+// the evicted chain may collide with the merged set (iteration indexes are
+// per-chain), so a still-running evicted chain can lose a running marker —
+// acceptable because eviction only targets the oldest chains, which are
+// almost always finished.
+func (rs *RunStats) mergeOldestChain() {
+	if len(rs.order) <= maxChainsPerRun {
+		return
+	}
+	oldest := rs.order[0]
+	rs.order = rs.order[1:]
+	src := rs.chains[oldest]
+	delete(rs.chains, oldest)
+	if src == nil {
+		return
+	}
+	dst, ok := rs.chains[mergedChainID]
+	if !ok {
+		dst = make(map[string]*NodeStats)
+		rs.chains[mergedChainID] = dst
+	}
+	for nodeID, ns := range src {
+		d := dst[nodeID]
+		if d == nil {
+			d = &NodeStats{RunningIdx: make(map[int]struct{}), LastIndex: -1}
+			dst[nodeID] = d
+		}
+		d.Pass += ns.Pass
+		d.Fail += ns.Fail
+		d.Skip += ns.Skip
+		if ns.LastIndex > d.LastIndex {
+			d.LastIndex = ns.LastIndex
+		}
+		for idx := range ns.RunningIdx {
+			d.RunningIdx[idx] = struct{}{}
+		}
+	}
 }
 
 // AddSpan appends a span to the trace.
@@ -162,6 +255,9 @@ func (c *Context) Finish() {
 		}
 	}
 
+	// Running markers of in-flight iterations are cleared at the run level
+	// (Tracer.FinishRun, called by the runner when the whole run completes);
+	// per-node terminal broadcasts already clear their own markers.
 	c.tracer.record(c.trace)
 }
 
@@ -184,6 +280,11 @@ func (c *Context) FinishWithCanceled(reason string) {
 type SpanBuilder struct {
 	span *Span
 	ctx  *Context
+
+	// lastIterIndex is the highest loop index broadcast via Running; the
+	// span-level Finish/Skip/FinishCanceled broadcasts carry it so the
+	// frontend can dedup them against per-iteration events.
+	lastIterIndex int
 }
 
 // SetInput records a summary of the span input.
@@ -218,7 +319,7 @@ func (b *SpanBuilder) Finish(output string, err error) {
 	}
 
 	b.ctx.trace.AddSpan(b.span)
-	b.emitBroadcast(string(b.span.Status), 0)
+	b.emitBroadcast(string(b.span.Status), b.lastIterIndex)
 }
 
 // Skip marks the span as skipped (e.g. conditional edge not taken).
@@ -228,7 +329,7 @@ func (b *SpanBuilder) Skip(reason string) {
 	b.span.Status = SpanStatusSkip
 	b.span.Error = reason
 	b.ctx.trace.AddSpan(b.span)
-	b.emitBroadcast(string(b.span.Status), 0)
+	b.emitBroadcast(string(b.span.Status), b.lastIterIndex)
 }
 
 // FinishCanceled completes the span with a "canceled" status, used when
@@ -242,18 +343,34 @@ func (b *SpanBuilder) FinishCanceled(output string, err error) {
 		b.span.Error = err.Error()
 	}
 	b.ctx.trace.AddSpan(b.span)
-	b.emitBroadcast(string(b.span.Status), 0)
+	b.emitBroadcast(string(b.span.Status), b.lastIterIndex)
 }
 
 // BroadcastRunning emits a "running" event for a span that is about to
 // start a loop iteration. This allows subscribers to see intermediate
 // progress during multi-iteration node execution.
 func (b *SpanBuilder) BroadcastRunning(loopIndex int) {
+	b.lastIterIndex = loopIndex
 	b.emitBroadcast("running", loopIndex)
 }
 
-// emitBroadcast calls the tracer's broadcast function if set.
+// BroadcastIterationResult emits the outcome of a single loop iteration
+// (ok or error) so subscribers can maintain cumulative per-iteration
+// counters. The span-level Finish broadcast repeats the final iteration
+// with the same loop index and is deduplicated downstream.
+func (b *SpanBuilder) BroadcastIterationResult(loopIndex int, failed bool) {
+	b.lastIterIndex = loopIndex
+	status := "ok"
+	if failed {
+		status = "error"
+	}
+	b.emitBroadcast(status, loopIndex)
+}
+
+// emitBroadcast updates the run's cumulative stats and calls the tracer's
+// broadcast function if set.
 func (b *SpanBuilder) emitBroadcast(status string, loopIndex int) {
+	b.ctx.tracer.updateRunStats(b.ctx.trace.RunID, b.span.ChainID, b.span.NodeID, status, loopIndex)
 	fn := b.ctx.tracer.broadcast
 	if fn == nil {
 		return
@@ -291,6 +408,12 @@ type Tracer struct {
 	node      *snowflake.Node
 	persister TracePersister
 	broadcast BroadcastFunc
+
+	// runStats aggregates cumulative per-node counters across every chain
+	// of a run (chains are traced individually, so no single Trace holds
+	// the full picture). Keyed by runID; bounded by maxTrackedRuns.
+	runStats      map[snowflake.ID]*RunStats
+	runStatsOrder []snowflake.ID // FIFO eviction order of tracked runs
 }
 
 // NewTracer creates a new Tracer with the given configuration.
@@ -311,6 +434,7 @@ func NewTracer(cfg Config) (*Tracer, error) {
 		node:      n,
 		persister: cfg.Persister,
 		broadcast: cfg.Broadcast,
+		runStats:  make(map[snowflake.ID]*RunStats),
 	}, nil
 }
 
@@ -358,6 +482,108 @@ func (t *Tracer) record(tr *Trace) {
 		go func() {
 			_ = t.persister.SaveTrace(context.Background(), tr)
 		}()
+	}
+}
+
+// newRunStatsLocked creates the stats bucket for a run, evicting the oldest
+// tracked run once maxTrackedRuns is exceeded. Callers must hold t.mu.
+func (t *Tracer) newRunStatsLocked(runID snowflake.ID) *RunStats {
+	if len(t.runStatsOrder) >= maxTrackedRuns {
+		old := t.runStatsOrder[0]
+		t.runStatsOrder = t.runStatsOrder[1:]
+		delete(t.runStats, old)
+	}
+	rs := &RunStats{chains: make(map[string]map[string]*NodeStats)}
+	t.runStats[runID] = rs
+	t.runStatsOrder = append(t.runStatsOrder, runID)
+	return rs
+}
+
+// updateRunStats maintains the per-run, per-(chain, node) cumulative
+// counters. Terminal statuses are applied idempotently via LastIndex so the
+// per-iteration event followed by the span-level Finish broadcast counts
+// exactly once.
+func (t *Tracer) updateRunStats(runID snowflake.ID, chainID, nodeID, status string, loopIndex int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	rs := t.runStats[runID]
+	if rs == nil {
+		rs = t.newRunStatsLocked(runID)
+	}
+
+	chainMap, ok := rs.chains[chainID]
+	if !ok {
+		chainMap = make(map[string]*NodeStats)
+		rs.chains[chainID] = chainMap
+		rs.order = append(rs.order, chainID)
+		rs.mergeOldestChain()
+	}
+	ns, ok := chainMap[nodeID]
+	if !ok {
+		ns = &NodeStats{RunningIdx: make(map[int]struct{}), LastIndex: -1}
+		chainMap[nodeID] = ns
+	}
+
+	switch status {
+	case "running":
+		if loopIndex > ns.LastIndex {
+			ns.RunningIdx[loopIndex] = struct{}{}
+		}
+	case "ok":
+		ns.applyTerminal(&ns.Pass, loopIndex)
+	case "error":
+		ns.applyTerminal(&ns.Fail, loopIndex)
+	case "skip", "canceled":
+		// Canceled iterations surface as skip in the UI (warning, not error).
+		ns.applyTerminal(&ns.Skip, loopIndex)
+	}
+}
+
+// SnapshotRunStats returns a deep copy of the cumulative per-node stats of a
+// run, aggregated across every chain spawned by it. This is what the
+// WebSocket subscribe snapshot sends so a client re-entering the realtime
+// page rebuilds the full cumulative state. Safe for concurrent use with an
+// in-flight run.
+func (t *Tracer) SnapshotRunStats(runID snowflake.ID) map[string]map[string]*NodeStats {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	rs := t.runStats[runID]
+	if rs == nil {
+		return nil
+	}
+	out := make(map[string]map[string]*NodeStats, len(rs.chains))
+	for chainID, nodes := range rs.chains {
+		m := make(map[string]*NodeStats, len(nodes))
+		for nodeID, ns := range nodes {
+			cp := *ns
+			cp.RunningIdx = make(map[int]struct{}, len(ns.RunningIdx))
+			for k := range ns.RunningIdx {
+				cp.RunningIdx[k] = struct{}{}
+			}
+			m[nodeID] = &cp
+		}
+		out[chainID] = m
+	}
+	return out
+}
+
+// FinishRun clears the in-flight iteration markers of every chain in the
+// run. Called by the runner when the run completes so late subscribers
+// never see stale running counts. The cumulative counters are kept so the
+// final totals remain visible after the run ends.
+func (t *Tracer) FinishRun(runID snowflake.ID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	rs := t.runStats[runID]
+	if rs == nil {
+		return
+	}
+	for _, nodes := range rs.chains {
+		for _, ns := range nodes {
+			ns.clearRunning()
+		}
 	}
 }
 

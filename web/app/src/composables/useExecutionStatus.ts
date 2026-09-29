@@ -1,5 +1,5 @@
 import { ref, watch, shallowRef, type Ref } from 'vue'
-import type { SpanUpdateEvent } from './useExecutionWs'
+import type { SpanUpdateEvent, SpanStatsEvent } from './useExecutionWs'
 import type { SpanDTO } from '@/types'
 
 export type NodeStatus = 'pass' | 'fail' | 'skip' | 'running' | 'idle'
@@ -29,11 +29,26 @@ export interface NodeBadge {
   loopTotal?: number
 }
 
+// Per (chain, node) cumulative state. Pass/fail/skip only grow; runningIdx
+// tracks in-flight iterations; appliedIndex is the highest iteration index
+// already counted (-1 = nothing), used to dedup the three data sources
+// (REST init, WS snapshot, WS incremental events).
+interface ChainNodeState {
+  pass: number
+  fail: number
+  skip: number
+  runningIdx: Set<number>
+  appliedIndex: number
+}
+
 export type ViewMode = 'aggregate' | 'chain'
 
-export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
+export function useExecutionStatus(
+  spanUpdates: Ref<SpanUpdateEvent[]>,
+  statsEvents: Ref<SpanStatsEvent[]>,
+) {
   const aggregateStatus = shallowRef<Map<string, AggregateCounts>>(new Map())
-  const chainStatuses = shallowRef<Map<string, Map<string, NodeStatus | null>>>(new Map())
+  const chainStatuses = shallowRef<Map<string, Map<string, ChainNodeState>>>(new Map())
   const loopProgress = shallowRef<Map<string, Map<string, LoopProgress>>>(new Map())
 
   const viewMode = ref<ViewMode>('aggregate')
@@ -72,6 +87,7 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
         return 'fail'
       case 'skip':
       case 'skipped':
+      case 'canceled':
         return 'skip'
       case 'running':
         return 'running'
@@ -80,32 +96,61 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
     }
   }
 
-  function processEvent(event: SpanUpdateEvent) {
-    const nodeId = event.node_id
-    const chainId = event.chain_id
-    const status = statusFromEvent(event)
-
-    // Update chain status
+  function getOrCreateState(chainId: string, nodeId: string): ChainNodeState {
     let chainMap = chainStatuses.value.get(chainId)
     if (!chainMap) {
       chainMap = new Map()
       chainStatuses.value.set(chainId, chainMap)
     }
-    chainMap.set(nodeId, status)
+    let state = chainMap.get(nodeId)
+    if (!state) {
+      state = { pass: 0, fail: 0, skip: 0, runningIdx: new Set(), appliedIndex: -1 }
+      chainMap.set(nodeId, state)
+    }
+    return state
+  }
 
-    // Recompute aggregate from chainStatuses
+  // Recompute the aggregate counts of a node across all chains.
+  function recomputeAggregate(nodeId: string) {
     const counts: AggregateCounts = { pass: 0, fail: 0, skip: 0, running: 0, idle: 0 }
     for (const [, nodes] of chainStatuses.value) {
       const s = nodes.get(nodeId)
-      if (s === 'pass') counts.pass++
-      else if (s === 'fail') counts.fail++
-      else if (s === 'skip') counts.skip++
-      else if (s === 'running') counts.running++
-      else counts.idle++
+      if (!s) continue
+      counts.pass += s.pass
+      counts.fail += s.fail
+      counts.skip += s.skip
+      counts.running += s.runningIdx.size
     }
     aggregateStatus.value.set(nodeId, counts)
+  }
 
-    // Update loop progress
+  function processEvent(event: SpanUpdateEvent) {
+    const nodeId = event.node_id
+    const chainId = event.chain_id
+    const status = statusFromEvent(event)
+    const idx = event.loop_index ?? 0
+    const state = getOrCreateState(chainId, nodeId)
+
+    if (status === 'running') {
+      // Ignore replays of iterations that already finished.
+      if (idx <= state.appliedIndex) return
+      state.runningIdx.add(idx)
+    } else if (status === 'pass' || status === 'fail' || status === 'skip') {
+      // Cumulative: terminal results only grow. Iterations at or below
+      // appliedIndex were already counted (e.g. per-iteration event
+      // followed by the span-level Finish broadcast).
+      if (idx <= state.appliedIndex) return
+      state.appliedIndex = idx
+      state.runningIdx.delete(idx)
+      if (status === 'pass') state.pass++
+      else if (status === 'fail') state.fail++
+      else state.skip++
+    } else {
+      // Unknown status: ignore.
+      return
+    }
+
+    // Update loop progress (idempotent via Math.max)
     if (event.loop_index !== undefined && event.loop_index !== null) {
       let chainLoopMap = loopProgress.value.get(chainId)
       if (!chainLoopMap) {
@@ -122,8 +167,47 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
       }
     }
 
+    recomputeAggregate(nodeId)
     // Trigger reactivity for shallowRef
     bumpVersion()
+  }
+
+  // Apply a span_stats snapshot: replaces the full state of one
+  // (chain, node). A snapshot older than what we already applied
+  // (last_index < appliedIndex — can happen when an incremental event
+  // arrives before the subscribe snapshot) is ignored to avoid rollback.
+  function processStatsEvent(event: SpanStatsEvent) {
+    const { chain_id: chainId, node_id: nodeId } = event
+    const lastIndex = event.last_index ?? -1
+    const existing = chainStatuses.value.get(chainId)?.get(nodeId)
+    if (existing && existing.appliedIndex > lastIndex) return
+
+    const state = getOrCreateState(chainId, nodeId)
+    state.pass = event.pass ?? 0
+    state.fail = event.fail ?? 0
+    state.skip = event.skip ?? 0
+    state.runningIdx = new Set(event.running_idx ?? [])
+    state.appliedIndex = lastIndex
+
+    // Rebuild loop progress from the snapshot.
+    if (lastIndex >= 0) {
+      let chainLoopMap = loopProgress.value.get(chainId)
+      if (!chainLoopMap) {
+        chainLoopMap = new Map()
+        loopProgress.value.set(chainId, chainLoopMap)
+      }
+      const currentIndex = lastIndex + 1 // loop_index is 0-based
+      const existingProgress = chainLoopMap.get(nodeId)
+      if (!existingProgress) {
+        chainLoopMap.set(nodeId, { current: currentIndex, total: currentIndex })
+      } else {
+        existingProgress.current = Math.max(existingProgress.current, currentIndex)
+        existingProgress.total = Math.max(existingProgress.total, currentIndex)
+      }
+    }
+
+    recomputeAggregate(nodeId)
+    bumpVersionImmediate()
   }
 
   // Watch for new span updates and process them
@@ -137,7 +221,21 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
         lastProcessedIndex++
       }
     },
-    { immediate: true }
+    { immediate: true },
+  )
+
+  // Watch for new span_stats snapshots and process them
+  let lastProcessedStatsIndex = 0
+  watch(
+    () => statsEvents.value.length,
+    () => {
+      const events = statsEvents.value
+      while (lastProcessedStatsIndex < events.length) {
+        processStatsEvent(events[lastProcessedStatsIndex])
+        lastProcessedStatsIndex++
+      }
+    },
+    { immediate: true },
   )
 
   function computeAggregateStatus(nodes: { id: string; loop_count?: number }[]): Map<string, NodeBadge> {
@@ -152,19 +250,19 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
         fail: agg?.fail ?? 0,
         skip: agg?.skip ?? 0,
         running: agg?.running ?? 0,
-        idle: agg?.idle ?? 0,
+        idle: 0,
       }
 
       if (agg) {
         if (agg.running > 0) {
           badge.status = 'running'
         } else if (agg.fail > 0) {
+          // Cumulative semantics: any failure keeps the node marked red,
+          // even when later iterations succeeded.
           badge.status = 'fail'
-        } else if (agg.pass > 0 && agg.skip === 0 && agg.idle === 0) {
-          badge.status = 'pass'
         } else if (agg.pass > 0) {
           badge.status = 'pass'
-        } else if (agg.skip > 0 && agg.pass === 0 && agg.fail === 0) {
+        } else if (agg.skip > 0) {
           badge.status = 'skip'
         } else {
           badge.status = 'idle'
@@ -209,22 +307,32 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
     bumpVersionImmediate()
   }
 
+  // Conservative fallback from persisted spans (REST trace): only seeds
+  // (chain, node) pairs that have no live state yet (appliedIndex = -1),
+  // so a late REST response never overwrites the WS snapshot or events
+  // that already arrived. Spans hold the node's final outcome only, so
+  // the final status is counted once at iteration 0.
   function initFromSpans(spans: SpanDTO[]) {
     for (const span of spans) {
       const chainId = span.chain_id || 'default'
       const nodeId = span.node_id
-      const status = spanStatusFromSpan(span.status)
 
-      // Update chain status
-      let chainMap = chainStatuses.value.get(chainId)
-      if (!chainMap) {
-        chainMap = new Map()
-        chainStatuses.value.set(chainId, chainMap)
-      }
-      chainMap.set(nodeId, status)
+      const existing = chainStatuses.value.get(chainId)?.get(nodeId)
+      if (existing && existing.appliedIndex >= 0) continue
+
+      const status = spanStatusFromSpan(span.status)
+      if (status !== 'pass' && status !== 'fail' && status !== 'skip') continue
+
+      const state = getOrCreateState(chainId, nodeId)
+      if (state.appliedIndex >= 0) continue
+      state.appliedIndex = 0
+      state.runningIdx = new Set()
+      if (status === 'pass') state.pass = 1
+      else if (status === 'fail') state.fail = 1
+      else state.skip = 1
     }
 
-    // Recompute aggregate
+    // Recompute aggregates for all touched nodes
     const allNodeIds = new Set<string>()
     for (const [, nodes] of chainStatuses.value) {
       for (const nodeId of nodes.keys()) {
@@ -232,16 +340,7 @@ export function useExecutionStatus(spanUpdates: Ref<SpanUpdateEvent[]>) {
       }
     }
     for (const nodeId of allNodeIds) {
-      const counts: AggregateCounts = { pass: 0, fail: 0, skip: 0, running: 0, idle: 0 }
-      for (const [, nodes] of chainStatuses.value) {
-        const s = nodes.get(nodeId)
-        if (s === 'pass') counts.pass++
-        else if (s === 'fail') counts.fail++
-        else if (s === 'skip') counts.skip++
-        else if (s === 'running') counts.running++
-        else counts.idle++
-      }
-      aggregateStatus.value.set(nodeId, counts)
+      recomputeAggregate(nodeId)
     }
 
     // Trigger reactivity for shallowRef immediately on init

@@ -9,14 +9,17 @@ import (
 // SendQueue is a thread-safe, deduplicating message queue for WebSocket
 // outbound messages. It solves the slow-network message-loss problem by:
 //
-//  1. Deduplicating: messages with the same key (run_id/chain_id/node_id)
-//     are coalesced — only the latest data is kept, eliminating stale
-//     intermediate states (e.g. "running" superseded by "ok").
+//  1. Deduplicating: messages with the same key (run_id/chain_id/node_id/
+//     loop_index) are coalesced — only the latest data is kept, eliminating
+//     stale intermediate states (e.g. "running" superseded by "ok" within
+//     the same iteration). Distinct iterations use distinct keys, so
+//     cumulative per-iteration counters never lose an event.
 //
 //  2. Never dropping: unlike a fixed-size channel that silently discards
 //     messages when full, the queue grows to accommodate all unique keys.
-//     The practical upper bound is the number of distinct (run,chain,node)
-//     tuples across all active subscriptions — typically O(nodes × chains).
+//     The practical upper bound is the number of distinct
+//     (run, chain, node, iteration) tuples across all active subscriptions
+//     — typically O(nodes × chains × iterations).
 //
 // WritePump drains the queue via TryPop in a loop, ensuring all pending
 // messages are flushed before waiting for the next signal.

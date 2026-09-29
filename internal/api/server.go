@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -110,6 +111,42 @@ func New(cfg Config) *Server {
 		if err := id.Parse(runID); err != nil {
 			return nil
 		}
+
+		// Prefer run-level cumulative stats: the runner spawns chains
+		// continuously (each with its own trace), so per-run stats are the
+		// only source that aggregates every chain — including per-iteration
+		// results (not persisted in spans) and in-flight iterations. This
+		// lets a client returning to the page rebuild the exact cumulative
+		// state instead of restarting from zero.
+		stats := tracer.SnapshotRunStats(id)
+		if len(stats) > 0 {
+			msgs := make([]ws.Message, 0, 16)
+			for chainID, nodes := range stats {
+				for nodeID, ns := range nodes {
+					running := make([]int, 0, len(ns.RunningIdx))
+					for idx := range ns.RunningIdx {
+						running = append(running, idx)
+					}
+					sort.Ints(running)
+					msgs = append(msgs, ws.Message{
+						Type:       "span_stats",
+						RunID:      runID,
+						ChainID:    chainID,
+						NodeID:     nodeID,
+						Pass:       ns.Pass,
+						Fail:       ns.Fail,
+						Skip:       ns.Skip,
+						RunningIdx: running,
+						LastIndex:  ns.LastIndex,
+					})
+				}
+			}
+			return msgs
+		}
+
+		// Fallback for runs without live stats (e.g. started before this
+		// process, traces loaded from DB): rebuild the last known state
+		// from persisted spans.
 		tr, ok := tracer.ByRunID(id)
 		if !ok {
 			return nil
