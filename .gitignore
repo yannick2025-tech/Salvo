@@ -36,3 +36,5 @@ coverage.html
 docs/biz-migration/login.md
 docs/biz-migration/config.toml
 docs/biz-migration/联调日志
+
+git-commit-report.md
