@@ -412,6 +412,92 @@ func TestDashboardOverviewRunDropdownListsAllScenes(t *testing.T) {
 		"selected running run must be in the dropdown")
 }
 
+func TestDashboardOverviewSelectedRunOutsideCutoffDrivesTimeSeries(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	node, err := snowflake.NewNode(7)
+	require.NoError(t, err)
+
+	createRun := func(sceneName, status string, startedAt, finishedAt time.Time, duration float64) *model.RunRecord {
+		resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+			Name: sceneName, Status: "draft",
+		})
+		result := decodeResponse(t, resp)
+		require.Equal(t, 0, result.Code)
+		sceneData, _ := json.Marshal(result.Data)
+		var scene dto.SceneDTO
+		require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+		rec := &model.RunRecord{
+			SceneID:    scene.ID,
+			RunID:      node.Generate(),
+			Status:     status,
+			StartedAt:  &startedAt,
+			FinishedAt: &finishedAt,
+			Duration:   duration,
+		}
+		require.NoError(t, srv.handler.runs.Create(context.Background(), rec))
+		return rec
+	}
+
+	// The selected run ended 2h ago — far outside the run-derived cutoff
+	// (duration + 300s). A recent run from ANOTHER scene must not leak
+	// into the selected run's time series window.
+	oldStart := time.Now().UTC().Add(-2 * time.Hour)
+	oldEnd := oldStart.Add(60 * time.Second)
+	oldRun := createRun("ts-old-scene", "failed", oldStart, oldEnd, 60)
+
+	recentStart := time.Now().UTC().Add(-2 * time.Minute)
+	recentEnd := recentStart.Add(30 * time.Second)
+	createRun("ts-recent-scene", "completed", recentStart, recentEnd, 30)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/dashboard/overview", dto.DashboardOverviewRequest{
+		RunID: strconv.FormatInt(int64(oldRun.ID), 10),
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	data, _ := json.Marshal(result.Data)
+	var overview dto.DashboardOverviewDTO
+	require.NoError(t, json.Unmarshal(data, &overview))
+	require.NotNil(t, overview.TimeSeries)
+	require.NotEmpty(t, overview.TimeSeries.Timestamps)
+
+	// Bucket labels are time-of-day only ("15:04:05"); compare via
+	// wrap-around distance in seconds of day.
+	sodLabel := func(label string) int {
+		pt, err := time.Parse("15:04:05", label)
+		require.NoError(t, err)
+		return pt.Hour()*3600 + pt.Minute()*60 + pt.Second()
+	}
+	sodTime := func(t time.Time) int {
+		l := t.Local()
+		return l.Hour()*3600 + l.Minute()*60 + l.Second()
+	}
+	wrapDist := func(a, b int) int {
+		d := a - b
+		if d < 0 {
+			d = -d
+		}
+		if d > 43200 {
+			d = 86400 - d
+		}
+		return d
+	}
+
+	labels := overview.TimeSeries.Timestamps
+	first := sodLabel(labels[0])
+	last := sodLabel(labels[len(labels)-1])
+
+	// Window = [start - 10% padding, end + padding + 5s]; for a 60s run
+	// the padding is 6s. First bucket ≈ oldStart-6s, last bucket ≈ oldEnd+10s.
+	assert.LessOrEqual(t, wrapDist(first, sodTime(oldStart)-6), 3,
+		"window must start at the selected run's start (minus padding)")
+	assert.LessOrEqual(t, wrapDist(last, sodTime(oldEnd)+10), 3,
+		"window must end at the selected run's end (plus padding), not at other runs' times")
+}
+
 func TestCopyScene(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)

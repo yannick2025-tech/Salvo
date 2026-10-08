@@ -2490,9 +2490,15 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				break
 			}
 		}
-		if rr.StartedAt != nil && rr.StartedAt.After(cutoff) {
-			seriesRuns = append(seriesRuns, dtoRR)
-		} else if rr.FinishedAt != nil && rr.FinishedAt.After(cutoff) {
+		// A selected run must always drive the time series, even when it
+		// ended long ago — the cutoff only bounds the no-selection recent
+		// window. Without this, an old selected run falls through to the
+		// recentRuns fallback below, which mixes runs from other scenes
+		// into one chart window (e.g. a multi-day span with time-only
+		// bucket labels).
+		inWindow := (rr.StartedAt != nil && rr.StartedAt.After(cutoff)) ||
+			(rr.FinishedAt != nil && rr.FinishedAt.After(cutoff))
+		if targetRun != nil || inWindow {
 			seriesRuns = append(seriesRuns, dtoRR)
 		}
 	}
