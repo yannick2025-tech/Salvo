@@ -1896,6 +1896,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 				logger.F("status", httpResp.StatusCode),
 				logger.F("block_on_error", true),
 			)
+			n.recordHardFailNodeStats(httpResp, false)
 			// Record failed node details
 			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "")
 			return nil, fmt.Errorf("%s", errMsg)
@@ -1970,6 +1971,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("error", errMsg),
 							)
 							if n.blockOnError {
+								n.recordHardFailNodeStats(httpResp, true)
 								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 								return nil, fmt.Errorf("%s", errMsg)
 							}
@@ -1986,6 +1988,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 								logger.F("error", errMsg),
 							)
 							if n.blockOnError {
+								n.recordHardFailNodeStats(httpResp, true)
 								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 								return nil, fmt.Errorf("%s", errMsg)
 							}
@@ -2001,6 +2004,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 							logger.F("actual", actualVal),
 						)
 						if n.blockOnError {
+							n.recordHardFailNodeStats(httpResp, true)
 							n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
 							return nil, fmt.Errorf("%s", errMsg)
 						}
@@ -2056,6 +2060,22 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 		out.Error = fmt.Errorf("%s", non2xxErr)
 	}
 	return out, nil
+}
+
+// recordHardFailNodeStats records a failed request on the node-level stats
+// before a hard-failure early return (block_on_error=true). Those returns
+// skip the shared node-stats block at the end of executeHTTP, which would
+// otherwise leave the node's totals at zero in the report's node ranking.
+func (n *sceneNode) recordHardFailNodeStats(httpResp *httpprotocol.HTTPResponse, assertionFailed bool) {
+	if n.nodeStats == nil || httpResp == nil {
+		return
+	}
+	n.nodeStats.RecordLatency(httpResp.Latency, false)
+	reason := fmt.Sprintf("HTTP-%d", httpResp.StatusCode)
+	if assertionFailed {
+		reason = "ASSERT-FAIL"
+	}
+	n.nodeStats.RecordError(reason)
 }
 
 // compareJSONValues compares an actual value from a JSON response body (decoded

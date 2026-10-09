@@ -168,6 +168,56 @@ func TestExecuteHTTP_AssertionSoftFailRecordsNodeStats(t *testing.T) {
 	assert.Equal(t, int64(0), stat.SuccessReqs.Load(), "assertion soft-failure must not count as success")
 }
 
+// TestExecuteHTTP_AssertionHardFailRecordsNodeStats verifies the node-level
+// stats also record a failure when block_on_error=true makes the assertion
+// failure a hard failure (early return path) — the report's node ranking
+// previously showed 0/0/0 for such nodes.
+func TestExecuteHTTP_AssertionHardFailRecordsNodeStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028}`))
+	}))
+	defer ts.Close()
+
+	stat := &NodeStats{}
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		true, stat,
+	)
+
+	_, err := node.Execute(context.Background(), &dag.Input{})
+	require.Error(t, err, "block_on_error assertion failure must be a hard failure")
+
+	assert.Equal(t, int64(1), stat.TotalReqs.Load(), "total requests should be recorded")
+	assert.Equal(t, int64(1), stat.FailedReqs.Load(), "assertion hard failure must be counted as failed")
+	assert.Equal(t, int64(0), stat.SuccessReqs.Load())
+	assert.Equal(t, int64(1), stat.Snapshot().ErrorCodes["ASSERT-FAIL"])
+}
+
+// TestExecuteHTTP_Non2xxHardFailRecordsNodeStats covers the non-2xx hard
+// failure early return: node stats must record the request as failed too.
+func TestExecuteHTTP_Non2xxHardFailRecordsNodeStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`internal error`))
+	}))
+	defer ts.Close()
+
+	stat := &NodeStats{}
+	node := newHTTPTestNode(
+		`{"method":"GET","url":"`+ts.URL+`"}`,
+		true, stat,
+	)
+
+	_, err := node.Execute(context.Background(), &dag.Input{})
+	require.Error(t, err)
+
+	assert.Equal(t, int64(1), stat.TotalReqs.Load())
+	assert.Equal(t, int64(1), stat.FailedReqs.Load())
+	assert.Equal(t, int64(0), stat.SuccessReqs.Load())
+	assert.Equal(t, int64(1), stat.Snapshot().ErrorCodes["HTTP-500"])
+}
+
 // TestExecuteHTTP_AssertionPassKeepsNoError guards the happy path: passed
 // assertions leave Output.Error empty.
 func TestExecuteHTTP_AssertionPassKeepsNoError(t *testing.T) {
