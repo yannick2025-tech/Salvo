@@ -116,6 +116,7 @@ func (m *MockServer) Start() error {
 	logHandler("/mock/api/inventory/", m.handleInventory)
 	logHandler("/mock/api/auth/login", m.handleAuthLogin)
 	logHandler("/mock/api/payment", m.handlePayment)
+	logHandler("/mock/api/payment/error", m.handlePaymentBizError)
 	logHandler("/mock/api/notify", m.handleNotify)
 	logHandler("/mock/health", m.handleHealth)
 
@@ -298,6 +299,22 @@ func (m *MockServer) handlePayment(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	json.Unmarshal(body, &req)
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"payment_id": "PAY-" + strconv.FormatInt(time.Now().Unix(), 10), "status": "success", "amount": req["amount"]}})
+}
+
+// handlePaymentBizError always returns HTTP 200 with a business error code
+// in the body (errorCode=5037). This is the fixture for body-assertion
+// failure scenarios: expect_body {"errorCode": 0} must mark the node as
+// failed while the HTTP layer stays 2xx.
+func (m *MockServer) handlePaymentBizError(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"errorCode": 5037,
+		"errorMsg":  "business error",
+		"data":      nil,
+	})
 }
 
 func (m *MockServer) handleNotify(w http.ResponseWriter, r *http.Request) {

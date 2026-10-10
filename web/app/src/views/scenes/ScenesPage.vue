@@ -351,6 +351,7 @@ description: |
   - Setup/Teardown 生命周期管理
   - IF-ELSE 条件分支
   - Generator 参数生成器
+  - 业务错误码断言 (Business Error Code) - HTTP 200 + body 内 errorCode=5037，expect_body 断言失败演示
 
 variables:
   - key: env
@@ -627,6 +628,24 @@ nodes:
       timeout: \${timeout_ms}
       expect_status: 200
 
+  # ---- 业务错误码断言演示：HTTP 始终返回 200，业务错误码在 body 内部 ----
+  # Mock 端点固定返回 {"errorCode":5037,"errorMsg":"business error"}，
+  # expect_body 断言 errorCode=0 失败 → 节点失败（trace/报告节点排名均应计 1 次失败）
+  - name: 业务错误码断言演示
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "\${base_url}/payment/error"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"order_id":"\${order_id}"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+      expect_body:
+        errorCode: 0
+
 teardown:
   - name: 查询最终订单状态
     type: teardown
@@ -689,6 +708,9 @@ edges:
     to: 商品推荐(Async Group)
 
   - from: 商品推荐(Async Group)
+    to: 业务错误码断言演示
+
+  - from: 业务错误码断言演示
     to: 查询最终订单状态
 
   - from: 跳过支付
