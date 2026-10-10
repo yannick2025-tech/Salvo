@@ -230,6 +230,13 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 		go func(n Node, sig chan struct{}) {
 			isSync := n.Mode() == ExecSync
+			// Always-run nodes (teardown) still execute when the chain is
+			// cancelled or their parent failed — cleanup must always run.
+			// Kept in sync with Executor.Execute in executor.go.
+			alwaysRun := false
+			if ar, ok := n.(AlwaysRunner); ok {
+				alwaysRun = ar.AlwaysRun()
+			}
 			if isSync {
 				defer syncWg.Done()
 			}
@@ -244,64 +251,71 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			hasActiveParent := false
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
-				select {
-				case <-parentSig:
-					e.mu.RLock()
-					_, parentSucceeded := e.results[edge.From]
-					e.mu.RUnlock()
-
-					if edge.Type == EdgeCondition {
-						// For conditional edges, a skipped parent is expected
-						// when the condition is not met. This is OR-join
-						// semantics: a skipped conditional parent does NOT
-						// block the child. If the parent was skipped (no
-						// result in map), this edge is inactive.
-						if !parentSucceeded {
-							continue
-						}
-						// Parent executed — evaluate the condition.
-						e.mu.RLock()
-						parentOutput := e.results[edge.From]
-						e.mu.RUnlock()
-						if e.evalCondition(ctx, edge.Condition, parentOutput) {
-							hasActiveParent = true
-						}
-						// Condition not met → this edge is inactive, but
-						// don't skip the node yet; other edges may provide
-						// an active path (OR-join).
-					} else {
-						// Normal edge: parent must succeed.
-						// If the parent was skipped (due to conditional edge
-						// upstream), treat this edge as inactive rather than
-						// failed — OR-join semantics.
-						if !parentSucceeded {
-							e.mu.RLock()
-							isSkipped := e.skipped[edge.From]
-							e.mu.RUnlock()
-							if isSkipped {
-								// Parent was conditionally skipped, not failed.
-								// This edge is inactive, don't set parentFailed.
-							} else if parentNode, ok := e.dag.Node(edge.From); ok && parentNode.Mode() == ExecAsync {
-								// Async parent: its signal closes at start and
-								// the result arrives later (or never, for
-								// detached nodes like interval timers).
-								// Downstream proceeds without waiting.
-								hasActiveParent = true
-							} else {
-								parentFailed = true
-							}
-						} else {
-							hasActiveParent = true
-						}
+				if !alwaysRun {
+					select {
+					case <-parentSig:
+					case <-ctx.Done():
+						span := tctx.StartSpan(n.ID())
+						span.SetChainID(chainID)
+						span.SetParentNodeID(parentNodeID)
+						span.Skip("parent cancelled")
+						errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
+						close(sig)
+						return
 					}
-				case <-ctx.Done():
-					span := tctx.StartSpan(n.ID())
-					span.SetChainID(chainID)
-					span.SetParentNodeID(parentNodeID)
-					span.Skip("parent cancelled")
-					errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
-					close(sig)
-					return
+				} else {
+					// Always-run nodes ignore chain cancellation while
+					// waiting for parents: teardown must still execute
+					// after the parent signals (success or failure).
+					<-parentSig
+				}
+				e.mu.RLock()
+				_, parentSucceeded := e.results[edge.From]
+				e.mu.RUnlock()
+
+				if edge.Type == EdgeCondition {
+					// For conditional edges, a skipped parent is expected
+					// when the condition is not met. This is OR-join
+					// semantics: a skipped conditional parent does NOT
+					// block the child. If the parent was skipped (no
+					// result in map), this edge is inactive.
+					if !parentSucceeded {
+						continue
+					}
+					// Parent executed — evaluate the condition.
+					e.mu.RLock()
+					parentOutput := e.results[edge.From]
+					e.mu.RUnlock()
+					if e.evalCondition(ctx, edge.Condition, parentOutput) {
+						hasActiveParent = true
+					}
+					// Condition not met → this edge is inactive, but
+					// don't skip the node yet; other edges may provide
+					// an active path (OR-join).
+				} else {
+					// Normal edge: parent must succeed.
+					// If the parent was skipped (due to conditional edge
+					// upstream), treat this edge as inactive rather than
+					// failed — OR-join semantics.
+					if !parentSucceeded {
+						e.mu.RLock()
+						isSkipped := e.skipped[edge.From]
+						e.mu.RUnlock()
+						if isSkipped {
+							// Parent was conditionally skipped, not failed.
+							// This edge is inactive, don't set parentFailed.
+						} else if parentNode, ok := e.dag.Node(edge.From); ok && parentNode.Mode() == ExecAsync {
+							// Async parent: its signal closes at start and
+							// the result arrives later (or never, for
+							// detached nodes like interval timers).
+							// Downstream proceeds without waiting.
+							hasActiveParent = true
+						} else {
+							parentFailed = true
+						}
+					} else {
+						hasActiveParent = true
+					}
 				}
 			}
 
@@ -309,7 +323,9 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			// If the node has parents but none are active (all conditional
 			// edges were not met or parents skipped), also skip — no path
 			// leads here. Nodes with zero parents (entry nodes) always execute.
-			if len(inEdges) > 0 && (parentFailed || !hasActiveParent) {
+			// Always-run nodes are exempt: teardown must execute even when
+			// the parent failed or the chain was cancelled.
+			if !alwaysRun && len(inEdges) > 0 && (parentFailed || !hasActiveParent) {
 				span := tctx.StartSpan(n.ID())
 				span.SetChainID(chainID)
 				span.SetParentNodeID(parentNodeID)
@@ -344,28 +360,36 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 			for i := 0; i < loopCount; i++ {
 				span.Running(n.ID(), i)
 
-				select {
-				case <-ctx.Done():
-					// Manual cancel → span shows as "canceled" (warn);
-					// other cancellations (timeout) → span shows as "error".
-					if IsManualCancel(ctx) {
-						span.FinishCanceled("", fmt.Errorf("node %s canceled: %w", n.ID(), ctx.Err()))
-					} else {
-						span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
+				if !alwaysRun {
+					select {
+					case <-ctx.Done():
+						// Manual cancel → span shows as "canceled" (warn);
+						// other cancellations (timeout) → span shows as "error".
+						if IsManualCancel(ctx) {
+							span.FinishCanceled("", fmt.Errorf("node %s canceled: %w", n.ID(), ctx.Err()))
+						} else {
+							span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
+						}
+						errCh <- fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err())
+						if isSync {
+							close(sig)
+						}
+						return
+					default:
 					}
-					errCh <- fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err())
-					if isSync {
-						close(sig)
-					}
-					return
-				default:
 				}
 
 				input := e.buildInput(n.ID())
 				inputJSON, _ := json.Marshal(input.Variables)
 				span.SetInput(string(inputJSON))
 
-				output, err := n.Execute(ctx, input)
+				// Always-run nodes detach from the chain context so a chain
+				// cancellation does not kill the cleanup request.
+				nodeCtx := ctx
+				if alwaysRun {
+					nodeCtx = context.WithoutCancel(ctx)
+				}
+				output, err := n.Execute(nodeCtx, input)
 				if err != nil {
 					// Broadcast the failed iteration before the span-level
 					// Finish so cumulative counters record it.
@@ -406,12 +430,21 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 		close(syncDone)
 	}()
 
+	var execErr error
 	select {
 	case <-syncDone:
 	case err := <-errCh:
-		return nil, err
+		execErr = err
 	case <-ctx.Done():
-		return nil, fmt.Errorf("executor cancelled: %w", ctx.Err())
+		execErr = fmt.Errorf("executor cancelled: %w", ctx.Err())
+	}
+	if execErr != nil {
+		// Always-run nodes (teardown) may still be executing on a
+		// cancelled chain — wait for them so cleanup results are
+		// recorded and no goroutine outlives the chain before
+		// returning the error.
+		<-syncDone
+		return nil, execErr
 	}
 
 	e.mu.RLock()

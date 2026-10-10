@@ -82,6 +82,13 @@ type Node interface {
 	BlockOnError() bool
 }
 
+// AlwaysRunner is an optional interface for nodes that must execute even
+// when the chain is cancelled or their parent failed. Teardown nodes use it
+// so per-chain cleanup always runs, regardless of upstream hard failures.
+type AlwaysRunner interface {
+	AlwaysRun() bool
+}
+
 // Edge represents a directed connection from one node to another.
 type Edge struct {
 	// From is the source node ID.

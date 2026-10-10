@@ -1076,12 +1076,15 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Sc
 
 		_, err := exec.ExecuteWithTrace(taskCtx, resolvedVars)
 		if err != nil {
-			r.log.Error("DAG execution failed",
+			r.log.Error("DAG chain failed; other chains continue",
 				logger.F("error", err),
 				logger.F("chain_id", chainID.String()),
 			)
 			r.stats.RecordLatency(0, false)
-			return err
+			// Swallow the chain error: a failed chain must not cancel the
+			// worker pool — the run keeps going so every chain's counts
+			// (including the failing node's) land in the report.
+			return nil
 		}
 
 		return nil
@@ -1448,6 +1451,13 @@ func (n *sceneNode) Timeout() time.Duration { return n.timeout }
 func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
 func (n *sceneNode) BlockOnError() bool     { return n.blockOnError }
+
+// AlwaysRun marks teardown nodes as mandatory: they must execute even when
+// the chain is cancelled (e.g. a block_on_error hard failure upstream), so
+// per-chain cleanup always runs and is counted in the report.
+func (n *sceneNode) AlwaysRun() bool {
+	return n.nodeType == model.NodeTypeTeardown
+}
 
 // recordFailedNode records detailed information about a failed node execution.
 // errCode overrides the derived error code when non-empty (e.g. "ASSERT-FAIL"

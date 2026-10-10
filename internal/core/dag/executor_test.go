@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 )
 
 // recordingNode is a test Node that records its execution order and supports
@@ -670,4 +672,144 @@ func TestExecutorWithLoggers(t *testing.T) {
 	require.NotNil(t, result)
 
 	assert.Greater(t, len(warnLogs), 0, "should have warn logs")
+}
+
+// blockingFailNode fails on execute and blocks the chain (block_on_error=true),
+// triggering chain-wide cancellation.
+type blockingFailNode struct {
+	id string
+}
+
+func (n *blockingFailNode) ID() string             { return n.id }
+func (n *blockingFailNode) Timeout() time.Duration { return 0 }
+func (n *blockingFailNode) LoopCount() int         { return 1 }
+func (n *blockingFailNode) Mode() ExecMode         { return ExecSync }
+func (n *blockingFailNode) BlockOnError() bool     { return true }
+
+func (n *blockingFailNode) Execute(_ context.Context, _ *Input) (*Output, error) {
+	return nil, fmt.Errorf("node %s: assertion failed", n.id)
+}
+
+// teardownNode implements AlwaysRunner: it must run even when the chain is
+// cancelled by an upstream block_on_error failure.
+type teardownNode struct {
+	id       string
+	executed atomic.Int32
+	ctxErr   error
+}
+
+func (n *teardownNode) ID() string             { return n.id }
+func (n *teardownNode) Timeout() time.Duration { return 0 }
+func (n *teardownNode) LoopCount() int         { return 1 }
+func (n *teardownNode) Mode() ExecMode         { return ExecSync }
+func (n *teardownNode) BlockOnError() bool     { return false }
+func (n *teardownNode) AlwaysRun() bool        { return true }
+
+func (n *teardownNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
+	n.executed.Add(1)
+	n.ctxErr = ctx.Err()
+	return &Output{Response: n.id}, nil
+}
+
+func TestExecutorTeardownRunsAfterBlockOnError(t *testing.T) {
+	g := New()
+	failing := &blockingFailNode{id: "A"}
+	cleanup1 := &teardownNode{id: "T1"}
+	cleanup2 := &teardownNode{id: "T2"}
+	blocked := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(failing))
+	require.NoError(t, g.AddNode(cleanup1))
+	require.NoError(t, g.AddNode(cleanup2))
+	require.NoError(t, g.AddNode(blocked))
+	require.NoError(t, g.AddEdge("A", "T1", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("T1", "T2", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	e := NewExecutor(g)
+	_, err := e.Execute(context.Background())
+	require.Error(t, err, "the chain must still report the block_on_error failure")
+
+	assert.Equal(t, int32(1), cleanup1.executed.Load(), "teardown T1 must run despite the chain failure")
+	assert.Equal(t, int32(1), cleanup2.executed.Load(), "teardown T2 must run after T1")
+	assert.NoError(t, cleanup1.ctxErr, "teardown must execute on a live (detached) context")
+	assert.Zero(t, blocked.ExecCount(), "non-teardown downstream nodes must stay skipped")
+}
+
+// --- fakes for the traced execution path (ExecuteWithTrace / executeTraced) ---
+
+type fakeTraceHook struct {
+	ctx *fakeTraceContext
+}
+
+func (h *fakeTraceHook) StartTrace(_ context.Context, _, _ snowflake.ID) TraceContext {
+	h.ctx = &fakeTraceContext{spans: map[string]*fakeSpan{}}
+	return h.ctx
+}
+
+type fakeTraceContext struct {
+	spans map[string]*fakeSpan
+	mu    sync.Mutex
+}
+
+func (c *fakeTraceContext) StartSpan(nodeID string) SpanContext {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := &fakeSpan{nodeID: nodeID}
+	c.spans[nodeID] = s
+	return s
+}
+func (c *fakeTraceContext) FinishTrace()                   {}
+func (c *fakeTraceContext) FinishTraceWithError(string)    {}
+func (c *fakeTraceContext) FinishTraceWithCanceled(string) {}
+
+type fakeSpan struct {
+	nodeID   string
+	skipped  bool
+	finished bool
+}
+
+func (s *fakeSpan) SetInput(string)              {}
+func (s *fakeSpan) SetChainID(string)            {}
+func (s *fakeSpan) SetParentNodeID(string)       {}
+func (s *fakeSpan) Finish(string, error)         { s.finished = true }
+func (s *fakeSpan) FinishCanceled(string, error) { s.finished = true }
+func (s *fakeSpan) Skip(string)                  { s.skipped = true }
+func (s *fakeSpan) Running(string, int)          {}
+func (s *fakeSpan) IterationResult(int, bool)    {}
+
+// TestExecuteWithTraceTeardownRunsAfterBlockOnError covers the traced
+// execution path (executeTraced), which is the one production takes when a
+// tracer is configured. The always-run (teardown) exemption must behave the
+// same as the plain Execute path.
+func TestExecuteWithTraceTeardownRunsAfterBlockOnError(t *testing.T) {
+	g := New()
+	failing := &blockingFailNode{id: "A"}
+	cleanup1 := &teardownNode{id: "T1"}
+	cleanup2 := &teardownNode{id: "T2"}
+	blocked := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(failing))
+	require.NoError(t, g.AddNode(cleanup1))
+	require.NoError(t, g.AddNode(cleanup2))
+	require.NoError(t, g.AddNode(blocked))
+	require.NoError(t, g.AddEdge("A", "T1", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("T1", "T2", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	hook := &fakeTraceHook{}
+	e := NewExecutor(g, WithTraceHook(hook, 1, 1))
+	_, err := e.ExecuteWithTrace(context.Background(), nil)
+	require.Error(t, err, "the chain must still report the block_on_error failure")
+
+	assert.Equal(t, int32(1), cleanup1.executed.Load(), "teardown T1 must run despite the chain failure (traced path)")
+	assert.Equal(t, int32(1), cleanup2.executed.Load(), "teardown T2 must run after T1 (traced path)")
+	assert.NoError(t, cleanup1.ctxErr, "teardown must execute on a detached context (traced path)")
+	assert.Zero(t, blocked.ExecCount(), "non-teardown downstream nodes must stay skipped (traced path)")
+
+	hook.ctx.mu.Lock()
+	defer hook.ctx.mu.Unlock()
+	assert.True(t, hook.ctx.spans["T1"].finished, "teardown span T1 must be finished, not skipped")
+	assert.True(t, hook.ctx.spans["T2"].finished, "teardown span T2 must be finished, not skipped")
+	assert.True(t, hook.ctx.spans["B"].skipped, "downstream span B must be skipped")
 }
