@@ -856,3 +856,54 @@ commit 3960a12 下，失败用例在链路跟踪列表出现 2 条完全相同 t
 
 #### 3. "只有失败才复现"是强诊断信号
 同一份代码成功/失败行为分叉时，优先检查错误分支是否有额外的生命周期调用（Finish/close/flush 等）
+
+## Lesson 13: 链失败连锁取消整个 run + teardown 被跳过 (2026-10-10)
+
+### 现象
+示例场景（含 `block_on_error: true` 的业务断言演示节点）10 并发跑 100 次时出现两个问题：
+1. 业务断言演示节点只记录总数 1、失败 1（预期 100/0/100），第一条链硬失败后整个 run 被打断
+2. teardown 清理数据节点总数/成功/失败全为 0，链中断时 teardown 未执行
+
+### 根因分析（两个独立的连锁问题）
+
+**问题 1 — pool fast-fail 连锁**：
+`internal/core/pool/pool.go` 中 task 返回 error 会触发 `p.cancel()` 取消整个 worker pool。而 runner 的 task 中 `exec.ExecuteWithTrace` 返回链错误（block_on_error 硬失败）时原样上抛 → 一条链失败取消了整个 pool → run 提前终止。
+
+**问题 2 — teardown 被三处取消路径跳过**：
+- executor.go 等待 parent 的 `select` 中 `ctx.Done()`（链取消）与 `parentSig` 同时就绪时随机命中取消分支直接 return
+- `parentFailed` 判定跳过节点无豁免（parent 硬失败 → teardown 跟着 SKIP）
+- 执行循环顶部 `ctx.Done()` 检查同样会取消 teardown
+
+### 修复方案
+1. **runner.go task 吞链错误**：`ExecuteWithTrace` 返回 error 时记 Error 日志 + `stats.RecordLatency(0, false)` 后 `return nil`，链错误不再上抛给 pool，run 继续跑完全部链
+2. **dag.AlwaysRunner 可选接口**：`AlwaysRun() bool`；`sceneNode` 对 `NodeTypeTeardown` 返回 true
+3. **executor.go 三处豁免**：等待 parent 改为 `if !alwaysRun { select... } else { <-parentSig }`（消除 select 竞争）；`parentFailed` 跳过判定加 `!alwaysRun`；执行循环 ctx.Done 检查加 `!alwaysRun`，teardown 用 `context.WithoutCancel(ctx)` 执行（自身 timeout 仍生效）
+4. **Execute 等待 teardown**：返回错误前 `<-syncDone` 等 teardown 跑完，保证统计落库、无 goroutine 逃逸
+5. **（二轮修复）trace.go executeTraced 同步豁免**：首轮修复后实测 teardown 仍 0/0/0——`Execute()` 与 `executeTraced()`（trace.go）是**两套并行的 DAG 遍历实现**，runner 配置 tracer 时 `ExecuteWithTrace` 走 `executeTraced`，executor.go 的豁免全部没被走到。已把三处豁免 + WithoutCancel + `<-syncDone` 逐条同步到 executeTraced，并新增 `TestExecuteWithTraceTeardownRunsAfterBlockOnError`（fakeTraceHook）覆盖 traced 路径
+
+### 诊断手法（二轮）
+日志中 `"node waiting for parents"`（executor.go logWarn）出现 0 次而 `"DAG chain failed; other chains continue"`（runner.go 新代码）正常出现 → 新代码已编译但 executor.go 的路径未执行 → 存在第二条执行路径。用 `strings bin/salvo | grep <日志字符串>` 确认二进制含新代码后，顺藤摸瓜找到 `ExecuteWithTrace → executeTraced` 分叉。
+
+### 语义总结
+
+| block_on_error | 链内行为 | 跨链行为 |
+|----------------|---------|---------|
+| `true` | 硬失败：取消本条 chain，下游节点 SKIP（teardown 豁免仍执行） | 其他并发链继续，run 不中断 |
+| `false` | 软失败：错误记入 `Output.Error`，链继续，trace 标失败 | 同上 |
+
+### Lessons Learned
+
+#### 1. 每层错误处理策略要显式确认
+pool 的 fast-fail 设计（task error → cancel 整个 pool）与"单链失败不应打断 run"的压测语义冲突；引入 pool 时必须确认上层 task 对错误的吞/抛策略
+
+#### 2. "清理必须执行"的节点需要显式接口契约
+teardown 的执行保证不能靠"恰好没被取消路径命中"（select 竞争下是概率性的）；AlwaysRunner 接口把意图显式化，executor 三处取消路径逐一豁免
+
+#### 3. select 多路就绪是概率性 bug 的温床
+`select { case <-parentSig; case <-ctx.Done() }` 两路同时就绪时随机命中，测试可能间歇通过；对"某信号优先"的需求必须用 if/else 显式分支而非 select
+
+#### 4. 取消语境下要区分"链取消"与"节点自身超时"
+`context.WithoutCancel` 保留 deadline/timeout 派生能力，teardown 既能脱离链取消又保留自身 timeout，是"豁免取消但不豁免超时"的标准做法
+
+#### 5. 双实现必须双同步：Execute() vs executeTraced() 是两套并行 DAG 遍历
+executor.go 的 `Execute()`（无 tracer）与 trace.go 的 `executeTraced()`（有 tracer，生产路径）各自实现了完整的节点遍历/信号/跳过逻辑。修改任何执行语义（取消、跳过、信号）必须两处同步，且测试必须两条路径都覆盖——只测 `Execute()` 会给出"修复完成"的假象。顺带的坑：expr 条件值只 strip 双引号，`!= ''` 实际比较字面量两个单引号（恒真），字符串比较必须用双引号值 `${var} == \"yes\"`

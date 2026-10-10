@@ -325,7 +325,7 @@ YAML 中定义了 10 条测试数据，又通过 GUI 上传了同名的 CSV 文�
 | `condition` | string | 节点执行条件表达式 |
 | `timed_trigger` | string | 定时触发，如 `"@every 10s"` |
 | `loop_count` | int | 节点循环次数(顶层字段) |
-| `block_on_error` | bool | 节点失败时是否中断整个链路执行（默认 `false`，失败不中断流程但 trace 链路标失败，见 [8.2](#82-软失败与-trace-链路成败)） |
+| `block_on_error` | bool | 节点失败时是否中断本条链路执行（默认 `false`，失败不中断流程但 trace 链路标失败，见 [8.1](#81-block_on_error-错误阻断)/[8.2](#82-软失败与-trace-链路成败)；`true` 时只中断本条 chain，其他并发链继续，teardown 仍执行） |
 
 节点类型清单（共 13 种）：
 
@@ -496,6 +496,10 @@ teardown:
 
 - 有 `edges`：按 edges 定义的 DAG 拓扑执行
 - 无 `edges`：Setup → Nodes → Teardown 顺序串联执行
+
+**teardown 的执行保证**：
+
+teardown 节点**无论链路成败都会执行**。即使主流程中某个 `block_on_error: true` 的节点硬失败导致链被取消（下游节点 SKIP），teardown 节点也会豁免取消、照常执行（仅受自身 `timeout` 约束），确保每条链的清理逻辑（删除测试数据、释放资源等）始终运行，其请求次数与成败计入测试报告。
 
 参考实现：[handler.go#L543-L549]($PROJECT_HOME/salvo/internal/api/handler.go#L543-L549)
 
@@ -1427,6 +1431,12 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 
 默认情况下（`block_on_error: false`，软失败），节点执行失败（HTTP 非 2xx、`expect_body` 断言失败等）不会中断整个链路，后续节点照常执行，但该节点的 trace span 与整条链路都会标记为失败（详见 [8.2 软失败与 trace 链路成败](#82-软失败与-trace-链路成败)）。通过设置 `block_on_error: true`，可以让该节点失败时**立即取消整个 chain 的执行**（硬失败，下游节点 SKIP）。
 
+**硬失败的作用范围**（重要）：
+
+- **只中断本条 chain**：压测 run 通常由多条并发 chain 组成（如 10 并发 × 100 次 = 1000 条链），某条链上的节点硬失败只会取消**这一条链**，其他并发链以及整个 run **继续执行**，每条链的成败独立计数进入测试报告。
+- **teardown 节点豁免**：链被硬失败取消时，链上的 `teardown` 节点**仍然执行**（脱离链取消上下文，仅受自身 `timeout` 约束），保证每条链的清理逻辑（删除测试数据等）无论链成败都会运行并计入报告。
+- **节点统计仍记录**：硬失败节点的请求次数、失败次数会正常记入测试报告的【节点排名】章节，不会因链中断而丢失。
+
 ```yaml
 # 示例：启动充电是关键步骤，失败后无需继续后续流程
 - name: 启动充电
@@ -1459,7 +1469,7 @@ Bearer ${__so("login","login",${salt_url},${login_url},${user},${pwd})}
 | HTTP 错误 | 响应状态码非 2xx（如 404、500） | 网络层/网关层错误 |
 | 业务断言失败 | `expect_body` 中定义的字段值不匹配 | 业务层错误，如 `errorCode != 0` |
 
-两种场景在 `block_on_error: false` 时均为软失败：流程继续、trace 标失败；`true` 时均为硬失败：中断 chain、下游节点 SKIP。
+两种场景在 `block_on_error: false` 时均为软失败：流程继续、trace 标失败；`true` 时均为硬失败：中断 chain、下游节点 SKIP（`teardown` 节点除外，仍会执行）。
 
 **与 while 循环的交互**：
 
