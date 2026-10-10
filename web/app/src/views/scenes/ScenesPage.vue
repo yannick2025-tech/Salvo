@@ -349,7 +349,7 @@ description: |
   - 定时器节点 (Timer Node) - 延迟等待 + 间隔心跳检测
   - 节点级 LoopCount - HTTP 节点独立循环执行
   - Setup/Teardown 生命周期管理
-  - IF-ELSE 条件分支
+  - IF-ELSE 条件分支 - mock 创建订单随机返回 require_payment=yes/no，两条分支各约 50% 概率被走到
   - Generator 参数生成器
   - 业务错误码断言 (Business Error Code) - HTTP 200 + body 内 errorCode=5037，expect_body 断言失败演示
 
@@ -368,6 +368,8 @@ variables:
     value: "1"
   - key: order_id
     value: ""
+  - key: require_payment
+    value: "yes"
   - key: payment_status
     value: ""
   - key: timeout_ms
@@ -501,6 +503,7 @@ nodes:
       expect_status: 201
       extract:
         order_id: "$.data.id"
+        require_payment: "$.data.require_payment"
       generator:
         body_fields:
           total:
@@ -530,10 +533,12 @@ nodes:
         - 订单处理子步骤3：更新状态
       loop_count: 3
 
+  # ---- IF-ELSE 分支演示：mock 创建订单时随机返回 require_payment=yes/no ----
+  # yes → 走支付链路；no → 走跳过支付，两条分支在【业务错误码断言演示】汇合
   - name: 判断是否支付
     type: if-else
     config:
-      expr: "\${order_id} != ''"
+      expr: '\${require_payment} == "yes"'
 
   - name: 支付订单
     type: http
@@ -710,10 +715,10 @@ edges:
   - from: 商品推荐(Async Group)
     to: 业务错误码断言演示
 
-  - from: 业务错误码断言演示
-    to: 查询最终订单状态
-
   - from: 跳过支付
+    to: 业务错误码断言演示
+
+  - from: 业务错误码断言演示
     to: 查询最终订单状态
 
   - from: 查询最终订单状态

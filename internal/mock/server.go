@@ -256,7 +256,14 @@ func (m *MockServer) handleOrders(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var req map[string]any
 		json.Unmarshal(body, &req)
-		writeJSON(w, 201, map[string]any{"code": 0, "data": map[string]any{"id": "ORD-003", "user_id": req["user_id"], "total": req["total"], "status": "created"}})
+		// require_payment alternates randomly (50/50) so the example
+		// scene's if-else branch (支付订单 vs 跳过支付) is genuinely
+		// exercised on both sides across chains.
+		requirePayment := "yes"
+		if rand.Intn(2) == 0 {
+			requirePayment = "no"
+		}
+		writeJSON(w, 201, map[string]any{"code": 0, "data": map[string]any{"id": "ORD-003", "user_id": req["user_id"], "total": req["total"], "status": "created", "require_payment": requirePayment}})
 	default:
 		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
 	}
