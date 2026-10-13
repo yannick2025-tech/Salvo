@@ -1001,9 +1001,21 @@ function renderSysExpandedChart(chartId: string) {
   }
 }
 
+// The system-monitor chart row is rendered behind v-if, so switching runs
+// (which clears the series) unmounts and later re-creates those containers.
+// A cached ECharts instance keeps drawing into the detached node, leaving the
+// new canvas blank, so re-init whenever the bound element changed.
+function bindSysChart(instance: echarts.ECharts | null, el: HTMLElement): echarts.ECharts {
+  if (instance && instance.getDom() !== el) {
+    instance.dispose()
+    instance = null
+  }
+  return instance ?? echarts.init(el)
+}
+
 function renderSysGoroutineChart() {
   if (!sysGoroutineChartRef.value) return
-  if (!sysGoroutineChart) sysGoroutineChart = echarts.init(sysGoroutineChartRef.value)
+  sysGoroutineChart = bindSysChart(sysGoroutineChart, sysGoroutineChartRef.value)
   sysGoroutineChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysGoroutine === 'smooth'
@@ -1024,7 +1036,7 @@ function renderSysGoroutineChart() {
 
 function renderSysHeapChart() {
   if (!sysHeapChartRef.value) return
-  if (!sysHeapChart) sysHeapChart = echarts.init(sysHeapChartRef.value)
+  sysHeapChart = bindSysChart(sysHeapChart, sysHeapChartRef.value)
   sysHeapChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysHeap === 'smooth'
@@ -1049,7 +1061,7 @@ function renderSysHeapChart() {
 
 function renderSysCpuChart() {
   if (!sysCpuChartRef.value) return
-  if (!sysCpuChart) sysCpuChart = echarts.init(sysCpuChartRef.value)
+  sysCpuChart = bindSysChart(sysCpuChart, sysCpuChartRef.value)
   sysCpuChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysCpu === 'smooth'
@@ -1070,7 +1082,7 @@ function renderSysCpuChart() {
 
 function renderSysTaskWaitChart() {
   if (!sysTaskWaitChartRef.value) return
-  if (!sysTaskWaitChart) sysTaskWaitChart = echarts.init(sysTaskWaitChartRef.value)
+  sysTaskWaitChart = bindSysChart(sysTaskWaitChart, sysTaskWaitChartRef.value)
   sysTaskWaitChart.clear()
   const theme = getChartTheme()
   const isSmooth = chartTypes.value.sysTaskWait === 'smooth'
@@ -1097,7 +1109,7 @@ function renderSysTaskWaitChart() {
 
 function renderSysQueueChart() {
   if (!sysQueueChartRef.value) return
-  if (!sysQueueChart) sysQueueChart = echarts.init(sysQueueChartRef.value)
+  sysQueueChart = bindSysChart(sysQueueChart, sysQueueChartRef.value)
   sysQueueChart.clear()
   const theme = getChartTheme()
   const data = getSysData('pending_queue_len')
