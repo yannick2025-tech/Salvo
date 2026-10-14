@@ -2,14 +2,22 @@
   <div class="users-page">
     <div class="page-header">
       <h2>用户管理</h2>
+<<<<<<< HEAD
       <button class="btn-login-primary" @click="showCreate = true">+ 新建用户</button>
+=======
+      <button class="btn-primary" @click="showCreate = true">+ 新建用户</button>
+>>>>>>> dev
     </div>
 
     <div class="table-wrapper">
       <table class="data-table">
         <thead>
           <tr>
+<<<<<<< HEAD
             <th>ID</th>
+=======
+            <th>数据KEY</th>
+>>>>>>> dev
             <th>邮箱</th>
             <th>昵称</th>
             <th>角色</th>
@@ -21,7 +29,11 @@
         <tbody>
           <tr v-if="users.length === 0"><td colspan="7" class="empty">暂无用户</td></tr>
           <tr v-for="u in users" :key="u.id">
+<<<<<<< HEAD
             <td class="mono">{{ u.id }}</td>
+=======
+            <td class="mono" :title="'数据库主键：' + u.id">{{ u.id }}</td>
+>>>>>>> dev
             <td>{{ u.email }}</td>
             <td>{{ u.nickname || '-' }}</td>
             <td><span class="role-badge">{{ u.role_name }}</span></td>
@@ -69,7 +81,11 @@
         <div v-if="formError" class="form-error">{{ formError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeModal">取消</button>
+<<<<<<< HEAD
           <button class="btn-login-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
+=======
+          <button class="btn-primary" @click="handleSave">{{ editingUser ? '保存' : '创建' }}</button>
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -270,7 +286,10 @@ onMounted(() => {
 .users-page { display: flex; flex-direction: column; gap: 16px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; }
 .page-header h2 { font-size: 18px; font-weight: 600; }
+<<<<<<< HEAD
 .btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
+=======
+>>>>>>> dev
 .btn-secondary { padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .btn-sm { padding: 4px 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.15s ease; }
 .btn-sm.danger { color: var(--accent-danger); border-color: var(--accent-danger); }
@@ -284,7 +303,11 @@ onMounted(() => {
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
+<<<<<<< HEAD
 .mono { font-family: monospace; font-size: 12px; }
+=======
+.mono { font-family: var(--font-mono); font-size: 12px; }
+>>>>>>> dev
 .actions { display: flex; gap: 6px; }
 .role-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }

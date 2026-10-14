@@ -5,11 +5,23 @@
 package http
 
 import (
+<<<<<<< HEAD
+=======
+	"bytes"
+>>>>>>> dev
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+<<<<<<< HEAD
 	"net/http"
+=======
+	"mime/multipart"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+>>>>>>> dev
 	"strings"
 	"time"
 
@@ -28,6 +40,19 @@ const (
 	MethodHead   Method = "HEAD"
 )
 
+<<<<<<< HEAD
+=======
+// FormData represents a multipart/form-data request body. It carries
+// simple string fields and one or more file paths that the protocol
+// layer will open and stream into the multipart writer.
+type FormData struct {
+	// Fields are simple text form values.
+	Fields map[string]string
+	// Files maps field name → file path on disk.
+	Files map[string]string
+}
+
+>>>>>>> dev
 // HTTPRequest is the HTTP-specific request type. It implements the
 // protocol.Request interface.
 type HTTPRequest struct {
@@ -35,6 +60,12 @@ type HTTPRequest struct {
 	URL     string
 	Headers map[string]string
 	Body    []byte
+<<<<<<< HEAD
+=======
+	// Form, when non-nil, builds a multipart/form-data request body.
+	// It takes precedence over Body when both are set.
+	Form    *FormData
+>>>>>>> dev
 	Timeout time.Duration
 }
 
@@ -131,12 +162,50 @@ func (p *Protocol) Execute(ctx context.Context, req protocol.Request) (protocol.
 		defer cancel()
 	}
 
+<<<<<<< HEAD
 	bodyReader := io.NopCloser(strings.NewReader(string(httpReq.Body)))
 	if httpReq.Body == nil {
 		bodyReader = nil
 	}
 
 	goReq, err := http.NewRequestWithContext(ctx, string(httpReq.Method), httpReq.URL, bodyReader)
+=======
+	// Ensure query parameters are properly percent-encoded. Variable
+	// interpolation can inject raw values (e.g. "Widget B") into the query
+	// string; unencoded spaces break the HTTP request line and cause
+	// servers to return 400 Bad Request before any handler runs.
+	requestURL := httpReq.URL
+	if u, perr := url.Parse(httpReq.URL); perr == nil && u.RawQuery != "" {
+		if values, verr := url.ParseQuery(u.RawQuery); verr == nil {
+			u.RawQuery = values.Encode()
+			requestURL = u.String()
+		}
+	}
+
+	// Build request body. multipart/form-data (Form) takes precedence over
+	// raw Body when both are set, because mixing the two on the same request
+	// is undefined behavior.
+	var bodyReader io.Reader
+	if httpReq.Form != nil {
+		buf, contentType, err := buildMultipartBody(httpReq.Form)
+		if err != nil {
+			return nil, fmt.Errorf("http: build multipart body: %w", err)
+		}
+		bodyReader = bytes.NewReader(buf)
+		// Auto-set Content-Type unless caller already provided one, so
+		// the boundary reaches the server intact.
+		if httpReq.Headers == nil {
+			httpReq.Headers = make(map[string]string)
+		}
+		if _, exists := httpReq.Headers["Content-Type"]; !exists {
+			httpReq.Headers["Content-Type"] = contentType
+		}
+	} else if httpReq.Body != nil {
+		bodyReader = strings.NewReader(string(httpReq.Body))
+	}
+
+	goReq, err := http.NewRequestWithContext(ctx, string(httpReq.Method), requestURL, bodyReader)
+>>>>>>> dev
 	if err != nil {
 		return nil, fmt.Errorf("http: create request: %w", err)
 	}
@@ -173,3 +242,80 @@ func (p *Protocol) Execute(ctx context.Context, req protocol.Request) (protocol.
 		Latency:    latency,
 	}, nil
 }
+<<<<<<< HEAD
+=======
+
+// buildMultipartBody constructs a multipart/form-data body from form fields
+// and file paths. It returns the full body bytes and the Content-Type
+// header value (including the generated boundary).
+//
+// Files are read from disk and streamed into a writer; missing files cause
+// an error that propagates up so callers can distinguish "file not found"
+// from a transport error.
+func buildMultipartBody(form *FormData) (body []byte, contentType string, err error) {
+	buf := &bytes.Buffer{}
+	w := multipart.NewWriter(buf)
+
+	// Text fields (sorted for deterministic output, helps with replay/debugging).
+	for _, k := range sortedKeys(form.Fields) {
+		if wErr := w.WriteField(k, form.Fields[k]); wErr != nil {
+			return nil, "", fmt.Errorf("write field %q: %w", k, wErr)
+		}
+	}
+
+	// Files.
+	for _, field := range sortedFileKeys(form.Files) {
+		path := form.Files[field]
+		f, openErr := os.Open(path)
+		if openErr != nil {
+			return nil, "", fmt.Errorf("open file for field %q: %w", field, openErr)
+		}
+		part, createErr := w.CreateFormFile(field, filepath.Base(path))
+		if createErr != nil {
+			_ = f.Close()
+			return nil, "", fmt.Errorf("create form file %q: %w", field, createErr)
+		}
+		if _, cpErr := io.Copy(part, f); cpErr != nil {
+			_ = f.Close()
+			return nil, "", fmt.Errorf("copy file %q: %w", field, cpErr)
+		}
+		if closeErr := f.Close(); closeErr != nil {
+			return nil, "", fmt.Errorf("close file %q: %w", field, closeErr)
+		}
+	}
+
+	if closeErr := w.Close(); closeErr != nil {
+		return nil, "", fmt.Errorf("close multipart writer: %w", closeErr)
+	}
+
+	return buf.Bytes(), w.FormDataContentType(), nil
+}
+
+// sortedKeys returns map keys sorted alphabetically.
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sortStrings(keys)
+	return keys
+}
+
+// sortedFileKeys is the same as sortedKeys but kept separate for clarity
+// (files vs fields are conceptually different categories).
+func sortedFileKeys(m map[string]string) []string {
+	return sortedKeys(m)
+}
+
+// sortStrings is an inlined insertion sort to avoid pulling in sort for
+// what's typically a tiny number of form fields (<20).
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		j := i
+		for j > 0 && s[j-1] > s[j] {
+			s[j-1], s[j] = s[j], s[j-1]
+			j--
+		}
+	}
+}
+>>>>>>> dev

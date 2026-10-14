@@ -28,12 +28,24 @@ func (m *Model) IsDeleted() bool {
 // Scene represents a test scenario configuration.
 type Scene struct {
 	Model
+<<<<<<< HEAD
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	DAGJSON     string `json:"dag_json"`
 	Variables   string `json:"variables,omitempty"`
 	Plugins     string `json:"plugins,omitempty"`
 	Status      string `json:"status"`
+=======
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	DAGJSON        string `json:"dag_json"`
+	Variables      string `json:"variables,omitempty"`
+	ConfigParams   string `json:"config_params,omitempty"`
+	DerivedParams  string `json:"derived_params,omitempty"`
+	Plugins        string `json:"plugins,omitempty"`
+	Status         string `json:"status"`
+	DefaultTimeout int    `json:"default_timeout,omitempty"` // 场景默认超时(秒)，0 表示使用系统默认
+>>>>>>> dev
 }
 
 const (
@@ -47,12 +59,23 @@ const (
 // Node represents a DAG node within a scene.
 type Node struct {
 	Model
+<<<<<<< HEAD
 	SceneID   snowflake.ID `json:"scene_id,string"`
 	Name      string       `json:"name"`
 	Type      string       `json:"type"`
 	Config    string       `json:"config,omitempty"`
 	Position  string       `json:"position,omitempty"`
 	LoopCount int          `json:"loop_count,omitempty"`
+=======
+	SceneID      snowflake.ID `json:"scene_id,string"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError bool         `json:"block_on_error,omitempty"`
+	Lifecycle    string       `json:"lifecycle,omitempty"`
+>>>>>>> dev
 }
 
 const (
@@ -62,10 +85,42 @@ const (
 	NodeTypeIfElse    = "if-else"
 	NodeTypeLoop      = "loop"
 	NodeTypeGroup     = "group"
+<<<<<<< HEAD
 	NodeTypeSetup     = "setup"
 	NodeTypeTeardown  = "teardown"
 )
 
+=======
+	NodeTypeWhile     = "while"
+	NodeTypeParallel  = "parallel"
+	NodeTypeSubFlow   = "sub_flow"
+	NodeTypeSetup     = "setup"
+	NodeTypeTeardown  = "teardown"
+	NodeTypeTimer     = "timer"
+	NodeTypeGenerator = "generator"
+)
+
+// Node lifecycle indicates which YAML section a node belongs to
+// (setup/teardown/main). Empty string means main. Orthogonal to Type.
+const (
+	NodeLifecycleMain     = ""
+	NodeLifecycleSetup    = "setup"
+	NodeLifecycleTeardown = "teardown"
+)
+
+// DataSource represents a CSV data source attached to a scene.
+type DataSource struct {
+	Model
+	SceneID  snowflake.ID `json:"scene_id,string"`
+	Name     string       `json:"name"`
+	FileName string       `json:"file_name"`
+	Columns  string       `json:"columns"` // JSON array of column names
+	Rows     string       `json:"rows"`    // JSON array of row objects
+	RowCount int          `json:"row_count"`
+	Source   string       `json:"source"` // "yaml" or "csv"
+}
+
+>>>>>>> dev
 // Edge represents a directed edge between two DAG nodes.
 type Edge struct {
 	Model
@@ -120,6 +175,16 @@ type Report struct {
 	FinishedAt *time.Time   `json:"finished_at,omitempty"`
 }
 
+<<<<<<< HEAD
+=======
+// ReportDetail represents the detailed data of a report.
+// This is stored in a separate table to optimize query performance.
+type ReportDetail struct {
+	ReportID snowflake.ID `json:"report_id,string"`
+	Detail   string       `json:"detail,omitempty"`
+}
+
+>>>>>>> dev
 const (
 	ReportStatusSuccess = "success"
 	ReportStatusFailed  = "failed"
@@ -129,6 +194,10 @@ const (
 // RunRecord represents a single test execution record.
 type RunRecord struct {
 	Model
+<<<<<<< HEAD
+=======
+	RunID       snowflake.ID `json:"run_id,string"`
+>>>>>>> dev
 	SceneID     snowflake.ID `json:"scene_id,string"`
 	Status      string       `json:"status"`
 	WorkerCount int          `json:"worker_count"`
@@ -157,12 +226,21 @@ const (
 
 type User struct {
 	Model
+<<<<<<< HEAD
 	Email        string     `json:"email"`
 	PasswordHash string     `json:"-"`
 	Nickname     string     `json:"nickname"`
 	RoleID       snowflake.ID `json:"role_id,string"`
 	Status       string     `json:"status"`
 	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+=======
+	Email        string       `json:"email"`
+	PasswordHash string       `json:"-"`
+	Nickname     string       `json:"nickname"`
+	RoleID       snowflake.ID `json:"role_id,string"`
+	Status       string       `json:"status"`
+	LastLoginAt  *time.Time   `json:"last_login_at,omitempty"`
+>>>>>>> dev
 }
 
 const (
@@ -191,6 +269,7 @@ type RolePermission struct {
 
 // TimeSeriesSample represents a time-series metric sample for a run or node.
 type TimeSeriesSample struct {
+<<<<<<< HEAD
 	ID            int64        `json:"id"`
 	RunID         snowflake.ID  `json:"run_id,string"`
 	NodeID        string       `json:"node_id"`
@@ -206,4 +285,21 @@ type TimeSeriesSample struct {
 	P99LatencyMs  float64      `json:"p99_latency_ms"`
 	MinLatencyMs  float64      `json:"min_latency_ms"`
 	MaxLatencyMs  float64      `json:"max_latency_ms"`
+=======
+	ID             int64        `json:"id"`
+	RunID          snowflake.ID `json:"run_id,string"`
+	NodeID         string       `json:"node_id"`
+	SampleTime     time.Time    `json:"sample_time"`
+	WindowDuration int          `json:"window_duration"`
+	QPS            float64      `json:"qps"`
+	TotalRequests  int64        `json:"total_requests"`
+	SuccessCount   int64        `json:"success_count"`
+	FailCount      int64        `json:"fail_count"`
+	AvgLatencyMs   float64      `json:"avg_latency_ms"`
+	P50LatencyMs   float64      `json:"p50_latency_ms"`
+	P95LatencyMs   float64      `json:"p95_latency_ms"`
+	P99LatencyMs   float64      `json:"p99_latency_ms"`
+	MinLatencyMs   float64      `json:"min_latency_ms"`
+	MaxLatencyMs   float64      `json:"max_latency_ms"`
+>>>>>>> dev
 }

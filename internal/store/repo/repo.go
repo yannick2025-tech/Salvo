@@ -8,11 +8,22 @@ package repo
 
 import (
 	"context"
+<<<<<<< HEAD
+=======
+	"errors"
+>>>>>>> dev
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 )
 
+<<<<<<< HEAD
+=======
+// ErrEmailTaken indicates an active user already owns the email, so a new
+// user cannot be created with it.
+var ErrEmailTaken = errors.New("email already in use")
+
+>>>>>>> dev
 // Filter holds common pagination and filtering parameters for List queries.
 type Filter struct {
 	// Offset is the number of records to skip.
@@ -41,6 +52,10 @@ type SceneRepo interface {
 	Update(ctx context.Context, scene *model.Scene) error
 	UpdateStatus(ctx context.Context, id snowflake.ID, status string) error
 	Delete(ctx context.Context, id snowflake.ID) error
+<<<<<<< HEAD
+=======
+	CopyTx(ctx context.Context, srcID snowflake.ID, newName, newDesc string) (*model.Scene, error)
+>>>>>>> dev
 }
 
 // NodeRepo provides persistence operations for Node entities.
@@ -100,6 +115,14 @@ type RunRecordRepo interface {
 
 type UserRepo interface {
 	Create(ctx context.Context, user *model.User) error
+<<<<<<< HEAD
+=======
+	// CreateOrRestore inserts a new user; if a soft-deleted user with the
+	// same email exists, it restores that row with the new values (keeping
+	// the original id and created_at). Returns ErrEmailTaken when an
+	// active user already owns the email.
+	CreateOrRestore(ctx context.Context, user *model.User) error
+>>>>>>> dev
 	GetByID(ctx context.Context, id snowflake.ID) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	List(ctx context.Context, filter Filter) ([]*model.User, error)
@@ -130,3 +153,27 @@ type RolePermissionRepo interface {
 	RevokeAll(ctx context.Context, roleID snowflake.ID) error
 	ListPermissions(ctx context.Context, roleID snowflake.ID) ([]*model.Permission, error)
 }
+<<<<<<< HEAD
+=======
+
+// DataSourceRepo provides persistence operations for DataSource entities.
+type DataSourceRepo interface {
+	Create(ctx context.Context, ds *model.DataSource) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.DataSource, error)
+	GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) ([]*model.DataSource, error)
+	GetBySceneIDAndNameAndSource(ctx context.Context, sceneID snowflake.ID, name string, source string) (*model.DataSource, error)
+	ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error)
+	Update(ctx context.Context, ds *model.DataSource) error
+	Delete(ctx context.Context, id snowflake.ID) error
+}
+
+// SOPluginRepo provides persistence operations for SOPlugin entities.
+type SOPluginRepo interface {
+	Create(ctx context.Context, p *model.SOPlugin) error
+	GetByID(ctx context.Context, id snowflake.ID) (*model.SOPlugin, error)
+	List(ctx context.Context, filter Filter) ([]*model.SOPlugin, error)
+	UpdateStatus(ctx context.Context, id snowflake.ID, status string) error
+	UpdateConfig(ctx context.Context, id snowflake.ID, config string) error
+	Delete(ctx context.Context, id snowflake.ID) error
+}
+>>>>>>> dev

@@ -13,6 +13,10 @@ package pool
 import (
 	"context"
 	"fmt"
+<<<<<<< HEAD
+=======
+	"runtime/debug"
+>>>>>>> dev
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,12 +67,22 @@ func (c Config) Validate() error {
 // Pool is a fixed-size goroutine pool that executes submitted tasks
 // respecting a configurable termination condition.
 type Pool struct {
+<<<<<<< HEAD
 	workers  int
 	cfg      Config
 	tasks    chan Task
 	ctx      context.Context
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
+=======
+	workers     int
+	cfg         Config
+	tasks       chan Task
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	waitTracker *WaitTimeTracker
+>>>>>>> dev
 
 	submitted atomic.Int64
 	completed atomic.Int64
@@ -97,11 +111,20 @@ func NewWithContext(parent context.Context, workers int, cfg Config) (*Pool, err
 	ctx, cancel := context.WithCancel(parent)
 
 	p := &Pool{
+<<<<<<< HEAD
 		workers: workers,
 		cfg:     cfg,
 		tasks:   make(chan Task, workers*2),
 		ctx:     ctx,
 		cancel:  cancel,
+=======
+		workers:     workers,
+		cfg:         cfg,
+		tasks:       make(chan Task, workers*2),
+		ctx:         ctx,
+		cancel:      cancel,
+		waitTracker: NewWaitTimeTracker(10000),
+>>>>>>> dev
 	}
 
 	p.start()
@@ -118,6 +141,14 @@ func (p *Pool) start() {
 
 	if p.cfg.RunMode == RunModeDuration {
 		go func() {
+<<<<<<< HEAD
+=======
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("[pool] duration timer panicked: %v\n%s\n", r, debug.Stack())
+				}
+			}()
+>>>>>>> dev
 			timer := time.NewTimer(p.cfg.Duration)
 			defer timer.Stop()
 			select {
@@ -138,12 +169,34 @@ func (p *Pool) worker() {
 		case <-p.ctx.Done():
 			return
 		case task := <-p.tasks:
+<<<<<<< HEAD
 			if err := task(p.ctx); err != nil {
 				p.errOnce.Do(func() {
 					p.firstErr = err
 					p.cancel()
 				})
 			}
+=======
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Log the panic using standard log output; the pool
+						// does not have a structured logger dependency.
+						fmt.Printf("[pool] worker panicked: %v\n%s\n", r, debug.Stack())
+						p.errOnce.Do(func() {
+							p.firstErr = fmt.Errorf("worker panicked: %v", r)
+							p.cancel()
+						})
+					}
+				}()
+				if err := task(p.ctx); err != nil {
+					p.errOnce.Do(func() {
+						p.firstErr = err
+						p.cancel()
+					})
+				}
+			}()
+>>>>>>> dev
 			p.completed.Add(1)
 		}
 	}
@@ -157,8 +210,20 @@ func (p *Pool) Submit(task Task) {
 	}
 	p.submitted.Add(1)
 
+<<<<<<< HEAD
 	select {
 	case p.tasks <- task:
+=======
+	enqueuedAt := time.Now()
+
+	select {
+	case p.tasks <- func(ctx context.Context) error {
+		if p.ctx.Err() == nil {
+			p.waitTracker.Record(time.Since(enqueuedAt))
+		}
+		return task(ctx)
+	}:
+>>>>>>> dev
 	case <-p.ctx.Done():
 	}
 }
@@ -215,3 +280,31 @@ func (p *Pool) Submitted() int64 {
 func (p *Pool) Completed() int64 {
 	return p.completed.Load()
 }
+<<<<<<< HEAD
+=======
+
+// TaskWaitStats returns aggregated wait-time statistics for tasks in
+// the pool. The statistics reflect the time between task submission
+// (Submit) and actual execution start.
+func (p *Pool) TaskWaitStats() WaitTimeStats {
+	return p.waitTracker.Stats()
+}
+
+// ActiveWorkers returns the number of currently executing workers,
+// computed as submitted minus completed tasks (capped at worker count).
+func (p *Pool) ActiveWorkers() int {
+	active := int(p.submitted.Load() - p.completed.Load())
+	if active < 0 {
+		active = 0
+	}
+	if active > p.workers {
+		active = p.workers
+	}
+	return active
+}
+
+// PendingQueueLen returns the number of tasks waiting in the queue.
+func (p *Pool) PendingQueueLen() int {
+	return len(p.tasks)
+}
+>>>>>>> dev

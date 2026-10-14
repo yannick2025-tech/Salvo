@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+<<<<<<< HEAD
+=======
+	"sync/atomic"
+>>>>>>> dev
 
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
@@ -14,6 +18,22 @@ import (
 // a single DAG execution.
 const ChainIDKey = "salvo_chain_id"
 
+<<<<<<< HEAD
+=======
+// ManualCancelKey is the context key for the manual-cancel flag.
+// The value stored is a *atomic.Bool that is set to true when the user
+// manually stops the run. Both the DAG executor and the runner use this
+// to distinguish manual cancellation from request timeouts.
+type ManualCancelKey struct{}
+
+// IsManualCancel checks whether the context carries a manual-cancel flag
+// that is set to true. Returns false if the flag is absent or not set.
+func IsManualCancel(ctx context.Context) bool {
+	flag, ok := ctx.Value(ManualCancelKey{}).(*atomic.Bool)
+	return ok && flag != nil && flag.Load()
+}
+
+>>>>>>> dev
 // TraceHook is called by the executor when a node starts and finishes.
 // It decouples the executor from the concrete tracing implementation.
 type TraceHook interface {
@@ -29,6 +49,11 @@ type TraceContext interface {
 	FinishTrace()
 	// FinishTraceWithError marks the trace as failed.
 	FinishTraceWithError(err string)
+<<<<<<< HEAD
+=======
+	// FinishTraceWithCanceled marks the trace as canceled (manual stop).
+	FinishTraceWithCanceled(reason string)
+>>>>>>> dev
 }
 
 // SpanContext records the outcome of a single node execution.
@@ -41,8 +66,20 @@ type SpanContext interface {
 	SetParentNodeID(parentNodeID string)
 	// Finish completes the span with output and error.
 	Finish(output string, err error)
+<<<<<<< HEAD
 	// Skip marks the span as skipped.
 	Skip(reason string)
+=======
+	// FinishCanceled marks the span as canceled (manual stop).
+	FinishCanceled(output string, err error)
+	// Skip marks the span as skipped.
+	Skip(reason string)
+	// Running broadcasts a "running" event for the given loop iteration.
+	Running(nodeID string, loopIndex int)
+	// IterationResult broadcasts the outcome of a single loop iteration so
+	// subscribers can maintain cumulative per-iteration counters.
+	IterationResult(loopIndex int, failed bool)
+>>>>>>> dev
 }
 
 // --- Adapters for the trace package ---
@@ -81,6 +118,14 @@ func (c *contextAdapter) FinishTraceWithError(err string) {
 	c.tctx.FinishWithError(err)
 }
 
+<<<<<<< HEAD
+=======
+// FinishTraceWithCanceled marks the trace as canceled (manual stop).
+func (c *contextAdapter) FinishTraceWithCanceled(reason string) {
+	c.tctx.FinishWithCanceled(reason)
+}
+
+>>>>>>> dev
 // spanAdapter adapts tracelib.SpanBuilder to SpanContext.
 type spanAdapter struct {
 	builder *tracelib.SpanBuilder
@@ -106,11 +151,32 @@ func (s *spanAdapter) Finish(output string, err error) {
 	s.builder.Finish(output, err)
 }
 
+<<<<<<< HEAD
+=======
+// FinishCanceled marks the span as canceled (manual stop).
+func (s *spanAdapter) FinishCanceled(output string, err error) {
+	s.builder.FinishCanceled(output, err)
+}
+
+>>>>>>> dev
 // Skip marks the span as skipped.
 func (s *spanAdapter) Skip(reason string) {
 	s.builder.Skip(reason)
 }
 
+<<<<<<< HEAD
+=======
+// Running broadcasts a "running" event for the given loop iteration.
+func (s *spanAdapter) Running(nodeID string, loopIndex int) {
+	s.builder.BroadcastRunning(loopIndex)
+}
+
+// IterationResult broadcasts the outcome of a single loop iteration.
+func (s *spanAdapter) IterationResult(loopIndex int, failed bool) {
+	s.builder.BroadcastIterationResult(loopIndex, failed)
+}
+
+>>>>>>> dev
 // WithTraceHook adds a trace hook to the executor. When set, the executor
 // records a span for every node execution and a trace for the full DAG run.
 func WithTraceHook(hook TraceHook, sceneID, runID snowflake.ID) ExecutorOption {
@@ -126,7 +192,11 @@ func WithTraceHook(hook TraceHook, sceneID, runID snowflake.ID) ExecutorOption {
 // node, and finishes the trace when done. Returns all node outputs.
 func (e *Executor) ExecuteWithTrace(ctx context.Context, initialVars map[string]any) (map[string]*Output, error) {
 	e.initialVars = initialVars
+<<<<<<< HEAD
 	
+=======
+
+>>>>>>> dev
 	if e.traceHook == nil {
 		out, err := e.Execute(ctx)
 		if out != nil {
@@ -142,7 +212,18 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, initialVars map[string]
 
 	out, err := e.executeTraced(ctx, tctx)
 	if err != nil {
+<<<<<<< HEAD
 		tctx.FinishTraceWithError(err.Error())
+=======
+		// Distinguish manual cancellation from real errors: a manual stop
+		// (user clicked Stop) is not a failure — mark the trace as "canceled"
+		// so it shows as a warning instead of an error.
+		if IsManualCancel(ctx) {
+			tctx.FinishTraceWithCanceled(err.Error())
+		} else {
+			tctx.FinishTraceWithError(err.Error())
+		}
+>>>>>>> dev
 	}
 	return out, err
 }
@@ -180,6 +261,16 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 		go func(n Node, sig chan struct{}) {
 			isSync := n.Mode() == ExecSync
+<<<<<<< HEAD
+=======
+			// Always-run nodes (teardown) still execute when the chain is
+			// cancelled or their parent failed — cleanup must always run.
+			// Kept in sync with Executor.Execute in executor.go.
+			alwaysRun := false
+			if ar, ok := n.(AlwaysRunner); ok {
+				alwaysRun = ar.AlwaysRun()
+			}
+>>>>>>> dev
 			if isSync {
 				defer syncWg.Done()
 			}
@@ -190,6 +281,7 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 				parentNodeID = inEdges[0].From
 			}
 
+<<<<<<< HEAD
 			for _, edge := range inEdges {
 				parentSig := signals[edge.From]
 				select {
@@ -218,6 +310,102 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 						return
 					}
 				}
+=======
+			parentFailed := false
+			hasActiveParent := false
+			for _, edge := range inEdges {
+				parentSig := signals[edge.From]
+				if !alwaysRun {
+					select {
+					case <-parentSig:
+					case <-ctx.Done():
+						span := tctx.StartSpan(n.ID())
+						span.SetChainID(chainID)
+						span.SetParentNodeID(parentNodeID)
+						span.Skip("parent cancelled")
+						errCh <- fmt.Errorf("waiting for parent of %s: %w", n.ID(), ctx.Err())
+						close(sig)
+						return
+					}
+				} else {
+					// Always-run nodes ignore chain cancellation while
+					// waiting for parents: teardown must still execute
+					// after the parent signals (success or failure).
+					<-parentSig
+				}
+				e.mu.RLock()
+				_, parentSucceeded := e.results[edge.From]
+				e.mu.RUnlock()
+
+				if edge.Type == EdgeCondition {
+					// For conditional edges, a skipped parent is expected
+					// when the condition is not met. This is OR-join
+					// semantics: a skipped conditional parent does NOT
+					// block the child. If the parent was skipped (no
+					// result in map), this edge is inactive.
+					if !parentSucceeded {
+						continue
+					}
+					// Parent executed — evaluate the condition.
+					e.mu.RLock()
+					parentOutput := e.results[edge.From]
+					e.mu.RUnlock()
+					if e.evalCondition(ctx, edge.Condition, parentOutput) {
+						hasActiveParent = true
+					}
+					// Condition not met → this edge is inactive, but
+					// don't skip the node yet; other edges may provide
+					// an active path (OR-join).
+				} else {
+					// Normal edge: parent must succeed.
+					// If the parent was skipped (due to conditional edge
+					// upstream), treat this edge as inactive rather than
+					// failed — OR-join semantics.
+					if !parentSucceeded {
+						e.mu.RLock()
+						isSkipped := e.skipped[edge.From]
+						e.mu.RUnlock()
+						if isSkipped {
+							// Parent was conditionally skipped, not failed.
+							// This edge is inactive, don't set parentFailed.
+						} else if parentNode, ok := e.dag.Node(edge.From); ok && parentNode.Mode() == ExecAsync {
+							// Async parent: its signal closes at start and
+							// the result arrives later (or never, for
+							// detached nodes like interval timers).
+							// Downstream proceeds without waiting.
+							hasActiveParent = true
+						} else {
+							parentFailed = true
+						}
+					} else {
+						hasActiveParent = true
+					}
+				}
+			}
+
+			// Skip this node if any normal-edge parent failed.
+			// If the node has parents but none are active (all conditional
+			// edges were not met or parents skipped), also skip — no path
+			// leads here. Nodes with zero parents (entry nodes) always execute.
+			// Always-run nodes are exempt: teardown must execute even when
+			// the parent failed or the chain was cancelled.
+			if !alwaysRun && len(inEdges) > 0 && (parentFailed || !hasActiveParent) {
+				span := tctx.StartSpan(n.ID())
+				span.SetChainID(chainID)
+				span.SetParentNodeID(parentNodeID)
+				reason := "parent failed"
+				if !hasActiveParent && !parentFailed {
+					reason = "no active parent path"
+				}
+				span.Skip(reason)
+				// Record this node as skipped so downstream merge nodes
+				// can distinguish conditional skips from actual failures.
+				e.mu.Lock()
+				e.skipped[n.ID()] = true
+				e.mu.Unlock()
+				close(sig)
+				return
+>>>>>>> dev
 			}
 
 			if !isSync {
@@ -235,6 +423,7 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 
 			var lastOutput *Output
 			for i := 0; i < loopCount; i++ {
+<<<<<<< HEAD
 				select {
 				case <-ctx.Done():
 					span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
@@ -244,14 +433,49 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 					}
 					return
 				default:
+=======
+				span.Running(n.ID(), i)
+
+				if !alwaysRun {
+					select {
+					case <-ctx.Done():
+						// Manual cancel → span shows as "canceled" (warn);
+						// other cancellations (timeout) → span shows as "error".
+						if IsManualCancel(ctx) {
+							span.FinishCanceled("", fmt.Errorf("node %s canceled: %w", n.ID(), ctx.Err()))
+						} else {
+							span.Finish("", fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err()))
+						}
+						errCh <- fmt.Errorf("node %s cancelled: %w", n.ID(), ctx.Err())
+						if isSync {
+							close(sig)
+						}
+						return
+					default:
+					}
+>>>>>>> dev
 				}
 
 				input := e.buildInput(n.ID())
 				inputJSON, _ := json.Marshal(input.Variables)
 				span.SetInput(string(inputJSON))
 
+<<<<<<< HEAD
 				output, err := n.Execute(ctx, input)
 				if err != nil {
+=======
+				// Always-run nodes detach from the chain context so a chain
+				// cancellation does not kill the cleanup request.
+				nodeCtx := ctx
+				if alwaysRun {
+					nodeCtx = context.WithoutCancel(ctx)
+				}
+				output, err := n.Execute(nodeCtx, input)
+				if err != nil {
+					// Broadcast the failed iteration before the span-level
+					// Finish so cumulative counters record it.
+					span.IterationResult(i, true)
+>>>>>>> dev
 					span.Finish("", err)
 					errCh <- fmt.Errorf("node %s execute: %w", n.ID(), err)
 					if isSync {
@@ -259,11 +483,25 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 					}
 					return
 				}
+<<<<<<< HEAD
+=======
+				// Soft failure (Output.Error) counts as a failed iteration
+				// even though execution continues to the next one.
+				span.IterationResult(i, output.Error != nil)
+>>>>>>> dev
 				lastOutput = output
 			}
 
 			outputJSON, _ := json.Marshal(lastOutput.Response)
+<<<<<<< HEAD
 			span.Finish(string(outputJSON), nil)
+=======
+			// A node may report failure via Output.Error (soft failure:
+			// swallowed assertion, non-2xx status) without returning an error
+			// from Execute. The span status must reflect the node's real
+			// outcome, aligned with nodeStats.
+			span.Finish(string(outputJSON), lastOutput.Error)
+>>>>>>> dev
 
 			e.mu.Lock()
 			e.results[n.ID()] = lastOutput
@@ -281,12 +519,30 @@ func (e *Executor) executeTraced(ctx context.Context, tctx TraceContext) (map[st
 		close(syncDone)
 	}()
 
+<<<<<<< HEAD
 	select {
 	case <-syncDone:
 	case err := <-errCh:
 		return nil, err
 	case <-ctx.Done():
 		return nil, fmt.Errorf("executor cancelled: %w", ctx.Err())
+=======
+	var execErr error
+	select {
+	case <-syncDone:
+	case err := <-errCh:
+		execErr = err
+	case <-ctx.Done():
+		execErr = fmt.Errorf("executor cancelled: %w", ctx.Err())
+	}
+	if execErr != nil {
+		// Always-run nodes (teardown) may still be executing on a
+		// cancelled chain — wait for them so cleanup results are
+		// recorded and no goroutine outlives the chain before
+		// returning the error.
+		<-syncDone
+		return nil, execErr
+>>>>>>> dev
 	}
 
 	e.mu.RLock()

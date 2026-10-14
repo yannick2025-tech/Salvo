@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">06</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold">体验一</text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 155.52 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 218.08 89.4 L 218.08 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">关键洞察</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-10" data-pptx-object="group" data-pptx-frame="240 260 800 180" data-pptx-source-ref="slide:10">
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="240 260 800 180" data-pptx-prst="roundRect" data-pptx-av-adj="val 6667" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 240 272 A 12 12 0 0 1 252 260 L 1028 260 A 12 12 0 0 1 1040 272 L 1040 428 A 12 12 0 0 1 1028 440 L 252 440 A 12 12 0 0 1 240 428 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="371.2 284.3 537.6 64.68" data-pptx-prst="rect" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 371.2 284.3 L 908.8 284.3 L 908.8 348.98 L 371.2 348.98 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="320" text-anchor="middle" xml:space="preserve" font-size="42" fill="#3458B0" font-weight="bold">定义问题比解决问题更重要</text>
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="448.86 359.6 382.27 36.96" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 448.86 359.6 L 831.14 359.6 L 831.14 396.56 L 448.86 396.56 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="380" text-anchor="middle" xml:space="preserve" font-size="24" fill="#1A1D26">先把需求定义清楚，AI 帮你实现</text>
+</g>
+</g></svg>

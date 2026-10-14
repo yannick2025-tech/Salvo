@@ -23,6 +23,10 @@ func (n *testNode) Execute(_ context.Context, _ *Input) (*Output, error) {
 func (n *testNode) Timeout() time.Duration { return n.timeout }
 func (n *testNode) LoopCount() int         { return n.loopCount }
 func (n *testNode) Mode() ExecMode         { return n.mode }
+<<<<<<< HEAD
+=======
+func (n *testNode) BlockOnError() bool      { return false }
+>>>>>>> dev
 
 func TestAddNode(t *testing.T) {
 	d := New()

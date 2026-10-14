@@ -1,0 +1,1316 @@
+package runner
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/yannick2025-tech/Salvo/internal/core/dag"
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
+	httpprotocol "github.com/yannick2025-tech/Salvo/internal/protocol/http"
+)
+
+// whileConfig holds the parsed configuration for a while node.
+type whileConfig struct {
+	ExitConditions       []exitCondition `json:"exit_conditions"`
+	IntervalSeconds      int             `json:"interval_seconds"`
+	MaxIterations        int             `json:"max_iterations"`
+	MaxDurationMinutes   int             `json:"max_duration_minutes"`
+	Steps                []stepConfig    `json:"steps"`
+	FailAfterConsecutive int             `json:"fail_after_consecutive"`
+	FailMessage          string          `json:"fail_message"`
+	FailOnMaxIterations  *bool           `json:"fail_on_max_iterations,omitempty"` // default true (backward compat); set false to treat max-iterations exit as success
+	FailOnMaxDuration    *bool           `json:"fail_on_max_duration,omitempty"`   // default true (backward compat); set false to treat max-duration exit as success
+}
+
+// exitCondition defines a condition to check for loop exit.
+type exitCondition struct {
+	Variable string `json:"variable"`
+	Operator string `json:"operator"`
+	Value    string `json:"value"`
+}
+
+// stepConfig defines a child step within a while node.
+type stepConfig struct {
+	Name                 string               `json:"name"`
+	Type                 string               `json:"type,omitempty"` // "http" (default) | "generator"
+	Config               map[string]any       `json:"config,omitempty"`
+	Condition            *stepConditionConfig `json:"condition,omitempty"`
+	Request              *stepRequestConfig   `json:"request,omitempty"`
+	Extract              extractConfig        `json:"extract,omitempty"`
+	ThinkTime            *thinkTimeConfig     `json:"think_time,omitempty"`
+	TimedTrigger         *timedTriggerConfig  `json:"timed_trigger,omitempty"`
+	Retry                *retryConfig         `json:"retry,omitempty"`
+	FailAfterConsecutive int                  `json:"fail_after_consecutive,omitempty"`
+	FailMessage          string               `json:"fail_message,omitempty"`
+	BlockOnError         bool                 `json:"block_on_error,omitempty"`
+	AesDecrypt           string               `json:"aes_decrypt,omitempty"` // AES key (base64) for decrypting encrypted response body
+	AesMode              *int                 `json:"aes_mode,omitempty"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
+}
+
+// stepConditionConfig defines a condition for step execution.
+type stepConditionConfig struct {
+	Variable string `json:"variable"`
+	Operator string `json:"operator"`
+	Value    string `json:"value"`
+}
+
+// stepRequestConfig defines an HTTP request within a step.
+type stepRequestConfig struct {
+	Method     string            `json:"method"`
+	URL        string            `json:"url"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Body       any               `json:"body,omitempty"`
+	Form       *stepFormConfig   `json:"form,omitempty"`
+	ExpectBody map[string]any    `json:"expect_body,omitempty"`
+}
+
+// stepFormConfig defines a multipart/form-data body for a step request.
+type stepFormConfig struct {
+	Fields map[string]string `json:"fields,omitempty"`
+	Files  map[string]string `json:"files,omitempty"`
+}
+
+// extractConfig holds extract entries parsed from either JSON format:
+//   - Array format:  [{"variable": "x", "path": "$.y"}, ...]
+//   - Object format: {"x": "$.y", "z": "$.w", ...}
+//
+// Both formats are supported transparently via custom UnmarshalJSON.
+type extractConfig []extractEntry
+
+// extractEntry maps a JSON path to a variable name.
+type extractEntry struct {
+	Variable string `json:"variable"`
+	Path     string `json:"path"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for extractConfig.
+// It accepts both array and object JSON formats for the extract field.
+func (ec *extractConfig) UnmarshalJSON(data []byte) error {
+	// Try array format first: [{"variable": "x", "path": "$.y"}]
+	var arr []json.RawMessage
+	if err := json.Unmarshal(data, &arr); err == nil {
+		entries := make([]extractEntry, 0, len(arr))
+		for _, raw := range arr {
+			var e extractEntry
+			if err := unmarshalExtractEntry(raw, &e); err != nil {
+				return fmt.Errorf("invalid extract entry in array: %w", err)
+			}
+			entries = append(entries, e)
+		}
+		*ec = entries
+		return nil
+	}
+
+	// Try object format: {"x": "$.y", "z": "$.w"}
+	var obj map[string]string
+	if err := json.Unmarshal(data, &obj); err == nil {
+		entries := make([]extractEntry, 0, len(obj))
+		for k, v := range obj {
+			entries = append(entries, extractEntry{Variable: k, Path: v})
+		}
+		*ec = entries
+		return nil
+	}
+
+	return fmt.Errorf("invalid extract config: expected array or object, got: %s", string(data))
+}
+
+// unmarshalExtractEntry unmarshals a single extract entry, supporting both
+// structured format {"variable": "x", "path": "$.y"} and
+// map format {"x": "$.y"}.
+func unmarshalExtractEntry(data []byte, e *extractEntry) error {
+	// Try structured format first.
+	var structured struct {
+		Variable string `json:"variable"`
+		Path     string `json:"path"`
+	}
+	if err := json.Unmarshal(data, &structured); err == nil && (structured.Variable != "" || structured.Path != "") {
+		e.Variable = structured.Variable
+		e.Path = structured.Path
+		return nil
+	}
+
+	// Try single-key map format.
+	var kv map[string]string
+	if err := json.Unmarshal(data, &kv); err == nil {
+		for k, v := range kv {
+			e.Variable = k
+			e.Path = v
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid extract entry: %s", string(data))
+}
+
+// thinkTimeConfig defines a random delay range in milliseconds.
+type thinkTimeConfig struct {
+	Min int `json:"min"`
+	Max int `json:"max"`
+}
+
+// timedTriggerConfig defines an async timed trigger.
+type timedTriggerConfig struct {
+	AfterSeconds string `json:"after_seconds"` // supports ${var} references
+	Once         bool   `json:"once"`
+}
+
+// retryConfig defines retry behavior.
+type retryConfig struct {
+	MaxAttempts int    `json:"max_attempts"`
+	On429       string `json:"on_429,omitempty"`
+}
+
+func (n *sceneNode) executeWhile(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg whileConfig
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse while node config", logger.F("error", err))
+		return nil, fmt.Errorf("parse while config: %w", err)
+	}
+
+	// Reference mode: children resolved from config.node_ids (mounted by
+	// buildDAG) take precedence over the embedded steps fallback.
+	if len(n.childNodes) > 0 {
+		return n.executeWhileRefMode(ctx, input, &cfg, nodeLog)
+	}
+
+	if len(cfg.Steps) == 0 {
+		nodeLog.Warn("while node has no steps, skipping")
+		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": "while", "iterations": 0}}, nil
+	}
+
+	if len(cfg.ExitConditions) == 0 && cfg.MaxIterations <= 0 {
+		return nil, fmt.Errorf("while node %s: must have exit_conditions or max_iterations (infinite loop protection)", n.id)
+	}
+
+	// Initialize loop variables from input.
+	loopVars := make(map[string]any)
+	if input != nil && input.Variables != nil {
+		for k, v := range input.Variables {
+			loopVars[k] = v
+		}
+	}
+
+	maxIterations := cfg.MaxIterations
+	if maxIterations <= 0 {
+		maxIterations = 0 // unlimited
+	}
+
+	var maxDuration time.Duration
+	if cfg.MaxDurationMinutes > 0 {
+		maxDuration = time.Duration(cfg.MaxDurationMinutes) * time.Minute
+	}
+
+	consecutiveFailures := make(map[int]int) // step index → consecutive failure count
+	triggeredSteps := make(map[int]bool)     // step index → timed trigger already fired
+	var triggeredMu sync.Mutex
+	var varsMu sync.RWMutex
+
+	// firstStepErr keeps the FIRST swallowed step failure (block_on_error
+	// = false) so the trace span reflects the real node outcome.
+	var firstStepErr error
+
+	iteration := 0
+	startTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			nodeLog.Warn("while loop cancelled", logger.F("iteration", iteration), logger.F("error", ctx.Err()))
+			return nil, fmt.Errorf("while loop cancelled at iteration %d: %w", iteration, ctx.Err())
+		default:
+		}
+
+		iteration++
+
+		// Check max iterations.
+		if maxIterations > 0 && iteration > maxIterations {
+			failOnMax := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxIterations != nil {
+				failOnMax = *cfg.FailOnMaxIterations
+			}
+			nodeLog.Warn("while loop reached max iterations",
+				logger.F("max_iterations", maxIterations),
+				logger.F("iteration", iteration),
+				logger.F("fail_on_max_iterations", failOnMax))
+			if failOnMax {
+				return nil, fmt.Errorf("while loop reached max iterations (%d)", maxIterations)
+			}
+			// Not a failure: return success with iteration info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  maxIterations,
+					"max_reached": true,
+				},
+				Error: firstStepErr,
+			}, nil
+		}
+
+		// Check max duration.
+		if maxDuration > 0 && time.Since(startTime) > maxDuration {
+			failOnMaxDur := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxDuration != nil {
+				failOnMaxDur = *cfg.FailOnMaxDuration
+			}
+			nodeLog.Warn("while loop exceeded max duration",
+				logger.F("max_duration", maxDuration),
+				logger.F("elapsed", time.Since(startTime)),
+				logger.F("fail_on_max_duration", failOnMaxDur))
+			if failOnMaxDur {
+				return nil, fmt.Errorf("while loop exceeded max duration (%v)", maxDuration)
+			}
+			// Not a failure: return success with elapsed info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  iteration,
+					"max_reached": true,
+				},
+				Error: firstStepErr,
+			}, nil
+		}
+
+		nodeLog.Info("while loop iteration",
+			logger.F("iteration", iteration),
+			logger.F("max_iterations", maxIterations),
+			logger.F("elapsed", time.Since(startTime).Round(time.Second).String()))
+
+		// Execute steps sequentially within this iteration.
+		for stepIdx, step := range cfg.Steps {
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("while loop cancelled during step %q: %w", step.Name, ctx.Err())
+			default:
+			}
+
+			nodeLog.Debug("executing while step", logger.F("step", stepIdx), logger.F("name", step.Name))
+
+			// Step condition check: if condition is set and evaluates to false, skip the step.
+			if step.Condition != nil {
+				condExpr := fmt.Sprintf("${%s} %s \"%s\"", step.Condition.Variable, step.Condition.Operator, step.Condition.Value)
+				varsMu.RLock()
+				condMet := expr.EvaluateConditionExpr(condExpr, loopVars)
+				varsMu.RUnlock()
+				if !condMet {
+					varsMu.RLock()
+					currentVal := loopVars[step.Condition.Variable]
+					varsMu.RUnlock()
+					nodeLog.Debug("skipping step due to condition not met",
+						logger.F("step", step.Name),
+						logger.F("condition", condExpr),
+						logger.F("current_value", currentVal))
+					// Reset consecutive failure counter since this step was skipped, not failed.
+					consecutiveFailures[stepIdx] = 0
+					continue
+				}
+			}
+
+			// Check if this step has a once-only timed trigger that already fired.
+			if step.TimedTrigger != nil && step.TimedTrigger.Once {
+				triggeredMu.Lock()
+				if triggeredSteps[stepIdx] {
+					triggeredMu.Unlock()
+					nodeLog.Info("timed trigger already fired, skipping",
+						logger.F("step", step.Name))
+					consecutiveFailures[stepIdx] = 0
+					continue
+				}
+				triggeredMu.Unlock()
+			}
+
+			// If step has a timed trigger with after_seconds, fire it asynchronously.
+			if step.TimedTrigger != nil && step.TimedTrigger.AfterSeconds != "" {
+				delayStr := resolveWithVariables(step.TimedTrigger.AfterSeconds, loopVars)
+				delaySec, err := parseDurationSeconds(delayStr)
+				if err != nil {
+					nodeLog.Warn("invalid timed_trigger after_seconds", logger.F("raw", step.TimedTrigger.AfterSeconds), logger.F("error", err))
+					continue
+				}
+
+				// Mark as triggered BEFORE launching the goroutine so that
+				// subsequent iterations skip this step immediately. Previously
+				// the flag was set after the goroutine completed (delay + HTTP),
+				// causing every iteration before that to launch a duplicate
+				// goroutine — violating once:true semantics.
+				triggeredMu.Lock()
+				triggeredSteps[stepIdx] = true
+				triggeredMu.Unlock()
+
+				nodeLog.Info("timed trigger scheduled",
+					logger.F("step", step.Name),
+					logger.F("delay_seconds", delaySec))
+
+				// Fire the trigger asynchronously.
+				go func(idx int, s stepConfig) {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(time.Duration(delaySec) * time.Second):
+					}
+
+					// Snapshot loopVars for read-only use (avoid concurrent map access).
+					varsMu.RLock()
+					localVars := make(map[string]any, len(loopVars))
+					for k, v := range loopVars {
+						localVars[k] = v
+					}
+					varsMu.RUnlock()
+
+					// Execute the step's HTTP request.
+					if s.Request != nil {
+						req := buildStepHTTPRequest(s.Request, localVars, nodeLog)
+						proto := httpprotocol.NewProtocol()
+						resp, err := proto.Execute(ctx, req)
+						if err != nil {
+							nodeLog.Warn("timed trigger HTTP request failed",
+								logger.F("step", s.Name),
+								logger.F("url", s.Request.URL),
+								logger.F("error", err))
+							return
+						}
+
+						if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+							// Log the HTTP request result for observability.
+							nodeLog.Info("timed trigger HTTP request completed",
+								logger.F("step", s.Name),
+								logger.F("method", string(req.Method)),
+								logger.F("url", req.URL),
+								logger.F("status", httpResp.StatusCode),
+								logger.F("latency_ms", httpResp.Latency.Milliseconds()))
+
+							if len(req.Body) > 0 {
+								nodeLog.Debug("timed trigger request body",
+									logger.F("step", s.Name),
+									logger.F("body", string(req.Body)))
+							}
+
+							if len(httpResp.Body) > 0 {
+								nodeLog.Debug("timed trigger response body",
+									logger.F("step", s.Name),
+									logger.F("status", httpResp.StatusCode),
+									logger.F("body", string(httpResp.Body)))
+							}
+
+							// Log ERROR with full details for non-2xx responses.
+							if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+								nodeLog.Error("timed trigger HTTP request failed with non-2xx status",
+									logger.F("step", s.Name),
+									logger.F("method", string(req.Method)),
+									logger.F("url", req.URL),
+									logger.F("status", httpResp.StatusCode),
+									logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+									logger.F("request_headers", req.Headers),
+									logger.F("request_body", string(req.Body)),
+									logger.F("response_body", string(httpResp.Body)))
+							}
+
+							// AES decrypt before extract if configured.
+							if s.AesDecrypt != "" && len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
+								aesKeyStr := resolveWithVariables(s.AesDecrypt, localVars)
+								sAesMode := 1 // default GCM
+								if s.AesMode != nil {
+									sAesMode = *s.AesMode
+								}
+								if decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, sAesMode); decryptErr != nil {
+									nodeLog.Warn("timed trigger AES decrypt failed",
+										logger.F("step", s.Name),
+										logger.F("error", decryptErr))
+								} else {
+									httpResp.Body = []byte(decrypted)
+									nodeLog.Debug("timed trigger AES decrypted plaintext",
+										logger.F("step", s.Name),
+										logger.F("body", decrypted))
+								}
+							}
+							if len(s.Extract) > 0 || (s.Config != nil && s.Config["extract"] != nil) {
+								localExtracted := make(map[string]any)
+								allExtracts := mergeStepExtracts(&s, nodeLog)
+								extractVarsFromResponse(httpResp.Body, allExtracts, localExtracted, nodeLog)
+								varsMu.Lock()
+								for k, v := range localExtracted {
+									loopVars[k] = v
+								}
+								varsMu.Unlock()
+							}
+						}
+					}
+
+					nodeLog.Info("timed trigger executed",
+						logger.F("step", s.Name),
+						logger.F("after_seconds", delaySec))
+				}(stepIdx, step)
+
+				continue
+			}
+
+			// Execute step based on type
+			stepType := step.Type
+			if stepType == "" {
+				stepType = "http" // default
+			}
+
+			if stepType == "generator" {
+				// Execute generator step
+				varsMu.Lock()
+				stepErr := n.executeWhileStepGenerator(ctx, &step, loopVars, nodeLog)
+				varsMu.Unlock()
+
+				if stepErr != nil {
+					// Check block_on_error first - takes precedence
+					if step.BlockOnError {
+						nodeLog.Error("while step failed with block_on_error=true",
+							logger.F("step", step.Name),
+							logger.F("error", stepErr))
+						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+					}
+
+					if firstStepErr == nil {
+						firstStepErr = stepErr
+					}
+					consecutiveFailures[stepIdx]++
+					nodeLog.Warn("while generator step failed",
+						logger.F("step", step.Name),
+						logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+						logger.F("error", stepErr))
+
+					// Check fail_after_consecutive.
+					failThreshold := cfg.FailAfterConsecutive
+					if step.FailAfterConsecutive > 0 {
+						failThreshold = step.FailAfterConsecutive
+					}
+					if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+						msg := cfg.FailMessage
+						if msg == "" {
+							msg = step.FailMessage
+						}
+						if msg == "" {
+							msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+						}
+						nodeLog.Error("while node failed due to consecutive failures",
+							logger.F("step", step.Name),
+							logger.F("failures", consecutiveFailures[stepIdx]),
+							logger.F("message", msg))
+						return nil, fmt.Errorf("while node: %s", msg)
+					}
+				} else {
+					consecutiveFailures[stepIdx] = 0
+				}
+			} else if step.Request != nil {
+				// Execute HTTP request (if any).
+				maxAttempts := 1
+				if step.Retry != nil && step.Retry.MaxAttempts > 0 {
+					maxAttempts = step.Retry.MaxAttempts
+				}
+
+				var stepErr error
+				for attempt := 0; attempt < maxAttempts; attempt++ {
+					if attempt > 0 {
+						nodeLog.Debug("retrying step",
+							logger.F("step", step.Name),
+							logger.F("attempt", attempt+1),
+							logger.F("max", maxAttempts))
+					}
+
+					varsMu.Lock()
+					stepErr = n.executeWhileStepHTTP(ctx, &step, loopVars, nodeLog)
+					varsMu.Unlock()
+					if stepErr == nil {
+						break
+					}
+
+					// Check for 429 retry.
+					if step.Retry != nil && step.Retry.On429 == "retry" && isHTTP429Error(stepErr) {
+						continue
+					}
+					break
+				}
+
+				if stepErr != nil {
+					// Check block_on_error first - takes precedence
+					if step.BlockOnError {
+						nodeLog.Error("while step failed with block_on_error=true",
+							logger.F("step", step.Name),
+							logger.F("error", stepErr))
+						return nil, fmt.Errorf("step %q failed and block_on_error is true", step.Name)
+					}
+
+					if firstStepErr == nil {
+						firstStepErr = stepErr
+					}
+					consecutiveFailures[stepIdx]++
+					nodeLog.Warn("while step failed",
+						logger.F("step", step.Name),
+						logger.F("consecutive_failures", consecutiveFailures[stepIdx]),
+						logger.F("error", stepErr))
+
+					// Check fail_after_consecutive.
+					failThreshold := cfg.FailAfterConsecutive
+					if step.FailAfterConsecutive > 0 {
+						failThreshold = step.FailAfterConsecutive
+					}
+					if failThreshold > 0 && consecutiveFailures[stepIdx] >= failThreshold {
+						msg := cfg.FailMessage
+						if msg == "" {
+							msg = step.FailMessage
+						}
+						if msg == "" {
+							msg = fmt.Sprintf("step %q failed %d consecutive times", step.Name, failThreshold)
+						}
+						nodeLog.Error("while node failed due to consecutive failures",
+							logger.F("step", step.Name),
+							logger.F("failures", consecutiveFailures[stepIdx]),
+							logger.F("message", msg))
+						return nil, fmt.Errorf("while node: %s", msg)
+					}
+				} else {
+					consecutiveFailures[stepIdx] = 0
+				}
+			}
+
+			// Apply think_time (random delay).
+			if step.ThinkTime != nil && step.ThinkTime.Min > 0 && step.ThinkTime.Max > 0 {
+				delay := randomInt(step.ThinkTime.Min, step.ThinkTime.Max)
+				nodeLog.Debug("think time delay", logger.F("delay_ms", delay))
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("while loop cancelled during think time: %w", ctx.Err())
+				case <-time.After(time.Duration(delay) * time.Millisecond):
+				}
+			}
+		}
+
+		// Check exit conditions after each iteration.
+		if len(cfg.ExitConditions) > 0 {
+			allMet := true
+			for _, ec := range cfg.ExitConditions {
+				condExpr := fmt.Sprintf("${%s} %s \"%s\"", ec.Variable, ec.Operator, ec.Value)
+				varsMu.RLock()
+				ecMet := expr.EvaluateConditionExpr(condExpr, loopVars)
+				currentVal := loopVars[ec.Variable]
+				varsMu.RUnlock()
+				nodeLog.Info("exit condition evaluated",
+					logger.F("variable", ec.Variable),
+					logger.F("current_value", currentVal),
+					logger.F("operator", ec.Operator),
+					logger.F("target", ec.Value),
+					logger.F("result", ecMet))
+				if !ecMet {
+					allMet = false
+					break
+				}
+			}
+			if allMet {
+				nodeLog.Info("while loop exit conditions met",
+					logger.F("iteration", iteration),
+					logger.F("elapsed", time.Since(startTime).Round(time.Second).String()))
+				return &dag.Output{
+					Response: map[string]any{
+						"node_id":    n.id,
+						"type":       "while",
+						"iterations": iteration,
+					},
+					Error: firstStepErr,
+				}, nil
+			}
+		}
+
+		// Wait for interval before next iteration.
+		if cfg.IntervalSeconds > 0 {
+			if maxIterations == 0 || iteration < maxIterations {
+				nodeLog.Debug("waiting interval before next iteration",
+					logger.F("interval_seconds", cfg.IntervalSeconds))
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("while loop cancelled during interval: %w", ctx.Err())
+				case <-time.After(time.Duration(cfg.IntervalSeconds) * time.Second):
+				}
+			}
+		}
+	}
+}
+
+// executeWhileRefMode runs the while loop with children mounted from
+// config.node_ids (the unified composite child-reference model). It preserves
+// the full while skeleton — exit conditions, max_iterations, max_duration,
+// fail_on_max_iterations, fail_on_max_duration and interval_seconds — but each
+// iteration executes the child chain via runChildChain instead of embedded
+// steps. Exit conditions are evaluated against input.Variables, which
+// runChildChain refreshes from the executor's shared scope after every child
+// step, so variables extracted by a child drive the exit condition.
+func (n *sceneNode) executeWhileRefMode(ctx context.Context, input *dag.Input, cfg *whileConfig, nodeLog logger.Logger) (*dag.Output, error) {
+	if input == nil {
+		return nil, fmt.Errorf("while node %s: nil input in reference mode", n.id)
+	}
+	if len(cfg.ExitConditions) == 0 && cfg.MaxIterations <= 0 && cfg.MaxDurationMinutes <= 0 {
+		return nil, fmt.Errorf("while node %s: must have exit_conditions or max_iterations (infinite loop protection)", n.id)
+	}
+
+	// Ensure input carries an executor so runChildChain can refresh variables.
+	if input.Variables == nil {
+		input.Variables = make(map[string]any)
+	}
+
+	maxIterations := cfg.MaxIterations
+	if maxIterations <= 0 {
+		maxIterations = 0 // unlimited
+	}
+	var maxDuration time.Duration
+	if cfg.MaxDurationMinutes > 0 {
+		maxDuration = time.Duration(cfg.MaxDurationMinutes) * time.Minute
+	}
+
+	// firstChildErr keeps the FIRST child soft failure (Output.Error) so the
+	// trace span reflects the real node outcome while the loop continues.
+	var firstChildErr error
+
+	iteration := 0
+	startTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			nodeLog.Warn("while loop cancelled", logger.F("iteration", iteration), logger.F("error", ctx.Err()))
+			return nil, fmt.Errorf("while loop cancelled at iteration %d: %w", iteration, ctx.Err())
+		default:
+		}
+
+		iteration++
+
+		// Check max iterations.
+		if maxIterations > 0 && iteration > maxIterations {
+			failOnMax := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxIterations != nil {
+				failOnMax = *cfg.FailOnMaxIterations
+			}
+			nodeLog.Warn("while loop reached max iterations",
+				logger.F("max_iterations", maxIterations),
+				logger.F("iteration", iteration),
+				logger.F("fail_on_max_iterations", failOnMax))
+			if failOnMax {
+				return nil, fmt.Errorf("while loop reached max iterations (%d)", maxIterations)
+			}
+			// Not a failure: return success with iteration info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  maxIterations,
+					"max_reached": true,
+				},
+				Error: firstChildErr,
+			}, nil
+		}
+
+		// Check max duration.
+		if maxDuration > 0 && time.Since(startTime) > maxDuration {
+			failOnMaxDur := true // default: treat as failure (backward compat)
+			if cfg.FailOnMaxDuration != nil {
+				failOnMaxDur = *cfg.FailOnMaxDuration
+			}
+			nodeLog.Warn("while loop exceeded max duration",
+				logger.F("max_duration", maxDuration),
+				logger.F("elapsed", time.Since(startTime)),
+				logger.F("fail_on_max_duration", failOnMaxDur))
+			if failOnMaxDur {
+				return nil, fmt.Errorf("while loop exceeded max duration (%v)", maxDuration)
+			}
+			// Not a failure: return success with elapsed info.
+			return &dag.Output{
+				Response: map[string]any{
+					"node_id":     n.id,
+					"type":        "while",
+					"iterations":  iteration,
+					"max_reached": true,
+				},
+				Error: firstChildErr,
+			}, nil
+		}
+
+		nodeLog.Info("while loop iteration",
+			logger.F("iteration", iteration),
+			logger.F("max_iterations", maxIterations),
+			logger.F("elapsed", time.Since(startTime).Round(time.Second).String()),
+			logger.F("mode", "ref"))
+
+		// Execute the child chain for this iteration. runChildChain refreshes
+		// input.Variables from the shared scope after every child step.
+		res, err := n.runChildChain(ctx, input, nodeLog)
+		if err != nil {
+			return nil, fmt.Errorf("while ref-mode iteration %d: %w", iteration, err)
+		}
+		if res.FirstSoftErr != nil && firstChildErr == nil {
+			firstChildErr = res.FirstSoftErr
+		}
+
+		// Check exit conditions after each iteration, against the refreshed
+		// input.Variables (extracts performed by children are visible here).
+		if len(cfg.ExitConditions) > 0 {
+			allMet := true
+			for _, ec := range cfg.ExitConditions {
+				condExpr := fmt.Sprintf("${%s} %s \"%s\"", ec.Variable, ec.Operator, ec.Value)
+				ecMet := expr.EvaluateConditionExpr(condExpr, input.Variables)
+				currentVal := input.Variables[ec.Variable]
+				nodeLog.Info("exit condition evaluated",
+					logger.F("variable", ec.Variable),
+					logger.F("current_value", currentVal),
+					logger.F("operator", ec.Operator),
+					logger.F("target", ec.Value),
+					logger.F("result", ecMet))
+				if !ecMet {
+					allMet = false
+					break
+				}
+			}
+			if allMet {
+				nodeLog.Info("while loop exit conditions met",
+					logger.F("iteration", iteration),
+					logger.F("elapsed", time.Since(startTime).Round(time.Second).String()))
+				return &dag.Output{
+					Response: map[string]any{
+						"node_id":    n.id,
+						"type":       "while",
+						"iterations": iteration,
+					},
+					Error: firstChildErr,
+				}, nil
+			}
+		}
+
+		// Wait for interval before next iteration.
+		if cfg.IntervalSeconds > 0 {
+			if maxIterations == 0 || iteration < maxIterations {
+				nodeLog.Debug("waiting interval before next iteration",
+					logger.F("interval_seconds", cfg.IntervalSeconds))
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("while loop cancelled during interval: %w", ctx.Err())
+				case <-time.After(time.Duration(cfg.IntervalSeconds) * time.Second):
+				}
+			}
+		}
+	}
+}
+
+// executeWhileStepGenerator executes a generator step in the while loop.
+func (n *sceneNode) executeWhileStepGenerator(ctx context.Context, step *stepConfig, loopVars map[string]any, nodeLog logger.Logger) error {
+	if step.Config == nil {
+		return fmt.Errorf("step %q: generator step requires config", step.Name)
+	}
+
+	expression, _ := step.Config["expression"].(string)
+	variable, _ := step.Config["variable"].(string)
+
+	if expression == "" || variable == "" {
+		return fmt.Errorf("step %q: generator requires expression and variable", step.Name)
+	}
+
+	nodeLog.Debug("executing while step generator",
+		logger.F("step", step.Name),
+		logger.F("expression", expression),
+		logger.F("variable", variable))
+
+	// Resolve variables in the expression
+	exprStr := resolveWithVariables(expression, loopVars)
+
+	// Resolve generator refs (${generator.xxx} patterns)
+	genReg := builtin.DefaultRegistry()
+	result := resolveGeneratorRefs(exprStr, genReg, nodeLog)
+
+	// Resolve expression engine functions (${__so(...)}, ${__random(...)}, etc.)
+	if n.exprReg != nil && strings.Contains(result, "${__") {
+		resolved, err := expr.Resolve(result, nil, n.exprReg)
+		if err != nil {
+			return fmt.Errorf("step %q: generator expression resolve failed: %w", step.Name, err)
+		}
+		result = resolved
+	}
+
+	// Store result in loopVars
+	loopVars[variable] = result
+
+	nodeLog.Debug("while step generator completed",
+		logger.F("step", step.Name),
+		logger.F("variable", variable),
+		logger.F("value", result))
+
+	// Extract variables from result if configured.
+	// Merge extracts from both step.Extract (top-level) and Config["extract"] (nested).
+	allExtracts := mergeStepExtracts(step, nodeLog)
+	if len(allExtracts) > 0 {
+		// Try to parse result as JSON
+		var resultData map[string]any
+		if err := json.Unmarshal([]byte(result), &resultData); err != nil {
+			nodeLog.Debug("generator result is not JSON, skipping extract",
+				logger.F("step", step.Name),
+				logger.F("error", err))
+		} else {
+			for _, ext := range allExtracts {
+				value := resolveJSONPath(resultData, ext.Path)
+				if value != nil {
+					loopVars[ext.Variable] = value
+					nodeLog.Info("extracted variable from generator",
+						logger.F("step", step.Name),
+						logger.F("variable", ext.Variable),
+						logger.F("value", value))
+				} else {
+					nodeLog.Warn("extract path not found in generator result",
+						logger.F("step", step.Name),
+						logger.F("variable", ext.Variable),
+						logger.F("path", ext.Path))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeWhileStepHTTP executes an HTTP request step in the while loop.
+func (n *sceneNode) executeWhileStepHTTP(ctx context.Context, step *stepConfig, loopVars map[string]any, nodeLog logger.Logger) error {
+	req := buildStepHTTPRequest(step.Request, loopVars, nodeLog)
+	proto := httpprotocol.NewProtocol()
+	resp, err := proto.Execute(ctx, req)
+	if err != nil {
+		// Connection/protocol error — record as failed request.
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", 0),
+			logger.F("reason", "connection_error"))
+		return fmt.Errorf("step %q HTTP request: %w", step.Name, err)
+	}
+
+	httpResp, ok := resp.(*httpprotocol.HTTPResponse)
+	if !ok {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(0, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", 0),
+			logger.F("reason", "unexpected_response_type"))
+		return fmt.Errorf("step %q: unexpected response type %T", step.Name, resp)
+	}
+
+	if !httpResp.IsSuccess() {
+		// HTTP response with non-success status code — record as failed request.
+		if n.stats != nil {
+			n.stats.RecordLatency(httpResp.Latency, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(httpResp.Latency, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(httpResp.Latency, false)
+		}
+		nodeLog.Debug("while step stats recorded",
+			logger.F("step", step.Name),
+			logger.F("success", false),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("status_code", httpResp.StatusCode),
+			logger.F("reason", "http_error"))
+		// Log ERROR with full request/response details for observability at INFO level.
+		nodeLog.Error("while step HTTP request failed with non-2xx status",
+			logger.F("step", step.Name),
+			logger.F("method", string(req.Method)),
+			logger.F("url", req.URL),
+			logger.F("status", httpResp.StatusCode),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+			logger.F("response_body", string(httpResp.Body)))
+		return fmt.Errorf("step %q HTTP %d", step.Name, httpResp.StatusCode)
+	}
+
+	if n.stats != nil {
+		n.stats.RecordLatency(httpResp.Latency, true)
+	}
+	if n.httpOnlyStats != nil {
+		n.httpOnlyStats.RecordLatency(httpResp.Latency, true)
+	}
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(httpResp.Latency, true)
+	}
+
+	nodeLog.Info("step HTTP request completed",
+		logger.F("step", step.Name),
+		logger.F("method", string(req.Method)),
+		logger.F("url", req.URL),
+		logger.F("status", httpResp.StatusCode),
+		logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+		logger.F("success", httpResp.IsSuccess()),
+	)
+
+	if len(req.Headers) > 0 {
+		nodeLog.Debug("step HTTP request headers",
+			logger.F("step", step.Name),
+			logger.F("headers", req.Headers),
+		)
+	}
+
+	if len(req.Body) > 0 {
+		nodeLog.Debug("step HTTP request body",
+			logger.F("step", step.Name),
+			logger.F("body", string(req.Body)),
+		)
+	}
+
+	if len(httpResp.Body) > 0 {
+		if httpResp.IsSuccess() {
+			nodeLog.Debug("step HTTP response body",
+				logger.F("step", step.Name),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("body", string(httpResp.Body)),
+			)
+		} else {
+			nodeLog.Debug("step HTTP response body (non-2xx)",
+				logger.F("step", step.Name),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("body", string(httpResp.Body)),
+			)
+		}
+	}
+
+	// AES decrypt: if aes_decrypt is configured and the response body is
+	// not plain JSON (doesn't start with '{'), decrypt it before extract.
+	if step.AesDecrypt != "" && len(httpResp.Body) > 0 {
+		aesKeyStr := resolveWithVariables(step.AesDecrypt, loopVars)
+		if httpResp.Body[0] != '{' {
+			stepAesMode := 1 // default GCM
+			if step.AesMode != nil {
+				stepAesMode = *step.AesMode
+			}
+			decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, stepAesMode)
+			if decryptErr != nil {
+				nodeLog.Error("while step AES decrypt failed",
+					logger.F("step", step.Name),
+					logger.F("error", decryptErr),
+					logger.F("aes_mode", stepAesMode),
+				)
+			} else {
+				httpResp.Body = []byte(decrypted)
+				nodeLog.Info("while step AES decrypt succeeded",
+					logger.F("step", step.Name),
+					logger.F("decrypted_len", len(decrypted)),
+				)
+				nodeLog.Debug("AES decrypted plaintext",
+					logger.F("step", step.Name),
+					logger.F("body", decrypted))
+			}
+		} else {
+			nodeLog.Debug("while step AES decrypt skipped: response is plain JSON",
+				logger.F("step", step.Name))
+		}
+	}
+
+	// Validate expect_body assertions (supports JSONPath with JSON string penetration).
+	if len(step.Request.ExpectBody) > 0 && len(httpResp.Body) > 0 {
+		var bodyJSON map[string]any
+		dec := json.NewDecoder(bytes.NewReader(httpResp.Body))
+		dec.UseNumber()
+		if err := dec.Decode(&bodyJSON); err != nil {
+			nodeLog.Error("while step: failed to parse response body for expect_body validation",
+				logger.F("step", step.Name),
+				logger.F("error", err))
+		} else {
+			for key, expectedVal := range step.Request.ExpectBody {
+				var actualVal any
+				if strings.HasPrefix(key, "$.") {
+					actualVal = resolveJSONPath(bodyJSON, key)
+					if actualVal == nil && expectedVal != nil {
+						errMsg := fmt.Sprintf("expect_body path %q not found in response", key)
+						nodeLog.Error("while step expect_body validation failed",
+							logger.F("step", step.Name),
+							logger.F("field", key),
+							logger.F("error", errMsg))
+						return fmt.Errorf("step %q: %s", step.Name, errMsg)
+					}
+				} else {
+					var exists bool
+					actualVal, exists = bodyJSON[key]
+					if !exists {
+						errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
+						nodeLog.Error("while step expect_body validation failed",
+							logger.F("step", step.Name),
+							logger.F("field", key),
+							logger.F("error", errMsg))
+						return fmt.Errorf("step %q: %s", step.Name, errMsg)
+					}
+				}
+				if !compareJSONValues(actualVal, expectedVal) {
+					errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, formatJSONValue(expectedVal), formatJSONValue(actualVal))
+					nodeLog.Error("while step expect_body validation failed",
+						logger.F("step", step.Name),
+						logger.F("field", key),
+						logger.F("expected", expectedVal),
+						logger.F("actual", actualVal))
+					return fmt.Errorf("step %q: %s", step.Name, errMsg)
+				}
+			}
+			nodeLog.Info("while step expect_body validation passed",
+				logger.F("step", step.Name),
+				logger.F("assertions", step.Request.ExpectBody))
+		}
+	}
+
+	// Extract variables from response.
+	// Merge extracts from both step.Extract (top-level) and Config["extract"] (nested).
+	allExtracts := mergeStepExtracts(step, nodeLog)
+	if len(allExtracts) > 0 {
+		extractVarsFromResponse(httpResp.Body, allExtracts, loopVars, nodeLog)
+	}
+
+	return nil
+}
+
+// buildStepHTTPRequest constructs an HTTPRequest from a step config.
+func buildStepHTTPRequest(cfg *stepRequestConfig, vars map[string]any, nodeLog logger.Logger) *httpprotocol.HTTPRequest {
+	url := resolveWithVariables(cfg.URL, vars)
+
+	method := cfg.Method
+	if method == "" {
+		method = "GET"
+	}
+
+	req := &httpprotocol.HTTPRequest{
+		Method:  httpprotocol.Method(method),
+		URL:     url,
+		Headers: make(map[string]string),
+	}
+
+	for k, v := range cfg.Headers {
+		req.Headers[k] = resolveWithVariables(v, vars)
+	}
+
+	if cfg.Body != nil {
+		switch b := cfg.Body.(type) {
+		case string:
+			req.Body = []byte(resolveWithVariables(b, vars))
+		case map[string]any:
+			bodyBytes, err := json.Marshal(b)
+			if err == nil {
+				bodyStr := resolveWithVariables(string(bodyBytes), vars)
+				req.Body = []byte(bodyStr)
+			}
+		default:
+			if bodyBytes, err := json.Marshal(b); err == nil {
+				bodyStr := resolveWithVariables(string(bodyBytes), vars)
+				req.Body = []byte(bodyStr)
+			}
+		}
+	}
+
+	// multipart/form-data (Form) takes precedence over Body when both set.
+	if cfg.Form != nil {
+		form := &httpprotocol.FormData{
+			Fields: make(map[string]string, len(cfg.Form.Fields)),
+			Files:  make(map[string]string, len(cfg.Form.Files)),
+		}
+		for k, v := range cfg.Form.Fields {
+			form.Fields[k] = resolveWithVariables(v, vars)
+		}
+		for k, v := range cfg.Form.Files {
+			form.Files[k] = resolveWithVariables(v, vars)
+		}
+		req.Form = form
+	}
+
+	return req
+}
+
+// extractVarsFromResponse extracts variables from an HTTP response body
+// using the configured extract entries and stores them in the vars map.
+func extractVarsFromResponse(body []byte, extracts extractConfig, vars map[string]any, nodeLog logger.Logger) {
+	if len(body) == 0 {
+		nodeLog.Debug("extract skipped: empty response body",
+			logger.F("extract_count", len(extracts)))
+		return
+	}
+
+	var jsonData map[string]any
+	if err := json.Unmarshal(body, &jsonData); err != nil {
+		nodeLog.Warn("extract skipped: response is not valid JSON",
+			logger.F("error", err),
+			logger.F("body_preview", truncateResponseBody(body, 100)),
+			logger.F("extract_count", len(extracts)))
+		return
+	}
+
+	for _, ext := range extracts {
+		value := resolveJSONPath(jsonData, ext.Path)
+		if value != nil {
+			vars[ext.Variable] = value
+			nodeLog.Info("extracted variable",
+				logger.F("variable", ext.Variable),
+				logger.F("path", ext.Path),
+				logger.F("value", value))
+		} else {
+			nodeLog.Warn("extract path not found in response",
+				logger.F("variable", ext.Variable),
+				logger.F("path", ext.Path))
+		}
+	}
+}
+
+// resolveJSONPath resolves a simple JSON path (e.g., "$.result.status") against data.
+// Supports: $.field, $.field.subfield, $.field[index], $.field.subfield[index]
+// Auto-penetrates JSON strings: when a field value is a JSON string (not an object),
+// it is automatically unmarshalled and traversal continues into the parsed object.
+func resolveJSONPath(data map[string]any, path string) any {
+	if !strings.HasPrefix(path, "$") {
+		return nil
+	}
+
+	// Strip "$." or "$" prefix.
+	parts := strings.Split(path, ".")
+	if parts[0] == "$" {
+		parts = parts[1:]
+	}
+
+	if len(parts) == 0 {
+		return data
+	}
+
+	current := any(data)
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		// Auto-penetrate JSON strings: if current is a string that looks like
+		// a JSON object/array, parse it so traversal can continue.
+		if s, ok := current.(string); ok {
+			var parsed map[string]any
+			if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+				current = parsed
+			}
+		}
+
+		// Check for array index: fieldName[index]
+		if idx := strings.Index(part, "["); idx >= 0 {
+			fieldName := part[:idx]
+			indexStr := part[idx+1 : len(part)-1] // strip [ and ]
+
+			// Navigate to the field.
+			if m, ok := current.(map[string]any); ok {
+				current = m[fieldName]
+			} else {
+				return nil
+			}
+
+			// Auto-penetrate JSON strings after field access too.
+			if s, ok := current.(string); ok {
+				var parsed map[string]any
+				if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+					current = parsed
+				}
+			}
+
+			// Navigate into the array.
+			arr, ok := current.([]any)
+			if !ok {
+				return nil
+			}
+			var index int
+			if _, err := fmt.Sscanf(indexStr, "%d", &index); err != nil {
+				return nil
+			}
+			if index < 0 || index >= len(arr) {
+				return nil
+			}
+			current = arr[index]
+		} else {
+			if m, ok := current.(map[string]any); ok {
+				current = m[part]
+			} else {
+				return nil
+			}
+		}
+	}
+
+	return current
+}
+
+// parseDurationSeconds parses a duration string as seconds.
+func parseDurationSeconds(s string) (float64, error) {
+	var sec float64
+	if _, err := fmt.Sscanf(s, "%f", &sec); err != nil {
+		return 0, err
+	}
+	return sec, nil
+}
+
+// isHTTP429Error checks if an error is an HTTP 429 error.
+func isHTTP429Error(err error) bool {
+	return strings.Contains(err.Error(), "429")
+}
+
+// randomInt returns a random integer in [min, max].
+func randomInt(min, max int) int {
+	if min >= max {
+		return min
+	}
+	// Simple deterministic approach using time for now.
+	// In production, use crypto/rand or math/rand with proper seeding.
+	r := time.Now().UnixNano() % int64(max-min+1)
+	return min + int(r)
+}
+
+// mergeStepExtracts merges extract entries from step.Extract (top-level)
+// and step.Config["extract"] (nested, e.g. for generator steps where
+// extract is inside the config block in YAML).
+func mergeStepExtracts(step *stepConfig, nodeLog logger.Logger) extractConfig {
+	result := make(extractConfig, 0, len(step.Extract)+2)
+	result = append(result, step.Extract...)
+
+	if step.Config != nil {
+		if rawExtract, ok := step.Config["extract"]; ok {
+			// Marshal and unmarshal the raw extract config through JSON
+			// to reuse the extractConfig UnmarshalJSON logic that handles
+			// both object and array formats.
+			extractBytes, err := json.Marshal(rawExtract)
+			if err != nil {
+				nodeLog.Warn("failed to marshal generator config extract",
+					logger.F("step", step.Name),
+					logger.F("error", err))
+			} else {
+				var cfgExtract extractConfig
+				if err := json.Unmarshal(extractBytes, &cfgExtract); err != nil {
+					nodeLog.Warn("failed to parse generator config extract",
+						logger.F("step", step.Name),
+						logger.F("error", err))
+				} else {
+					result = append(result, cfgExtract...)
+				}
+			}
+		}
+	}
+
+	return result
+}

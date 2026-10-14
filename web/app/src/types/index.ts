@@ -74,10 +74,21 @@ export interface SceneDTO {
   description: string
   dag_json: string
   variables: string
+<<<<<<< HEAD
+=======
+  config_params: string
+  derived_params: string
+>>>>>>> dev
   plugins: string
   status: string
   created_at: string
   updated_at: string
+<<<<<<< HEAD
+=======
+  last_run_id?: string
+  last_run_started_at?: string
+  last_run_status?: string
+>>>>>>> dev
 }
 
 export interface CreateSceneRequest {
@@ -89,6 +100,10 @@ export interface CreateSceneRequest {
 
 export interface RunRecordDTO {
   id: string
+<<<<<<< HEAD
+=======
+  run_id: string
+>>>>>>> dev
   scene_id: string
   status: string
   worker_count: number
@@ -138,19 +153,33 @@ export interface SpanDTO {
   duration_ns: number
 }
 
+<<<<<<< HEAD
 export interface ReportDTO {
+=======
+export interface ReportListItemDTO {
+>>>>>>> dev
   id: string
   scene_id: string
   run_id: string
   status: string
   summary: string
+<<<<<<< HEAD
   detail: string
+=======
+>>>>>>> dev
   started_at?: string
   finished_at?: string
   created_at: string
   updated_at: string
 }
 
+<<<<<<< HEAD
+=======
+export interface ReportDTO extends ReportListItemDTO {
+  detail: string
+}
+
+>>>>>>> dev
 export interface ChangePasswordRequest {
   old_password: string
   new_password: string
@@ -169,6 +198,11 @@ export interface NodeDTO {
   config: string
   position: string
   loop_count: number
+<<<<<<< HEAD
+=======
+  block_on_error: boolean
+  lifecycle: string
+>>>>>>> dev
   created_at: string
   updated_at: string
 }
@@ -264,6 +298,25 @@ export interface DashboardOverviewDTO {
   recent_runs: RunRecordDTO[]
   node_metrics: NodeMetricDTO[]
   time_series?: TimeSeriesDTO
+<<<<<<< HEAD
+=======
+  http_only_time_series?: TimeSeriesDTO
+  system_metrics?: RuntimeMetricsDTO
+}
+
+export interface RuntimeMetricsDTO {
+  goroutine_count: number
+  heap_alloc_mb: number
+  heap_sys_mb: number
+  cpu_percent: number
+  rss_mb: number
+  active_workers: number
+  pending_queue_len: number
+  task_wait_p50_ms: number
+  task_wait_p95_ms: number
+  task_wait_p99_ms: number
+  gc_pause_last_ms: number
+>>>>>>> dev
 }
 
 export interface NodeMetricDTO {
@@ -351,3 +404,47 @@ export interface GeneratorCategoryInfo {
   label: string
   generators: GeneratorInfo[]
 }
+<<<<<<< HEAD
+=======
+
+// --- SO Plugin Types ---
+
+export interface SOPluginDTO {
+  id: string
+  name: string
+  version: string
+  file_path: string
+  status: string
+  config: string
+  created_at: string
+  updated_at: string
+}
+
+export interface UploadSOPluginRequest {
+  name: string
+  version: string
+  file_path: string
+  status?: string
+  config?: string
+}
+
+export interface ListSOPluginsRequest {
+  offset?: number
+  limit?: number
+  status?: string
+}
+
+export interface UpdateSOPluginStatusRequest {
+  id: string
+  status: string
+}
+
+export interface UpdateSOPluginConfigRequest {
+  id: string
+  config: string
+}
+
+export interface ExportYAMLResponse {
+  yaml: string
+}
+>>>>>>> dev

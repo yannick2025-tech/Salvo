@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">28</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold"><tspan>体验</tspan><tspan>三</tspan></text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 512.83 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 575.39 89.4 L 575.39 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">CodeGraph：代码理解与同步</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="63.28 154.7 214.13 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 63.28 154.7 L 277.41 154.7 L 277.41 182.42 L 63.28 182.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="63.28" y="170" text-anchor="start" xml:space="preserve" font-size="18" fill="#59606E">让 AI 知道"我在改什么"</text>
+</g>
+<g id="shape-19" data-pptx-object="group" data-pptx-frame="140 220 1000 160" data-pptx-source-ref="slide:19">
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="140 220 480 160" data-pptx-prst="roundRect" data-pptx-av-adj="val 5000" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 140 228 A 8 8 0 0 1 148 220 L 612 220 A 8 8 0 0 1 620 228 L 620 372 A 8 8 0 0 1 612 380 L 148 380 A 8 8 0 0 1 140 372 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="179.28 239.7 58.68 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 179.28 239.7 L 237.96 239.7 L 237.96 267.42 L 179.28 267.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.28" y="255" text-anchor="start" xml:space="preserve" font-size="18" fill="#3458B0" font-weight="bold">修改前</text>
+</g>
+<g id="shape-10" data-pptx-object="shape" data-pptx-frame="179.36 276.4 231.09 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
+<path d="M 179.36 276.4 L 410.45 276.4 L 410.45 301.04 L 179.36 301.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.36" y="290" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">必须使用 codegraph 理解代码</text>
+</g>
+<g id="shape-11" data-pptx-object="shape" data-pptx-frame="179.36 306.4 120 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:11" data-pptx-semantic-object="shape">
+<path d="M 179.36 306.4 L 299.36 306.4 L 299.36 331.04 L 179.36 331.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.36" y="320" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">结构和依赖关系</text>
+</g>
+<g id="shape-12" data-pptx-object="shape" data-pptx-frame="179.44 343.1 227.7 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:12" data-pptx-semantic-object="shape">
+<path d="M 179.44 343.1 L 407.14 343.1 L 407.14 364.66 L 179.44 364.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.44" y="355" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">避免 AI 幻觉导致的代码理解偏差</text>
+</g>
+<g id="shape-13" data-pptx-object="shape" data-pptx-frame="624.09 264.2 31.82 73.92" data-pptx-prst="rect" data-pptx-source-ref="slide:13" data-pptx-semantic-object="shape">
+<path d="M 624.09 264.2 L 655.91 264.2 L 655.91 338.12 L 624.09 338.12 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="305" text-anchor="middle" xml:space="preserve" font-size="48" fill="#3458B0">→</text>
+</g>
+<g id="shape-14" data-pptx-object="shape" data-pptx-frame="700 220 440 160" data-pptx-prst="roundRect" data-pptx-av-adj="val 5000" data-pptx-source-ref="slide:14" data-pptx-semantic-object="shape">
+<path d="M 700 228 A 8 8 0 0 1 708 220 L 1132 220 A 8 8 0 0 1 1140 228 L 1140 372 A 8 8 0 0 1 1132 380 L 708 380 A 8 8 0 0 1 700 372 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-15" data-pptx-object="shape" data-pptx-frame="739.28 239.7 58.68 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:15" data-pptx-semantic-object="shape">
+<path d="M 739.28 239.7 L 797.96 239.7 L 797.96 267.42 L 739.28 267.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="739.28" y="255" text-anchor="start" xml:space="preserve" font-size="18" fill="#3458B0" font-weight="bold">修改后</text>
+</g>
+<g id="shape-16" data-pptx-object="shape" data-pptx-frame="739.36 276.4 200.56 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:16" data-pptx-semantic-object="shape">
+<path d="M 739.36 276.4 L 939.92 276.4 L 939.92 301.04 L 739.36 301.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="739.36" y="290" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">必须使用 codegraph sync</text>
+</g>
+<g id="shape-17" data-pptx-object="shape" data-pptx-frame="739.36 306.4 103.04 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:17" data-pptx-semantic-object="shape">
+<path d="M 739.36 306.4 L 842.4 306.4 L 842.4 331.04 L 739.36 331.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="739.36" y="320" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">同步更新索引</text>
+</g>
+<g id="shape-18" data-pptx-object="shape" data-pptx-frame="739.44 343.1 164.36 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:18" data-pptx-semantic-object="shape">
+<path d="M 739.44 343.1 L 903.8 343.1 L 903.8 364.66 L 739.44 364.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="739.44" y="355" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">确保修改时知道影响范围</text>
+</g>
+</g>
+<g id="shape-26" data-pptx-object="group" data-pptx-frame="140 440 1000 220" data-pptx-source-ref="slide:26">
+<g id="shape-20" data-pptx-object="shape" data-pptx-frame="140 440 1000 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-source-ref="slide:20" data-pptx-semantic-object="shape">
+<path d="M 140 448 A 8 8 0 0 1 148 440 L 1132 440 A 8 8 0 0 1 1140 448 L 1140 492 A 8 8 0 0 1 1132 500 L 148 500 A 8 8 0 0 1 140 492 Z" fill="#FFFFFF" stroke-width="1" stroke="#DCE1EA" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-21" data-pptx-object="shape" data-pptx-frame="179.36 461.4 283.52 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:21" data-pptx-semantic-object="shape">
+<path d="M 179.36 461.4 L 462.88 461.4 L 462.88 486.04 L 179.36 486.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.36" y="475" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">✓ 避免 AI 幻觉导致的代码理解偏差</text>
+</g>
+<g id="shape-22" data-pptx-object="shape" data-pptx-frame="140 520 1000 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-source-ref="slide:22" data-pptx-semantic-object="shape">
+<path d="M 140 528 A 8 8 0 0 1 148 520 L 1132 520 A 8 8 0 0 1 1140 528 L 1140 572 A 8 8 0 0 1 1132 580 L 148 580 A 8 8 0 0 1 140 572 Z" fill="#FFFFFF" stroke-width="1" stroke="#DCE1EA" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-23" data-pptx-object="shape" data-pptx-frame="179.36 541.4 209.89 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:23" data-pptx-semantic-object="shape">
+<path d="M 179.36 541.4 L 389.25 541.4 L 389.25 566.04 L 179.36 566.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.36" y="555" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">✓ 确保修改时知道影响范围</text>
+</g>
+<g id="shape-24" data-pptx-object="shape" data-pptx-frame="140 600 1000 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-source-ref="slide:24" data-pptx-semantic-object="shape">
+<path d="M 140 608 A 8 8 0 0 1 148 600 L 1132 600 A 8 8 0 0 1 1140 608 L 1140 652 A 8 8 0 0 1 1132 660 L 148 660 A 8 8 0 0 1 140 652 Z" fill="#FFFFFF" stroke-width="1" stroke="#DCE1EA" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-25" data-pptx-object="shape" data-pptx-frame="179.36 621.4 243.81 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:25" data-pptx-semantic-object="shape">
+<path d="M 179.36 621.4 L 423.17 621.4 L 423.17 646.04 L 179.36 646.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="179.36" y="635" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">✓ 维护代码库的完整性和一致性</text>
+</g>
+</g></svg>

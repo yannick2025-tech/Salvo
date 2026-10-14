@@ -11,6 +11,7 @@ import (
 type NodeStats struct {
 	mu sync.Mutex
 
+<<<<<<< HEAD
 	TotalReqs   atomic.Int64
 	SuccessReqs atomic.Int64
 	FailedReqs  atomic.Int64
@@ -21,10 +22,24 @@ type NodeStats struct {
 	errorMu     sync.RWMutex
 	latencies   []time.Duration
 	maxSamples  int
+=======
+	TotalReqs    atomic.Int64
+	SuccessReqs  atomic.Int64
+	FailedReqs   atomic.Int64
+	CanceledReqs atomic.Int64
+	MinLatency   atomic.Int64
+	TTFB         atomic.Int64
+
+	errorCodes map[string]*int64
+	errorMu    sync.RWMutex
+	latencies  []time.Duration
+	maxSamples int
+>>>>>>> dev
 }
 
 // NodeSnapshot represents a point-in-time snapshot of node statistics.
 type NodeSnapshot struct {
+<<<<<<< HEAD
 	NodeID      string            `json:"node_id"`
 	NodeType    string            `json:"node_type"`
 	NodeName    string            `json:"node_name"`
@@ -40,6 +55,24 @@ type NodeSnapshot struct {
 	MinLatency  time.Duration     `json:"min_latency"`
 	TTFB        time.Duration     `json:"ttfb_ms"`
 	ErrorCodes  map[string]int64  `json:"error_codes"`
+=======
+	NodeID       string           `json:"node_id"`
+	NodeType     string           `json:"node_type"`
+	NodeName     string           `json:"node_name"`
+	TotalReqs    int64            `json:"total_requests"`
+	SuccessReqs  int64            `json:"success_requests"`
+	FailedReqs   int64            `json:"failed_requests"`
+	CanceledReqs int64            `json:"canceled_requests"`
+	SuccessRate  float64          `json:"success_rate"`
+	AvgLatency   time.Duration    `json:"avg_latency"`
+	P50Latency   time.Duration    `json:"p50_latency"`
+	P90Latency   time.Duration    `json:"p90_latency"`
+	P95Latency   time.Duration    `json:"p95_latency"`
+	P99Latency   time.Duration    `json:"p99_latency"`
+	MinLatency   time.Duration    `json:"min_latency"`
+	TTFB         time.Duration    `json:"ttfb_ms"`
+	ErrorCodes   map[string]int64 `json:"error_codes"`
+>>>>>>> dev
 }
 
 // NewNodeStats creates a new NodeStats instance with the given maximum sample limit.
@@ -90,6 +123,16 @@ func (s *NodeStats) RecordLatency(d time.Duration, success bool) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// RecordCanceled records a request that was aborted due to manual scene
+// cancellation. Like Stats.RecordCanceled, this does NOT increment
+// TotalReqs, so the node's error rate stays consistent with the config.
+func (s *NodeStats) RecordCanceled() {
+	s.CanceledReqs.Add(1)
+}
+
+>>>>>>> dev
 // RecordError records an error with an associated status code or reason string.
 func (s *NodeStats) RecordError(code string) {
 	s.errorMu.Lock()
@@ -144,10 +187,18 @@ func (s *NodeStats) Snapshot() *NodeSnapshot {
 	}
 
 	return &NodeSnapshot{
+<<<<<<< HEAD
 		TotalReqs:   total,
 		SuccessReqs: succ,
 		FailedReqs:  fail,
 		SuccessRate: rate,
+=======
+		TotalReqs:    total,
+		SuccessReqs:  succ,
+		FailedReqs:   fail,
+		CanceledReqs: s.CanceledReqs.Load(),
+		SuccessRate:  rate,
+>>>>>>> dev
 		AvgLatency:  avg,
 		P50Latency:  p50,
 		P90Latency:  p90,

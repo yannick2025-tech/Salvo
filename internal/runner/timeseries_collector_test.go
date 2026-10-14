@@ -202,9 +202,23 @@ func (m *mockStatsProvider) GlobalSnapshot() *Sample {
 
 	snap := m.globalSnapshots[m.index%len(m.globalSnapshots)]
 	m.index++
+<<<<<<< HEAD
 	return &snap
 }
 
+=======
+	// Override timestamp with current time to simulate real stats provider
+	// behavior (prevents stale timestamps from breaking memory window cleanup
+	// when the mock cycles through its pre-generated samples).
+	snap.Timestamp = time.Now()
+	return &snap
+}
+
+func (m *mockStatsProvider) HttpOnlySnapshot() *Sample {
+	return m.GlobalSnapshot()
+}
+
+>>>>>>> dev
 func (m *mockStatsProvider) NodeSnapshots() map[string]*Sample {
 	m.mu.Lock()
 	defer m.mu.Unlock()

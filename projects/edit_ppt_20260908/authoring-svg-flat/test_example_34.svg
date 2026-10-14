@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">34</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="95 53.1 58 16.93" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold">体验八</text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 550 55.44" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 412.56 89.4 L 412.56 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">单元测试示例：全链路验证</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-sub" data-pptx-object="shape" data-pptx-frame="62.56 160 700 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 62.56 160 L 562.56 160 L 562.56 190 L 62.56 190 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="62.56" y="180" text-anchor="start" xml:space="preserve" font-size="18" fill="#59606E">TestSOPlugin_FullChain — 6 步串联 4 个组件层，无 mock 核心环节</text>
+</g>
+<g id="shape-step1" data-pptx-object="shape" data-pptx-frame="140 220 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 228 A 8 8 0 0 1 148 220 L 672 220 A 8 8 0 0 1 680 228 L 680 272 A 8 8 0 0 1 672 280 L 148 280 A 8 8 0 0 1 140 272 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step1-num" data-pptx-object="shape" data-pptx-frame="150 230 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="250" rx="20" ry="20" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="256" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF" font-weight="bold">1</text>
+</g>
+<g id="shape-step1-text" data-pptx-object="shape" data-pptx-frame="200 232 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 232 L 670 232 L 670 268 L 200 268 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="250" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">API 上传插件记录 → HTTP POST /so-plugins/create → SQLite 持久化</text>
+</g>
+<g id="shape-step2" data-pptx-object="shape" data-pptx-frame="140 290 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 298 A 8 8 0 0 1 148 290 L 672 290 A 8 8 0 0 1 680 298 L 680 342 A 8 8 0 0 1 672 350 L 148 350 A 8 8 0 0 1 140 342 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step2-num" data-pptx-object="shape" data-pptx-frame="150 300 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="320" rx="20" ry="20" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="326" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF" font-weight="bold">2</text>
+</g>
+<g id="shape-step2-text" data-pptx-object="shape" data-pptx-frame="200 302 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 302 L 670 302 L 670 338 L 200 338 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="320" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">创建表达式函数注册表 → expr.NewFunctionRegistry()</text>
+</g>
+<g id="shape-step3" data-pptx-object="shape" data-pptx-frame="140 360 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 368 A 8 8 0 0 1 148 360 L 672 360 A 8 8 0 0 1 680 368 L 680 412 A 8 8 0 0 1 672 420 L 148 420 A 8 8 0 0 1 140 412 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step3-num" data-pptx-object="shape" data-pptx-frame="150 370 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="390" rx="20" ry="20" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="396" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF" font-weight="bold">3</text>
+</g>
+<g id="shape-step3-text" data-pptx-object="shape" data-pptx-frame="200 372 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 372 L 670 372 L 670 408 L 200 408 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="390" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">Loader 注册内存插件 → so.NewLoader().Register(aesPlugin)</text>
+</g>
+<g id="shape-step4" data-pptx-object="shape" data-pptx-frame="140 430 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 438 A 8 8 0 0 1 148 430 L 672 430 A 8 8 0 0 1 680 438 L 680 482 A 8 8 0 0 1 672 490 L 148 490 A 8 8 0 0 1 140 482 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step4-num" data-pptx-object="shape" data-pptx-frame="150 440 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="460" rx="20" ry="20" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="466" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF" font-weight="bold">4</text>
+</g>
+<g id="shape-step4-text" data-pptx-object="shape" data-pptx-frame="200 442 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 442 L 670 442 L 670 478 L 200 478 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="460" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">注册 __so 桥接函数 → so.RegisterSO(reg, loader)</text>
+</g>
+<g id="shape-step5" data-pptx-object="shape" data-pptx-frame="140 500 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 508 A 8 8 0 0 1 148 500 L 672 500 A 8 8 0 0 1 680 508 L 680 552 A 8 8 0 0 1 672 560 L 148 560 A 8 8 0 0 1 140 552 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step5-num" data-pptx-object="shape" data-pptx-frame="150 510 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="530" rx="20" ry="20" fill="#FFFFFF" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="536" text-anchor="middle" xml:space="preserve" font-size="18" fill="#3458B0" font-weight="bold">5</text>
+</g>
+<g id="shape-step5-text" data-pptx-object="shape" data-pptx-frame="200 512 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 512 L 670 512 L 670 548 L 200 548 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="530" text-anchor="start" xml:space="preserve" font-size="16" fill="#FFFFFF">表达式引擎调用插件加解密 → encrypt → decrypt 验证往返一致</text>
+</g>
+<g id="shape-step6" data-pptx-object="shape" data-pptx-frame="140 570 540 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-semantic-object="shape">
+<path d="M 140 578 A 8 8 0 0 1 148 570 L 672 570 A 8 8 0 0 1 680 578 L 680 622 A 8 8 0 0 1 672 630 L 148 630 A 8 8 0 0 1 140 622 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-step6-num" data-pptx-object="shape" data-pptx-frame="150 580 40 40" data-pptx-prst="ellipse" data-pptx-semantic-object="shape">
+<ellipse cx="170" cy="600" rx="20" ry="20" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+<text x="170" y="606" text-anchor="middle" xml:space="preserve" font-size="18" fill="#FFFFFF" font-weight="bold">6</text>
+</g>
+<g id="shape-step6-text" data-pptx-object="shape" data-pptx-frame="200 582 560 36" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 200 582 L 670 582 L 670 618 L 200 618 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="210" y="600" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">回查 DB 验证记录仍存在 → POST /so-plugins/get</text>
+</g>
+<g id="shape-right-card" data-pptx-object="shape" data-pptx-frame="720 220 420 410" data-pptx-prst="roundRect" data-pptx-av-adj="val 4762" data-pptx-semantic-object="shape">
+<path d="M 720 228 A 8 8 0 0 1 728 220 L 1132 220 A 8 8 0 0 1 1140 228 L 1140 622 A 8 8 0 0 1 1132 630 L 728 630 A 8 8 0 0 1 720 622 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-right-title" data-pptx-object="shape" data-pptx-frame="760 245 340 40" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 245 L 1100 245 L 1100 285 L 760 285 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="760" y="268" text-anchor="start" xml:space="preserve" font-size="20" fill="#3458B0" font-weight="bold">为什么适合做示例</text>
+</g>
+<g id="shape-right-b1a" data-pptx-object="shape" data-pptx-frame="760 310 340 24" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 310 L 1100 310 L 1100 334 L 760 334 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="325" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">链路长且每一环真实执行</text>
+</g>
+<g id="shape-right-b1b" data-pptx-object="shape" data-pptx-frame="760 335 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 335 L 1100 335 L 1100 355 L 760 355 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="350" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">HTTP API → 鉴权 → 数据库 → 插件加载器</text>
+</g>
+<g id="shape-right-b1c" data-pptx-object="shape" data-pptx-frame="760 355 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 355 L 1100 355 L 1100 375 L 760 375 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="370" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">→ 表达式引擎 → AES 加密算法</text>
+</g>
+<g id="shape-right-b2a" data-pptx-object="shape" data-pptx-frame="760 400 340 24" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 400 L 1100 400 L 1100 424 L 760 424 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="415" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">加密→解密→断言原文</text>
+</g>
+<g id="shape-right-b2b" data-pptx-object="shape" data-pptx-frame="760 425 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 425 L 1100 425 L 1100 445 L 760 445 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="440" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">业务闭环验证逻辑直观</text>
+</g>
+<g id="shape-right-b3a" data-pptx-object="shape" data-pptx-frame="760 470 340 24" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 470 L 1100 470 L 1100 494 L 760 494 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="485" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">覆盖三大特色模块</text>
+</g>
+<g id="shape-right-b3b" data-pptx-object="shape" data-pptx-frame="760 495 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 495 L 1100 495 L 1100 515 L 760 515 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="510" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">SO 插件热加载 + 表达式引擎 + API 层</text>
+</g>
+<g id="shape-right-b4a" data-pptx-object="shape" data-pptx-frame="760 540 340 24" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 540 L 1100 540 L 1100 564 L 760 564 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="555" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26">无 mock 核心环节</text>
+</g>
+<g id="shape-right-b4b" data-pptx-object="shape" data-pptx-frame="760 565 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 565 L 1100 565 L 1100 585 L 760 585 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="580" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">没有 mock 掉数据库、插件加载、</text>
+</g>
+<g id="shape-right-b4c" data-pptx-object="shape" data-pptx-frame="760 585 340 20" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 760 585 L 1100 585 L 1100 605 L 760 605 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="780" y="600" text-anchor="start" xml:space="preserve" font-size="14" fill="#59606E">表达式引擎等核心组件</text>
+</g>
+</svg>

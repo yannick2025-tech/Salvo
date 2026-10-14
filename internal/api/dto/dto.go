@@ -63,12 +63,22 @@ type ListResponse[T any] struct {
 
 // CreateSceneRequest is the request body for POST /api/v1/scenes/create.
 type CreateSceneRequest struct {
+<<<<<<< HEAD
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	DAGJSON     string `json:"dag_json,omitempty"`
 	Variables   string `json:"variables,omitempty"`
 	Plugins     string `json:"plugins,omitempty"`
 	Status      string `json:"status,omitempty"`
+=======
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	DAGJSON        string `json:"dag_json,omitempty"`
+	Variables      string `json:"variables,omitempty"`
+	Plugins        string `json:"plugins,omitempty"`
+	Status         string `json:"status,omitempty"`
+	DefaultTimeout int    `json:"default_timeout,omitempty"`
+>>>>>>> dev
 }
 
 // ImportYAMLRequest is the request body for POST /api/v1/scenes/import.
@@ -78,6 +88,7 @@ type ImportYAMLRequest struct {
 	YAML        string `json:"yaml"`
 }
 
+<<<<<<< HEAD
 // UpdateSceneRequest is the request body for POST /api/v1/scenes/update.
 type UpdateSceneRequest struct {
 	ID          snowflake.ID `json:"id"`
@@ -87,6 +98,31 @@ type UpdateSceneRequest struct {
 	Variables   string       `json:"variables,omitempty"`
 	Plugins     string       `json:"plugins,omitempty"`
 	Status      string       `json:"status,omitempty"`
+=======
+// CopySceneRequest is the request body for POST /api/v1/scenes/copy.
+type CopySceneRequest struct {
+	SceneID snowflake.ID `json:"scene_id"`
+	Name    string       `json:"name"`
+}
+
+// ExportYAMLResponse is the response body for POST /api/v1/scenes/export.
+type ExportYAMLResponse struct {
+	YAML string `json:"yaml"`
+}
+
+// UpdateSceneRequest is the request body for POST /api/v1/scenes/update.
+type UpdateSceneRequest struct {
+	ID             snowflake.ID `json:"id"`
+	Name           string       `json:"name,omitempty"`
+	Description    string       `json:"description,omitempty"`
+	DAGJSON        string       `json:"dag_json,omitempty"`
+	Variables      string       `json:"variables,omitempty"`
+	ConfigParams   string       `json:"config_params,omitempty"`
+	DerivedParams  string       `json:"derived_params,omitempty"`
+	Plugins        string       `json:"plugins,omitempty"`
+	Status         string       `json:"status,omitempty"`
+	DefaultTimeout *int         `json:"default_timeout,omitempty"`
+>>>>>>> dev
 }
 
 // ListScenesRequest is the request body for POST /api/v1/scenes/list.
@@ -98,6 +134,7 @@ type ListScenesRequest struct {
 
 // SceneDTO is the scene detail returned in API responses.
 type SceneDTO struct {
+<<<<<<< HEAD
 	ID          snowflake.ID `json:"id"`
 	Name        string       `json:"name"`
 	Description string       `json:"description"`
@@ -107,28 +144,69 @@ type SceneDTO struct {
 	Status      string       `json:"status"`
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
+=======
+	ID             snowflake.ID `json:"id"`
+	Name           string       `json:"name"`
+	Description    string       `json:"description"`
+	DAGJSON        string       `json:"dag_json"`
+	Variables      string       `json:"variables"`
+	ConfigParams   string       `json:"config_params"`
+	DerivedParams  string       `json:"derived_params"`
+	Plugins        string       `json:"plugins"`
+	Status         string       `json:"status"`
+	DefaultTimeout int          `json:"default_timeout"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
+	// LastRunID is the run_id of the most recent run of this scene,
+	// serialized as string to avoid JS precision loss with snowflake IDs.
+	LastRunID string `json:"last_run_id,omitempty"`
+	// LastRunStartedAt is the start time of the most recent run.
+	LastRunStartedAt *time.Time `json:"last_run_started_at,omitempty"`
+	// LastRunStatus is the status of the most recent run.
+	LastRunStatus string `json:"last_run_status,omitempty"`
+>>>>>>> dev
 }
 
 // --- Node ---
 
 // AddNodeRequest is the request body for POST /api/v1/scenes/nodes/add.
 type AddNodeRequest struct {
+<<<<<<< HEAD
 	SceneID   snowflake.ID `json:"scene_id"`
 	Name      string       `json:"name"`
 	Type      string       `json:"type"`
 	Config    string       `json:"config,omitempty"`
 	Position  string       `json:"position,omitempty"`
 	LoopCount int          `json:"loop_count,omitempty"`
+=======
+	SceneID      snowflake.ID `json:"scene_id"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError bool         `json:"block_on_error,omitempty"`
+>>>>>>> dev
 }
 
 // UpdateNodeRequest is the request body for POST /api/v1/scenes/nodes/update.
 type UpdateNodeRequest struct {
+<<<<<<< HEAD
 	ID        snowflake.ID `json:"id"`
 	Name      string       `json:"name,omitempty"`
 	Type      string       `json:"type,omitempty"`
 	Config    string       `json:"config,omitempty"`
 	Position  string       `json:"position,omitempty"`
 	LoopCount int          `json:"loop_count,omitempty"`
+=======
+	ID           snowflake.ID `json:"id"`
+	Name         string       `json:"name,omitempty"`
+	Type         string       `json:"type,omitempty"`
+	Config       string       `json:"config,omitempty"`
+	Position     string       `json:"position,omitempty"`
+	LoopCount    int          `json:"loop_count,omitempty"`
+	BlockOnError *bool        `json:"block_on_error,omitempty"`
+>>>>>>> dev
 }
 
 // DeleteNodeRequest is the request body for POST /api/v1/scenes/nodes/delete.
@@ -145,6 +223,7 @@ type ListNodesRequest struct {
 
 // NodeDTO is the node detail returned in API responses.
 type NodeDTO struct {
+<<<<<<< HEAD
 	ID        snowflake.ID `json:"id"`
 	SceneID   snowflake.ID `json:"scene_id"`
 	Name      string       `json:"name"`
@@ -154,6 +233,19 @@ type NodeDTO struct {
 	LoopCount int          `json:"loop_count"`
 	CreatedAt time.Time    `json:"created_at"`
 	UpdatedAt time.Time    `json:"updated_at"`
+=======
+	ID           snowflake.ID `json:"id"`
+	SceneID      snowflake.ID `json:"scene_id"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Config       string       `json:"config"`
+	Position     string       `json:"position"`
+	LoopCount    int          `json:"loop_count"`
+	BlockOnError bool         `json:"block_on_error"`
+	Lifecycle    string       `json:"lifecycle"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
+>>>>>>> dev
 }
 
 // --- Edge ---
@@ -208,6 +300,109 @@ type SetVariableRequest struct {
 	Value   string       `json:"value"`
 }
 
+<<<<<<< HEAD
+=======
+// BatchSetVariablesRequest is the request body for POST /api/v1/scenes/variables/batch-set.
+// It replaces all scene-level variables with the provided key-value map.
+type BatchSetVariablesRequest struct {
+	SceneID   snowflake.ID      `json:"scene_id"`
+	Variables map[string]string `json:"variables"`
+}
+
+// BatchSetVariablesResponse is the response for the batch-set endpoint.
+type BatchSetVariablesResponse struct {
+	Variables map[string]string `json:"variables"`
+}
+
+// --- DataSource ---
+
+// UploadDataSourceRequest is the request body for POST /api/v1/scenes/datasources/upload.
+type UploadDataSourceRequest struct {
+	SceneID  snowflake.ID `json:"scene_id"`
+	FileName string       `json:"file_name"`
+	Content  string       `json:"content"` // raw CSV content
+}
+
+// UpdateDataSourceRequest is the request body for POST /api/v1/scenes/datasources/update.
+type UpdateDataSourceRequest struct {
+	ID      snowflake.ID `json:"id"`
+	Content string       `json:"content"` // raw CSV content
+}
+
+// --- SO Plugin ---
+
+type UploadSOPluginRequest struct {
+	Name     string `json:"name"`
+	Version  string `json:"version"`
+	FilePath string `json:"file_path"`
+	Status   string `json:"status"`
+	Config   string `json:"config"`
+}
+
+type ListSOPluginsRequest struct {
+	Offset int    `json:"offset"`
+	Limit  int    `json:"limit"`
+	Status string `json:"status"`
+}
+
+type GetSOPluginRequest struct {
+	ID snowflake.ID `json:"id"`
+}
+
+type UpdateSOPluginStatusRequest struct {
+	ID     snowflake.ID `json:"id"`
+	Status string       `json:"status"`
+}
+
+type UpdateSOPluginConfigRequest struct {
+	ID     snowflake.ID `json:"id"`
+	Config string       `json:"config"`
+}
+
+type DeleteSOPluginRequest struct {
+	ID snowflake.ID `json:"id"`
+}
+
+// DataSourceDTO is the data source detail returned in API responses.
+type DataSourceDTO struct {
+	ID               snowflake.ID `json:"id"`
+	SceneID          snowflake.ID `json:"scene_id"`
+	Name             string       `json:"name"`
+	FileName         string       `json:"file_name"`
+	Columns          []string     `json:"columns"`
+	RowCount         int          `json:"row_count"`
+	Source           string       `json:"source"` // "yaml" or "csv"
+	RemovedEmptyRows int          `json:"removed_empty_rows,omitempty"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
+}
+
+// SOPluginDTO is the SO plugin detail returned in API responses.
+type SOPluginDTO struct {
+	ID        snowflake.ID `json:"id"`
+	Name      string       `json:"name"`
+	Version   string       `json:"version"`
+	FilePath  string       `json:"file_path"`
+	Status    string       `json:"status"`
+	Config    string       `json:"config"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// DataSourcePreviewDTO is the data source preview with sample rows.
+type DataSourcePreviewDTO struct {
+	ID        snowflake.ID        `json:"id"`
+	SceneID   snowflake.ID        `json:"scene_id"`
+	Name      string              `json:"name"`
+	FileName  string              `json:"file_name"`
+	Columns   []string            `json:"columns"`
+	RowCount  int                 `json:"row_count"`
+	Rows      []map[string]string `json:"rows"`
+	CreatedAt time.Time           `json:"created_at"`
+	UpdatedAt time.Time           `json:"updated_at"`
+}
+
+>>>>>>> dev
 // VariableDTO is the variable detail returned in API responses.
 type VariableDTO struct {
 	ID        snowflake.ID `json:"id"`
@@ -275,6 +470,23 @@ type ReportDTO struct {
 	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
+<<<<<<< HEAD
+=======
+// ReportListItemDTO is the lightweight report data returned in list responses.
+// It excludes the detail field to optimize payload size for list queries.
+type ReportListItemDTO struct {
+	ID         snowflake.ID `json:"id,string"`
+	SceneID    snowflake.ID `json:"scene_id,string"`
+	RunID      snowflake.ID `json:"run_id,string"`
+	Status     string       `json:"status"`
+	Summary    string       `json:"summary"`
+	StartedAt  *time.Time   `json:"started_at,omitempty"`
+	FinishedAt *time.Time   `json:"finished_at,omitempty"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
+}
+
+>>>>>>> dev
 // --- RunRecord ---
 
 // ListRunRecordsRequest is the request body for listing run records.
@@ -288,6 +500,10 @@ type ListRunRecordsRequest struct {
 // RunRecordDTO is the run record detail returned in API responses.
 type RunRecordDTO struct {
 	ID          snowflake.ID `json:"id"`
+<<<<<<< HEAD
+=======
+	RunID       snowflake.ID `json:"run_id"`
+>>>>>>> dev
 	SceneID     snowflake.ID `json:"scene_id"`
 	Status      string       `json:"status"`
 	WorkerCount int          `json:"worker_count"`
@@ -313,7 +529,16 @@ type RunRecordDTO struct {
 
 // ListTracesRequest is the request for listing traces.
 type ListTracesRequest struct {
+<<<<<<< HEAD
 	SceneID snowflake.ID `json:"scene_id,omitempty"`
+=======
+	SceneID      snowflake.ID `json:"scene_id,omitempty"`
+	TraceID      string       `json:"trace_id,omitempty"`     // smart match: trace id OR run id
+	SceneName    string       `json:"scene_name,omitempty"`   // fuzzy scene name match
+	Status       string       `json:"status,omitempty"`       // ok|error|skip|canceled
+	MinDurationMs *float64   `json:"min_duration_ms,omitempty"` // inclusive, milliseconds
+	MaxDurationMs *float64   `json:"max_duration_ms,omitempty"` // inclusive, milliseconds
+>>>>>>> dev
 	Limit   int          `json:"limit,omitempty"`
 	Offset  int          `json:"offset,omitempty"`
 }
@@ -485,6 +710,7 @@ type ListRolesRequest struct {
 type DashboardOverviewRequest struct {
 	RangeSeconds int    `json:"range_seconds,omitempty"`
 	SceneID      string `json:"scene_id,omitempty"`
+<<<<<<< HEAD
 }
 
 type DashboardOverviewDTO struct {
@@ -500,6 +726,44 @@ type DashboardOverviewDTO struct {
 	RecentRuns  []RunRecordDTO  `json:"recent_runs"`
 	NodeMetrics []NodeMetricDTO `json:"node_metrics"`
 	TimeSeries  *TimeSeriesDTO  `json:"time_series,omitempty"`
+=======
+	RunID        string `json:"run_id,omitempty"`
+}
+
+type DashboardOverviewDTO struct {
+	TotalReqs               int64               `json:"total_reqs"`
+	SuccessReqs             int64               `json:"success_reqs"`
+	FailedReqs              int64               `json:"failed_reqs"`
+	P50Latency              float64             `json:"p50_latency"`
+	P95Latency              float64             `json:"p95_latency"`
+	P99Latency              float64             `json:"p99_latency"`
+	AvgLatency              float64             `json:"avg_latency"`
+	Running                 int                 `json:"running"`
+	SceneID                 int64               `json:"scene_id,omitempty"`
+	RecentRuns              []RunRecordDTO      `json:"recent_runs"`
+	NodeMetrics             []NodeMetricDTO     `json:"node_metrics"`
+	TimeSeries              *TimeSeriesDTO      `json:"time_series,omitempty"`
+	HttpOnlyTimeSeries      *TimeSeriesDTO      `json:"http_only_time_series,omitempty"`
+	SystemMetrics           *RuntimeMetricsDTO  `json:"system_metrics,omitempty"`
+	SystemMetricsTimeSeries []RuntimeMetricsDTO `json:"system_metrics_time_series,omitempty"`
+}
+
+// RuntimeMetricsDTO holds the latest runtime/system metrics snapshot
+// for the Dashboard real-time monitoring section.
+type RuntimeMetricsDTO struct {
+	Timestamp       string  `json:"timestamp,omitempty"`
+	GoroutineCount  int64   `json:"goroutine_count"`
+	HeapAllocMB     float64 `json:"heap_alloc_mb"`
+	HeapSysMB       float64 `json:"heap_sys_mb"`
+	CPUUsagePercent float64 `json:"cpu_percent"`
+	RSSMemoryMB     float64 `json:"rss_mb"`
+	ActiveWorkers   int     `json:"active_workers"`
+	PendingQueueLen int     `json:"pending_queue_len"`
+	TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
+	TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
+	TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
+	GCPauseLastMs   float64 `json:"gc_pause_last_ms"`
+>>>>>>> dev
 }
 
 type NodeMetricDTO struct {
@@ -536,8 +800,14 @@ type TimeSeriesDTO struct {
 // --- Dashboard History DTOs ---
 
 type DashboardHistoryRequest struct {
+<<<<<<< HEAD
 	SceneID int64 `json:"scene_id,omitempty"`
 	Limit   int   `json:"limit,omitempty"`
+=======
+	SceneID string `json:"scene_id,omitempty"`
+	RunID   string `json:"run_id,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+>>>>>>> dev
 }
 
 type DashboardHistoryDTO struct {

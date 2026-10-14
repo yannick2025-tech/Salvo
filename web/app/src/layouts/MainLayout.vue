@@ -3,7 +3,11 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo">
+<<<<<<< HEAD
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2">
+=======
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+>>>>>>> dev
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
           <span class="logo-text">Salvo</span>
@@ -153,6 +157,24 @@ const SettingsIcon = {
   },
 }
 
+<<<<<<< HEAD
+=======
+const PluginIcon = {
+  render() {
+    return h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
+      h('rect', { x: 2, y: 2, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 14, y: 2, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 2, y: 14, width: 8, height: 8, rx: 2 }),
+      h('rect', { x: 14, y: 14, width: 8, height: 8, rx: 2 }),
+      h('line', { x1: 10, y1: 6, x2: 14, y2: 6 }),
+      h('line', { x1: 6, y1: 10, x2: 6, y2: 14 }),
+      h('line', { x1: 18, y1: 10, x2: 18, y2: 14 }),
+      h('line', { x1: 10, y1: 18, x2: 14, y2: 18 }),
+    ])
+  },
+}
+
+>>>>>>> dev
 const allMenuItems = [
   { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
   { path: '/scenes', label: '场景管理', icon: SceneIcon },
@@ -160,7 +182,12 @@ const allMenuItems = [
   { path: '/reports', label: '测试报告', icon: ReportIcon },
   { path: '/traces', label: '链路追踪', icon: TraceIcon },
   { path: '/users', label: '用户管理', icon: UserIcon, permission: 'users:read' },
+<<<<<<< HEAD
   { path: '/settings', label: '系统设置', icon: SettingsIcon },
+=======
+  { path: '/plugins', label: 'SO 插件管理', icon: PluginIcon, permission: 'plugins:read' },
+  { path: '/settings', label: '个人设置', icon: SettingsIcon },
+>>>>>>> dev
 ]
 
 const menuItems = computed(() => {

@@ -2,6 +2,7 @@
   <div class="dashboard-page">
     <div class="scene-selector">
       <div class="selector-header">
+<<<<<<< HEAD
         <h3>场景选择</h3>
         <select v-model="selectedSceneId" @change="onSceneChange" class="scene-select">
           <option 
@@ -17,10 +18,23 @@
         </select>
       </div>
       <div v-if="selectedSceneId" class="time-window-row">
+=======
+        <h3>运行选择</h3>
+        <CustomSelect
+          v-model="selectedRunId"
+          :options="runOptions"
+          placeholder="暂无运行"
+          @update:modelValue="onRunChange"
+          style="min-width: 350px;"
+        />
+      </div>
+      <div v-if="selectedRunId" class="time-window-row">
+>>>>>>> dev
         <div class="time-window-info">
           <span class="window-label">时间范围:</span>
           <span class="window-value">{{ timeWindowDisplay }}</span>
           <span v-if="durationDisplay" class="duration-value"> | 持续: {{ durationDisplay }}</span>
+<<<<<<< HEAD
           <span v-if="isSceneRunning" class="live-indicator">● 实时</span>
         </div>
         <div v-if="showRefreshSelector" class="refresh-selector">
@@ -28,6 +42,17 @@
           <select v-model="refreshInterval" @change="onRefreshIntervalChange" class="refresh-select">
             <option v-for="sec in refreshOptions" :key="sec" :value="sec">{{ sec }}秒</option>
           </select>
+=======
+          <span v-if="isRunRunning" class="live-indicator">● 实时</span>
+        </div>
+        <div v-if="showRefreshSelector" class="refresh-selector">
+          <span class="refresh-label">刷新:</span>
+          <CustomSelect
+            v-model="refreshInterval"
+            :options="refreshOptions.map(s => ({ value: String(s), label: s + '秒' }))"
+            @update:modelValue="onRefreshIntervalChange"
+          />
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -61,8 +86,19 @@
         </div>
         <div class="chart-body" ref="latencyChartRef"></div>
         <div class="chart-type-toggle center">
+<<<<<<< HEAD
           <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
           <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
+=======
+          <div class="type-btn-group">
+            <button :class="['type-btn', { active: latencyDataSource === 'full' }]" @click="latencyDataSource = 'full'; renderLatencyChart()">端到端</button>
+            <button :class="['type-btn', { active: latencyDataSource === 'httpOnly' }]" @click="latencyDataSource = 'httpOnly'; renderLatencyChart()">纯HTTP</button>
+          </div>
+          <div class="type-btn-group">
+            <button :class="['type-btn', { active: chartTypes.latTrend === 'smooth' }]" @click="switchChartType('latTrend', 'smooth')">平滑</button>
+            <button :class="['type-btn', { active: chartTypes.latTrend === 'step' }]" @click="switchChartType('latTrend', 'step')">阶梯</button>
+          </div>
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -92,7 +128,11 @@
               <span :class="['run-status', run.status]">{{ run.status }}</span>
             </div>
             <div class="run-metrics">
+<<<<<<< HEAD
               <span>QPS: {{ formatNum(run.total_reqs / Math.max(run.duration, 1)) }}</span>
+=======
+              <span>QPS: {{ formatRate(run.total_reqs / Math.max(run.duration, 1)) }}</span>
+>>>>>>> dev
               <span>P99: {{ formatMs(run.p99_latency) }}</span>
               <span>成功率: {{ ((run.success_reqs / Math.max(run.total_reqs, 1)) * 100).toFixed(2) }}%</span>
             </div>
@@ -135,7 +175,11 @@
                 <span class="bar-value">{{ formatMs(node.p99_latency) }}</span>
               </div>
             </div>
+<<<<<<< HEAD
             <div v-if="expandedNodeId === node.node_id" class="node-detail" @click.stop>
+=======
+            <div v-show="expandedNodeId === node.node_id" class="node-detail" @click.stop>
+>>>>>>> dev
               <div class="node-time-range">
                 <span class="time-range-label">时间区间:</span>
                 <span class="time-range-value">{{ getNodeTimeRange(node) }}</span>
@@ -157,36 +201,268 @@
         </div>
       </div>
     </div>
+<<<<<<< HEAD
+=======
+
+    <!-- System Monitoring Section -->
+    <div v-if="overview?.system_metrics" ref="sysMonitorSectionRef" class="system-monitor-section">
+      <h3 class="section-title">系统监控</h3>
+      <div class="sys-gauge-row">
+        <div class="sys-gauge-card" :class="gaugeStatus('goroutine')" :style="{ borderColor: gaugeColor('goroutine'), '--gauge-color': gaugeColor('goroutine') }" data-tooltip="Goroutine 数量：当前 Go 运行时活跃协程总数" :data-alert="gaugeAlert('goroutine')">
+          <div class="gauge-label">Goroutines</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('goroutine') }">{{ overview.system_metrics.goroutine_count }}</div>
+          <div class="gauge-unit">个</div>
+          <div v-if="gaugeAlert('goroutine')" class="gauge-alert">{{ gaugeAlert('goroutine') }}</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('heap')" :style="{ borderColor: gaugeColor('heap'), '--gauge-color': gaugeColor('heap') }" data-tooltip="堆内存分配量 (Heap Alloc)：Go 运行时当前已分配的堆内存大小 (MB)" :data-alert="gaugeAlert('heap')">
+          <div class="gauge-label">Heap Alloc</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('heap') }">{{ overview.system_metrics.heap_alloc_mb.toFixed(3) }}</div>
+          <div class="gauge-unit">MB</div>
+          <div v-if="gaugeAlert('heap')" class="gauge-alert">{{ gaugeAlert('heap') }}</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('cpu')" :style="{ borderColor: gaugeColor('cpu'), '--gauge-color': gaugeColor('cpu') }" data-tooltip="CPU 使用率：当前进程瞬时 CPU 占用百分比" :data-alert="gaugeAlert('cpu')">
+          <div class="gauge-label">CPU</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('cpu') }">{{ overview.system_metrics.cpu_percent.toFixed(3) }}</div>
+          <div class="gauge-unit">%</div>
+          <div v-if="gaugeAlert('cpu')" class="gauge-alert">{{ gaugeAlert('cpu') }}</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('wait')" :style="{ borderColor: gaugeColor('wait'), '--gauge-color': gaugeColor('wait') }" data-tooltip="任务等待时间 P99：99% 的任务从入队到被 Worker 取出的等待时间" :data-alert="gaugeAlert('wait')">
+          <div class="gauge-label">Task Wait P99</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('wait') }">{{ overview.system_metrics.task_wait_p99_ms.toFixed(3) }}</div>
+          <div class="gauge-unit">ms</div>
+          <div v-if="gaugeAlert('wait')" class="gauge-alert">{{ gaugeAlert('wait') }}</div>
+        </div>
+        <div class="sys-gauge-card" :class="gaugeStatus('queue')" :style="{ borderColor: gaugeColor('queue'), '--gauge-color': gaugeColor('queue') }" data-tooltip="待处理队列长度：当前在队列中等待执行的任务数" :data-alert="gaugeAlert('queue')">
+          <div class="gauge-label">Pending Queue</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('queue') }">{{ overview.system_metrics.pending_queue_len }}</div>
+          <div class="gauge-unit">任务</div>
+          <div v-if="gaugeAlert('queue')" class="gauge-alert">{{ gaugeAlert('queue') }}</div>
+        </div>
+        <div class="sys-gauge-card status-normal" :style="{ borderColor: gaugeColor('workers'), '--gauge-color': gaugeColor('workers') }" data-tooltip="活跃 Worker 数：当前正在执行任务的 Worker 协程数">
+          <div class="gauge-label">Active Workers</div>
+          <div class="gauge-value" :style="{ color: gaugeValueColor('workers') }">{{ overview.system_metrics.active_workers }}</div>
+          <div class="gauge-unit">个</div>
+        </div>
+      </div>
+
+      <!-- System Trend Charts -->
+      <div v-if="sysMetricsHistory.length >= 2 || sysMetricsTimeSeries.length >= 2" class="sys-charts-row">
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysGoroutine' }" @click="toggleSysChartExpand('sysGoroutine')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysGoroutine' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysGoroutine'" ref="sysGoroutineChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">当前 Go 运行时中活跃的协程数量，反映并发任务规模</div>
+          <div v-show="expandedSysChartId === 'sysGoroutine'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysGoroutineExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysHeap' }" @click="toggleSysChartExpand('sysHeap')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysHeap' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysHeap'" ref="sysHeapChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">堆内存分配量（Heap Alloc），反映运行时内存使用情况</div>
+          <div v-show="expandedSysChartId === 'sysHeap'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysHeapExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysCpu' }" @click="toggleSysChartExpand('sysCpu')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysCpu' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysCpu'" ref="sysCpuChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">进程 CPU 使用率，反映计算资源消耗</div>
+          <div v-show="expandedSysChartId === 'sysCpu'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysCpuExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysTaskWait' }" @click="toggleSysChartExpand('sysTaskWait')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysTaskWait' ? '▼' : '▶' }}</span>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysTaskWait'" ref="sysTaskWaitChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">任务排队等待时间：任务提交到 Worker 接手执行的等待耗时（非网络延迟），反映 Worker 池繁忙程度</div>
+          <div v-show="expandedSysChartId === 'sysTaskWait'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysTaskWaitExpandedRef" class="sys-expanded-canvas"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+        <div class="sys-chart-item" :class="{ expanded: expandedSysChartId === 'sysQueue' }" @click="toggleSysChartExpand('sysQueue')">
+          <div class="sys-chart-header">
+            <span class="expand-icon">{{ expandedSysChartId === 'sysQueue' ? '▼' : '▶' }}</span>
+            <span class="sys-chart-title">Pending Queue</span>
+          </div>
+          <div v-show="expandedSysChartId !== 'sysQueue'" ref="sysQueueChartRef" class="sys-chart-canvas"></div>
+          <div class="sys-chart-desc">待处理队列中积压的任务数，0 表示所有任务被即时消费</div>
+          <div v-show="expandedSysChartId === 'sysQueue'" class="sys-chart-expanded" @click.stop>
+            <div ref="sysQueueExpandedRef" class="sys-expanded-canvas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+>>>>>>> dev
   </div>
 </template>
 
 <script setup lang="ts">
+<<<<<<< HEAD
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import type { DashboardOverviewDTO, RunHistoryDTO } from '@/types'
+=======
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import * as echarts from 'echarts'
+import type { DashboardOverviewDTO, RunHistoryDTO, RuntimeMetricsDTO } from '@/types'
+import CustomSelect from '@/components/CustomSelect.vue'
+>>>>>>> dev
 
 const qpsChartRef = ref<HTMLElement>()
 const latencyChartRef = ref<HTMLElement>()
 const errorChartRef = ref<HTMLElement>()
+<<<<<<< HEAD
+=======
+const sysGoroutineChartRef = ref<HTMLElement>()
+const sysHeapChartRef = ref<HTMLElement>()
+const sysCpuChartRef = ref<HTMLElement>()
+const sysTaskWaitChartRef = ref<HTMLElement>()
+const sysQueueChartRef = ref<HTMLElement>()
+const sysGoroutineExpandedRef = ref<HTMLElement>()
+const sysHeapExpandedRef = ref<HTMLElement>()
+const sysCpuExpandedRef = ref<HTMLElement>()
+const sysTaskWaitExpandedRef = ref<HTMLElement>()
+const sysQueueExpandedRef = ref<HTMLElement>()
+>>>>>>> dev
 
 let qpsChart: echarts.ECharts | null = null
 let latencyChart: echarts.ECharts | null = null
 let errorChart: echarts.ECharts | null = null
+<<<<<<< HEAD
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
 let themeObserver: MutationObserver | null = null
+=======
+let sysGoroutineChart: echarts.ECharts | null = null
+let sysHeapChart: echarts.ECharts | null = null
+let sysCpuChart: echarts.ECharts | null = null
+let sysTaskWaitChart: echarts.ECharts | null = null
+let sysQueueChart: echarts.ECharts | null = null
+let sysGoroutineExpandedChart: echarts.ECharts | null = null
+let sysHeapExpandedChart: echarts.ECharts | null = null
+let sysCpuExpandedChart: echarts.ECharts | null = null
+let sysTaskWaitExpandedChart: echarts.ECharts | null = null
+let sysQueueExpandedChart: echarts.ECharts | null = null
+let sysQueueMax = 0 // 记录队列历史最大值，防止 Y 轴归零后历史柱子不可见
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let timeRefreshTimer: ReturnType<typeof setInterval> | null = null
+let themeObserver: MutationObserver | null = null
+let sysObserver: IntersectionObserver | null = null
+>>>>>>> dev
 const expandedNodeId = ref('')
 const nodeChartRefs = new Map<string, HTMLElement>()
 const nodeCharts = new Map<string, echarts.ECharts>()
 const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   errorRate: 'smooth',
   qpsTrend: 'smooth',
+<<<<<<< HEAD
   latTrend: 'smooth'
 })
 
 function initNodeChartTypes() {
   overview.value?.node_metrics?.forEach(node => {
     chartTypes.value[`node-${node.node_id}`] = 'smooth'
+=======
+  latTrend: 'smooth',
+  sysGoroutine: 'smooth',
+  sysHeap: 'smooth',
+  sysCpu: 'smooth',
+  sysTaskWait: 'smooth',
+  sysQueue: 'smooth',
+})
+
+const latencyDataSource = ref<'full' | 'httpOnly'>('full')
+
+// Accumulated system metrics time series for trend charts.
+const sysMetricsHistory = ref<RuntimeMetricsDTO[]>([])
+const MAX_SYS_HISTORY = 300
+const sysMetricsTimeSeries = ref<any[]>([])
+const sysChartsVisible = ref(false)
+let sysChartsRendered = false
+let prewarmRetryTimer: ReturnType<typeof setTimeout> | null = null
+
+function prewarmSysCharts() {
+  if (sysMetricsHistory.value.length === 0 && sysMetricsTimeSeries.value.length === 0) return
+  // Wait until the container has actual dimensions before initializing ECharts.
+  // ECharts fails silently in zero-size containers and resize() cannot recover.
+  if (!sysMonitorSectionRef.value || sysMonitorSectionRef.value.getBoundingClientRect().height === 0) {
+    // Use requestAnimationFrame to wait for browser layout to complete, then retry
+    if (prewarmRetryTimer) clearTimeout(prewarmRetryTimer)
+    prewarmRetryTimer = setTimeout(() => {
+      requestAnimationFrame(() => prewarmSysCharts())
+    }, 100)
+    return
+  }
+  renderSysGoroutineChart()
+  renderSysHeapChart()
+  renderSysCpuChart()
+  renderSysTaskWaitChart()
+  renderSysQueueChart()
+  sysChartsRendered = true
+}
+
+function refreshSysCharts() {
+  if (!sysChartsRendered) return
+  if (sysMetricsTimeSeries.value.length > 0 || sysMetricsHistory.value.length >= 2) {
+    renderSysGoroutineChart()
+    renderSysHeapChart()
+    renderSysCpuChart()
+    renderSysTaskWaitChart()
+    renderSysQueueChart()
+  }
+}
+const sysMonitorSectionRef = ref<HTMLElement | null>(null)
+const expandedSysChartId = ref<string | null>(null)
+
+function initNodeChartTypes() {
+  overview.value?.node_metrics?.forEach(node => {
+    const key = `node-${node.node_id}`
+    // Only initialize new node keys: polling calls this on every refresh and
+    // must not reset the user's smooth/step choice for already-rendered charts.
+    if (chartTypes.value[key] === undefined) {
+      chartTypes.value[key] = 'smooth'
+    }
+>>>>>>> dev
   })
 }
 
@@ -196,12 +472,28 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'qpsTrend') renderQpsChart()
   else if (chartId === 'latTrend') renderLatencyChart()
   else if (chartId.startsWith('node-')) renderNodeDetailChart(chartId.slice(5))
+<<<<<<< HEAD
+=======
+  else if (chartId === 'sysGoroutine') { renderSysGoroutineChart(); if (expandedSysChartId.value === 'sysGoroutine') renderSysExpandedChart('sysGoroutine') }
+  else if (chartId === 'sysHeap') { renderSysHeapChart(); if (expandedSysChartId.value === 'sysHeap') renderSysExpandedChart('sysHeap') }
+  else if (chartId === 'sysCpu') { renderSysCpuChart(); if (expandedSysChartId.value === 'sysCpu') renderSysExpandedChart('sysCpu') }
+  else if (chartId === 'sysTaskWait') { renderSysTaskWaitChart(); if (expandedSysChartId.value === 'sysTaskWait') renderSysExpandedChart('sysTaskWait') }
+  else if (chartId === 'sysQueue') renderSysQueueChart()
+>>>>>>> dev
 }
 
 const overview = ref<DashboardOverviewDTO | null>(null)
 
 const historyData = ref<RunHistoryDTO[]>([])
+<<<<<<< HEAD
 const selectedSceneId = ref<string>('')
+=======
+const pollCheckCounter = ref(0)
+const selectedRunId = ref<string>('')
+// Set when the user picks a run in the dropdown; disables auto-following
+// the latest run in checkLatestRunScene until the page is reloaded.
+const userSelectedRun = ref(false)
+>>>>>>> dev
 const sceneList = ref<SceneInfo[]>([])
 const loading = ref(true)
 
@@ -217,6 +509,18 @@ interface SceneInfo {
   finished_at?: string
 }
 
+<<<<<<< HEAD
+=======
+interface RunOption {
+  run_id: string
+  scene_id: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  started_at?: string
+  finished_at?: string
+  label: string
+}
+
+>>>>>>> dev
 const runningScenes = computed<SceneInfo[]>(() => {
   return sceneList.value.filter(s => s.status === 'running')
 })
@@ -229,9 +533,29 @@ const allScenes = computed<SceneInfo[]>(() => {
   return [...runningScenes.value, ...historyScenes.value]
 })
 
+<<<<<<< HEAD
 const isSceneRunning = computed(() => {
   if (!selectedSceneId.value) return runningScenes.value.length > 0
   return runningScenes.value.some(s => s.scene_id === selectedSceneId.value)
+=======
+const runOptions = computed(() => {
+  const runs = overview.value?.recent_runs || []
+  if (runs.length === 0) {
+    return []
+  }
+  return runs
+    .filter((r: any) => r.id)  // Filter out runs without id
+    .map((r: any) => ({
+      value: String(r.id),
+      label: `运行-${String(r.id).slice(-8)} [场景-${String(r.scene_id).slice(-8)}] ${r.status === 'running' ? '(运行中)' : r.status === 'completed' ? '(已完成)' : `(${r.status})`}`
+    }))
+})
+
+const isRunRunning = computed(() => {
+  if (!selectedRunId.value) return false
+  const run = overview.value?.recent_runs?.find(r => String(r.id) === selectedRunId.value)
+  return run?.status === 'running'
+>>>>>>> dev
 })
 
 const showRefreshSelector = computed(() => {
@@ -239,6 +563,7 @@ const showRefreshSelector = computed(() => {
 })
 
 const timeWindowDisplay = computed(() => {
+<<<<<<< HEAD
   if (!selectedSceneId.value) return '全部场景'
 
   const runs = overview.value?.recent_runs
@@ -249,6 +574,12 @@ const timeWindowDisplay = computed(() => {
 
   const run = sceneRuns[0]
   if (!run.started_at) return '-'
+=======
+  if (!selectedRunId.value) return '全部运行'
+
+  const run = overview.value?.recent_runs?.find((r: any) => String(r.id) === selectedRunId.value)
+  if (!run || !run.started_at) return '-'
+>>>>>>> dev
 
   const start = formatDateTime(run.started_at)
   if (run.status === 'running') {
@@ -261,6 +592,7 @@ const timeWindowDisplay = computed(() => {
 })
 
 const durationDisplay = computed(() => {
+<<<<<<< HEAD
   if (!selectedSceneId.value) return ''
 
   const runs = overview.value?.recent_runs
@@ -277,12 +609,33 @@ const durationDisplay = computed(() => {
   const doneRun = sceneRuns[0]
   if (doneRun && doneRun.finished_at && doneRun.started_at) {
     return formatDuration((new Date(doneRun.finished_at).getTime() - new Date(doneRun.started_at).getTime()) / 1000)
+=======
+  if (!selectedRunId.value) return ''
+
+  const run = overview.value?.recent_runs?.find((r: any) => String(r.id) === selectedRunId.value)
+  if (!run) return ''
+
+  if (run.status === 'running' && run.started_at) {
+    return formatDuration((Date.now() - new Date(run.started_at).getTime()) / 1000)
+  }
+
+  if (run.finished_at && run.started_at) {
+    return formatDuration((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
+>>>>>>> dev
   }
 
   return ''
 })
 
+<<<<<<< HEAD
 function onSceneChange() {
+=======
+function onRunChange() {
+  userSelectedRun.value = true
+  sysMetricsHistory.value = []
+  sysMetricsTimeSeries.value = []
+  sysQueueMax = 0
+>>>>>>> dev
   fetchOverview()
   userAdjustedZoom.value = false
 }
@@ -295,21 +648,36 @@ function onRefreshIntervalChange() {
 function restartPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   const interval = refreshInterval.value * 1000
+<<<<<<< HEAD
   pollTimer = setInterval(() => {
     if (!userAdjustedZoom.value) {
       fetchOverview()
+=======
+  pollTimer = setInterval(async () => {
+    if (!userAdjustedZoom.value) {
+      await fetchSceneList()
+      await fetchOverview()
+>>>>>>> dev
     }
   }, interval)
 }
 
 async function loadHistoryData() {
+<<<<<<< HEAD
   if (!selectedSceneId.value) return
+=======
+  if (!selectedRunId.value) return
+>>>>>>> dev
   try {
     const token = localStorage.getItem('salvo_token')
     const resp = await fetch('/api/v1/dashboard/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+<<<<<<< HEAD
       body: JSON.stringify({ scene_id: Number(selectedSceneId.value), limit: 5 })
+=======
+      body: JSON.stringify({ run_id: selectedRunId.value, limit: 5 })
+>>>>>>> dev
     })
     const json = await resp.json()
     if (json.code === 0 && json.data?.history?.length) {
@@ -348,10 +716,48 @@ async function fetchSceneList() {
         finished_at: s.finished_at,
       }))
 
+<<<<<<< HEAD
       if (!selectedSceneId.value && sceneList.value.length > 0) {
         const firstRunning = sceneList.value.find(s => s.status === 'running')
         if (firstRunning) {
           selectedSceneId.value = firstRunning.scene_id
+=======
+      if (!selectedRunId.value && sceneList.value.length > 0) {
+        // Try to find the most recent run by querying history (no scene filter)
+        try {
+          const historyResp = await fetch('/api/v1/dashboard/history', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ limit: 1 })
+          })
+          const historyJson = await historyResp.json()
+          if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
+            const latestRun = historyJson.data.history[0]
+            const latestRunId = String(latestRun.run_id)
+            selectedRunId.value = latestRunId
+          } else {
+            const firstRunning = sceneList.value.find(s => s.status === 'running')
+            if (firstRunning) {
+              // Select the most recent run for this scene
+              const runForScene = overview.value?.recent_runs?.find((r: any) => String(r.scene_id) === firstRunning.scene_id)
+              if (runForScene) {
+                selectedRunId.value = String(runForScene.id)
+              }
+            }
+          }
+        } catch {
+          // Fallback: select first running scene's most recent run
+          const firstRunning = sceneList.value.find(s => s.status === 'running')
+          if (firstRunning) {
+            const runForScene = overview.value?.recent_runs?.find((r: any) => String(r.scene_id) === firstRunning.scene_id)
+            if (runForScene) {
+              selectedRunId.value = String(runForScene.id)
+            }
+          }
+>>>>>>> dev
         }
       }
 
@@ -395,11 +801,19 @@ function formatDuration(seconds: number): string {
   const pad = (n: number) => String(n).padStart(2, '0')
 
   if (hours > 0) {
+<<<<<<< HEAD
     return `${hours}小时${pad(minutes)}分${pad(secs)}秒`
   } else if (minutes > 0) {
     return `${minutes}分${pad(secs)}秒`
   } else {
     return `${secs}秒`
+=======
+    return `${pad(hours)}小时${pad(minutes)}分${pad(secs)}秒`
+  } else if (minutes > 0) {
+    return `${pad(minutes)}分${pad(secs)}秒`
+  } else {
+    return `${pad(secs)}秒`
+>>>>>>> dev
   }
 }
 
@@ -452,9 +866,24 @@ function getNodeTimeRange(_node: any): string {
 }
 
 function toggleNodeExpand(nodeId: string) {
+<<<<<<< HEAD
   expandedNodeId.value = expandedNodeId.value === nodeId ? '' : nodeId
   if (expandedNodeId.value) {
     setTimeout(() => renderNodeDetailChart(nodeId), 50)
+=======
+  const wasExpanded = expandedNodeId.value === nodeId
+  expandedNodeId.value = wasExpanded ? '' : nodeId
+  if (expandedNodeId.value) {
+    setTimeout(() => renderNodeDetailChart(nodeId), 50)
+  } else {
+    requestAnimationFrame(() => {
+      if (sysGoroutineChart) sysGoroutineChart.resize()
+      if (sysHeapChart) sysHeapChart.resize()
+      if (sysCpuChart) sysCpuChart.resize()
+      if (sysTaskWaitChart) sysTaskWaitChart.resize()
+      if (sysQueueChart) sysQueueChart.resize()
+    })
+>>>>>>> dev
   }
 }
 
@@ -471,7 +900,11 @@ const summaryMetrics = computed(() => {
       { label: '成功率', value: '-', color: 'var(--accent-success)', sub: '' },
       { label: 'P50 延迟', value: '-', color: 'var(--accent-info)', sub: '' },
       { label: 'P95 延迟', value: '-', color: 'var(--accent-warning)', sub: '' },
+<<<<<<< HEAD
       { label: 'P99 延迟', value: '-', color: 'var(--accent-danger)', sub: '' },
+=======
+      { label: 'P99 延迟', value: '-', color: '#f0883e', sub: '' },
+>>>>>>> dev
       { label: '运行中', value: '-', color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: null },
     ]
   }
@@ -489,7 +922,11 @@ const summaryMetrics = computed(() => {
     { label: '成功率', value: rate, color: 'var(--accent-success)', sub: '' },
     { label: 'P50 延迟', value: formatMs(d.p50_latency), color: 'var(--accent-info)', sub: '' },
     { label: 'P95 延迟', value: formatMs(d.p95_latency), color: 'var(--accent-warning)', sub: '' },
+<<<<<<< HEAD
     { label: 'P99 延迟', value: formatMs(d.p99_latency), color: 'var(--accent-danger)', sub: '' },
+=======
+    { label: 'P99 延迟', value: formatMs(d.p99_latency), color: '#f0883e', sub: '' },
+>>>>>>> dev
     { label: '运行中', value: String(d.running), color: 'var(--accent-primary)', sub: '', isTimeCard: true, timeInfo: timeInfo },
   ]
 })
@@ -500,6 +937,16 @@ function formatNum(n: number): string {
   return Math.round(n).toString()
 }
 
+<<<<<<< HEAD
+=======
+function formatRate(n: number): string {
+  if (!n) return '0'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K'
+  return n.toFixed(2)
+}
+
+>>>>>>> dev
 function formatMs(sec: number): string {
   if (!sec) return '0ms'
   const ms = sec * 1000
@@ -529,12 +976,350 @@ function getNodeMaxLatency(node: any): number {
 function nodeQPS(node: any): string {
   if (node.ts_qps?.length) {
     const valid = node.ts_qps.filter((v: number) => v > 0)
+<<<<<<< HEAD
     if (valid.length) return formatNum(valid.reduce((a: number, b: number) => a + b, 0) / valid.length)
   }
   if (node.total_reqs > 0 && node.avg_latency > 0) return formatNum(1 / node.avg_latency)
   return '0'
 }
 
+=======
+    if (valid.length) return formatRate(valid.reduce((a: number, b: number) => a + b, 0) / valid.length)
+  }
+  if (node.total_reqs > 0 && node.avg_latency > 0) return formatRate(1 / node.avg_latency)
+  return '0'
+}
+
+function gaugeStatus(metric: string): string {
+  const m = overview.value?.system_metrics
+  if (!m) return 'status-normal'
+  switch (metric) {
+    case 'goroutine':
+      if (m.goroutine_count > 50000) return 'status-danger'
+      if (m.goroutine_count > 10000) return 'status-warning'
+      return 'status-normal'
+    case 'heap':
+      if (m.heap_alloc_mb > 1024) return 'status-danger'
+      if (m.heap_alloc_mb > 512) return 'status-warning'
+      return 'status-normal'
+    case 'cpu':
+      if (m.cpu_percent > 90) return 'status-danger'
+      if (m.cpu_percent > 70) return 'status-warning'
+      return 'status-normal'
+    case 'wait':
+      if (m.task_wait_p99_ms > 100) return 'status-danger'
+      if (m.task_wait_p99_ms > 10) return 'status-warning'
+      return 'status-normal'
+    case 'queue':
+      if (m.pending_queue_len > 1000) return 'status-danger'
+      if (m.pending_queue_len > 100) return 'status-warning'
+      return 'status-normal'
+    default:
+      return 'status-normal'
+  }
+}
+
+function gaugeAlert(metric: string): string {
+  const m = overview.value?.system_metrics
+  if (!m) return ''
+  switch (metric) {
+    case 'goroutine':
+      if (m.goroutine_count > 50000) return '🚨 超过 50K'
+      if (m.goroutine_count > 10000) return '⚠️ 超过 10K'
+      return ''
+    case 'heap':
+      if (m.heap_alloc_mb > 1024) return '🚨 超过 1GB'
+      if (m.heap_alloc_mb > 512) return '⚠️ 超过 512MB'
+      return ''
+    case 'cpu':
+      if (m.cpu_percent > 90) return '🚨 超过 90%'
+      if (m.cpu_percent > 70) return '⚠️ 超过 70%'
+      return ''
+    case 'wait':
+      if (m.task_wait_p99_ms > 60000) return '🚨 超过 60000ms'
+      if (m.task_wait_p99_ms > 30000) return '⚠️ 超过 30000ms'
+      return ''
+    case 'queue':
+      if (m.pending_queue_len > 1000) return '🚨 超过 1K'
+      if (m.pending_queue_len > 500) return '⚠️ 超过 500'
+      return ''
+    default:
+      return ''
+  }
+}
+
+const gaugeColors: Record<string, string> = {
+  goroutine: '#0d9488',
+  heap: '#58a6ff',
+  cpu: '#bf8700',
+  wait: '#cf222e',
+  queue: '#94a3b8',
+  workers: '#1a7f37',
+}
+
+function gaugeColor(metric: string): string {
+  return gaugeColors[metric] || '#64748b'
+}
+
+function gaugeValueColor(metric: string): string {
+  const status = gaugeStatus(metric)
+  if (status === 'status-danger') return 'var(--accent-danger, #cf222e)'
+  if (status === 'status-warning') return 'var(--accent-warning, #bf8700)'
+  return gaugeColor(metric)
+}
+
+function getSysTimeLabels(): string[] {
+  if (sysMetricsTimeSeries.value.length > 0) {
+    return sysMetricsTimeSeries.value.map((m: any, i: number) => {
+      const t = m.timestamp ? new Date(m.timestamp) : null
+      if (t && !isNaN(t.getTime())) {
+        return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      }
+      return `${i}s`
+    })
+  }
+  return sysMetricsHistory.value.map((_, i) => {
+    const t = new Date(Date.now() - (sysMetricsHistory.value.length - 1 - i) * refreshInterval.value * 1000)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+}
+
+function getSysData(key: string): any[] {
+  if (sysMetricsTimeSeries.value.length > 0) {
+    return sysMetricsTimeSeries.value.map((m: any) => m[key])
+  }
+  return sysMetricsHistory.value.map((m: any) => m[key])
+}
+
+function toggleSysChartExpand(chartId: string) {
+  const wasExpanded = expandedSysChartId.value === chartId
+  expandedSysChartId.value = wasExpanded ? null : chartId
+  if (expandedSysChartId.value) {
+    setTimeout(() => renderSysExpandedChart(chartId), 50)
+  } else {
+    requestAnimationFrame(() => {
+      sysGoroutineChart?.resize()
+      sysHeapChart?.resize()
+      sysCpuChart?.resize()
+      sysTaskWaitChart?.resize()
+      sysQueueChart?.resize()
+    })
+  }
+}
+
+function renderSysExpandedChart(chartId: string) {
+  const refMap: Record<string, HTMLElement | undefined> = {
+    sysGoroutine: sysGoroutineExpandedRef.value,
+    sysHeap: sysHeapExpandedRef.value,
+    sysCpu: sysCpuExpandedRef.value,
+    sysTaskWait: sysTaskWaitExpandedRef.value,
+    sysQueue: sysQueueExpandedRef.value,
+  }
+  const el = refMap[chartId]
+  if (!el) return
+  const chartMap: Record<string, echarts.ECharts | null> = {
+    sysGoroutine: sysGoroutineExpandedChart,
+    sysHeap: sysHeapExpandedChart,
+    sysCpu: sysCpuExpandedChart,
+    sysTaskWait: sysTaskWaitExpandedChart,
+    sysQueue: sysQueueExpandedChart,
+  }
+  let chart = chartMap[chartId]
+  if (chart) { chart.dispose(); chart = null }
+  chart = echarts.init(el)
+  if (chartId === 'sysGoroutine') sysGoroutineExpandedChart = chart
+  else if (chartId === 'sysHeap') sysHeapExpandedChart = chart
+  else if (chartId === 'sysCpu') sysCpuExpandedChart = chart
+  else if (chartId === 'sysTaskWait') sysTaskWaitExpandedChart = chart
+  else if (chartId === 'sysQueue') sysQueueExpandedChart = chart
+
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value[chartId] === 'smooth'
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+  const labels = getSysTimeLabels()
+
+  const baseGrid = { top: 50, right: 40, bottom: 50, left: 55 }
+  const baseXAxis = { type: 'category' as const, data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 11 } }
+  const baseYAxis = { type: 'value' as const, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 11 } }
+
+  if (chartId === 'sysGoroutine') {
+    const data = getSysData('goroutine_count')
+    if (!data.length) return
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 11 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 11 } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: baseYAxis, series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysHeap') {
+    const allocData = getSysData('heap_alloc_mb')
+    const sysData = getSysData('heap_sys_mb')
+    if (!allocData.length) return
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}MB' } }, series: [{ name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.primary }, itemStyle: { color: theme.colors.primary } }, { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info, type: 'dashed' }, itemStyle: { color: theme.colors.info } }], tooltip: getTooltipConfig(), legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysCpu') {
+    const data = getSysData('cpu_percent')
+    if (!data.length) return
+    const areaGrad = new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.2)` }, { offset: 1, color: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.01)` }])
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.info }, label: { formatter: '70%', color: theme.colors.info, fontSize: 11, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: 100, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}%' } }, series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info }, areaStyle: { color: areaGrad }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '88,166,255' : '9,105,218'}, 0.15)`, handleStyle: { color: theme.colors.info }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysTaskWait') {
+    const p50 = getSysData('task_wait_p50_ms')
+    const p95 = getSysData('task_wait_p95_ms')
+    const p99 = getSysData('task_wait_p99_ms')
+    if (!p50.length) return
+    const ml = { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 11, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 11, position: 'end' } }] }
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: { ...baseGrid, right: 60 }, xAxis: baseXAxis, yAxis: { ...baseYAxis, axisLabel: { ...baseYAxis.axisLabel, formatter: '{value}ms' } }, series: [{ name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.info }, itemStyle: { color: theme.colors.info } }, { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.warning }, itemStyle: { color: theme.colors.warning } }, { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { width: 2, color: theme.colors.danger }, itemStyle: { color: theme.colors.danger }, markLine: ml }], tooltip: getTooltipConfig(), legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '248,81,73' : '207,34,46'}, 0.15)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  } else if (chartId === 'sysQueue') {
+    const data = getSysData('pending_queue_len')
+    if (!data.length) return
+    const currentMax = Math.max(...data)
+    if (currentMax > sysQueueMax) sysQueueMax = currentMax
+    const queueColor = isDark ? '#94a3b8' : '#64748b'
+    chart.setOption({ backgroundColor: theme.bgColor, textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, grid: baseGrid, xAxis: baseXAxis, yAxis: { ...baseYAxis, min: 0, max: Math.max(sysQueueMax, 10) }, series: [{ name: 'Pending Queue', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: queueColor, width: 2 }, itemStyle: { color: queueColor }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' }, { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' }]) } }], tooltip: getTooltipConfig(), legend: { data: ['Pending Queue'], textStyle: { color: theme.textColor }, top: 0 }, dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${isDark ? '148,163,184' : '100,116,139'}, 0.15)`, handleStyle: { color: queueColor }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }] }, true)
+  }
+}
+
+// The system-monitor chart row is rendered behind v-if, so switching runs
+// (which clears the series) unmounts and later re-creates those containers.
+// A cached ECharts instance keeps drawing into the detached node, leaving the
+// new canvas blank, so re-init whenever the bound element changed.
+function bindSysChart(instance: echarts.ECharts | null, el: HTMLElement): echarts.ECharts {
+  if (instance && instance.getDom() !== el) {
+    instance.dispose()
+    instance = null
+  }
+  return instance ?? echarts.init(el)
+}
+
+function renderSysGoroutineChart() {
+  if (!sysGoroutineChartRef.value) return
+  sysGoroutineChart = bindSysChart(sysGoroutineChart, sysGoroutineChartRef.value)
+  sysGoroutineChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysGoroutine === 'smooth'
+  const data = getSysData('goroutine_count')
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  sysGoroutineChart.setOption({
+    backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, itemStyle: { color: theme.colors.primary }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: theme.colors.warning }, label: { formatter: '10K', color: theme.colors.warning, fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: theme.colors.danger }, label: { formatter: '50K', color: theme.colors.danger, fontSize: 10 } }] } }],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['Goroutines'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysHeapChart() {
+  if (!sysHeapChartRef.value) return
+  sysHeapChart = bindSysChart(sysHeapChart, sysHeapChartRef.value)
+  sysHeapChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysHeap === 'smooth'
+  const allocData = getSysData('heap_alloc_mb')
+  const sysData = getSysData('heap_sys_mb')
+  const labels = getSysTimeLabels()
+  if (!allocData.length) return
+  sysHeapChart.setOption({
+    backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}MB' } },
+    series: [
+      { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, itemStyle: { color: theme.colors.primary } },
+      { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2, type: 'dashed' }, itemStyle: { color: theme.colors.info } },
+    ],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysCpuChart() {
+  if (!sysCpuChartRef.value) return
+  sysCpuChart = bindSysChart(sysCpuChart, sysCpuChartRef.value)
+  sysCpuChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysCpu === 'smooth'
+  const data = getSysData('cpu_percent')
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  sysCpuChart.setOption({
+    backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 48, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}%' } },
+    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.info === '#0969da' ? '9,105,218' : '88,166,255'}, 0.2)` }, { offset: 1, color: `rgba(${theme.colors.info === '#0969da' ? '9,105,218' : '88,166,255'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: theme.colors.info }, label: { formatter: '70%', color: theme.colors.info, fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: theme.colors.danger }, label: { formatter: '90%', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } }],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['CPU'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysTaskWaitChart() {
+  if (!sysTaskWaitChartRef.value) return
+  sysTaskWaitChart = bindSysChart(sysTaskWaitChart, sysTaskWaitChartRef.value)
+  sysTaskWaitChart.clear()
+  const theme = getChartTheme()
+  const isSmooth = chartTypes.value.sysTaskWait === 'smooth'
+  const p50 = getSysData('task_wait_p50_ms')
+  const p95 = getSysData('task_wait_p95_ms')
+  const p99 = getSysData('task_wait_p99_ms')
+  const labels = getSysTimeLabels()
+  if (!p50.length) return
+  sysTaskWaitChart.setOption({
+    backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 48, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
+    series: [
+      { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info } },
+      { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning } },
+      { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10, lineStyle: { color: theme.colors.warning }, label: { formatter: '10ms', color: theme.colors.warning, fontSize: 10, position: 'end' } }, { yAxis: 100, lineStyle: { color: theme.colors.danger }, label: { formatter: '100ms', color: theme.colors.danger, fontSize: 10, position: 'end' } }] } },
+    ],
+    tooltip: getTooltipConfig(),
+    legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysQueueChart() {
+  if (!sysQueueChartRef.value) return
+  sysQueueChart = bindSysChart(sysQueueChart, sysQueueChartRef.value)
+  sysQueueChart.clear()
+  const theme = getChartTheme()
+  const data = getSysData('pending_queue_len')
+  const labels = getSysTimeLabels()
+  if (!data.length) return
+  // 记录历史最大值，防止 Y 轴归零后历史数据不可见
+  const currentMax = Math.max(...data)
+  if (currentMax > sysQueueMax) sysQueueMax = currentMax
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+  const queueColor = isDark ? '#94a3b8' : '#64748b'
+  sysQueueChart.setOption({
+    backgroundColor: theme.bgColor,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 16, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: Math.max(sysQueueMax, 10), axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    series: [{
+      name: 'Pending Queue',
+      data,
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { color: queueColor, width: 2 },
+      itemStyle: { color: queueColor },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(100,116,139,0.20)' },
+          { offset: 1, color: isDark ? 'rgba(148,163,184,0.02)' : 'rgba(100,116,139,0.02)' },
+        ]),
+      },
+    }],
+    tooltip: getTooltipConfig(),
+  }, true)
+}
+
+>>>>>>> dev
 function getChartTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
   if (isDark) {
@@ -543,11 +1328,21 @@ function getChartTheme() {
       lineColor: '#30363d',
       bgColor: 'transparent',
       colors: {
+<<<<<<< HEAD
         primary: '#00E5FF',
         success: '#4ade80',
         warning: '#eab308',
         danger: '#ef4444',
         info: '#3b82f6',
+=======
+        primary: '#2dd4bf',   // 蓝绿 Teal — 主指标/QPS
+        success: '#3fb950',   // 绿色系 — 成功/P50
+        warning: '#e3b341',   // 黄色系 — 警告/P90
+        danger: '#f0883e',    // 橙色系 — P99
+        info: '#58a6ff',      // 蓝色系 — 信息/辅助
+        accent: '#58a6ff',    // 蓝色系 — P95
+        avg: '#a371f7',       // 紫色系 — Avg
+>>>>>>> dev
       }
     }
   }
@@ -556,11 +1351,21 @@ function getChartTheme() {
     lineColor: '#e2e8f0',
     bgColor: 'transparent',
     colors: {
+<<<<<<< HEAD
       primary: '#0891b2',
       success: '#16a34a',
       warning: '#ca8a04',
       danger: '#dc2626',
       info: '#2563eb',
+=======
+      primary: '#0d9488',   // 蓝绿 Teal
+      success: '#1a7f37',   // 绿色系
+      warning: '#bf8700',   // 黄色系
+      danger: '#f0883e',    // 橙色系 — P99
+      info: '#0969da',      // 蓝色系
+      accent: '#0969da',    // 蓝色系 — P95
+      avg: '#8957e5',       // 紫色系 — Avg
+>>>>>>> dev
     }
   }
 }
@@ -576,7 +1381,10 @@ function getTooltipConfig() {
 
   return {
     trigger: 'axis' as const,
+<<<<<<< HEAD
     confine: true,
+=======
+>>>>>>> dev
     backgroundColor: bgColor,
     borderColor: borderColor,
     borderWidth: 1,
@@ -595,9 +1403,23 @@ function getTooltipConfig() {
       let result = `<div style="font-size:11.5px;color:${titleColor};margin-bottom:10px;font-weight:600;letter-spacing:0.3px">${params[0].axisValue}</div>`
       for (const param of params) {
         const rawVal = Number(param.value)
+<<<<<<< HEAD
         const val = isNaN(rawVal) ? '-' : (param.seriesName === 'QPS' ? rawVal.toFixed(1) : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? rawVal.toFixed(2) : rawVal.toFixed(1)))
         const unit = param.seriesName === 'QPS' ? '' : (param.seriesName === '错误率' || param.seriesName === 'error_rate' ? '%' : 'ms')
         result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${param.seriesName}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,'SF Mono','Monaco','Menlo',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
+=======
+        const name = param.seriesName
+        let val: string
+        let unit: string
+        if (name === 'QPS') { val = rawVal.toFixed(2); unit = '' }
+        else if (name === '错误率' || name === 'error_rate') { val = rawVal.toFixed(2); unit = '%' }
+        else if (name === 'HeapAlloc' || name === 'HeapSys') { val = rawVal.toFixed(1); unit = ' MB' }
+        else if (name === 'CPU') { val = rawVal.toFixed(1); unit = '%' }
+        else if (name.startsWith('P5') || name.startsWith('P9')) { val = rawVal.toFixed(1); unit = 'ms' }
+        else if (name === 'Goroutines') { val = Math.round(rawVal).toLocaleString(); unit = '' }
+        else { val = rawVal.toFixed(1); unit = 'ms' }
+        result += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:6px;padding:2px 0"><span style="font-size:11px;color:${labelColor};font-weight:500">${param.marker}${name}</span><span style="font-size:11px;color:${valueColor};font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif,'SF Mono','Monaco','Inconsolata','Menlo','Consolas','Courier New',monospace;letter-spacing:0.5px">${val}${unit}</span></div>`
+>>>>>>> dev
       }
       return result
     }
@@ -605,6 +1427,16 @@ function getTooltipConfig() {
 }
 
 function getFilteredTimeSeries() {
+<<<<<<< HEAD
+=======
+  if (latencyDataSource.value === 'httpOnly') {
+    const httpTs = overview.value?.http_only_time_series
+    if (httpTs && httpTs.timestamps?.length) {
+      return httpTs
+    }
+  }
+
+>>>>>>> dev
   const ts = overview.value?.time_series
   if (ts && ts.timestamps?.length) {
     return ts
@@ -636,6 +1468,10 @@ function renderQpsChart() {
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     qpsChart.setOption({
+<<<<<<< HEAD
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -645,11 +1481,20 @@ function renderQpsChart() {
   }
   qpsChart.setOption({
     backgroundColor: theme.bgColor,
+<<<<<<< HEAD
     grid: { top: 20, right: 20, bottom: 50, left: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
     series: [{ data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` }, { offset: 1, color: 'rgba(0,229,255,0)' }]) } }],
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 20, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
+    series: [{ name: 'QPS', data: ts.qps, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.primary, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` }, { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0)` }]) } }],
+>>>>>>> dev
     tooltip: getTooltipConfig(),
   }, true)
   qpsChart.off('datazoom')
@@ -669,6 +1514,10 @@ function renderLatencyChart() {
   const ts = getFilteredTimeSeries()
   if (!ts || !ts.timestamps.length) {
     latencyChart.setOption({
+<<<<<<< HEAD
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -678,6 +1527,7 @@ function renderLatencyChart() {
   }
   latencyChart.setOption({
     backgroundColor: theme.bgColor,
+<<<<<<< HEAD
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
@@ -686,6 +1536,17 @@ function renderLatencyChart() {
       { name: 'P50', data: ts.p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.info, width: 2 } },
       { name: 'P95', data: ts.p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.warning, width: 2 } },
       { name: 'P99', data: ts.p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 } },
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: ts.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: '{value}ms' } },
+    series: [
+      { name: 'P50', data: ts.p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success } },
+      { name: 'P95', data: ts.p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.accent, width: 2 }, itemStyle: { color: theme.colors.accent } },
+      { name: 'P99', data: ts.p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger } },
+>>>>>>> dev
     ],
     tooltip: getTooltipConfig(),
     legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: theme.textColor }, top: 0 },
@@ -707,6 +1568,10 @@ function renderErrorChart() {
   if (!ts || !ts.timestamps.length) {
     errorChart.setOption({
       backgroundColor: theme.bgColor,
+<<<<<<< HEAD
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: theme.textColor, fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -718,8 +1583,14 @@ function renderErrorChart() {
   const maxErrRate = Math.max(...ts.error_rate, 0.01)
   errorChart.setOption({
     backgroundColor: theme.bgColor,
+<<<<<<< HEAD
     grid: { top: 16, right: 16, bottom: 44, left: 50 },
     dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 16, right: 16, bottom: 44, left: 50 },
+    dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.10)`, handleStyle: { color: theme.colors.danger }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+>>>>>>> dev
     xAxis: { type: 'category', data: ts.timestamps, axisLine: { show: false }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor(ts.timestamps.length / 8) }, splitLine: { show: false } },
     yAxis: { type: 'value', min: 0, max: maxErrRate * 1.5 > 0 ? Math.max(maxErrRate * 1.5, 1) : 1, axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' } },
     series: [{
@@ -730,7 +1601,11 @@ function renderErrorChart() {
       step: isSmooth ? false : 'middle',
       symbol: 'none',
       lineStyle: { width: 2, color: theme.colors.danger },
+<<<<<<< HEAD
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#be123c' ? '190, 18, 60' : '225, 29, 72'}, 0.01)` }]) }
+=======
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.18)` }, { offset: 1, color: `rgba(${theme.colors.danger === '#cf222e' ? '207,34,46' : '248,81,73'}, 0.01)` }]) }
+>>>>>>> dev
     }],
     tooltip: getTooltipConfig(),
   }, true)
@@ -774,6 +1649,7 @@ function renderNodeDetailChart(nodeId: string) {
     
     const timestampsLength = node.timestamps?.length || 0
     const series: any[] = [
+<<<<<<< HEAD
       { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.info, width: 2 }, itemStyle: { color: theme.colors.info }, areaStyle: undefined },
       { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
       { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.warning, width: 2 }, itemStyle: { color: theme.colors.warning }, areaStyle: undefined },
@@ -781,14 +1657,30 @@ function renderNodeDetailChart(nodeId: string) {
     ]
     if (tsQPS.length > 0) {
       series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined, animationDelay: () => 0 })
+=======
+      { name: 'P50', data: padArray(tsP50, timestampsLength), lineStyle: { color: theme.colors.success, width: 2 }, itemStyle: { color: theme.colors.success }, areaStyle: undefined },
+      { name: 'Avg', data: padArray(tsAvg, timestampsLength), lineStyle: { color: theme.colors.avg, width: 2 }, itemStyle: { color: theme.colors.avg }, areaStyle: undefined },
+      { name: 'P95', data: padArray(tsP95, timestampsLength), lineStyle: { color: theme.colors.accent, width: 2 }, itemStyle: { color: theme.colors.accent }, areaStyle: undefined },
+      { name: 'P99', data: padArray(tsP99, timestampsLength), lineStyle: { color: theme.colors.danger, width: 2 }, itemStyle: { color: theme.colors.danger }, areaStyle: undefined },
+    ]
+    if (tsQPS.length > 0) {
+      series.push({ name: 'QPS', data: padArray(tsQPS, timestampsLength), type: 'bar', lineStyle: undefined, itemStyle: { color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.25)`, borderRadius: [2, 2, 0, 0] }, areaStyle: undefined, animationDelay: () => 0 })
+>>>>>>> dev
     }
 
     const hasQPS = series.length > 4
     chart.setOption({
       backgroundColor: 'transparent',
+<<<<<<< HEAD
       legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
       grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
       dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+      legend: { top: 0, textStyle: { color: theme.textColor, fontSize: 10 }, itemWidth: 16, itemHeight: 3 },
+      grid: { top: 28, right: hasQPS ? 48 : 12, bottom: 36, left: 48 },
+      dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: theme.lineColor, fillerColor: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.15)`, handleStyle: { color: theme.colors.primary }, textStyle: { color: theme.textColor, fontSize: 9 }, showDetail: false }],
+>>>>>>> dev
       xAxis: { type: 'category', data: node.timestamps, axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 9, interval: Math.floor((node.timestamps!.length || 1) / 6) - 1 } },
       yAxis: hasQPS ? [
         { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -811,6 +1703,10 @@ function renderNodeDetailChart(nodeId: string) {
   } else {
     chart.setOption({
       backgroundColor: 'transparent',
+<<<<<<< HEAD
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       grid: { top: 16, right: 16, bottom: 36, left: 48 },
       xAxis: { type: 'category', data: ['P50', 'P95', 'P99', 'Avg'], axisLine: { lineStyle: { color: theme.lineColor } }, axisLabel: { color: theme.textColor, fontSize: 10 } },
       yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: theme.lineColor, type: 'dashed' } }, axisLabel: { color: theme.textColor, fontSize: 9, formatter: '{value}ms' } },
@@ -822,7 +1718,11 @@ function renderNodeDetailChart(nodeId: string) {
           borderRadius: [3, 3, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: theme.colors.primary },
+<<<<<<< HEAD
             { offset: 1, color: `rgba(${theme.colors.primary === '#0891b2' ? '8, 145, 178' : '0, 229, 255'}, 0.3)` },
+=======
+            { offset: 1, color: `rgba(${theme.colors.primary === '#0d9488' ? '13,148,136' : '45,212,191'}, 0.3)` },
+>>>>>>> dev
           ]),
         },
       }],
@@ -831,10 +1731,58 @@ function renderNodeDetailChart(nodeId: string) {
   }
 }
 
+<<<<<<< HEAD
 async function fetchOverview() {
   try {
     const sceneId = selectedSceneId.value || undefined
     const requestData = { range_seconds: 0, scene_id: sceneId }
+=======
+async function checkLatestRunScene() {
+  // Respect the user's manual run selection: once they pick a run in the
+  // dropdown (e.g. to inspect a finished one), stop auto-following the
+  // latest run so the selection survives later polls.
+  if (userSelectedRun.value) return
+  try {
+    const token = localStorage.getItem('salvo_token')
+    const historyResp = await fetch('/api/v1/dashboard/history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ limit: 1 })
+    })
+    const historyJson = await historyResp.json()
+    if (historyJson.code === 0 && historyJson.data?.history?.length > 0) {
+      const latestRunId = String(historyJson.data.history[0].run_id)
+      // Switch to the latest run if different from current selection
+      if (latestRunId !== selectedRunId.value) {
+        selectedRunId.value = latestRunId
+      }
+    }
+  } catch {
+    // Silently fail - keep current selection
+  }
+}
+
+async function fetchOverview() {
+  try {
+    // Periodically check if a different scene has the most recent run
+    // (every 6th poll = every 30 seconds with default 5s interval)
+    pollCheckCounter.value++
+    if (pollCheckCounter.value >= 6) {
+      pollCheckCounter.value = 0
+      await checkLatestRunScene()
+    }
+
+    const runId = selectedRunId.value || undefined
+    const requestData: any = { range_seconds: 0 }
+    if (runId) {
+      requestData.run_id = runId
+    }
+    // If no run_id selected yet, don't pass scene_id — backend will return all runs
+    // and auto-select logic below will pick the first one, triggering a second call with run_id
+>>>>>>> dev
 
     const token = localStorage.getItem('salvo_token')
     const fetchResp = await fetch('/api/v1/dashboard/overview', {
@@ -852,7 +1800,37 @@ async function fetchOverview() {
       overview.value = resp.data
       syncRunningStatus()
       initNodeChartTypes()
+<<<<<<< HEAD
       const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
+=======
+
+      // Auto-select the most recent run if none selected, then re-fetch with run_id
+      if (!selectedRunId.value && resp.data?.recent_runs?.length) {
+        selectedRunId.value = String(resp.data.recent_runs[0].id)
+        console.log('🔄 Auto-selected run:', selectedRunId.value)
+        // Re-fetch with the selected run_id to get specific run data
+        await fetchOverview()
+        return
+      }
+
+      const hasRunning = resp.data?.recent_runs?.some((r: any) => r.status === 'running')
+
+      // Prefer the backend-provided time series (live snapshots for running
+      // runs, DB report data for completed runs) so charts render immediately
+      // with full history. Fall back to local accumulation only when the
+      // backend returns a bare snapshot without a time series.
+      if (resp.data?.system_metrics_time_series?.length > 0) {
+        sysMetricsTimeSeries.value = resp.data.system_metrics_time_series
+        sysMetricsHistory.value = []
+      } else if (hasRunning && resp.data?.system_metrics) {
+        sysMetricsTimeSeries.value = []
+        sysMetricsHistory.value.push(resp.data.system_metrics)
+        if (sysMetricsHistory.value.length > MAX_SYS_HISTORY) {
+          sysMetricsHistory.value = sysMetricsHistory.value.slice(-MAX_SYS_HISTORY)
+        }
+      }
+
+>>>>>>> dev
       const hasTimeSeries = resp.data?.time_series?.timestamps?.length > 0
       if (!hasRunning && !hasTimeSeries) {
         loadHistoryData()
@@ -860,6 +1838,18 @@ async function fetchOverview() {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
+<<<<<<< HEAD
+=======
+      // Wait for DOM update AND browser paint so chart containers have actual dimensions.
+      // nextTick only waits for Vue's DOM update, but ECharts needs the browser to have
+      // actually painted (layout computed) for containers to have non-zero dimensions.
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          prewarmSysCharts()
+          refreshSysCharts()
+        })
+      })
+>>>>>>> dev
       if (expandedNodeId.value) {
         renderNodeDetailChart(expandedNodeId.value)
       }
@@ -873,17 +1863,39 @@ function handleResize() {
   qpsChart?.resize()
   latencyChart?.resize()
   errorChart?.resize()
+<<<<<<< HEAD
 }
 
 onMounted(() => {
   fetchSceneList()
   fetchOverview()
+=======
+  sysGoroutineChart?.resize()
+  sysHeapChart?.resize()
+  sysCpuChart?.resize()
+  sysTaskWaitChart?.resize()
+  sysQueueChart?.resize()
+  if (expandedSysChartId.value) {
+    const id = expandedSysChartId.value
+    const map: Record<string, echarts.ECharts | null> = { sysGoroutine: sysGoroutineExpandedChart, sysHeap: sysHeapExpandedChart, sysCpu: sysCpuExpandedChart, sysTaskWait: sysTaskWaitExpandedChart, sysQueue: sysQueueExpandedChart }
+    map[id]?.resize()
+  }
+}
+
+onMounted(async () => {
+  await fetchSceneList()
+  await fetchOverview()
+>>>>>>> dev
   loadHistoryData()
 
   setTimeout(() => {
     renderQpsChart()
     renderLatencyChart()
     renderErrorChart()
+<<<<<<< HEAD
+=======
+    prewarmSysCharts()
+>>>>>>> dev
   }, 100)
   window.addEventListener('resize', handleResize)
 
@@ -891,29 +1903,86 @@ onMounted(() => {
     qpsChart?.dispose(); qpsChart = null
     latencyChart?.dispose(); latencyChart = null
     errorChart?.dispose(); errorChart = null
+<<<<<<< HEAD
     nodeCharts.forEach((c, k) => { c.dispose() })
     nodeCharts.clear()
+=======
+    sysGoroutineChart?.dispose(); sysGoroutineChart = null
+    sysHeapChart?.dispose(); sysHeapChart = null
+    sysCpuChart?.dispose(); sysCpuChart = null
+    sysTaskWaitChart?.dispose(); sysTaskWaitChart = null
+    sysQueueChart?.dispose(); sysQueueChart = null
+    sysGoroutineExpandedChart?.dispose(); sysGoroutineExpandedChart = null
+    sysHeapExpandedChart?.dispose(); sysHeapExpandedChart = null
+    sysCpuExpandedChart?.dispose(); sysCpuExpandedChart = null
+    sysTaskWaitExpandedChart?.dispose(); sysTaskWaitExpandedChart = null
+    sysQueueExpandedChart?.dispose(); sysQueueExpandedChart = null
+    nodeCharts.forEach((c) => { c.dispose() })
+    nodeCharts.clear()
+    if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
+    sysChartsRendered = false
+>>>>>>> dev
     requestAnimationFrame(() => {
       renderQpsChart()
       renderLatencyChart()
       renderErrorChart()
+<<<<<<< HEAD
       if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
+=======
+      prewarmSysCharts()
+      if (expandedNodeId.value) renderNodeDetailChart(expandedNodeId.value)
+      if (expandedSysChartId.value) renderSysExpandedChart(expandedSysChartId.value)
+>>>>>>> dev
     })
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
   
   watch(allScenes, (scenes) => {
+<<<<<<< HEAD
     if (scenes.length > 0 && !selectedSceneId.value) {
       const firstRunning = scenes.find(s => s.status === 'running')
       if (firstRunning) {
         selectedSceneId.value = firstRunning.scene_id
         console.log('🔄 Auto-selected running scene:', selectedSceneId.value)
+=======
+    if (scenes.length > 0 && !selectedRunId.value && overview.value?.recent_runs?.length) {
+      // Auto-select the most recent run
+      const latestRun = overview.value.recent_runs[0]
+      if (latestRun) {
+        selectedRunId.value = String(latestRun.id)
+>>>>>>> dev
       }
     }
   }, { immediate: true })
   
   restartPolling()
 
+<<<<<<< HEAD
+=======
+  sysObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        sysChartsVisible.value = true
+        sysObserver?.disconnect()
+      }
+    }
+  }, { rootMargin: '800px 0px' })
+
+  watch(sysChartsVisible, (visible) => {
+    if (!visible) return
+    prewarmSysCharts()
+    refreshSysCharts()
+  }, { once: true })
+
+  nextTick(() => {
+    if (sysMonitorSectionRef.value) {
+      sysObserver?.observe(sysMonitorSectionRef.value)
+    } else {
+      sysChartsVisible.value = true
+    }
+  })
+
+>>>>>>> dev
   timeRefreshTimer = setInterval(() => {
     if (overview.value?.recent_runs?.some(r => r.status === 'running')) {
       overview.value = { ...overview.value }
@@ -924,11 +1993,31 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   themeObserver?.disconnect()
+<<<<<<< HEAD
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
   qpsChart?.dispose()
   latencyChart?.dispose()
   errorChart?.dispose()
+=======
+  sysObserver?.disconnect()
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (timeRefreshTimer) { clearInterval(timeRefreshTimer); timeRefreshTimer = null }
+  if (prewarmRetryTimer) { clearTimeout(prewarmRetryTimer); prewarmRetryTimer = null }
+  qpsChart?.dispose()
+  latencyChart?.dispose()
+  errorChart?.dispose()
+  sysGoroutineChart?.dispose()
+  sysHeapChart?.dispose()
+  sysCpuChart?.dispose()
+  sysTaskWaitChart?.dispose()
+  sysQueueChart?.dispose()
+  sysGoroutineExpandedChart?.dispose()
+  sysHeapExpandedChart?.dispose()
+  sysCpuExpandedChart?.dispose()
+  sysTaskWaitExpandedChart?.dispose()
+  sysQueueExpandedChart?.dispose()
+>>>>>>> dev
 })
 </script>
 
@@ -960,6 +2049,7 @@ onUnmounted(() => {
   margin: 0;
 }
 
+<<<<<<< HEAD
 .scene-select {
   padding: 8px 12px;
   border: 1px solid var(--border-secondary);
@@ -982,6 +2072,8 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(0,229,255,0.1);
 }
 
+=======
+>>>>>>> dev
 .scene-tabs {
   display: flex;
   gap: 8px;
@@ -1101,12 +2193,23 @@ onUnmounted(() => {
   animation: blink 1.5s infinite;
 }
 
+<<<<<<< HEAD
+=======
+[data-theme='light'] .live-indicator {
+  color: #65a30d;
+}
+
+>>>>>>> dev
 .refresh-selector {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
+<<<<<<< HEAD
   background: var(--bg-tertiary);
+=======
+  background: var(--bg-secondary);
+>>>>>>> dev
   border-radius: var(--radius-sm);
   font-size: 12px;
 }
@@ -1118,6 +2221,7 @@ onUnmounted(() => {
 }
 
 .refresh-select {
+<<<<<<< HEAD
   background: var(--bg-secondary);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-sm);
@@ -1125,6 +2229,35 @@ onUnmounted(() => {
   font-size: 12px;
   padding: 4px 8px;
   cursor: pointer;
+=======
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 22px 4px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b949e' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+[data-theme='light'] .refresh-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23656d76' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.refresh-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.refresh-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.15);
+>>>>>>> dev
 }
 
 @keyframes blink {
@@ -1190,7 +2323,11 @@ onUnmounted(() => {
 
 .time-value {
   color: var(--text-secondary);
+<<<<<<< HEAD
   font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+=======
+  font-family: var(--font-mono);
+>>>>>>> dev
   font-size: 10.5px;
   word-break: break-all;
   line-height: 1.4;
@@ -1368,7 +2505,11 @@ onUnmounted(() => {
 }
 
 .node-id {
+<<<<<<< HEAD
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+=======
+  font-family: var(--font-mono);
+>>>>>>> dev
   font-size: 11px;
   color: var(--text-tertiary);
   padding: 2px 6px;
@@ -1506,6 +2647,7 @@ onUnmounted(() => {
 
 /* Dark theme tooltip */
 [data-theme='dark'] .bar-tooltip::before {
+<<<<<<< HEAD
   background: rgba(30, 41, 59, 0.95);
   color: #e2e8f0;
   border-color: rgba(71, 85, 105, 0.3);
@@ -1517,6 +2659,31 @@ onUnmounted(() => {
 [data-theme='dark'] .bar-tooltip::after {
   border-top-color: rgba(30, 41, 59, 0.95);
   filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.2));
+=======
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='dark'] .bar-tooltip::after {
+  border-top-color: rgba(22, 27, 34, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Dark theme tooltip for gauge cards */
+[data-theme='dark'] .sys-gauge-card[data-tooltip]::after {
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .sys-gauge-card[data-tooltip]::before {
+  border-top-color: rgba(22, 27, 34, 0.96);
+>>>>>>> dev
 }
 
 .bar-fill {
@@ -1526,8 +2693,13 @@ onUnmounted(() => {
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .bar-fill.p50 { background: var(--accent-primary); }
+<<<<<<< HEAD
 .bar-fill.p95 { background: var(--accent-warning); }
 .bar-fill.p99 { background: var(--accent-danger); }
+=======
+.bar-fill.p95 { background: var(--accent-info); }
+.bar-fill.p99 { background: #f0883e; }
+>>>>>>> dev
 
 .bar-value {
   font-size: 12px;
@@ -1535,7 +2707,11 @@ onUnmounted(() => {
   width: 65px;
   text-align: right;
   flex-shrink: 0;
+<<<<<<< HEAD
   font-family: 'SF Mono', 'Monaco', monospace;
+=======
+  font-family: var(--font-mono);
+>>>>>>> dev
   font-weight: 500;
 }
 
@@ -1549,7 +2725,11 @@ onUnmounted(() => {
 .time-range-label {
   font-size: 12px;
   color: var(--text-tertiary);
+<<<<<<< HEAD
   font-family: monospace;
+=======
+  font-family: var(--font-mono);
+>>>>>>> dev
 }
 
 .node-card { 
@@ -1628,7 +2808,11 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 2px;
+<<<<<<< HEAD
   background: linear-gradient(90deg, transparent, #0891b2, transparent);
+=======
+  background: linear-gradient(90deg, transparent, #0d9488, transparent);
+>>>>>>> dev
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -1646,9 +2830,15 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
+<<<<<<< HEAD
 [data-theme='light'] .node-type.http { 
   background: linear-gradient(135deg, rgba(217, 70, 239, 0.18) 0%, rgba(8, 145, 178, 0.08) 100%); 
   color: #0891b2;
+=======
+[data-theme='light'] .node-type.http {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.18) 0%, rgba(9, 105, 218, 0.08) 100%);
+  color: #0d9488;
+>>>>>>> dev
 }
 
 [data-theme='light'] .node-type.setup, 
@@ -1668,7 +2858,11 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .qps-value {
+<<<<<<< HEAD
   background: linear-gradient(135deg, #0891b2 0%, #d946ef 100%);
+=======
+  background: linear-gradient(135deg, #0d9488 0%, #0969da 100%);
+>>>>>>> dev
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1679,6 +2873,7 @@ onUnmounted(() => {
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
 
+<<<<<<< HEAD
 [data-theme='light'] .bar-fill.p50 { 
   background: linear-gradient(90deg, #d946ef 0%, #0891b2 100%); 
   box-shadow: 0 1px 4px rgba(217, 70, 239, 0.4);
@@ -1692,6 +2887,20 @@ onUnmounted(() => {
 [data-theme='light'] .bar-fill.p99 { 
   background: linear-gradient(90deg, #be123c 0%, #e11d48 100%); 
   box-shadow: 0 1px 4px rgba(225, 29, 72, 0.4);
+=======
+[data-theme='light'] .bar-fill.p50 {
+  background: linear-gradient(90deg, #1a7f37 0%, #0d9488 100%);
+  box-shadow: 0 1px 4px rgba(26, 127, 55, 0.4);
+}
+
+[data-theme='light'] .bar-fill.p95 {
+  background: linear-gradient(90deg, #0969da 0%, #0550ae 100%);
+  box-shadow: 0 1px 4px rgba(9, 105, 218, 0.4);
+}
+
+[data-theme='light'] .bar-fill.p99 {
+  background: #f0883e;
+>>>>>>> dev
 }
 
 [data-theme='light'] .node-qps {
@@ -1703,6 +2912,7 @@ onUnmounted(() => {
 }
 
 [data-theme='light'] .node-card:hover {
+<<<<<<< HEAD
   border-color: #0891b2;
   box-shadow: 0 8px 24px rgba(8, 145, 178, 0.15);
 }
@@ -1710,6 +2920,15 @@ onUnmounted(() => {
 [data-theme='light'] .node-card.expanded {
   border-color: #0891b2;
   box-shadow: 0 12px 40px rgba(8, 145, 178, 0.18);
+=======
+  border-color: #0d9488;
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.15);
+}
+
+[data-theme='light'] .node-card.expanded {
+  border-color: #0d9488;
+  box-shadow: 0 12px 40px rgba(13, 148, 136, 0.18);
+>>>>>>> dev
 }
 
 [data-theme='light'] .detail-item {
@@ -1751,7 +2970,11 @@ onUnmounted(() => {
 
 .time-range-value {
   color: var(--accent-primary);
+<<<<<<< HEAD
   font-family: 'Monaco', 'Menlo', monospace;
+=======
+  font-family: var(--font-mono);
+>>>>>>> dev
   font-size: 10.5px;
   font-weight: 600;
 }
@@ -1785,6 +3008,13 @@ onUnmounted(() => {
   justify-content: center;
   margin-top: 8px;
 }
+<<<<<<< HEAD
+=======
+.type-btn-group {
+  display: flex;
+  gap: 4px;
+}
+>>>>>>> dev
 .type-btn {
   padding: 3px 12px;
   border: 1px solid var(--border-primary);
@@ -1801,8 +3031,230 @@ onUnmounted(() => {
   border-color: var(--accent-primary);
 }
 [data-theme='dark'] .type-btn.active {
+<<<<<<< HEAD
   background: rgba(0,229,255,0.15);
   color: #00E5FF;
   border-color: rgba(0,229,255,0.3);
+=======
+  background: rgba(45,212,191,0.15);
+  color: #2dd4bf;
+  border-color: rgba(45,212,191,0.3);
+}
+
+/* System Monitoring Section */
+.system-monitor-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.sys-gauge-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sys-gauge-card {
+  flex: 1;
+  min-width: 120px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: center;
+  transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  cursor: default;
+}
+
+.sys-gauge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sys-gauge-card[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  font-size: 11.5px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 10px;
+  white-space: normal;
+  max-width: 220px;
+  width: max-content;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0.2s;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sys-gauge-card[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.96);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s 0.2s;
+  z-index: 101;
+  pointer-events: none;
+}
+
+.sys-gauge-card[data-tooltip]:hover::after,
+.sys-gauge-card[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0s;
+  transform: translateX(-50%) scale(1);
+}
+
+.sys-gauge-card.status-warning {
+  border-color: var(--accent-warning, #bf8700) !important;
+  background: rgba(191, 135, 0, 0.05);
+}
+
+.sys-gauge-card.status-danger {
+  border-color: var(--accent-danger, #cf222e) !important;
+  background: rgba(207, 34, 46, 0.05);
+}
+
+.sys-gauge-card .gauge-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.sys-gauge-card .gauge-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-sans), var(--font-mono);
+  transition: color 0.3s ease;
+}
+
+.sys-gauge-card.status-warning .gauge-value {
+  color: var(--accent-warning, #bf8700);
+}
+
+.sys-gauge-card.status-danger .gauge-value {
+  color: var(--accent-danger, #cf222e);
+}
+
+.sys-gauge-card .gauge-unit {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.gauge-alert {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.status-warning .gauge-alert {
+  color: var(--accent-warning, #bf8700);
+  background: rgba(191, 135, 0, 0.10);
+}
+
+.status-danger .gauge-alert {
+  color: var(--accent-danger, #cf222e);
+  background: rgba(207, 34, 46, 0.10);
+}
+
+.sys-gauge-row {
+  display: flex;
+  gap: 10px;
+  overflow: visible;
+}
+
+.sys-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sys-chart-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  overflow: visible;
+}
+
+.sys-chart-canvas {
+  width: 100%;
+  height: 220px;
+  overflow: visible;
+}
+
+.sys-chart-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+
+.sys-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sys-chart-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.expand-icon {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.sys-chart-item.expanded {
+  grid-column: 1 / -1;
+}
+
+.sys-chart-expanded {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.sys-expanded-canvas {
+  height: 320px;
+>>>>>>> dev
 }
 </style>

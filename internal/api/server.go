@@ -10,27 +10,52 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+<<<<<<< HEAD
+=======
+	"sort"
+>>>>>>> dev
 	"strings"
 	"time"
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/auth"
+<<<<<<< HEAD
 	"github.com/yannick2025-tech/Salvo/internal/logger"
+=======
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
+	"github.com/yannick2025-tech/Salvo/internal/plugin/so"
+>>>>>>> dev
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
 	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
+<<<<<<< HEAD
+=======
+	"github.com/yannick2025-tech/Salvo/internal/ws"
+>>>>>>> dev
 )
 
 type Server struct {
 	httpServer *http.Server
+<<<<<<< HEAD
+=======
+	soLoader   *so.Loader
+	soReg      *expr.FunctionRegistry
+>>>>>>> dev
 	db         *sqlite.DB
 	logger     logger.Logger
 	handler    *Handler
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker
 	webDir     string
+<<<<<<< HEAD
+=======
+	wsHub      *ws.Hub
+>>>>>>> dev
 }
 
 type Config struct {
@@ -44,6 +69,15 @@ type Config struct {
 }
 
 func New(cfg Config) *Server {
+<<<<<<< HEAD
+=======
+	// Create the WebSocket Hub early so it can be wired into the tracer.
+	// The Hub is created without SpanState first; we set it after the
+	// tracer is available (circular dependency: hub needs tracer, tracer
+	// needs hub.BroadcastToRun).
+	wsHub := ws.NewHub()
+
+>>>>>>> dev
 	h := &Handler{
 		log:        cfg.Logger,
 		scenes:     sqlite.NewSceneRepo(cfg.DB),
@@ -57,7 +91,14 @@ func New(cfg Config) *Server {
 		roles:      sqlite.NewRoleRepo(cfg.DB),
 		perms:      sqlite.NewPermissionRepo(cfg.DB),
 		rp:         sqlite.NewRolePermissionRepo(cfg.DB),
+<<<<<<< HEAD
 		jwt:        cfg.JWT,
+=======
+		dataSources: sqlite.NewDataSourceRepo(cfg.DB),
+		soPlugins:   sqlite.NewSOPluginRepo(cfg.DB),
+		jwt:         cfg.JWT,
+		soLoader:    nil, // will be set after bootstrap
+>>>>>>> dev
 		rbac:       cfg.RBAC,
 		globalVars: cfg.Variables,
 	}
@@ -67,12 +108,94 @@ func New(cfg Config) *Server {
 	tracer, err := tracelib.NewTracer(tracelib.Config{
 		BufferSize: 1000,
 		Persister:  h.traceStore,
+<<<<<<< HEAD
+=======
+		Broadcast: func(runID string, chainID string, nodeID string, status string, durationNs int64, errMsg string, loopIndex int) {
+			wsHub.BroadcastToRun(runID, ws.Message{
+				Type:       "span_update",
+				RunID:      runID,
+				ChainID:    chainID,
+				NodeID:     nodeID,
+				Status:     status,
+				DurationNs: durationNs,
+				Error:      errMsg,
+				LoopIndex:  loopIndex,
+			})
+		},
+>>>>>>> dev
 	})
 	if err != nil {
 		cfg.Logger.Error("failed to create tracer", logger.F("error", err))
 	}
 	h.tracer = tracer
 
+<<<<<<< HEAD
+=======
+	// Wire the tracer into the Hub so that Subscribe can push current
+	// span states to newly connected clients, eliminating the race
+	// between subscription and broadcast over slow networks.
+	wsHub.SetSpanState(func(runID string) []ws.Message {
+		var id snowflake.ID
+		if err := id.Parse(runID); err != nil {
+			return nil
+		}
+
+		// Prefer run-level cumulative stats: the runner spawns chains
+		// continuously (each with its own trace), so per-run stats are the
+		// only source that aggregates every chain — including per-iteration
+		// results (not persisted in spans) and in-flight iterations. This
+		// lets a client returning to the page rebuild the exact cumulative
+		// state instead of restarting from zero.
+		stats := tracer.SnapshotRunStats(id)
+		if len(stats) > 0 {
+			msgs := make([]ws.Message, 0, 16)
+			for chainID, nodes := range stats {
+				for nodeID, ns := range nodes {
+					running := make([]int, 0, len(ns.RunningIdx))
+					for idx := range ns.RunningIdx {
+						running = append(running, idx)
+					}
+					sort.Ints(running)
+					msgs = append(msgs, ws.Message{
+						Type:       "span_stats",
+						RunID:      runID,
+						ChainID:    chainID,
+						NodeID:     nodeID,
+						Pass:       ns.Pass,
+						Fail:       ns.Fail,
+						Skip:       ns.Skip,
+						RunningIdx: running,
+						LastIndex:  ns.LastIndex,
+					})
+				}
+			}
+			return msgs
+		}
+
+		// Fallback for runs without live stats (e.g. started before this
+		// process, traces loaded from DB): rebuild the last known state
+		// from persisted spans.
+		tr, ok := tracer.ByRunID(id)
+		if !ok {
+			return nil
+		}
+		spans := tr.SnapshotSpans()
+		msgs := make([]ws.Message, 0, len(spans))
+		for _, span := range spans {
+			msgs = append(msgs, ws.Message{
+				Type:       "span_update",
+				RunID:      runID,
+				ChainID:    span.ChainID,
+				NodeID:     span.NodeID,
+				Status:     string(span.Status),
+				DurationNs: int64(span.Duration),
+				Error:      span.Error,
+			})
+		}
+		return msgs
+	})
+
+>>>>>>> dev
 	if err := h.tracer.LoadFromDB(context.Background()); err != nil {
 		cfg.Logger.Warn("failed to load traces from db on startup", logger.F("error", err))
 	} else {
@@ -80,17 +203,49 @@ func New(cfg Config) *Server {
 	}
 
 	h.tsStore = runner.NewSQLiteTimeSeriesStore(cfg.DB.DB)
+<<<<<<< HEAD
 	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.tracer, h.tsStore, cfg.Logger)
 
 	s := &Server{
 		db:      cfg.DB,
+=======
+	h.runnerMgr = runner.NewManager(h.scenes, h.nodes, h.edges, h.runs, h.reports, h.dataSources, h.tracer, h.tsStore, cfg.Logger, nil)
+
+	// Bootstrap SO plugin system: create a registry and load enabled plugins.
+	soReg := expr.NewFunctionRegistry()
+	builtin.RegisterAll(soReg)
+	soLoader, err := so.InitFromDB(context.Background(), h.soPlugins, soReg)
+	if err != nil {
+		cfg.Logger.Warn("so plugin bootstrap completed with errors", logger.F("error", err))
+	} else {
+		cfg.Logger.Info("so plugin bootstrap completed")
+	}
+	// Pass the SO expression registry to the runner manager so that generator
+	// nodes can resolve ${__so(...)} expressions.
+	h.runnerMgr.SetExprRegistry(soReg)
+	// Store soLoader in handler for hot-load after upload.
+	h.soLoader = soLoader
+
+	s := &Server{
+		soLoader: soLoader,
+		soReg:    soReg,
+		db:       cfg.DB,
+>>>>>>> dev
 		logger:  cfg.Logger,
 		handler: h,
 		jwt:     cfg.JWT,
 		rbac:    cfg.RBAC,
 		webDir:  cfg.WebDir,
+<<<<<<< HEAD
 	}
 
+=======
+		wsHub:   wsHub,
+	}
+
+	go s.wsHub.Run()
+
+>>>>>>> dev
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 
@@ -133,6 +288,10 @@ var routePermissions = map[string]string{
 	"/api/v1/scenes/list":          "scene:read",
 	"/api/v1/scenes/create":      "scene:write",
 	"/api/v1/scenes/import":      "scene:write",
+<<<<<<< HEAD
+=======
+	"/api/v1/scenes/copy":        "scene:write",
+>>>>>>> dev
 	"/api/v1/scenes/get":           "scene:read",
 	"/api/v1/scenes/update":        "scene:write",
 	"/api/v1/scenes/delete":        "scene:write",
@@ -150,6 +309,16 @@ var routePermissions = map[string]string{
 	"/api/v1/scenes/status":        "runner:read",
 	"/api/v1/plugins/list":         "settings:read",
 	"/api/v1/plugins/config":       "settings:write",
+<<<<<<< HEAD
+=======
+	"/api/v1/so-plugins/upload-file": "admin:write",
+	"/api/v1/so-plugins/create":    "admin:write",
+	"/api/v1/so-plugins/list":      "admin:read",
+	"/api/v1/so-plugins/get":       "admin:read",
+	"/api/v1/so-plugins/status":    "admin:write",
+	"/api/v1/so-plugins/config":    "admin:write",
+	"/api/v1/so-plugins/delete":    "admin:write",
+>>>>>>> dev
 	"/api/v1/reports/list":         "report:read",
 	"/api/v1/reports/get":          "report:read",
 	"/api/v1/runs/list":            "runner:read",
@@ -183,6 +352,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/scenes/list", s.handleAuth(s.handler.ListScenes))
 	mux.HandleFunc("POST /api/v1/scenes/create", s.handleAuth(s.handler.CreateScene))
 	mux.HandleFunc("POST /api/v1/scenes/import", s.handleAuth(s.handler.ImportYAML))
+<<<<<<< HEAD
+=======
+	mux.HandleFunc("POST /api/v1/scenes/copy", s.handleAuth(s.handler.CopyScene))
+	mux.HandleFunc("POST /api/v1/scenes/export", s.handleAuth(s.handler.ExportYAML))
+>>>>>>> dev
 	mux.HandleFunc("POST /api/v1/scenes/get", s.handleAuth(s.handler.GetScene))
 	mux.HandleFunc("POST /api/v1/scenes/update", s.handleAuth(s.handler.UpdateScene))
 	mux.HandleFunc("POST /api/v1/scenes/delete", s.handleAuth(s.handler.DeleteScene))
@@ -198,10 +372,31 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/scenes/variables/list", s.handleAuth(s.handler.ListVariables))
 	mux.HandleFunc("POST /api/v1/scenes/variables/set", s.handleAuth(s.handler.SetVariable))
+<<<<<<< HEAD
+=======
+	mux.HandleFunc("POST /api/v1/scenes/variables/batch-set", s.handleAuth(s.handler.BatchSetVariables))
+
+	mux.HandleFunc("POST /api/v1/scenes/datasources/upload", s.handleAuth(s.handler.UploadDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/update", s.handleAuth(s.handler.UpdateDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/list", s.handleAuth(s.handler.ListDataSources))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/preview", s.handleAuth(s.handler.PreviewDataSource))
+	mux.HandleFunc("POST /api/v1/scenes/datasources/delete", s.handleAuth(s.handler.DeleteDataSource))
+>>>>>>> dev
 
 	mux.HandleFunc("POST /api/v1/plugins/list", s.handleAuth(s.handler.ListPlugins))
 	mux.HandleFunc("POST /api/v1/plugins/config", s.handleAuth(s.handler.UpdatePluginConfig))
 
+<<<<<<< HEAD
+=======
+	mux.HandleFunc("POST /api/v1/so-plugins/upload-file", s.handleAuth(s.handler.UploadSOPluginFile))
+	mux.HandleFunc("POST /api/v1/so-plugins/create", s.handleAuth(s.handler.UploadSOPlugin))
+	mux.HandleFunc("POST /api/v1/so-plugins/list", s.handleAuth(s.handler.ListSOPlugins))
+	mux.HandleFunc("POST /api/v1/so-plugins/get", s.handleAuth(s.handler.GetSOPlugin))
+	mux.HandleFunc("POST /api/v1/so-plugins/status", s.handleAuth(s.handler.UpdateSOPluginStatus))
+	mux.HandleFunc("POST /api/v1/so-plugins/config", s.handleAuth(s.handler.UpdateSOPluginConfig))
+	mux.HandleFunc("POST /api/v1/so-plugins/delete", s.handleAuth(s.handler.DeleteSOPlugin))
+
+>>>>>>> dev
 	mux.HandleFunc("POST /api/v1/generators/list", s.handleAuth(s.handler.ListGenerators))
 
 	mux.HandleFunc("POST /api/v1/reports/list", s.handleAuth(s.handler.ListReports))
@@ -230,6 +425,13 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/roles/update", s.handleAuth(s.handler.UpdateRole))
 	mux.HandleFunc("POST /api/v1/roles/delete", s.handleAuth(s.handler.DeleteRole))
 
+<<<<<<< HEAD
+=======
+	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
+		ws.ServeWs(s.wsHub, w, r)
+	})
+
+>>>>>>> dev
 	if s.webDir != "" {
 		s.registerSPA(mux)
 	}
@@ -285,26 +487,60 @@ func (s *Server) handleAuth(h handlerFunc) http.HandlerFunc {
 
 		claims, err := s.jwt.Parse(tokenStr)
 		if err != nil {
+<<<<<<< HEAD
+=======
+			s.logger.Debug("auth: JWT parse failed", logger.F("error", err))
+>>>>>>> dev
 			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
 			return
 		}
 
+<<<<<<< HEAD
 		ctx := auth.WithUserID(r.Context(), claims.UserID)
 		ctx = auth.WithRoleID(ctx, claims.RoleID)
+=======
+		// Resolve role_name → role_id from current DB (role_id may change
+		// after DB rebuild, but role_name is stable).
+		role, _ := s.handler.roles.GetByName(r.Context(), claims.RoleName)
+		var roleID snowflake.ID
+		if role != nil {
+			roleID = role.ID
+		}
+
+		s.logger.Debug("auth: token parsed",
+			logger.F("user_id", claims.UserID),
+			logger.F("role_name", claims.RoleName),
+			logger.F("resolved_role_id", roleID),
+			logger.F("path", r.URL.Path),
+		)
+
+		ctx := auth.WithUserID(r.Context(), claims.UserID)
+		ctx = auth.WithRoleID(ctx, roleID)
+>>>>>>> dev
 
 		perm, exists := routePermissions[r.URL.Path]
 		if exists && perm != "" {
 			parts := strings.SplitN(perm, ":", 2)
 			if len(parts) == 2 {
+<<<<<<< HEAD
 				ok, err := s.rbac.HasPermission(ctx, claims.RoleID, parts[0], parts[1])
 				if err != nil {
 					s.logger.Error("rbac check failed", logger.F("error", err), logger.F("role_id", claims.RoleID), logger.F("path", r.URL.Path))
+=======
+				ok, err := s.rbac.HasPermission(ctx, roleID, parts[0], parts[1])
+				if err != nil {
+					s.logger.Error("rbac check failed", logger.F("error", err), logger.F("role_name", claims.RoleName), logger.F("path", r.URL.Path))
+>>>>>>> dev
 					writeJSON(w, dto.ErrorResp(500, "permission check failed"))
 					return
 				}
 				if !ok {
 					s.logger.Warn("permission denied",
+<<<<<<< HEAD
 						logger.F("role_id", claims.RoleID),
+=======
+						logger.F("role_name", claims.RoleName),
+>>>>>>> dev
 						logger.F("user_id", claims.UserID),
 						logger.F("required", perm),
 						logger.F("path", r.URL.Path),
@@ -337,12 +573,35 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		claims, err := s.jwt.Parse(tokenStr)
 		if err != nil {
+<<<<<<< HEAD
+=======
+			s.logger.Debug("authMiddleware: JWT parse failed", logger.F("error", err))
+>>>>>>> dev
 			writeJSON(w, dto.ErrorResp(401, "invalid or expired token"))
 			return
 		}
 
+<<<<<<< HEAD
 		ctx := auth.WithUserID(r.Context(), claims.UserID)
 		ctx = auth.WithRoleID(ctx, claims.RoleID)
+=======
+		// Resolve role_name → role_id from current DB.
+		role, _ := s.handler.roles.GetByName(r.Context(), claims.RoleName)
+		var roleID snowflake.ID
+		if role != nil {
+			roleID = role.ID
+		}
+
+		s.logger.Debug("authMiddleware: token parsed",
+			logger.F("user_id", claims.UserID),
+			logger.F("role_name", claims.RoleName),
+			logger.F("resolved_role_id", roleID),
+			logger.F("path", r.URL.Path),
+		)
+
+		ctx := auth.WithUserID(r.Context(), claims.UserID)
+		ctx = auth.WithRoleID(ctx, roleID)
+>>>>>>> dev
 
 		next(w, r.WithContext(ctx))
 	}
@@ -407,6 +666,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 }
 
 type Handler struct {
+<<<<<<< HEAD
 	log        logger.Logger
 	scenes     repo.SceneRepo
 	nodes      repo.NodeRepo
@@ -426,4 +686,28 @@ type Handler struct {
 	jwt        *auth.JWTManager
 	rbac       *auth.RBACChecker
 	globalVars map[string]string
+=======
+	log         logger.Logger
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	variables   repo.VariableRepo
+	plugins     repo.PluginConfigRepo
+	reports     repo.ReportRepo
+	runs        repo.RunRecordRepo
+	users       repo.UserRepo
+	roles       repo.RoleRepo
+	perms       repo.PermissionRepo
+	rp          repo.RolePermissionRepo
+	dataSources repo.DataSourceRepo
+	soPlugins   repo.SOPluginRepo
+	soLoader    *so.Loader
+	tracer      *tracelib.Tracer
+	traceStore  *tracestore.Store
+	tsStore     runner.TimeSeriesStore
+	runnerMgr   *runner.Manager
+	jwt         *auth.JWTManager
+	rbac        *auth.RBACChecker
+	globalVars  map[string]string
+>>>>>>> dev
 }

@@ -13,8 +13,24 @@ import (
 // contextKey is the type used for context value keys in this package.
 type contextKey string
 
+<<<<<<< HEAD
 // traceIDKey is the context key for the trace identifier.
 const traceIDKey contextKey = "trace_id"
+=======
+const (
+	// traceIDKey is the context key for the trace identifier.
+	traceIDKey contextKey = "trace_id"
+	// chainIDKey is the context key for the chain (DAG execution) identifier.
+	chainIDKey contextKey = "chain_id"
+	// nodeIDKey is the context key for the node identifier.
+	nodeIDKey contextKey = "node_id"
+	// sceneIDKey is the context key for the scene identifier.
+	sceneIDKey contextKey = "scene_id"
+	// runIDKey is the context key for the business run identifier — the ID
+	// users search backend logs with (not the traces.id DB primary key).
+	runIDKey contextKey = "run_id"
+)
+>>>>>>> dev
 
 // ContextWithTraceID returns a copy of ctx that carries the given traceID.
 // The trace ID will be automatically injected into log entries created via
@@ -35,6 +51,45 @@ func TraceIDFromContext(ctx context.Context) string {
 	return ""
 }
 
+<<<<<<< HEAD
+=======
+// ContextWithChainID returns a copy of ctx that carries the given chainID.
+// The chain ID will be automatically injected into log entries via WithContext.
+func ContextWithChainID(ctx context.Context, chainID string) context.Context {
+	return context.WithValue(ctx, chainIDKey, chainID)
+}
+
+// ContextWithNodeID returns a copy of ctx that carries the given nodeID.
+// The node ID will be automatically injected into log entries via WithContext.
+func ContextWithNodeID(ctx context.Context, nodeID string) context.Context {
+	return context.WithValue(ctx, nodeIDKey, nodeID)
+}
+
+// ContextWithSceneID returns a copy of ctx that carries the given sceneID.
+// The scene ID will be automatically injected into log entries via WithContext.
+func ContextWithSceneID(ctx context.Context, sceneID string) context.Context {
+	return context.WithValue(ctx, sceneIDKey, sceneID)
+}
+
+// ContextWithRunID returns a copy of ctx that carries the given runID.
+// The run ID will be automatically injected into log entries via WithContext.
+func ContextWithRunID(ctx context.Context, runID string) context.Context {
+	return context.WithValue(ctx, runIDKey, runID)
+}
+
+// RunIDFromContext extracts the run ID from ctx.
+// Returns an empty string if ctx is nil or no run ID is present.
+func RunIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(runIDKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
+>>>>>>> dev
 // zapLogger is the zap-backed implementation of the Logger interface.
 type zapLogger struct {
 	sugar *zap.SugaredLogger
@@ -121,13 +176,41 @@ func (l *zapLogger) With(fields ...Field) Logger {
 	}
 }
 
+<<<<<<< HEAD
 // WithContext returns a child Logger that injects the trace-id from ctx.
+=======
+// WithContext returns a child Logger that injects trace context (trace_id,
+// chain_id, node_id, scene_id, run_id) from ctx into every subsequent log entry.
+>>>>>>> dev
 func (l *zapLogger) WithContext(ctx context.Context) Logger {
 	if ctx == nil {
 		return l
 	}
+<<<<<<< HEAD
 	if traceID := TraceIDFromContext(ctx); traceID != "" {
 		return l.With(F("trace_id", traceID))
+=======
+
+	var fields []Field
+	if traceID := TraceIDFromContext(ctx); traceID != "" {
+		fields = append(fields, F("trace_id", traceID))
+	}
+	if runID := RunIDFromContext(ctx); runID != "" {
+		fields = append(fields, F("run_id", runID))
+	}
+	if v, ok := ctx.Value(chainIDKey).(string); ok && v != "" {
+		fields = append(fields, F("chain_id", v))
+	}
+	if v, ok := ctx.Value(nodeIDKey).(string); ok && v != "" {
+		fields = append(fields, F("node_id", v))
+	}
+	if v, ok := ctx.Value(sceneIDKey).(string); ok && v != "" {
+		fields = append(fields, F("scene_id", v))
+	}
+
+	if len(fields) > 0 {
+		return l.With(fields...)
+>>>>>>> dev
 	}
 	return l
 }

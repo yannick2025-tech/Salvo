@@ -2,17 +2,28 @@ package api
 
 import (
 	"archive/zip"
+<<<<<<< HEAD
+=======
+	"bytes"
+>>>>>>> dev
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+<<<<<<< HEAD
 	"math/rand/v2"
+=======
+>>>>>>> dev
 	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+<<<<<<< HEAD
+=======
+	"unicode/utf8"
+>>>>>>> dev
 
 	"github.com/yannick2025-tech/Salvo/internal/api/dto"
 	"github.com/yannick2025-tech/Salvo/internal/generator/builtin"
@@ -22,6 +33,10 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+<<<<<<< HEAD
+=======
+	tracestore "github.com/yannick2025-tech/Salvo/internal/trace/store"
+>>>>>>> dev
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,6 +44,22 @@ const defaultLimit = 20
 
 // --- Scene Handlers ---
 
+<<<<<<< HEAD
+=======
+// validateSceneMeta checks scene name/description length limits shared by
+// create, update, copy and import handlers. Lengths are counted in runes
+// (not bytes) to match the frontend maxlength semantics for CJK input.
+func validateSceneMeta(name, description string) error {
+	if utf8.RuneCountInString(name) > 64 {
+		return fmt.Errorf("scene name must be at most 64 characters")
+	}
+	if utf8.RuneCountInString(description) > 256 {
+		return fmt.Errorf("scene description must be at most 256 characters")
+	}
+	return nil
+}
+
+>>>>>>> dev
 func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	req, err := decode[dto.CreateSceneRequest](r)
 	if err != nil {
@@ -37,6 +68,12 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	if req.Name == "" {
 		return dto.ErrorResp(400, "name is required")
 	}
+<<<<<<< HEAD
+=======
+	if err := validateSceneMeta(req.Name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+>>>>>>> dev
 
 	status := req.Status
 	if status == "" {
@@ -44,6 +81,7 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 	}
 
 	scene := &model.Scene{
+<<<<<<< HEAD
 		Name:        req.Name,
 		Description: req.Description,
 		DAGJSON:     req.DAGJSON,
@@ -54,11 +92,25 @@ func (h *Handler) CreateScene(r *http.Request) dto.Response {
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+=======
+		Name:           req.Name,
+		Description:    req.Description,
+		DAGJSON:        req.DAGJSON,
+		Variables:      req.Variables,
+		Plugins:        req.Plugins,
+		Status:         status,
+		DefaultTimeout: req.DefaultTimeout,
+	}
+
+	if err := h.scenes.Create(r.Context(), scene); err != nil {
+		return h.internalErr("create scene", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toSceneDTO(scene))
 }
 
+<<<<<<< HEAD
 type yamlScene struct {
 	Name        string        `yaml:"name"`
 	Description string        `yaml:"description"`
@@ -73,6 +125,83 @@ type yamlNode struct {
 	Name   string         `yaml:"name"`
 	Type   string         `yaml:"type"`
 	Config map[string]any `yaml:"config"`
+=======
+// CopyScene duplicates a scene with all its nodes, edges and data sources.
+func (h *Handler) CopyScene(r *http.Request) dto.Response {
+	req, err := decode[dto.CopySceneRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.Name == "" {
+		return dto.ErrorResp(400, "name is required")
+	}
+	if err := validateSceneMeta(req.Name, ""); err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	ctx := r.Context()
+	src, err := h.scenes.GetByID(ctx, req.SceneID)
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("scene not found: %v", err))
+	}
+
+	// 重名检查：场景名在系统内保持唯一
+	existing, err := h.scenes.List(ctx, repo.Filter{Limit: 1000, Offset: 0})
+	if err != nil {
+		return h.internalErr("list scenes", err)
+	}
+	for _, s := range existing {
+		if s.Name == req.Name {
+			return dto.ErrorResp(409, fmt.Sprintf("scene name %q already exists", req.Name))
+		}
+	}
+
+	copied, err := h.scenes.CopyTx(ctx, src.ID, req.Name, src.Description)
+	if err != nil {
+		return h.internalErr("copy scene", err)
+	}
+
+	return dto.OK(toSceneDTO(copied))
+}
+
+type yamlScene struct {
+	Name           string            `yaml:"name"`
+	DefaultTimeout int               `yaml:"default_timeout,omitempty"`
+	Description    string            `yaml:"description"`
+	Variables      []yamlVarItem     `yaml:"variables,omitempty"`
+	ConfigParams   map[string]string `yaml:"config_params,omitempty"`
+	DerivedParams  map[string]string `yaml:"derived_params,omitempty"`
+	DataSources    []yamlDataSource  `yaml:"data_sources,omitempty"`
+	Setup          []yamlNode        `yaml:"setup,omitempty"`
+	Nodes          []yamlNode        `yaml:"nodes"`
+	Teardown       []yamlNode        `yaml:"teardown,omitempty"`
+	Edges          []yamlEdge        `yaml:"edges,omitempty"`
+}
+
+type yamlDataSource struct {
+	Name    string              `yaml:"name"`
+	Columns []string            `yaml:"columns"`
+	Rows    []map[string]string `yaml:"rows"`
+}
+
+type yamlRetry struct {
+	Count    int    `yaml:"count" json:"count"`
+	Interval string `yaml:"interval" json:"interval"`
+}
+
+type yamlNode struct {
+	Name         string         `yaml:"name"`
+	Type         string         `yaml:"type"`
+	Config       map[string]any `yaml:"config,omitempty"`
+	ThinkTime    string         `yaml:"think_time,omitempty"`
+	Retry        *yamlRetry     `yaml:"retry,omitempty"`
+	Condition    string         `yaml:"condition,omitempty"`
+	TimedTrigger string         `yaml:"timed_trigger,omitempty"`
+	BlockOnError bool           `yaml:"block_on_error,omitempty"`
+>>>>>>> dev
 }
 
 type yamlEdge struct {
@@ -86,6 +215,16 @@ type yamlVarItem struct {
 	Value string `yaml:"value"`
 }
 
+<<<<<<< HEAD
+=======
+// rollbackImport best-effort deletes the scene created by a partially
+// failed YAML import so no orphan scene is left behind. Errors ignored:
+// the original import failure is the one reported to the user.
+func (h *Handler) rollbackImport(ctx context.Context, sceneID snowflake.ID) {
+	_ = h.scenes.Delete(ctx, sceneID)
+}
+
+>>>>>>> dev
 func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	req, err := decode[dto.ImportYAMLRequest](r)
 	if err != nil {
@@ -107,6 +246,7 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 	if name == "" {
 		return dto.ErrorResp(400, "scene name is required")
 	}
+<<<<<<< HEAD
 
 	var varsJSON string
 	if len(ys.Variables) > 0 {
@@ -123,17 +263,164 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		Description: req.Description,
 		Variables:   varsJSON,
 		Status:      model.SceneStatusDraft,
+=======
+	if err := validateSceneMeta(name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+
+	// Store variables, config_params, derived_params as separate JSON fields
+	// so export can reconstruct the original YAML sections without heuristics.
+	var varsJSON string
+	vm := make(map[string]string)
+	for _, v := range ys.Variables {
+		vm[v.Key] = v.Value
+	}
+	if len(vm) > 0 {
+		vb, _ := json.Marshal(vm)
+		varsJSON = string(vb)
+	}
+	var configParamsJSON string
+	if len(ys.ConfigParams) > 0 {
+		vb, _ := json.Marshal(ys.ConfigParams)
+		configParamsJSON = string(vb)
+	}
+	var derivedParamsJSON string
+	if len(ys.DerivedParams) > 0 {
+		vb, _ := json.Marshal(ys.DerivedParams)
+		derivedParamsJSON = string(vb)
+	}
+
+	scene := &model.Scene{
+		Name:          name,
+		Description:   req.Description,
+		Variables:     varsJSON,
+		ConfigParams:  configParamsJSON,
+		DerivedParams: derivedParamsJSON,
+		Status:        model.SceneStatusDraft,
+>>>>>>> dev
 	}
 	if scene.Description == "" {
 		scene.Description = ys.Description
 	}
+<<<<<<< HEAD
 
 	if err := h.scenes.Create(r.Context(), scene); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("create scene: %v", err))
+=======
+	if ys.DefaultTimeout > 0 {
+		scene.DefaultTimeout = ys.DefaultTimeout
+	}
+
+	// Build a tagged list so each node carries the YAML section (setup/nodes/teardown)
+	// it came from. Lifecycle is orthogonal to Type and stored on the Node for
+	// lossless reconstruction of setup/teardown sections on export.
+	type taggedNode struct {
+		yn        yamlNode
+		lifecycle string
+	}
+	allNodes := make([]taggedNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
+	for _, yn := range ys.Setup {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleSetup})
+	}
+	for _, yn := range ys.Nodes {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleMain})
+	}
+	for _, yn := range ys.Teardown {
+		allNodes = append(allNodes, taggedNode{yn: yn, lifecycle: model.NodeLifecycleTeardown})
+	}
+
+	// Validate all node references BEFORE creating the scene: an invalid
+	// YAML must be rejected without leaving a partially-imported orphan
+	// scene behind (the import dialog allows retrying, and each retry
+	// used to create another scene row with the same name).
+	nodeNames := make(map[string]bool, len(allNodes))
+	nodeTypes := make(map[string]string, len(allNodes))
+	for _, item := range allNodes {
+		if err := validateNodeName(item.yn.Name); err != nil {
+			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", item.yn.Name, err))
+		}
+		nodeNames[item.yn.Name] = true
+		nodeTypes[item.yn.Name] = item.yn.Type
+	}
+	for _, yds := range ys.DataSources {
+		if yds.Name == "" {
+			return dto.ErrorResp(400, "data source name is required")
+		}
+	}
+	for _, item := range allNodes {
+		if !isCompositeNodeType(item.yn.Type) {
+			continue
+		}
+		childRefs, _ := item.yn.Config["node_ids"].([]any)
+		for _, nameVal := range childRefs {
+			child, ok := nameVal.(string)
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: node_ids must be strings", item.yn.Type, item.yn.Name))
+			}
+			if !nodeNames[child] {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: child node %q not found", item.yn.Type, item.yn.Name, child))
+			}
+			// Nesting rules (aligned with buildDAG/buildCompositeChildSN):
+			// group cannot contain another group; while/loop cannot contain
+			// any composite node (group/while/loop).
+			childType := nodeTypes[child]
+			if item.yn.Type == model.NodeTypeGroup && childType == model.NodeTypeGroup {
+				return dto.ErrorResp(400, fmt.Sprintf("group node %q: cannot contain another group node %q", item.yn.Name, child))
+			}
+			if item.yn.Type != model.NodeTypeGroup && isCompositeNodeType(childType) {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: cannot contain composite child %q (type %s)", item.yn.Type, item.yn.Name, child, childType))
+			}
+		}
+	}
+	for _, ye := range ys.Edges {
+		if !nodeNames[ye.From] {
+			return dto.ErrorResp(400, fmt.Sprintf("edge from node %q not found", ye.From))
+		}
+		if !nodeNames[ye.To] {
+			return dto.ErrorResp(400, fmt.Sprintf("edge to node %q not found", ye.To))
+		}
+	}
+
+	if err := h.scenes.Create(r.Context(), scene); err != nil {
+		return h.internalErr("create scene", err)
+	}
+
+	// Import data sources: create DataSource records and build name→ID map.
+	dsNameToID := make(map[string]snowflake.ID)
+	for _, yds := range ys.DataSources {
+		// Skip if a CSV-uploaded data source with same name already exists
+		existingCSV, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), scene.ID, yds.Name, "csv")
+		if existingCSV != nil {
+			dsNameToID[yds.Name] = existingCSV.ID
+			continue
+		}
+		// Delete existing yaml data source with same name before creating
+		existingYAML, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), scene.ID, yds.Name, "yaml")
+		if existingYAML != nil {
+			_ = h.dataSources.Delete(r.Context(), existingYAML.ID)
+		}
+		columnsJSON, _ := json.Marshal(yds.Columns)
+		rowsJSON, _ := json.Marshal(yds.Rows)
+		ds := &model.DataSource{
+			SceneID:  scene.ID,
+			Name:     yds.Name,
+			FileName: yds.Name + ".csv",
+			Columns:  string(columnsJSON),
+			Rows:     string(rowsJSON),
+			RowCount: len(yds.Rows),
+			Source:   "yaml",
+		}
+		if err := h.dataSources.Create(r.Context(), ds); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
+			return h.internalErr(fmt.Sprintf("create data source %s", yds.Name), err)
+		}
+		dsNameToID[yds.Name] = ds.ID
+>>>>>>> dev
 	}
 
 	nodeNameToID := make(map[string]snowflake.ID)
 
+<<<<<<< HEAD
 	allNodes := make([]yamlNode, 0, len(ys.Setup)+len(ys.Nodes)+len(ys.Teardown))
 	allNodes = append(allNodes, ys.Setup...)
 	allNodes = append(allNodes, ys.Nodes...)
@@ -152,10 +439,88 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 		}
 		if err := h.nodes.Create(r.Context(), node); err != nil {
 			return dto.ErrorResp(500, fmt.Sprintf("create node %q: %v", yn.Name, err))
+=======
+	for _, item := range allNodes {
+		yn := item.yn
+		if err := validateNodeName(yn.Name); err != nil {
+			return dto.ErrorResp(400, fmt.Sprintf("node %q: %v", yn.Name, err))
+		}
+
+		// Merge think_time, retry, condition, timed_trigger into Config.
+		if yn.Config == nil {
+			yn.Config = make(map[string]any)
+		}
+		if yn.ThinkTime != "" {
+			yn.Config["think_time"] = yn.ThinkTime
+		}
+		if yn.Retry != nil {
+			yn.Config["retry"] = yn.Retry
+		}
+		if yn.Condition != "" {
+			yn.Config["condition"] = yn.Condition
+		}
+		if yn.TimedTrigger != "" {
+			yn.Config["timed_trigger"] = yn.TimedTrigger
+		}
+
+		configBytes, _ := json.Marshal(yn.Config)
+		node := &model.Node{
+			SceneID:      scene.ID,
+			Name:         yn.Name,
+			Type:         yn.Type,
+			Config:       string(configBytes),
+			BlockOnError: yn.BlockOnError,
+			Lifecycle:    item.lifecycle,
+		}
+		if err := h.nodes.Create(r.Context(), node); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
+			return h.internalErr(fmt.Sprintf("create node %s", yn.Name), err)
+>>>>>>> dev
 		}
 		nodeNameToID[yn.Name] = node.ID
 	}
 
+<<<<<<< HEAD
+=======
+	// Resolve composite node (group/while/loop) node_ids from names to IDs.
+	// Composite config stores node_ids as string IDs; in YAML they are node names.
+	for _, item := range allNodes {
+		yn := item.yn
+		if !isCompositeNodeType(yn.Type) {
+			continue
+		}
+		nodeID, ok := nodeNameToID[yn.Name]
+		if !ok {
+			continue
+		}
+		nodeNames, _ := yn.Config["node_ids"].([]any)
+		resolvedIDs := make([]string, 0, len(nodeNames))
+		for _, nameVal := range nodeNames {
+			name, ok := nameVal.(string)
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: node_ids must be strings", yn.Type, yn.Name))
+			}
+			childID, ok := nodeNameToID[name]
+			if !ok {
+				return dto.ErrorResp(400, fmt.Sprintf("%s node %q: child node %q not found", yn.Type, yn.Name, name))
+			}
+			resolvedIDs = append(resolvedIDs, childID.String())
+		}
+		yn.Config["node_ids"] = resolvedIDs
+		configBytes, _ := json.Marshal(yn.Config)
+		node, err := h.nodes.GetByID(r.Context(), nodeID)
+		if err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
+			return h.internalErr(fmt.Sprintf("get %s node %s", yn.Type, yn.Name), err)
+		}
+		node.Config = string(configBytes)
+		if err := h.nodes.Update(r.Context(), node); err != nil {
+			h.rollbackImport(r.Context(), scene.ID)
+			return h.internalErr(fmt.Sprintf("update %s node %s", yn.Type, yn.Name), err)
+		}
+	}
+
+>>>>>>> dev
 	if len(ys.Edges) > 0 {
 		for _, ye := range ys.Edges {
 			fromID, ok := nodeNameToID[ye.From]
@@ -173,7 +538,12 @@ func (h *Handler) ImportYAML(r *http.Request) dto.Response {
 				Condition: ye.Condition,
 			}
 			if err := h.edges.Create(r.Context(), edge); err != nil {
+<<<<<<< HEAD
 				return dto.ErrorResp(500, fmt.Sprintf("create edge: %v", err))
+=======
+				h.rollbackImport(r.Context(), scene.ID)
+				return h.internalErr("create edge", err)
+>>>>>>> dev
 			}
 		}
 	} else {
@@ -246,7 +616,11 @@ func (h *Handler) GetScene(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+=======
+		return h.internalErr("get scene", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toSceneDTO(scene))
@@ -260,13 +634,23 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	if req.ID == 0 {
 		return dto.ErrorResp(400, "id is required")
 	}
+<<<<<<< HEAD
+=======
+	if err := validateSceneMeta(req.Name, req.Description); err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+>>>>>>> dev
 
 	scene, err := h.scenes.GetByID(r.Context(), req.ID)
 	if err == sql.ErrNoRows {
 		return dto.ErrorResp(404, "scene not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get scene: %v", err))
+=======
+		return h.internalErr("get scene", err)
+>>>>>>> dev
 	}
 
 	if req.Name != "" {
@@ -281,15 +665,33 @@ func (h *Handler) UpdateScene(r *http.Request) dto.Response {
 	if req.Variables != "" {
 		scene.Variables = req.Variables
 	}
+<<<<<<< HEAD
+=======
+	if req.ConfigParams != "" {
+		scene.ConfigParams = req.ConfigParams
+	}
+	if req.DerivedParams != "" {
+		scene.DerivedParams = req.DerivedParams
+	}
+>>>>>>> dev
 	if req.Plugins != "" {
 		scene.Plugins = req.Plugins
 	}
 	if req.Status != "" {
 		scene.Status = req.Status
 	}
+<<<<<<< HEAD
 
 	if err := h.scenes.Update(r.Context(), scene); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("update scene: %v", err))
+=======
+	if req.DefaultTimeout != nil {
+		scene.DefaultTimeout = *req.DefaultTimeout
+	}
+
+	if err := h.scenes.Update(r.Context(), scene); err != nil {
+		return h.internalErr("update scene", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toSceneDTO(scene))
@@ -305,12 +707,267 @@ func (h *Handler) DeleteScene(r *http.Request) dto.Response {
 	}
 
 	if err := h.scenes.Delete(r.Context(), req.ID); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("delete scene: %v", err))
+=======
+		return h.internalErr("delete scene", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(nil)
 }
 
+<<<<<<< HEAD
+=======
+// ExportYAML serializes a scene and all its nodes, edges, variables,
+// and data sources into a YAML document for backup or migration.
+func (h *Handler) ExportYAML(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	scene, err := h.scenes.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	}
+	if err != nil {
+		return h.internalErr("get scene", err)
+	}
+
+	// Fetch all nodes.
+	nodes, err := h.nodes.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
+	if err != nil {
+		return h.internalErr("list nodes", err)
+	}
+
+	// Fetch all edges.
+	edges, err := h.edges.List(r.Context(), repo.Filter{SceneID: req.ID, Limit: 1000})
+	if err != nil {
+		return h.internalErr("list edges", err)
+	}
+
+	// Fetch data sources with source=yaml for YAML export.
+	var yamlDataSources []yamlDataSource
+	allDataSources, _ := h.dataSources.ListBySceneID(r.Context(), req.ID)
+	for _, ds := range allDataSources {
+		if ds.Source == "yaml" {
+			var columns []string
+			if ds.Columns != "" {
+				json.Unmarshal([]byte(ds.Columns), &columns)
+			}
+			var rows []map[string]string
+			if ds.Rows != "" {
+				json.Unmarshal([]byte(ds.Rows), &rows)
+			}
+			yamlDataSources = append(yamlDataSources, yamlDataSource{
+				Name:    ds.Name,
+				Columns: columns,
+				Rows:    rows,
+			})
+		}
+	}
+
+	// Read variables, config_params, derived_params from their dedicated
+	// DB fields (stored separately at import time for YAML section fidelity).
+	var varsList []yamlVarItem
+	if scene.Variables != "" {
+		var asMap map[string]string
+		if err := json.Unmarshal([]byte(scene.Variables), &asMap); err == nil {
+			for k, v := range asMap {
+				varsList = append(varsList, yamlVarItem{Key: k, Value: v})
+			}
+		} else {
+			var asSlice []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal([]byte(scene.Variables), &asSlice); err == nil {
+				for _, v := range asSlice {
+					varsList = append(varsList, yamlVarItem{Key: v.Key, Value: v.Value})
+				}
+			}
+		}
+	}
+	var configParams map[string]string
+	if scene.ConfigParams != "" {
+		_ = json.Unmarshal([]byte(scene.ConfigParams), &configParams)
+	}
+	var derivedParams map[string]string
+	if scene.DerivedParams != "" {
+		_ = json.Unmarshal([]byte(scene.DerivedParams), &derivedParams)
+	}
+	// Sort variables by key for deterministic output.
+	sort.Slice(varsList, func(i, j int) bool {
+		return varsList[i].Key < varsList[j].Key
+	})
+
+	// Build YAML nodes.
+	var yamlNodes []yamlNode
+	var yamlSetup []yamlNode
+	var yamlTeardown []yamlNode
+	nodeNameMap := make(map[string]*model.Node)
+	// nodeIDNameMap resolves snowflake ID → node name so that composite
+	// node_ids can be exported as names (import validation matches by name,
+	// so exporting raw IDs would break the export→import round trip).
+	nodeIDNameMap := make(map[string]string, len(nodes))
+	for _, n := range nodes {
+		nodeIDNameMap[n.ID.String()] = n.Name
+	}
+
+	for _, n := range nodes {
+		nodeNameMap[n.Name] = n
+
+		parsedConfig := make(map[string]any)
+		if n.Config != "" {
+			json.Unmarshal([]byte(n.Config), &parsedConfig)
+		}
+
+		yn := yamlNode{
+			Name:         n.Name,
+			Type:         n.Type,
+			Config:       nil,
+			BlockOnError: n.BlockOnError,
+		}
+
+		// Extract known top-level fields back out of config.
+		var extraConfig map[string]any
+		if parsedConfig != nil {
+			extraConfig = make(map[string]any)
+			for k, v := range parsedConfig {
+				switch k {
+				case "think_time":
+					if s, ok := v.(string); ok {
+						yn.ThinkTime = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "retry":
+					if m, ok := v.(map[string]any); ok {
+						yn.Retry = &yamlRetry{}
+						if c, ok2 := m["count"].(float64); ok2 {
+							yn.Retry.Count = int(c)
+						}
+						if iv, ok2 := m["interval"].(string); ok2 {
+							yn.Retry.Interval = iv
+						}
+					} else {
+						extraConfig[k] = v
+					}
+				case "condition":
+					if s, ok := v.(string); ok {
+						yn.Condition = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "timed_trigger":
+					if s, ok := v.(string); ok {
+						yn.TimedTrigger = s
+					} else {
+						extraConfig[k] = v
+					}
+				case "node_ids":
+					// Composite nodes (group/while/loop) store child refs as
+					// snowflake IDs; convert them back to node names so the
+					// exported YAML re-imports cleanly (import validates by
+					// name). Values already stored as names pass through;
+					// unresolvable values are kept as-is.
+					if isCompositeNodeType(n.Type) {
+						if refs, ok := v.([]any); ok {
+							namedRefs := make([]string, 0, len(refs))
+							for _, rv := range refs {
+								ref, ok := rv.(string)
+								if !ok {
+									continue
+								}
+								if name, ok := nodeIDNameMap[ref]; ok {
+									namedRefs = append(namedRefs, name)
+								} else {
+									namedRefs = append(namedRefs, ref)
+								}
+							}
+							extraConfig[k] = namedRefs
+						} else {
+							extraConfig[k] = v
+						}
+					} else {
+						extraConfig[k] = v
+					}
+				default:
+					extraConfig[k] = v
+				}
+			}
+		}
+		// Only set Config if there are remaining fields.
+		if len(extraConfig) > 0 {
+			yn.Config = extraConfig
+		}
+
+		switch n.Lifecycle {
+		case model.NodeLifecycleSetup:
+			yamlSetup = append(yamlSetup, yn)
+		case model.NodeLifecycleTeardown:
+			yamlTeardown = append(yamlTeardown, yn)
+		default:
+			yamlNodes = append(yamlNodes, yn)
+		}
+	}
+
+	// Build YAML edges.
+	var yamlEdges []yamlEdge
+	for _, e := range edges {
+		fromName := ""
+		toName := ""
+		for name, n := range nodeNameMap {
+			if n.ID == e.FromNode {
+				fromName = name
+			}
+			if n.ID == e.ToNode {
+				toName = name
+			}
+		}
+		if fromName != "" && toName != "" {
+			yamlEdges = append(yamlEdges, yamlEdge{
+				From:      fromName,
+				To:        toName,
+				Condition: e.Condition,
+			})
+		}
+	}
+
+	// Build YAML scene.
+	ys := yamlScene{
+		Name:           scene.Name,
+		Description:    scene.Description,
+		DefaultTimeout: scene.DefaultTimeout,
+		DataSources:    yamlDataSources,
+		Variables:      varsList,
+		ConfigParams:   configParams,
+		DerivedParams:  derivedParams,
+		Setup:          yamlSetup,
+		Nodes:          yamlNodes,
+		Teardown:       yamlTeardown,
+		Edges:          yamlEdges,
+	}
+
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(ys); err != nil {
+		return h.internalErr("marshal yaml", err)
+	}
+	enc.Close()
+	yamlBytes := buf.Bytes()
+
+	return dto.OK(dto.ExportYAMLResponse{
+		YAML: string(yamlBytes),
+	})
+}
+
+>>>>>>> dev
 func (h *Handler) ListScenes(r *http.Request) dto.Response {
 	req, err := decode[dto.ListScenesRequest](r)
 	if err != nil {
@@ -328,12 +985,22 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 		Limit:  limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list scenes: %v", err))
+=======
+		return h.internalErr("list scenes", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.SceneDTO, 0, len(scenes))
 	for _, s := range scenes {
+<<<<<<< HEAD
 		items = append(items, toSceneDTO(s))
+=======
+		item := toSceneDTO(s)
+		h.fillLastRun(r.Context(), &item)
+		items = append(items, item)
+>>>>>>> dev
 	}
 
 	return dto.OK(dto.ListResponse[[]dto.SceneDTO]{
@@ -346,6 +1013,33 @@ func (h *Handler) ListScenes(r *http.Request) dto.Response {
 	})
 }
 
+<<<<<<< HEAD
+=======
+// fillLastRun populates the last-run fields of a scene DTO with the most
+// recent run record of that scene (empty when the scene has never run).
+// The in-memory runner manager is the single source of truth for liveness:
+// when an active runner exists the status is forced to running so that a
+// transient run-record query/write failure cannot make a live run look
+// idle on the scene list (实时进度 button stays clickable).
+func (h *Handler) fillLastRun(ctx context.Context, item *dto.SceneDTO) {
+	runs, err := h.runs.List(ctx, repo.Filter{SceneID: item.ID, Limit: 1})
+	if err != nil {
+		h.log.Warn("failed to load last run for scene list",
+			logger.F("scene_id", item.ID.String()),
+			logger.F("error", err))
+	}
+	if len(runs) > 0 {
+		last := runs[0]
+		item.LastRunID = strconv.FormatInt(int64(last.RunID), 10)
+		item.LastRunStartedAt = last.StartedAt
+		item.LastRunStatus = last.Status
+	}
+	if _, running := h.runnerMgr.Get(item.ID); running {
+		item.LastRunStatus = model.RunStatusRunning
+	}
+}
+
+>>>>>>> dev
 // --- Node Handlers ---
 
 var sqlInjectionPattern = regexp.MustCompile(`['";]|--|/\*|\*/`)
@@ -355,7 +1049,11 @@ func validateNodeName(name string) error {
 	if name == "" {
 		return fmt.Errorf("node name is required")
 	}
+<<<<<<< HEAD
 	if len(name) > 50 {
+=======
+	if utf8.RuneCountInString(name) > 50 {
+>>>>>>> dev
 		return fmt.Errorf("node name must be at most 50 characters")
 	}
 	if sqlInjectionPattern.MatchString(name) {
@@ -364,6 +1062,17 @@ func validateNodeName(name string) error {
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// isCompositeNodeType reports whether the node type is a composite node whose
+// children are referenced via config.node_ids (group/while/loop). Used by YAML
+// import validation and name→ID resolution, which apply the same rules as the
+// runner's buildDAG composite handling.
+func isCompositeNodeType(t string) bool {
+	return t == model.NodeTypeGroup || t == model.NodeTypeWhile || t == model.NodeTypeLoop
+}
+
+>>>>>>> dev
 func (h *Handler) AddNode(r *http.Request) dto.Response {
 	req, err := decode[dto.AddNodeRequest](r)
 	if err != nil {
@@ -383,6 +1092,7 @@ func (h *Handler) AddNode(r *http.Request) dto.Response {
 	}
 
 	node := &model.Node{
+<<<<<<< HEAD
 		SceneID:   req.SceneID,
 		Name:      req.Name,
 		Type:      req.Type,
@@ -393,6 +1103,19 @@ func (h *Handler) AddNode(r *http.Request) dto.Response {
 
 	if err := h.nodes.Create(r.Context(), node); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("add node: %v", err))
+=======
+		SceneID:      req.SceneID,
+		Name:         req.Name,
+		Type:         req.Type,
+		Config:       req.Config,
+		Position:     req.Position,
+		LoopCount:    req.LoopCount,
+		BlockOnError: req.BlockOnError,
+	}
+
+	if err := h.nodes.Create(r.Context(), node); err != nil {
+		return h.internalErr("add node", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toNodeDTO(node))
@@ -412,7 +1135,11 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "node not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get node: %v", err))
+=======
+		return h.internalErr("get node", err)
+>>>>>>> dev
 	}
 
 	if req.Name != "" {
@@ -433,9 +1160,18 @@ func (h *Handler) UpdateNode(r *http.Request) dto.Response {
 	if req.LoopCount > 0 {
 		node.LoopCount = req.LoopCount
 	}
+<<<<<<< HEAD
 
 	if err := h.nodes.Update(r.Context(), node); err != nil {
 		return dto.ErrorResp(500, fmt.Sprintf("update node: %v", err))
+=======
+	if req.BlockOnError != nil {
+		node.BlockOnError = *req.BlockOnError
+	}
+
+	if err := h.nodes.Update(r.Context(), node); err != nil {
+		return h.internalErr("update node", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toNodeDTO(node))
@@ -451,7 +1187,11 @@ func (h *Handler) DeleteNode(r *http.Request) dto.Response {
 	}
 
 	if err := h.nodes.Delete(r.Context(), req.ID); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("delete node: %v", err))
+=======
+		return h.internalErr("delete node", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(nil)
@@ -477,7 +1217,11 @@ func (h *Handler) ListNodes(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list nodes: %v", err))
+=======
+		return h.internalErr("list nodes", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.NodeDTO, 0, len(nodes))
@@ -521,7 +1265,11 @@ func (h *Handler) AddEdge(r *http.Request) dto.Response {
 	}
 
 	if err := h.edges.Create(r.Context(), edge); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("add edge: %v", err))
+=======
+		return h.internalErr("add edge", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toEdgeDTO(edge))
@@ -547,7 +1295,11 @@ func (h *Handler) ListEdges(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list edges: %v", err))
+=======
+		return h.internalErr("list edges", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.EdgeDTO, 0, len(edges))
@@ -575,7 +1327,11 @@ func (h *Handler) DeleteEdge(r *http.Request) dto.Response {
 	}
 
 	if err := h.edges.Delete(r.Context(), req.ID); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("delete edge: %v", err))
+=======
+		return h.internalErr("delete edge", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(nil)
@@ -603,7 +1359,11 @@ func (h *Handler) ListVariables(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list variables: %v", err))
+=======
+		return h.internalErr("list variables", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.VariableDTO, 0, len(vars))
@@ -644,12 +1404,257 @@ func (h *Handler) SetVariable(r *http.Request) dto.Response {
 	}
 
 	if err := h.variables.Create(r.Context(), v); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("set variable: %v", err))
+=======
+		return h.internalErr("set variable", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toVariableDTO(v))
 }
 
+<<<<<<< HEAD
+=======
+// BatchSetVariables replaces all scene-level variables with the provided map.
+// It serializes the variables map to JSON and updates the scene's Variables field.
+func (h *Handler) BatchSetVariables(r *http.Request) dto.Response {
+	req, err := decode[dto.BatchSetVariablesRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	scene, err := h.scenes.GetByID(r.Context(), req.SceneID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	}
+	if err != nil {
+		return h.internalErr("get scene", err)
+	}
+
+	varsJSON, err := json.Marshal(req.Variables)
+	if err != nil {
+		return h.internalErr("marshal variables", err)
+	}
+	scene.Variables = string(varsJSON)
+
+	if err := h.scenes.Update(r.Context(), scene); err != nil {
+		return h.internalErr("update scene variables", err)
+	}
+
+	return dto.OK(dto.BatchSetVariablesResponse{Variables: req.Variables})
+}
+
+// --- DataSource Handlers ---
+
+func (h *Handler) UploadDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.UploadDataSourceRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+	if req.FileName == "" {
+		return dto.ErrorResp(400, "file_name is required")
+	}
+	if req.Content == "" {
+		return dto.ErrorResp(400, "content is required")
+	}
+
+	// Verify scene exists
+	if _, err := h.scenes.GetByID(r.Context(), req.SceneID); err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "scene not found")
+	} else if err != nil {
+		return h.internalErr("get scene", err)
+	}
+
+	// Parse CSV (empty rows are automatically removed)
+	columns, rows, removedEmptyRows, err := runner.ParseCSV(req.FileName, strings.NewReader(req.Content))
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("parse csv: %v", err))
+	}
+
+	// Check for existing CSV data source with same name (upsert, YAML data source is preserved)
+	dsModel := runner.ToDataSourceModel(req.SceneID, req.FileName, columns, rows)
+
+	existingCSV, _ := h.dataSources.GetBySceneIDAndNameAndSource(r.Context(), req.SceneID, dsModel.Name, "csv")
+	if existingCSV != nil {
+		_ = h.dataSources.Delete(r.Context(), existingCSV.ID)
+	}
+
+	if err := h.dataSources.Create(r.Context(), dsModel); err != nil {
+		return h.internalErr("create data source", err)
+	}
+
+	return dto.OK(dto.DataSourceDTO{
+		ID:               dsModel.ID,
+		SceneID:          dsModel.SceneID,
+		Name:             dsModel.Name,
+		FileName:         dsModel.FileName,
+		Columns:          columns,
+		RowCount:         dsModel.RowCount,
+		Source:           dsModel.Source,
+		RemovedEmptyRows: removedEmptyRows,
+		CreatedAt:        dsModel.CreatedAt,
+		UpdatedAt:        dsModel.UpdatedAt,
+	})
+}
+
+func (h *Handler) ListDataSources(r *http.Request) dto.Response {
+	req, err := decode[dto.SceneIDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.SceneID == 0 {
+		return dto.ErrorResp(400, "scene_id is required")
+	}
+
+	sources, err := h.dataSources.ListBySceneID(r.Context(), req.SceneID)
+	if err != nil {
+		return h.internalErr("list data sources", err)
+	}
+
+	var items []dto.DataSourceDTO
+	for _, ds := range sources {
+		var columns []string
+		if err := json.Unmarshal([]byte(ds.Columns), &columns); err != nil {
+			// Legacy format: comma-separated string (from older YAML imports)
+			if ds.Columns != "" {
+				columns = strings.Split(ds.Columns, ",")
+			}
+		}
+		items = append(items, dto.DataSourceDTO{
+			ID:        ds.ID,
+			SceneID:   ds.SceneID,
+			Name:      ds.Name,
+			FileName:  ds.FileName,
+			Columns:   columns,
+			RowCount:  ds.RowCount,
+			Source:    ds.Source,
+			CreatedAt: ds.CreatedAt,
+			UpdatedAt: ds.UpdatedAt,
+		})
+	}
+	return dto.OK(items)
+}
+
+func (h *Handler) PreviewDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	ds, err := h.dataSources.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "data source not found")
+	}
+	if err != nil {
+		return h.internalErr("get data source", err)
+	}
+
+	var columns []string
+	if err := json.Unmarshal([]byte(ds.Columns), &columns); err != nil {
+		// Legacy format: comma-separated string (from older YAML imports)
+		if ds.Columns != "" {
+			columns = strings.Split(ds.Columns, ",")
+		}
+	}
+	var rows []map[string]string
+	_ = json.Unmarshal([]byte(ds.Rows), &rows)
+
+	// Limit preview to first 10 rows
+	previewRows := rows
+	if len(rows) > 10 {
+		previewRows = rows[:10]
+	}
+
+	return dto.OK(dto.DataSourcePreviewDTO{
+		ID:        ds.ID,
+		SceneID:   ds.SceneID,
+		Name:      ds.Name,
+		FileName:  ds.FileName,
+		Columns:   columns,
+		RowCount:  ds.RowCount,
+		Rows:      previewRows,
+		CreatedAt: ds.CreatedAt,
+		UpdatedAt: ds.UpdatedAt,
+	})
+}
+
+func (h *Handler) UpdateDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.UpdateDataSourceRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+	if req.Content == "" {
+		return dto.ErrorResp(400, "content is required")
+	}
+
+	existing, err := h.dataSources.GetByID(r.Context(), req.ID)
+	if err == sql.ErrNoRows {
+		return dto.ErrorResp(404, "data source not found")
+	}
+	if err != nil {
+		return h.internalErr("get data source", err)
+	}
+
+	// Parse the updated CSV content
+	columns, rows, removedEmptyRows, err := runner.ParseCSV(existing.FileName, strings.NewReader(req.Content))
+	if err != nil {
+		return dto.ErrorResp(400, fmt.Sprintf("parse csv: %v", err))
+	}
+
+	// Update the existing record in-place, preserving its source (yaml/csv)
+	columnsJSON, _ := json.Marshal(columns)
+	rowsJSON, _ := json.Marshal(rows)
+	existing.Columns = string(columnsJSON)
+	existing.Rows = string(rowsJSON)
+	existing.RowCount = len(rows)
+
+	if err := h.dataSources.Update(r.Context(), existing); err != nil {
+		return h.internalErr("update data source", err)
+	}
+
+	return dto.OK(dto.DataSourceDTO{
+		ID:               existing.ID,
+		SceneID:          existing.SceneID,
+		Name:             existing.Name,
+		FileName:         existing.FileName,
+		Columns:          columns,
+		RowCount:         existing.RowCount,
+		Source:           existing.Source,
+		RemovedEmptyRows: removedEmptyRows,
+		CreatedAt:        existing.CreatedAt,
+		UpdatedAt:        existing.UpdatedAt,
+	})
+}
+
+func (h *Handler) DeleteDataSource(r *http.Request) dto.Response {
+	req, err := decode[dto.IDRequest](r)
+	if err != nil {
+		return dto.ErrorResp(400, err.Error())
+	}
+	if req.ID == 0 {
+		return dto.ErrorResp(400, "id is required")
+	}
+
+	if err := h.dataSources.Delete(r.Context(), req.ID); err != nil {
+		return h.internalErr("delete data source", err)
+	}
+	return dto.OK(nil)
+}
+
+>>>>>>> dev
 // --- Plugin Handlers ---
 
 func (h *Handler) ListPlugins(r *http.Request) dto.Response {
@@ -666,7 +1671,11 @@ func (h *Handler) ListPlugins(r *http.Request) dto.Response {
 		Limit:   100,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list plugins: %v", err))
+=======
+		return h.internalErr("list plugins", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.PluginConfigDTO, 0, len(plugins))
@@ -703,7 +1712,11 @@ func (h *Handler) UpdatePluginConfig(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "plugin config not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get plugin config: %v", err))
+=======
+		return h.internalErr("get plugin config", err)
+>>>>>>> dev
 	}
 
 	if req.Name != "" {
@@ -726,7 +1739,11 @@ func (h *Handler) UpdatePluginConfig(r *http.Request) dto.Response {
 	}
 
 	if err := h.plugins.Update(r.Context(), pc); err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("update plugin config: %v", err))
+=======
+		return h.internalErr("update plugin config", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toPluginConfigDTO(pc))
@@ -752,6 +1769,7 @@ func (h *Handler) ListReports(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list reports: %v", err))
 	}
 
@@ -761,6 +1779,17 @@ func (h *Handler) ListReports(r *http.Request) dto.Response {
 	}
 
 	return dto.OK(dto.ListResponse[[]dto.ReportDTO]{
+=======
+		return h.internalErr("list reports", err)
+	}
+
+	items := make([]dto.ReportListItemDTO, 0, len(reports))
+	for _, rp := range reports {
+		items = append(items, toReportListItemDTO(rp))
+	}
+
+	return dto.OK(dto.ListResponse[[]dto.ReportListItemDTO]{
+>>>>>>> dev
 		Items: items,
 		Pagination: dto.Pagination{
 			Offset: req.Offset,
@@ -784,7 +1813,11 @@ func (h *Handler) GetReport(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "report not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get report: %v", err))
+=======
+		return h.internalErr("get report", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toReportDTO(report))
@@ -890,7 +1923,11 @@ func generateReportFilename(sceneID snowflake.ID) string {
 		last8 = sceneStr
 	}
 	now := time.Now()
+<<<<<<< HEAD
 	return fmt.Sprintf("report-%s-%s-%s", last8, now.Format("20060102"), now.Format("150405"))
+=======
+	return fmt.Sprintf("salvo-report-%s-%s-%s", last8, now.Format("20060102"), now.Format("150405"))
+>>>>>>> dev
 }
 
 // --- RunRecord Handlers ---
@@ -913,7 +1950,11 @@ func (h *Handler) ListRunRecords(r *http.Request) dto.Response {
 		Limit:   limit,
 	})
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("list run records: %v", err))
+=======
+		return h.internalErr("list run records", err)
+>>>>>>> dev
 	}
 
 	items := make([]dto.RunRecordDTO, 0, len(runs))
@@ -968,7 +2009,11 @@ func (h *Handler) GetRunRecord(r *http.Request) dto.Response {
 		return dto.ErrorResp(404, "run record not found")
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return dto.ErrorResp(500, fmt.Sprintf("get run record: %v", err))
+=======
+		return h.internalErr("get run record", err)
+>>>>>>> dev
 	}
 
 	return dto.OK(toRunRecordDTO(run))
@@ -978,6 +2023,7 @@ func (h *Handler) GetRunRecord(r *http.Request) dto.Response {
 
 func toSceneDTO(s *model.Scene) dto.SceneDTO {
 	return dto.SceneDTO{
+<<<<<<< HEAD
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,
@@ -987,11 +2033,26 @@ func toSceneDTO(s *model.Scene) dto.SceneDTO {
 		Status:      s.Status,
 		CreatedAt:   s.CreatedAt,
 		UpdatedAt:   s.UpdatedAt,
+=======
+		ID:             s.ID,
+		Name:           s.Name,
+		Description:    s.Description,
+		DAGJSON:        s.DAGJSON,
+		Variables:      s.Variables,
+		ConfigParams:   s.ConfigParams,
+		DerivedParams:  s.DerivedParams,
+		Plugins:        s.Plugins,
+		Status:         s.Status,
+		DefaultTimeout: s.DefaultTimeout,
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      s.UpdatedAt,
+>>>>>>> dev
 	}
 }
 
 func toNodeDTO(n *model.Node) dto.NodeDTO {
 	return dto.NodeDTO{
+<<<<<<< HEAD
 		ID:        n.ID,
 		SceneID:   n.SceneID,
 		Name:      n.Name,
@@ -1001,6 +2062,19 @@ func toNodeDTO(n *model.Node) dto.NodeDTO {
 		LoopCount: n.LoopCount,
 		CreatedAt: n.CreatedAt,
 		UpdatedAt: n.UpdatedAt,
+=======
+		ID:           n.ID,
+		SceneID:      n.SceneID,
+		Name:         n.Name,
+		Type:         n.Type,
+		Config:       n.Config,
+		Position:     n.Position,
+		LoopCount:    n.LoopCount,
+		BlockOnError: n.BlockOnError,
+		Lifecycle:    n.Lifecycle,
+		CreatedAt:    n.CreatedAt,
+		UpdatedAt:    n.UpdatedAt,
+>>>>>>> dev
 	}
 }
 
@@ -1059,9 +2133,30 @@ func toReportDTO(rp *model.Report) dto.ReportDTO {
 	}
 }
 
+<<<<<<< HEAD
 func toRunRecordDTO(rr *model.RunRecord) dto.RunRecordDTO {
 	return dto.RunRecordDTO{
 		ID:          rr.ID,
+=======
+func toReportListItemDTO(rp *model.Report) dto.ReportListItemDTO {
+	return dto.ReportListItemDTO{
+		ID:         rp.ID,
+		SceneID:    rp.SceneID,
+		RunID:      rp.RunID,
+		Status:     rp.Status,
+		Summary:    rp.Summary,
+		StartedAt:  rp.StartedAt,
+		FinishedAt: rp.FinishedAt,
+		CreatedAt:  rp.CreatedAt,
+		UpdatedAt:  rp.UpdatedAt,
+	}
+}
+
+func toRunRecordDTO(rr *model.RunRecord) dto.RunRecordDTO {
+	return dto.RunRecordDTO{
+		ID:          rr.ID,
+		RunID:       rr.RunID,
+>>>>>>> dev
 		SceneID:     rr.SceneID,
 		Status:      rr.Status,
 		WorkerCount: rr.WorkerCount,
@@ -1101,11 +2196,61 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 		offset = 0
 	}
 
+<<<<<<< HEAD
 	var traces []*tracelib.Trace
 	if req.SceneID != 0 {
 		traces = h.tracer.ListByScene(req.SceneID, limit, offset)
 	} else {
 		traces = h.tracer.List(limit, offset)
+=======
+	// Build the combined (AND) filter and validate the request fields.
+	filter := tracestore.TraceFilter{
+		SceneID:   req.SceneID,
+		SceneName: req.SceneName,
+	}
+	if req.TraceID != "" {
+		if _, err := strconv.ParseInt(req.TraceID, 10, 64); err != nil {
+			return dto.ErrorResp(400, "TraceID/RunID 必须为数字")
+		}
+		filter.TraceID = req.TraceID
+	}
+	if req.Status != "" {
+		switch req.Status {
+		case string(tracelib.SpanStatusOK), string(tracelib.SpanStatusError),
+			string(tracelib.SpanStatusSkip), string(tracelib.SpanStatusCanceled):
+			filter.Status = req.Status
+		default:
+			return dto.ErrorResp(400, "无效的状态值")
+		}
+	}
+	if req.MinDurationMs != nil && *req.MinDurationMs < 0 {
+		return dto.ErrorResp(400, "耗时不能为负数")
+	}
+	if req.MaxDurationMs != nil && *req.MaxDurationMs < 0 {
+		return dto.ErrorResp(400, "耗时不能为负数")
+	}
+	if req.MinDurationMs != nil {
+		filter.MinDuration = time.Duration(*req.MinDurationMs * float64(time.Millisecond))
+	}
+	if req.MaxDurationMs != nil {
+		filter.MaxDuration = time.Duration(*req.MaxDurationMs * float64(time.Millisecond))
+	}
+	if filter.MinDuration > 0 && filter.MaxDuration > 0 && filter.MinDuration > filter.MaxDuration {
+		return dto.ErrorResp(400, "最小耗时不能大于最大耗时")
+	}
+
+	// Query from SQLite for full history instead of in-memory buffer (capped at 1000).
+	traces, err := h.traceStore.ListTraces(r.Context(), filter, limit, offset)
+	if err != nil {
+		h.log.Error("failed to list traces from db", logger.F("error", err))
+		return dto.ErrorResp(500, "failed to list traces")
+	}
+
+	total, err := h.traceStore.CountTraces(r.Context(), filter)
+	if err != nil {
+		h.log.Error("failed to count traces from db", logger.F("error", err))
+		return dto.ErrorResp(500, "failed to count traces")
+>>>>>>> dev
 	}
 
 	items := make([]dto.TraceDTO, 0, len(traces))
@@ -1116,7 +2261,11 @@ func (h *Handler) ListTraces(r *http.Request) dto.Response {
 	return dto.OK(dto.ListResponse[[]dto.TraceDTO]{
 		Items: items,
 		Pagination: dto.Pagination{
+<<<<<<< HEAD
 			Total:  h.tracer.Total(),
+=======
+			Total:  total,
+>>>>>>> dev
 			Limit:  limit,
 			Offset: offset,
 		},
@@ -1178,7 +2327,11 @@ func (h *Handler) resolveTraceNames(ctx context.Context, sceneID snowflake.ID, t
 	}
 
 	nodeNameMap := make(map[string]string)
+<<<<<<< HEAD
 	for _, sp := range tr.Spans {
+=======
+	for _, sp := range tr.SnapshotSpans() {
+>>>>>>> dev
 		if _, exists := nodeNameMap[sp.NodeID]; exists {
 			continue
 		}
@@ -1194,8 +2347,14 @@ func (h *Handler) resolveTraceNames(ctx context.Context, sceneID snowflake.ID, t
 }
 
 func toTraceDTO(tr *tracelib.Trace, sceneName string, nodeNameMap map[string]string) dto.TraceDTO {
+<<<<<<< HEAD
 	spans := make([]dto.SpanDTO, 0, len(tr.Spans))
 	for _, sp := range tr.Spans {
+=======
+	snapSpans := tr.SnapshotSpans()
+	spans := make([]dto.SpanDTO, 0, len(snapSpans))
+	for _, sp := range snapSpans {
+>>>>>>> dev
 		spans = append(spans, dto.SpanDTO{
 			ID:           sp.ID,
 			TraceID:      sp.TraceID,
@@ -1260,11 +2419,20 @@ func (h *Handler) StartScene(r *http.Request) dto.Response {
 	}
 
 	cfg := runner.Config{
+<<<<<<< HEAD
 		SceneID:   req.SceneID,
 		Workers:   workers,
 		RunMode:   runMode,
 		Count:     req.Count,
 		Variables: mergedVars,
+=======
+		SceneID:             req.SceneID,
+		Workers:             workers,
+		RunMode:             runMode,
+		Count:               req.Count,
+		Variables:           mergedVars,
+		EnableSystemMetrics: true,
+>>>>>>> dev
 	}
 
 	if req.Duration > 0 {
@@ -1280,6 +2448,15 @@ func (h *Handler) StartScene(r *http.Request) dto.Response {
 
 	rn, err := h.runnerMgr.Start(r.Context(), cfg)
 	if err != nil {
+<<<<<<< HEAD
+=======
+		h.log.Error("failed to start scene",
+			logger.F("scene_id", req.SceneID.String()),
+			logger.F("workers", workers),
+			logger.F("run_mode", runMode),
+			logger.F("error", err),
+		)
+>>>>>>> dev
 		return dto.ErrorResp(400, err.Error())
 	}
 
@@ -1354,8 +2531,36 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			logger.F("scene_id", sceneID))
 	}
 
+<<<<<<< HEAD
 	filter := repo.Filter{Limit: 50}
 	if sceneID > 0 {
+=======
+	// If run_id is specified, fetch only that specific run
+	var targetRun *model.RunRecord
+	if req.RunID != "" {
+		runID, err := strconv.ParseInt(req.RunID, 10, 64)
+		if err != nil {
+			return dto.ErrorResp(400, "invalid run_id")
+		}
+		targetRun, err = h.runs.GetByID(r.Context(), snowflake.ID(runID))
+		if err != nil {
+			return dto.ErrorResp(404, "run not found")
+		}
+		// Override scene_id from the run record
+		sceneID = targetRun.SceneID.Int64()
+		// Set range based on this run's duration
+		if targetRun.Duration > 0 {
+			rangeSeconds = int(targetRun.Duration) + 300
+		}
+	}
+
+	// Only filter runs by scene when the caller explicitly passed scene_id.
+	// When a specific run is selected, its scene must NOT filter the runs
+	// query: recent_runs feeds the run selector dropdown and must list runs
+	// from ALL scenes so the user can switch between them.
+	filter := repo.Filter{Limit: 50}
+	if req.SceneID != "" && sceneID > 0 {
+>>>>>>> dev
 		filter.SceneID = snowflake.ID(sceneID)
 	}
 
@@ -1364,7 +2569,28 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		return dto.ErrorResp(500, "failed to list runs")
 	}
 
+<<<<<<< HEAD
 	if sceneID > 0 && len(runRecords) > 0 {
+=======
+	// Fallback: if no runs found and no scene_id specified, get the most recent run
+	if len(runRecords) == 0 && sceneID == 0 && req.RunID == "" {
+		filter = repo.Filter{Limit: 1}
+		runRecords, err = h.runs.List(r.Context(), filter)
+		if err != nil {
+			return dto.ErrorResp(500, "failed to list runs")
+		}
+	}
+
+	if len(runRecords) == 0 && sceneID > 0 {
+		h.log.Warn("no run records found for scene in DashboardOverview",
+			logger.F("scene_id", sceneID))
+	}
+
+	// Scene range widening only applies to explicit scene mode; with a
+	// selected run, runRecords spans all scenes and rangeSeconds is already
+	// derived from the run's duration above.
+	if req.SceneID != "" && len(runRecords) > 0 {
+>>>>>>> dev
 		var earliest, latest time.Time
 		for _, rr := range runRecords {
 			if rr.StartedAt != nil && (earliest.IsZero() || rr.StartedAt.Before(earliest)) {
@@ -1400,6 +2626,10 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	h.log.Debug("DashboardOverview debug",
 		logger.F("scene_id", sceneID),
+<<<<<<< HEAD
+=======
+		logger.F("run_id", req.RunID),
+>>>>>>> dev
 		logger.F("run_records_count", len(runRecords)),
 		logger.F("running_map_count", len(runningMap)))
 
@@ -1416,7 +2646,24 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 
 	cutoff := time.Now().Add(-time.Duration(rangeSeconds) * time.Second)
 
+<<<<<<< HEAD
 	for _, rr := range runRecords {
+=======
+	// Pre-populate recentRuns with all runs (for dropdown selection).
+	// When a specific run is selected, the main loop below only aggregates
+	// data for that run, but recentRuns still lists all runs so the user
+	// can switch between them in the dashboard dropdown.
+	for _, rr := range runRecords {
+		recentRuns = append(recentRuns, toRunRecordDTO(rr))
+	}
+
+	for _, rr := range runRecords {
+		// If targetRun is specified, only process that specific run
+		if targetRun != nil && rr.ID != targetRun.ID {
+			continue
+		}
+
+>>>>>>> dev
 		dtoRR := toRunRecordDTO(rr)
 
 		if rr.Status == "running" {
@@ -1427,10 +2674,19 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 				liveSuccess := st.SuccessReqs.Load()
 				liveFailed := st.FailedReqs.Load()
 
+<<<<<<< HEAD
 				if liveTotal > 0 || rnStatus == "running" {
 					if rnStatus == "running" {
 						running++
 					}
+=======
+				// Only use live stats when the runner is still actively running.
+				// When the runner has stopped (done/canceled/failed), fall through
+				// to use the stored run_record values to avoid latency fluctuations
+				// from in-flight requests completing after stop.
+				if rnStatus == "running" {
+					running++
+>>>>>>> dev
 
 					totalReqs += liveTotal
 					successReqs += liveSuccess
@@ -1556,10 +2812,29 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 			}
 		}
 
+<<<<<<< HEAD
 		recentRuns = append(recentRuns, dtoRR)
 		if rr.StartedAt != nil && rr.StartedAt.After(cutoff) {
 			seriesRuns = append(seriesRuns, dtoRR)
 		} else if rr.FinishedAt != nil && rr.FinishedAt.After(cutoff) {
+=======
+		// Update the pre-populated recentRuns entry with aggregated data
+		for i := range recentRuns {
+			if recentRuns[i].ID == dtoRR.ID {
+				recentRuns[i] = dtoRR
+				break
+			}
+		}
+		// A selected run must always drive the time series, even when it
+		// ended long ago — the cutoff only bounds the no-selection recent
+		// window. Without this, an old selected run falls through to the
+		// recentRuns fallback below, which mixes runs from other scenes
+		// into one chart window (e.g. a multi-day span with time-only
+		// bucket labels).
+		inWindow := (rr.StartedAt != nil && rr.StartedAt.After(cutoff)) ||
+			(rr.FinishedAt != nil && rr.FinishedAt.After(cutoff))
+		if targetRun != nil || inWindow {
+>>>>>>> dev
 			seriesRuns = append(seriesRuns, dtoRR)
 		}
 	}
@@ -1610,9 +2885,204 @@ func (h *Handler) DashboardOverview(r *http.Request) dto.Response {
 		response.SceneID = sceneID
 	}
 
+<<<<<<< HEAD
 	return dto.OK(response)
 }
 
+=======
+	if sceneID > 0 {
+		if rn, ok := runningMap[strconv.FormatInt(sceneID, 10)]; ok {
+			if httpOnlySamples := rn.HttpOnlyGlobalTimeSeries(); len(httpOnlySamples) > 0 {
+				response.HttpOnlyTimeSeries = h.samplesToTimeSeriesDTO(httpOnlySamples)
+			}
+		}
+	}
+	// If the scene is not running, fall back to the completed report of the
+	// selected run (or the latest run when no specific run is selected).
+	if sceneID > 0 {
+		rn, sceneIsRunning := runningMap[strconv.FormatInt(sceneID, 10)]
+		// Use live metrics only when the selected run is the running one.
+		// Otherwise the user selected an older completed run and we must
+		// load that run's report from the DB instead of live data.
+		selectedRunIsRunning := targetRun == nil || targetRun.Status == "running"
+		if sceneIsRunning && selectedRunIsRunning {
+			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
+				last := snapshots[len(snapshots)-1]
+				response.SystemMetrics = &dto.RuntimeMetricsDTO{
+					GoroutineCount:  last.GoroutineCount,
+					HeapAllocMB:     last.HeapAllocMB,
+					HeapSysMB:       last.HeapSysMB,
+					CPUUsagePercent: last.CPUUsagePercent,
+					RSSMemoryMB:     last.RSSMemoryMB,
+					ActiveWorkers:   last.ActiveWorkers,
+					PendingQueueLen: last.PendingQueueLen,
+					TaskWaitP50Ms:   last.TaskWaitP50Ms,
+					TaskWaitP95Ms:   last.TaskWaitP95Ms,
+					TaskWaitP99Ms:   last.TaskWaitP99Ms,
+					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
+				}
+				// Return the live time series so the frontend can render charts
+				// immediately instead of accumulating one point per poll.
+				// Cap to the most recent 300 snapshots (2s sampling = ~10min
+				// window) to keep the payload bounded for long-running tests.
+				series := snapshots
+				if len(series) > 300 {
+					series = series[len(series)-300:]
+				}
+				for _, snap := range series {
+					response.SystemMetricsTimeSeries = append(response.SystemMetricsTimeSeries, dto.RuntimeMetricsDTO{
+						Timestamp:       snap.Timestamp.Format(time.RFC3339),
+						GoroutineCount:  snap.GoroutineCount,
+						HeapAllocMB:     snap.HeapAllocMB,
+						HeapSysMB:       snap.HeapSysMB,
+						CPUUsagePercent: snap.CPUUsagePercent,
+						RSSMemoryMB:     snap.RSSMemoryMB,
+						ActiveWorkers:   snap.ActiveWorkers,
+						PendingQueueLen: snap.PendingQueueLen,
+						TaskWaitP50Ms:   snap.TaskWaitP50Ms,
+						TaskWaitP95Ms:   snap.TaskWaitP95Ms,
+						TaskWaitP99Ms:   snap.TaskWaitP99Ms,
+						GCPauseLastMs:   float64(snap.GCPauseLastNs) / 1e6,
+					})
+				}
+			}
+		} else {
+			var dbRunID snowflake.ID
+			if targetRun != nil {
+				dbRunID = targetRun.ID
+			}
+			response.SystemMetrics, response.SystemMetricsTimeSeries = h.loadSystemMetricsFromDB(r.Context(), snowflake.ID(sceneID), dbRunID)
+		}
+	} else if len(runningMap) > 0 {
+		for _, rn := range runningMap {
+			if snapshots := rn.RuntimeMetricsSnapshots(); len(snapshots) > 0 {
+				last := snapshots[len(snapshots)-1]
+				response.SystemMetrics = &dto.RuntimeMetricsDTO{
+					GoroutineCount:  last.GoroutineCount,
+					HeapAllocMB:     last.HeapAllocMB,
+					HeapSysMB:       last.HeapSysMB,
+					CPUUsagePercent: last.CPUUsagePercent,
+					RSSMemoryMB:     last.RSSMemoryMB,
+					ActiveWorkers:   last.ActiveWorkers,
+					PendingQueueLen: last.PendingQueueLen,
+					TaskWaitP50Ms:   last.TaskWaitP50Ms,
+					TaskWaitP95Ms:   last.TaskWaitP95Ms,
+					TaskWaitP99Ms:   last.TaskWaitP99Ms,
+					GCPauseLastMs:   float64(last.GCPauseLastNs) / 1e6,
+				}
+			}
+			break
+		}
+	}
+
+	return dto.OK(response)
+}
+
+// loadSystemMetricsFromDB loads system metrics from the persisted report.
+// When runID > 0 it loads that specific run's report; otherwise it falls back
+// to the latest run of the scene.
+func (h *Handler) loadSystemMetricsFromDB(ctx context.Context, sceneID snowflake.ID, runID snowflake.ID) (*dto.RuntimeMetricsDTO, []dto.RuntimeMetricsDTO) {
+	var latestRR *model.RunRecord
+	if runID > 0 {
+		rr, err := h.runs.GetByID(ctx, runID)
+		if err != nil || rr == nil || rr.ID == 0 {
+			return nil, nil
+		}
+		latestRR = rr
+	} else {
+		filter := repo.Filter{SceneID: sceneID, Limit: 1}
+		runRecords, err := h.runs.List(ctx, filter)
+		if err != nil || len(runRecords) == 0 {
+			return nil, nil
+		}
+		latestRR = runRecords[0]
+	}
+	if latestRR.ID == 0 {
+		return nil, nil
+	}
+	report, err := h.reports.GetByRunID(ctx, latestRR.ID)
+	if err != nil || report == nil || report.Detail == "" || report.Detail == "{}" {
+		return nil, nil
+	}
+	var detail struct {
+		SystemMetrics *struct {
+			TimeSeries []struct {
+				Timestamp       string  `json:"timestamp"`
+				GoroutineCount  int64   `json:"goroutine_count"`
+				HeapAllocMB     float64 `json:"heap_alloc_mb"`
+				HeapSysMB       float64 `json:"heap_sys_mb"`
+				CPUUsagePercent float64 `json:"cpu_percent"`
+				RSSMemoryMB     float64 `json:"rss_mb"`
+				ActiveWorkers   int     `json:"active_workers"`
+				PendingQueueLen int     `json:"pending_queue_len"`
+				TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
+				TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
+				TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
+				GCPauseLastNs   uint64  `json:"gc_pause_last_ns"`
+			} `json:"time_series,omitempty"`
+			Summary struct {
+				GoroutineMax     float64 `json:"goroutine_max"`
+				GoroutineAvg     float64 `json:"goroutine_avg"`
+				HeapAllocMaxMB   float64 `json:"heap_alloc_max_mb"`
+				HeapAllocAvgMB   float64 `json:"heap_alloc_avg_mb"`
+				CPUMax           float64 `json:"cpu_max"`
+				CPUAvg           float64 `json:"cpu_avg"`
+				TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+				TaskWaitP50MaxMs float64 `json:"task_wait_p50_max_ms"`
+				TaskWaitP95MaxMs float64 `json:"task_wait_p95_max_ms"`
+				TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+				GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
+				PendingQueueMax  float64 `json:"pending_queue_max"`
+				PendingQueueAvg  float64 `json:"pending_queue_avg"`
+				ActiveWorkersMax float64 `json:"active_workers_max"`
+				ActiveWorkersAvg float64 `json:"active_workers_avg"`
+			} `json:"summary"`
+		} `json:"system_metrics,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(report.Detail), &detail); err != nil {
+		return nil, nil
+	}
+	sm := detail.SystemMetrics
+	if sm == nil {
+		return nil, nil
+	}
+
+	snapshot := &dto.RuntimeMetricsDTO{
+		GoroutineCount:  int64(sm.Summary.GoroutineMax),
+		HeapAllocMB:     sm.Summary.HeapAllocMaxMB,
+		HeapSysMB:       0,
+		CPUUsagePercent: sm.Summary.CPUMax,
+		RSSMemoryMB:     0,
+		ActiveWorkers:   int(sm.Summary.ActiveWorkersMax),
+		PendingQueueLen: int(sm.Summary.PendingQueueMax),
+		TaskWaitP50Ms:   sm.Summary.TaskWaitP50MaxMs,
+		TaskWaitP95Ms:   sm.Summary.TaskWaitP95MaxMs,
+		TaskWaitP99Ms:   sm.Summary.TaskWaitP99MaxMs,
+		GCPauseLastMs:   sm.Summary.GCPauseTotalMs,
+	}
+
+	var timeSeries []dto.RuntimeMetricsDTO
+	for _, ts := range sm.TimeSeries {
+		timeSeries = append(timeSeries, dto.RuntimeMetricsDTO{
+			Timestamp:       ts.Timestamp,
+			GoroutineCount:  ts.GoroutineCount,
+			HeapAllocMB:     ts.HeapAllocMB,
+			HeapSysMB:       ts.HeapSysMB,
+			CPUUsagePercent: ts.CPUUsagePercent,
+			RSSMemoryMB:     ts.RSSMemoryMB,
+			ActiveWorkers:   ts.ActiveWorkers,
+			PendingQueueLen: ts.PendingQueueLen,
+			TaskWaitP50Ms:   ts.TaskWaitP50Ms,
+			TaskWaitP95Ms:   ts.TaskWaitP95Ms,
+			TaskWaitP99Ms:   ts.TaskWaitP99Ms,
+			GCPauseLastMs:   float64(ts.GCPauseLastNs) / 1e6,
+		})
+	}
+
+	return snapshot, timeSeries
+}
+
+>>>>>>> dev
 func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 	req, err := decode[dto.DashboardHistoryRequest](r)
 	if err != nil {
@@ -1624,6 +3094,7 @@ func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 		limit = 20
 	}
 
+<<<<<<< HEAD
 	filter := repo.Filter{Limit: limit}
 	if req.SceneID > 0 {
 		filter.SceneID = snowflake.ID(req.SceneID)
@@ -1632,6 +3103,33 @@ func (h *Handler) DashboardHistory(r *http.Request) dto.Response {
 	runRecords, err := h.runs.List(r.Context(), filter)
 	if err != nil {
 		return dto.ErrorResp(500, "failed to list runs")
+=======
+	var runRecords []*model.RunRecord
+	if req.RunID != "" {
+		runID, parseErr := strconv.ParseInt(req.RunID, 10, 64)
+		if parseErr != nil {
+			return dto.ErrorResp(400, "invalid run_id")
+		}
+		rr, getErr := h.runs.GetByID(r.Context(), snowflake.ID(runID))
+		if getErr != nil {
+			return dto.ErrorResp(404, "run not found")
+		}
+		runRecords = []*model.RunRecord{rr}
+	} else {
+		filter := repo.Filter{Limit: limit}
+		if req.SceneID != "" {
+			sceneID, parseErr := strconv.ParseInt(req.SceneID, 10, 64)
+			if parseErr != nil {
+				return dto.ErrorResp(400, "invalid scene_id")
+			}
+			filter.SceneID = snowflake.ID(sceneID)
+		}
+
+		runRecords, err = h.runs.List(r.Context(), filter)
+		if err != nil {
+			return dto.ErrorResp(500, "failed to list runs")
+		}
+>>>>>>> dev
 	}
 
 	var history []dto.RunHistoryDTO
@@ -1843,12 +3341,22 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 
 		var allDurs []float64
 		for _, s := range spans {
+<<<<<<< HEAD
 			dur := s.duration
 			// Ensure minimum delay of 30ms (0.03 seconds) to match mock server behavior
 			if dur < 0.03 {
 				dur = 0.03 + rand.Float64()*0.17 // 30-200ms range
 			}
 			allDurs = append(allDurs, dur)
+=======
+			// Skip spans are not real requests — they represent nodes that
+			// were never executed (e.g. downstream of a failed parent).
+			// Exclude them from totals, latency, and QPS calculations.
+			if s.status == "skip" {
+				continue
+			}
+			allDurs = append(allDurs, s.duration)
+>>>>>>> dev
 			nm.TotalReqs++
 			if s.status == "ok" {
 				nm.SuccessReqs++
@@ -1876,6 +3384,12 @@ func (h *Handler) aggregateNodeMetrics(r *http.Request) []dto.NodeMetricDTO {
 			}
 
 			for _, s := range spans {
+<<<<<<< HEAD
+=======
+				if s.status == "skip" {
+					continue
+				}
+>>>>>>> dev
 				idx := int(s.startedAt.Sub(globalStart) / bucketSize)
 				if idx < 0 {
 					idx = 0
@@ -2019,11 +3533,18 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 
 		var allDurs []float64
 		for _, s := range spans {
+<<<<<<< HEAD
 			dur := s.duration
 			if dur < 0.03 {
 				dur = 0.03 + rand.Float64()*0.17
 			}
 			allDurs = append(allDurs, dur)
+=======
+			if s.status == "skip" {
+				continue
+			}
+			allDurs = append(allDurs, s.duration)
+>>>>>>> dev
 			nm.TotalReqs++
 			if s.status == "ok" {
 				nm.SuccessReqs++
@@ -2051,6 +3572,12 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 			}
 
 			for _, s := range spans {
+<<<<<<< HEAD
+=======
+				if s.status == "skip" {
+					continue
+				}
+>>>>>>> dev
 				idx := int(s.startedAt.Sub(globalStart) / bucketSize)
 				if idx < 0 {
 					idx = 0
@@ -2101,6 +3628,90 @@ func (h *Handler) aggregateNodeMetricsWithSceneID(r *http.Request, sceneID int64
 		result = append(result, nm)
 	}
 
+<<<<<<< HEAD
+=======
+	// --- Report Fallback: supplement Group child nodes missing from tracer spans ---
+	// Group child nodes execute via executeGroup() directly, bypassing DAG executor's span recording.
+	// Their metrics exist in r.nodeStats (HTML report) but not in tracer spans (Dashboard).
+	// Fallback: query latest completed run's report detail for missing nodes.
+	tracerNodeSet := make(map[string]bool, len(nodeIDs))
+	for _, id := range nodeIDs {
+		tracerNodeSet[id] = true
+	}
+
+	if sceneID > 0 {
+		if reports, rptErr := h.reports.List(r.Context(), repo.Filter{SceneID: snowflake.ID(sceneID), Limit: 1}); rptErr == nil && len(reports) > 0 {
+			latestReport := reports[0]
+			if latestReport.Detail != "" && latestReport.Detail != "{}" {
+				var rptDetail struct {
+					Metadata struct {
+						StartedAt  string  `json:"started_at"`
+						FinishedAt string  `json:"finished_at"`
+						Duration   float64 `json:"duration_sec"`
+					} `json:"metadata"`
+					NodeMetrics []struct {
+						NodeID   string `json:"node_id"`
+						NodeName string `json:"node_name"`
+						NodeType string `json:"node_type,omitempty"`
+						Summary  struct {
+							TotalRequests int64   `json:"total_requests"`
+							SuccessCount  int64   `json:"success_count"`
+							FailCount     int64   `json:"fail_count"`
+							SuccessRate   float64 `json:"success_rate"`
+							AvgLatencyMs  float64 `json:"avg_latency_ms"`
+							P50LatencyMs  float64 `json:"p50_latency_ms"`
+							P95LatencyMs  float64 `json:"p95_latency_ms"`
+							P99LatencyMs  float64 `json:"p99_latency_ms"`
+							MaxLatencyMs  float64 `json:"max_latency_ms"`
+							MinLatencyMs  float64 `json:"min_latency_ms"`
+						} `json:"summary"`
+					} `json:"node_metrics"`
+				}
+				if json.Unmarshal([]byte(latestReport.Detail), &rptDetail) == nil {
+					runDurSec := rptDetail.Metadata.Duration
+					if runDurSec <= 0 {
+						runDurSec = totalDur.Seconds()
+					}
+					for _, nm := range rptDetail.NodeMetrics {
+						if tracerNodeSet[nm.NodeID] {
+							continue // already in tracer data
+						}
+						avgQPS := float64(0)
+						if runDurSec > 0 && nm.Summary.TotalRequests > 0 {
+							avgQPS = float64(nm.Summary.TotalRequests) / runDurSec
+						}
+						supplement := dto.NodeMetricDTO{
+							NodeID:      nm.NodeID,
+							Name:        nm.NodeName,
+							Type:        nm.NodeType,
+							SortOrder:   orderMap[nm.NodeID],
+							TotalReqs:   nm.Summary.TotalRequests,
+							SuccessReqs: nm.Summary.SuccessCount,
+							AvgLatency:  nm.Summary.AvgLatencyMs,
+							P50Latency:  nm.Summary.P50LatencyMs,
+							P95Latency:  nm.Summary.P95LatencyMs,
+							P99Latency:  nm.Summary.P99LatencyMs,
+							Timestamps:  []string{},
+							TSP50:       []float64{},
+							TSP95:       []float64{},
+							TSP99:       []float64{},
+							TSAvg:       []float64{},
+							TSQPS:       []float64{avgQPS},
+						}
+						if supplement.Name == "" {
+							supplement.Name = nm.NodeID
+						}
+						if supplement.Type == "" {
+							supplement.Type = "http"
+						}
+						result = append(result, supplement)
+					}
+				}
+			}
+		}
+	}
+
+>>>>>>> dev
 	sort.Slice(result, func(i, j int) bool { return result[i].SortOrder < result[j].SortOrder })
 	return result
 }
@@ -2203,6 +3814,18 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 	points := min(rangeSeconds, 120)
 	interval := float64(rangeSeconds) / float64(points)
 
+<<<<<<< HEAD
+=======
+	// Check if any run is still running
+	hasRunning := false
+	for _, run := range runs {
+		if run.Status == "running" {
+			hasRunning = true
+			break
+		}
+	}
+
+>>>>>>> dev
 	now := time.Now()
 	timestamps := make([]string, points)
 	qps := make([]float64, points)
@@ -2245,6 +3868,20 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 		}
 	}
 
+<<<<<<< HEAD
+=======
+	// Trim trailing zero-value buckets.
+	// Running tests: trim all trailing zeros (chart ends at last data point).
+	// Finished tests: keep last 10 seconds of zeros (show curve dropping to zero).
+	n := trimTrailingZeros(!hasRunning, qps, p50, p95, p99, errRate)
+	timestamps = timestamps[:n]
+	qps = qps[:n]
+	p50 = p50[:n]
+	p95 = p95[:n]
+	p99 = p99[:n]
+	errRate = errRate[:n]
+
+>>>>>>> dev
 	return &dto.TimeSeriesDTO{
 		Timestamps: timestamps,
 		QPS:        qps,
@@ -2255,6 +3892,44 @@ func (h *Handler) buildTimeSeries(runs []dto.RunRecordDTO, rangeSeconds int) *dt
 	}
 }
 
+<<<<<<< HEAD
+=======
+// trimTrailingZeros returns the length after removing trailing entries
+// where ALL metric arrays are zero. Keeps at least 1 entry.
+// When isFinished=true, preserves all entries (including trailing zeros)
+// so the chart can show the curve dropping to zero.
+// When isFinished=false (running test), trims all trailing zeros so the
+// chart ends at the last data point without showing future zero buckets.
+func trimTrailingZeros(isFinished bool, arrays ...[]float64) int {
+	if len(arrays) == 0 || len(arrays[0]) == 0 {
+		return 0
+	}
+
+	// For finished tests, keep all entries (including trailing zeros)
+	// to show the curve dropping to zero
+	if isFinished {
+		return len(arrays[0])
+	}
+
+	// For running tests, trim all trailing zeros
+	n := len(arrays[0])
+	for n > 1 {
+		allZero := true
+		for _, a := range arrays {
+			if a[n-1] != 0 {
+				allZero = false
+				break
+			}
+		}
+		if !allZero {
+			break
+		}
+		n--
+	}
+	return n
+}
+
+>>>>>>> dev
 func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecordDTO, rangeSeconds int) *dto.TimeSeriesDTO {
 	var windowStart, windowEnd time.Time
 	hasRunning := false
@@ -2276,11 +3951,40 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		}
 	}
 
+<<<<<<< HEAD
 	if !hasRunning && !windowStart.IsZero() && !windowEnd.IsZero() {
 		windowStart = windowStart.Add(-time.Minute)
 		windowEnd = windowEnd.Add(time.Minute)
 	} else if hasRunning && !windowStart.IsZero() {
 		windowStart = windowStart.Add(-time.Minute)
+=======
+	var paddingOffset time.Duration
+	paddingOffset = 5 * time.Second
+
+	if !hasRunning && !windowStart.IsZero() && !windowEnd.IsZero() {
+		// Dynamic padding: 10% of test duration, min 10s, max 60s
+		padding := windowEnd.Sub(windowStart) / 10
+		if padding < paddingOffset {
+			padding = paddingOffset
+		}
+		if padding > 1200*time.Second {
+			padding = 1200 * time.Second
+		}
+		windowStart = windowStart.Add(-padding)
+		// For finished tests, add extra 10 seconds after end time
+		// so the chart can show the curve dropping to zero
+		windowEnd = windowEnd.Add(padding + paddingOffset)
+	} else if hasRunning && !windowStart.IsZero() {
+		// For running tests, only pad the start; end is "now"
+		padding := time.Since(windowStart) / 10
+		if padding < paddingOffset {
+			padding = paddingOffset
+		}
+		if padding > 60*time.Second {
+			padding = 60 * time.Second
+		}
+		windowStart = windowStart.Add(-padding)
+>>>>>>> dev
 		windowEnd = time.Now()
 	}
 
@@ -2359,6 +4063,20 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		}
 	}
 
+<<<<<<< HEAD
+=======
+	// Trim trailing zero-value buckets.
+	// Running tests: trim all trailing zeros (chart ends at last data point).
+	// Finished tests: keep last 10 seconds of zeros (show curve dropping to zero).
+	n := trimTrailingZeros(!hasRunning, qps, p50, p95, p99, errRate)
+	timestamps = timestamps[:n]
+	qps = qps[:n]
+	p50 = p50[:n]
+	p95 = p95[:n]
+	p99 = p99[:n]
+	errRate = errRate[:n]
+
+>>>>>>> dev
 	return &dto.TimeSeriesDTO{
 		Timestamps:  timestamps,
 		QPS:         qps,
@@ -2371,3 +4089,40 @@ func (h *Handler) buildTimeSeriesWithDB(ctx context.Context, runs []dto.RunRecor
 		HasRunning:  hasRunning,
 	}
 }
+<<<<<<< HEAD
+=======
+
+func (h *Handler) samplesToTimeSeriesDTO(samples []runner.Sample) *dto.TimeSeriesDTO {
+	if len(samples) == 0 {
+		return nil
+	}
+
+	timestamps := make([]string, len(samples))
+	qps := make([]float64, len(samples))
+	p50 := make([]float64, len(samples))
+	p95 := make([]float64, len(samples))
+	p99 := make([]float64, len(samples))
+	errRate := make([]float64, len(samples))
+
+	for i, s := range samples {
+		timestamps[i] = s.Timestamp.Local().Format("15:04:05")
+		qps[i] = s.QPS
+		p50[i] = s.P50LatencyMs
+		p95[i] = s.P95LatencyMs
+		p99[i] = s.P99LatencyMs
+		if s.TotalRequests > 0 {
+			errRate[i] = float64(s.FailCount) / float64(s.TotalRequests) * 100
+		}
+	}
+
+	return &dto.TimeSeriesDTO{
+		Timestamps: timestamps,
+		QPS:        qps,
+		P50:        p50,
+		P95:        p95,
+		P99:        p99,
+		ErrorRate:  errRate,
+		HasRunning: true,
+	}
+}
+>>>>>>> dev

@@ -59,6 +59,10 @@ func newTestTimeSeriesStore(t *testing.T) *testTimeSeriesStore {
 			fail_count      INTEGER    NOT NULL DEFAULT 0,
 			avg_latency_ms  REAL       NOT NULL DEFAULT 0,
 			p50_latency_ms  REAL       NOT NULL DEFAULT 0,
+<<<<<<< HEAD
+=======
+			p90_latency_ms  REAL       NOT NULL DEFAULT 0,
+>>>>>>> dev
 			p95_latency_ms  REAL       NOT NULL DEFAULT 0,
 			p99_latency_ms  REAL       NOT NULL DEFAULT 0,
 			min_latency_ms  REAL       NOT NULL DEFAULT 0,

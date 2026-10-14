@@ -12,6 +12,10 @@ const router = createRouter({
     },
     {
       path: '/',
+<<<<<<< HEAD
+=======
+      name: 'Layout',
+>>>>>>> dev
       component: () => import('@/layouts/MainLayout.vue'),
       meta: { requiresAuth: true },
       children: [
@@ -19,6 +23,10 @@ const router = createRouter({
         { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/dashboard/DashboardPage.vue') },
         { path: 'scenes', name: 'Scenes', component: () => import('@/views/scenes/ScenesPage.vue') },
         { path: 'scenes/:id', name: 'SceneDetail', component: () => import('@/views/scenes/SceneDetailPage.vue'), props: true },
+<<<<<<< HEAD
+=======
+        { path: 'scenes/:id/settings', name: 'SceneSettings', component: () => import('@/views/scenes/SceneSettingsPage.vue'), props: true },
+>>>>>>> dev
         { path: 'runner', name: 'Runner', component: () => import('@/views/runner/RunnerPage.vue') },
         { path: 'reports', name: 'Reports', component: () => import('@/views/reports/ReportsPage.vue') },
         { path: 'reports/:id', name: 'ReportDetail', component: () => import('@/views/reports/ReportDetailPage.vue'), props: true },
@@ -28,27 +36,52 @@ const router = createRouter({
         { path: 'settings', name: 'Settings', component: () => import('@/views/settings/SettingsPage.vue') },
       ],
     },
+<<<<<<< HEAD
+=======
+    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+>>>>>>> dev
   ],
 })
 
 router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
+<<<<<<< HEAD
 
   if (auth.token && !auth.validated) {
     await auth.validateToken()
   }
 
   if (to.meta.requiresAuth !== false && !auth.isLoggedIn) {
+=======
+  console.log('[router] beforeEach:', to.path, 'token:', !!auth.token, 'validated:', auth.validated, 'isLoggedIn:', auth.isLoggedIn)
+
+  if (auth.token && !auth.validated) {
+    console.log('[router] calling validateToken')
+    await auth.validateToken()
+    console.log('[router] after validateToken: validated=', auth.validated, 'isLoggedIn=', auth.isLoggedIn)
+  }
+
+  if (to.meta.requiresAuth !== false && !auth.isLoggedIn) {
+    console.log('[router] redirecting to Login')
+>>>>>>> dev
     next({ name: 'Login', query: { redirect: to.fullPath } })
     return
   }
 
   if (to.name === 'Login' && auth.isLoggedIn) {
+<<<<<<< HEAD
+=======
+    console.log('[router] redirecting to Dashboard (already logged in)')
+>>>>>>> dev
     next({ name: 'Dashboard' })
     return
   }
 
   if (to.meta.permission && !auth.canAccess([to.meta.permission as string])) {
+<<<<<<< HEAD
+=======
+    console.log('[router] permission denied for', to.meta.permission)
+>>>>>>> dev
     next({ name: 'Dashboard' })
     return
   }
@@ -57,3 +90,13 @@ router.beforeEach(async (to, _from, next) => {
 })
 
 export default router
+<<<<<<< HEAD
+=======
+
+// 路由变更时 HMR 无法自动更新已注册的路由表，需要完整刷新
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate()
+  })
+}
+>>>>>>> dev

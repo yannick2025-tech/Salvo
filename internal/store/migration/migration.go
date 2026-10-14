@@ -20,6 +20,10 @@ func Migrate(db *sql.DB) error {
 		{"variables", createVariablesTable},
 		{"plugin_configs", createPluginConfigsTable},
 		{"reports", createReportsTable},
+<<<<<<< HEAD
+=======
+		{"report_details", createReportDetailsTable},
+>>>>>>> dev
 		{"run_records", createRunRecordsTable},
 		{"traces", createTracesTable},
 		{"spans", createSpansTable},
@@ -28,6 +32,11 @@ func Migrate(db *sql.DB) error {
 		{"role_permissions", createRolePermissionsTable},
 		{"users", createUsersTable},
 		{"time_series_samples", createTimeSeriesSamplesTable},
+<<<<<<< HEAD
+=======
+		{"data_sources", createDataSourcesTable},
+		{"so_plugins", createSoPluginsTable},
+>>>>>>> dev
 	}
 
 	for _, m := range migrations {
@@ -40,6 +49,23 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE run_records ADD COLUMN p90_latency REAL DEFAULT 0`,
 		`ALTER TABLE time_series_samples ADD COLUMN p90_latency_ms REAL DEFAULT 0`,
 		`ALTER TABLE run_records ADD COLUMN count INTEGER DEFAULT 0`,
+<<<<<<< HEAD
+=======
+		`ALTER TABLE run_records ADD COLUMN run_id INTEGER DEFAULT 0`,
+		`ALTER TABLE scenes ADD COLUMN default_timeout INTEGER DEFAULT 0`,
+		`ALTER TABLE nodes ADD COLUMN block_on_error BOOLEAN DEFAULT FALSE`,
+		`ALTER TABLE nodes ADD COLUMN lifecycle TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scenes ADD COLUMN config_params TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scenes ADD COLUMN derived_params TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE data_sources ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
+		// Migration for report_details table
+		`INSERT INTO report_details (report_id, detail) SELECT id, detail FROM reports WHERE detail IS NOT NULL AND detail != ''`,
+		`ALTER TABLE reports DROP COLUMN detail`,
+		// Add indexes for better query performance
+		`CREATE INDEX IF NOT EXISTS idx_reports_run_id ON reports(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_reports_started_at ON reports(started_at)`,
+>>>>>>> dev
 	}
 	for _, sql := range alterMigrations {
 		db.Exec(sql)
@@ -57,6 +83,10 @@ CREATE TABLE IF NOT EXISTS scenes (
 	variables       TEXT    DEFAULT '',
 	plugins         TEXT    DEFAULT '',
 	status          TEXT    NOT NULL DEFAULT 'draft',
+<<<<<<< HEAD
+=======
+	default_timeout INTEGER DEFAULT 0,
+>>>>>>> dev
 	created_at      DATETIME NOT NULL,
 	updated_at      DATETIME NOT NULL,
 	deleted_at      DATETIME DEFAULT NULL
@@ -194,7 +224,11 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 `
 
+<<<<<<< HEAD
 const currentVersion = 3
+=======
+const currentVersion = 8
+>>>>>>> dev
 
 func ensureSchemaVersion(db *sql.DB) error {
 	if _, err := db.Exec(createSchemaVersionTable); err != nil {
@@ -309,6 +343,31 @@ func CurrentVersion() int {
 	return currentVersion
 }
 
+<<<<<<< HEAD
+=======
+// RollbackReportDetailsMigration rolls back the report_details table migration.
+// This function restores the original reports.detail column and removes the report_details table.
+// WARNING: This function should only be used during development or for emergency rollbacks.
+func RollbackReportDetailsMigration(db *sql.DB) error {
+	rollbackMigrations := []string{
+		// Add detail column back to reports table
+		`ALTER TABLE reports ADD COLUMN detail TEXT DEFAULT ''`,
+		// Restore data from report_details to reports
+		`UPDATE reports SET detail = (SELECT detail FROM report_details WHERE report_id = reports.id)`,
+		// Drop report_details table
+		`DROP TABLE IF EXISTS report_details`,
+	}
+
+	for _, sql := range rollbackMigrations {
+		if _, err := db.Exec(sql); err != nil {
+			return fmt.Errorf("rollback: %w", err)
+		}
+	}
+
+	return nil
+}
+
+>>>>>>> dev
 const createTimeSeriesSamplesTable = `
 CREATE TABLE IF NOT EXISTS time_series_samples (
 	id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -334,3 +393,51 @@ CREATE INDEX IF NOT EXISTS idx_ts_run_node ON time_series_samples (run_id, node_
 CREATE INDEX IF NOT EXISTS idx_ts_run_time ON time_series_samples (run_id, sample_time);
 CREATE INDEX IF NOT EXISTS idx_ts_sample_time ON time_series_samples (sample_time);
 `
+<<<<<<< HEAD
+=======
+
+const createDataSourcesTable = `
+CREATE TABLE IF NOT EXISTS data_sources (
+	id              INTEGER PRIMARY KEY,
+	scene_id        INTEGER NOT NULL,
+	name            TEXT    NOT NULL,
+	file_name       TEXT    NOT NULL,
+	columns         TEXT    NOT NULL DEFAULT '[]',
+	rows            TEXT    NOT NULL DEFAULT '[]',
+	row_count       INTEGER NOT NULL DEFAULT 0,
+	source          TEXT    NOT NULL DEFAULT 'csv',
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL,
+	FOREIGN KEY (scene_id) REFERENCES scenes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_data_sources_scene_id ON data_sources(scene_id);
+CREATE INDEX IF NOT EXISTS idx_data_sources_name ON data_sources(name);
+CREATE INDEX IF NOT EXISTS idx_data_sources_deleted_at ON data_sources(deleted_at);
+`
+
+const createSoPluginsTable = `
+CREATE TABLE IF NOT EXISTS so_plugins (
+	id              INTEGER PRIMARY KEY,
+	name            TEXT    NOT NULL,
+	version         TEXT    NOT NULL,
+	file_path       TEXT    NOT NULL,
+	status          TEXT    NOT NULL DEFAULT 'disabled',
+	config          TEXT    DEFAULT '',
+	created_at      DATETIME NOT NULL,
+	updated_at      DATETIME NOT NULL,
+	deleted_at      DATETIME DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_name ON so_plugins(name);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_status ON so_plugins(status);
+CREATE INDEX IF NOT EXISTS idx_so_plugins_deleted_at ON so_plugins(deleted_at);
+`
+
+const createReportDetailsTable = `
+CREATE TABLE IF NOT EXISTS report_details (
+	report_id       INTEGER PRIMARY KEY,
+	detail          TEXT,
+	FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
+);
+`
+>>>>>>> dev

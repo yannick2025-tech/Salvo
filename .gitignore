@@ -11,6 +11,8 @@
 vendor/
 node_modules/
 dist/
+# Embedded ECharts for exported HTML reports (copied from node_modules)
+internal/api/echarts.min.js
 .env
 *.log
 .DS_Store
@@ -21,3 +23,21 @@ bin/
 logs/
 salvo
 *.vue.js
+<<<<<<< HEAD
+=======
+
+# codegraph
+.codegraph/
+
+# go
+*.cover
+coverage.out
+coverage.html
+
+# docs
+docs/biz-migration/login.md
+docs/biz-migration/config.toml
+docs/biz-migration/联调日志
+
+git-commit-report.md
+>>>>>>> dev

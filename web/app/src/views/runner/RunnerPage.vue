@@ -9,10 +9,18 @@
         <h3>启动场景</h3>
         <div class="form-group">
           <label>场景</label>
+<<<<<<< HEAD
           <select v-model="form.scene_id">
             <option value="">选择场景</option>
             <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
+=======
+          <CustomSelect
+            v-model="form.scene_id"
+            :options="sceneOptions"
+            placeholder="选择场景"
+          />
+>>>>>>> dev
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -26,16 +34,27 @@
         </div>
         <div class="form-group">
           <label>运行模式</label>
+<<<<<<< HEAD
           <select v-model="form.run_mode">
             <option value="duration">持续时间</option>
             <option value="count">请求数</option>
           </select>
+=======
+          <CustomSelect
+            v-model="form.run_mode"
+            :options="runModeOptions"
+          />
+>>>>>>> dev
         </div>
         <div class="form-group" v-if="form.run_mode === 'count'">
           <label>总请求数</label>
           <input v-model.number="form.count" type="number" min="1" />
         </div>
+<<<<<<< HEAD
         <button class="btn-login-primary" @click="handleStart" :disabled="!form.scene_id || starting || selectedSceneHasNoDAG">
+=======
+        <button class="btn-primary" @click="handleStart" :disabled="!canRunScene || !form.scene_id || starting || selectedSceneHasNoDAG" :title="canRunScene ? '' : '您当前的角色没有运行权限'">
+>>>>>>> dev
           {{ starting ? '启动中...' : '启动' }}
         </button>
         <div v-if="form.scene_id && selectedSceneHasNoDAG" class="no-dag-warning">
@@ -45,10 +64,17 @@
 
       <div class="card status-card">
         <h3>运行状态</h3>
+<<<<<<< HEAD
         <div v-if="activeRuns.length === 0 && recentFailedRuns.length === 0" class="empty">暂无运行中的场景</div>
         <div v-for="run in activeRuns" :key="run.id" class="run-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
+=======
+        <div v-if="activeRuns.length === 0 && recentFinishedRuns.length === 0" class="empty">暂无运行中的场景</div>
+        <div v-for="run in activeRuns" :key="run.id" class="run-item">
+          <div class="run-header">
+            <router-link :to="'/scenes'" class="run-name link" :title="'跳转到场景列表'">Scene #{{ run.scene_id }}</router-link>
+>>>>>>> dev
             <span class="status running">运行中</span>
           </div>
           <div class="run-footer">
@@ -59,11 +85,23 @@
               <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
               <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
             </div>
+<<<<<<< HEAD
             <button class="btn-sm danger" 
                     :disabled="stoppingSceneIds.has(run.scene_id) || run.status !== 'running'" 
                     @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
               {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
             </button>
+=======
+            <div class="run-actions">
+              <button class="btn-sm danger"
+                      :disabled="!canRunScene || stoppingSceneIds.has(run.scene_id) || run.status !== 'running'"
+                      :title="canRunScene ? '' : '您当前的角色没有运行权限'"
+                      @click="showStopConfirm(run.scene_id, getSceneName(run.scene_id))">
+                {{ stoppingSceneIds.has(run.scene_id) ? '停止中...' : '停止' }}
+              </button>
+              <button class="btn-sm progress" @click="viewProgress(run.scene_id)">实时进度</button>
+            </div>
+>>>>>>> dev
           </div>
         </div>
         
@@ -86,16 +124,27 @@
             </div>
           </div>
         </div>
+<<<<<<< HEAD
         <div v-for="run in recentFailedRuns" :key="'fail-'+run.id" class="run-item failed-item">
           <div class="run-header">
             <span class="run-name">Scene #{{ run.scene_id }}</span>
             <span class="status failed">已失败</span>
+=======
+        <div v-for="run in recentFinishedRuns" :key="'fin-'+run.id" :class="['run-item', run.status === 'failed' ? 'failed-item' : 'completed-item']">
+          <div class="run-header">
+            <router-link :to="'/scenes'" class="run-name link" :title="'跳转到场景列表'">Scene #{{ run.scene_id }}</router-link>
+            <span :class="['status', run.status === 'failed' ? 'failed' : 'completed']">{{ run.status === 'failed' ? '已失败' : '已完成' }}</span>
+>>>>>>> dev
           </div>
           <div v-if="run.error_msg" class="error-msg">{{ run.error_msg }}</div>
           <div class="run-metrics">
             <div class="metric"><span class="metric-label">总请求</span><span class="metric-val">{{ run.total_reqs }}</span></div>
             <div class="metric"><span class="metric-label">成功</span><span class="metric-val success">{{ run.success_reqs }}</span></div>
             <div class="metric"><span class="metric-label">失败</span><span class="metric-val danger">{{ run.failed_reqs }}</span></div>
+<<<<<<< HEAD
+=======
+            <div class="metric"><span class="metric-label">P99</span><span class="metric-val">{{ formatMs(run.p99_latency) }}</span></div>
+>>>>>>> dev
           </div>
         </div>
       </div>
@@ -107,7 +156,12 @@
       <table class="data-table">
         <thead>
           <tr>
+<<<<<<< HEAD
             <th>ID</th>
+=======
+            <th>数据KEY</th>
+            <th>运行ID</th>
+>>>>>>> dev
             <th>场景</th>
             <th>状态</th>
             <th>并发</th>
@@ -118,6 +172,7 @@
             <th>P99</th>
             <th>开始时间</th>
             <th>结束时间</th>
+<<<<<<< HEAD
           </tr>
         </thead>
         <tbody>
@@ -129,34 +184,88 @@
             <td>{{ Math.round(r.worker_count || 0) }}</td>
             <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? '持续时间' : '请求数' }}</span></td>
             <td class="mono">{{ r.run_mode === 'duration' ? Math.round(r.duration || 0) + 's' : (r.count || 0).toLocaleString() }}</td>
+=======
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="runs.length === 0"><td colspan="13" class="empty">暂无运行记录</td></tr>
+          <tr v-for="r in runs" :key="r.id">
+            <td class="mono" :title="'数据库主键：' + r.id">{{ r.id }}</td>
+            <td class="mono copyable" :title="'运行ID，检索后端日志用此 ID，点击复制'" @click="copyWithToast(r.run_id)">{{ r.run_id }}</td>
+            <td><router-link :to="'/scenes'" class="link" :title="'跳转到场景列表'">{{ r.scene_id }}</router-link></td>
+            <td><span :class="['status-badge', r.status]">{{ r.status }}</span></td>
+            <td>{{ Math.round(r.worker_count || 0) }}</td>
+            <td><span class="mode-tag" :class="r.run_mode">{{ r.run_mode === 'duration' ? '持续时间' : '请求数' }}</span></td>
+            <td class="mono">{{ r.run_mode === 'duration' ? (r.duration || 0).toFixed(2) + 's' : (r.count || 0).toLocaleString() }}</td>
+>>>>>>> dev
             <td>{{ r.total_reqs }}</td>
             <td>{{ ((r.success_reqs / Math.max(r.total_reqs, 1)) * 100).toFixed(2) }}%</td>
             <td>{{ formatMs(r.p99_latency) }}</td>
             <td>{{ formatTime(r.started_at) }}</td>
             <td>{{ r.status === 'running' ? '--' : formatTime(r.finished_at) }}</td>
+<<<<<<< HEAD
+=======
+            <td><router-link :to="`/traces?trace_id=${r.run_id}`" class="link" :title="'在链路列表中按运行ID ' + r.run_id + ' 过滤'">链路</router-link></td>
+>>>>>>> dev
           </tr>
         </tbody>
       </table>
       </div>
     </div>
+<<<<<<< HEAD
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
+=======
+>>>>>>> dev
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+<<<<<<< HEAD
 import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
 import { listNodes } from '@/api/node'
 import type { SceneDTO, RunRecordDTO } from '@/types'
+=======
+import { useRouter } from 'vue-router'
+import { listScenes, listRuns, startScene, stopScene } from '@/api/scene'
+import { listNodes } from '@/api/node'
+import { copyWithToast } from '@/utils/clipboard'
+import { showToast } from '@/utils/toast'
+import { useAuthStore } from '@/stores/auth'
+import type { SceneDTO, RunRecordDTO } from '@/types'
+import CustomSelect from '@/components/CustomSelect.vue'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const canRunScene = computed(() => authStore.canAccess(['scene:run']))
+>>>>>>> dev
 
 const scenes = ref<SceneDTO[]>([])
 const runs = ref<RunRecordDTO[]>([])
 const activeRuns = ref<RunRecordDTO[]>([])
+<<<<<<< HEAD
 const starting = ref(false)
 const selectedSceneHasNoDAG = ref(false)
 const toastMsg = ref('')
 const toastType = ref('info')
+=======
+
+const sceneOptions = computed(() => {
+  return scenes.value.map(s => ({
+    value: s.id,
+    label: s.name,
+  }))
+})
+
+const runModeOptions = [
+  { value: 'duration', label: '持续时间' },
+  { value: 'count', label: '请求数' },
+]
+const starting = ref(false)
+const selectedSceneHasNoDAG = ref(false)
+>>>>>>> dev
 
 const stopConfirm = reactive({
   visible: false,
@@ -215,6 +324,7 @@ async function fetchRuns() {
   } catch { /* ignore */ }
 }
 
+<<<<<<< HEAD
 const recentFailedRuns = computed(() => {
   return runs.value
     .filter((r) => r.status === 'failed')
@@ -227,6 +337,19 @@ function showToast(msg: string, type = 'info') {
   setTimeout(() => { toastMsg.value = '' }, 5000)
 }
 
+=======
+const recentFinishedRuns = computed(() => {
+  return runs.value
+    .filter((r) => r.status !== 'running')
+    .sort((a, b) => {
+      const aTime = a.started_at ? new Date(a.started_at).getTime() : 0
+      const bTime = b.started_at ? new Date(b.started_at).getTime() : 0
+      return bTime - aTime
+    })
+    .slice(0, 10)
+})
+
+>>>>>>> dev
 async function handleStart() {
   if (!form.scene_id) return
   starting.value = true
@@ -311,6 +434,13 @@ function getSceneName(sceneId: string): string {
   return scene?.name || `Scene #${sceneId}`
 }
 
+<<<<<<< HEAD
+=======
+function viewProgress(sceneId: string) {
+  router.push(`/scenes/${sceneId}?mode=exec`)
+}
+
+>>>>>>> dev
 onMounted(() => {
   fetchScenes()
   fetchRuns()
@@ -330,12 +460,21 @@ onUnmounted(() => {
 .card { background: var(--bg-card); border: 1px solid var(--border-secondary); border-radius: var(--radius-md); padding: 20px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
 .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+<<<<<<< HEAD
 .form-group label { font-size: 12px; color: var(--text-secondary); }
 .form-group input, .form-group select { height: 34px; padding: 0 8px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .btn-primary { padding: 8px 20px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; margin-top: 8px; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+=======
+.form-group label { font-size: 12px; line-height: 16px; color: var(--text-secondary); }
+.form-group input, .form-group select { height: 34px; padding: 0 8px; border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; }
+.form-group :deep(.custom-select-trigger) { height: 34px; padding: 0 12px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.btn-primary { padding: 8px 20px; margin-top: 8px; }
+>>>>>>> dev
 .no-dag-warning { margin-top: 8px; font-size: 12px; color: #f0ad4e; background: rgba(240,173,78,0.1); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(240,173,78,0.3); }
 
 .btn-sm {
@@ -365,6 +504,19 @@ onUnmounted(() => {
   color: #fff;
 }
 
+<<<<<<< HEAD
+=======
+.btn-sm.progress {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-sm.progress:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+>>>>>>> dev
 .btn-sm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -464,11 +616,20 @@ onUnmounted(() => {
 .run-name { font-size: 13px; font-weight: 500; }
 .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
+<<<<<<< HEAD
 .run-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 .run-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .metric-label { font-size: 11px; color: var(--text-tertiary); }
 .metric-val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+=======
+.run-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+.run-actions { display: flex; gap: 8px; }
+.run-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
+.metric { display: flex; flex-direction: column; gap: 2px; }
+.metric-label { font-size: 11px; line-height: 16px; color: var(--text-tertiary); }
+.metric-val { font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+>>>>>>> dev
 .metric-val.success { color: var(--accent-success); }
 .metric-val.danger { color: var(--accent-danger); }
 
@@ -476,7 +637,15 @@ onUnmounted(() => {
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .data-table th, .data-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-secondary); white-space: nowrap; }
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
+<<<<<<< HEAD
 .mono { font-family: monospace; font-size: 12px; }
+=======
+.mono { font-family: var(--font-mono); font-size: 12px; }
+.copyable { cursor: pointer; }
+.copyable:hover { color: var(--accent-primary); }
+.link { color: var(--accent-primary); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+>>>>>>> dev
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .status-badge.running { background: rgba(88,166,255,0.15); color: var(--accent-primary); }
 .status-badge.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
@@ -485,6 +654,7 @@ onUnmounted(() => {
 .mode-tag.duration { background: rgba(210,153,34,0.15); color: #9a6700; }
 .mode-tag.count { background: rgba(130,80,223,0.15); color: #8250df; }
 .status.failed { background: rgba(248,81,73,0.15); color: var(--accent-danger); }
+<<<<<<< HEAD
 .failed-item { border-left: 3px solid var(--accent-danger); }
 .error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }
 
@@ -496,4 +666,10 @@ onUnmounted(() => {
 .toast.info { background: var(--accent-primary); color: #fff; }
 .toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
 @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+=======
+.status.completed { background: rgba(63,185,80,0.15); color: var(--accent-success); }
+.failed-item { border-left: 3px solid var(--accent-danger); }
+.completed-item { border-left: 3px solid var(--accent-success); }
+.error-msg { font-size: 12px; color: var(--accent-danger); margin-bottom: 8px; padding: 6px 10px; background: rgba(248,81,73,0.08); border-radius: var(--radius-sm); word-break: break-all; }
+>>>>>>> dev
 </style>

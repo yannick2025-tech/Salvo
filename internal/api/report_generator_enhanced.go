@@ -1,6 +1,10 @@
 package api
 
 import (
+<<<<<<< HEAD
+=======
+	_ "embed"
+>>>>>>> dev
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -10,6 +14,12 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/runner"
 )
 
+<<<<<<< HEAD
+=======
+//go:embed echarts.min.js
+var echartsMinJS string
+
+>>>>>>> dev
 var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs(template.FuncMap{
 	"formatTime": func(t time.Time) string {
 		if t.IsZero() {
@@ -68,7 +78,11 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 		if q <= 0 {
 			return "--"
 		}
+<<<<<<< HEAD
 		return fmt.Sprintf("%.1f", q)
+=======
+		return fmt.Sprintf("%.2f", q)
+>>>>>>> dev
 	},
 	"formatNumber": func(n interface{}) string {
 		switch v := n.(type) {
@@ -97,24 +111,42 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>测试报告 - Salvo</title>
+<<<<<<< HEAD
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+=======
+    <script>{{.EChartsJS}}</script>
+>>>>>>> dev
     <style>
         :root {
             --bg-primary: #ffffff;
             --bg-secondary: #f9fafb;
             --bg-card: #ffffff;
             --bg-tertiary: #f3f4f6;
+<<<<<<< HEAD
             --bg-hover: rgba(8,145,178,0.04);
+=======
+            --bg-hover: rgba(45,212,191,0.04);
+>>>>>>> dev
             --text-primary: #111827;
             --text-secondary: #374151;
             --text-tertiary: #6b7280;
             --border-primary: #e5e7eb;
             --border-secondary: #e5e7eb;
+<<<<<<< HEAD
             --accent-primary: #0891b2;
             --accent-success: #16a34a;
             --accent-danger: #dc2626;
             --accent-warning: #ca8a04;
             --accent-info: #2563eb;
+=======
+            --border-color: #e5e7eb;
+            --border-light: #f3f4f6;
+            --accent-primary: #0d9488;
+            --accent-success: #1a7f37;
+            --accent-danger: #cf222e;
+            --accent-warning: #bf8700;
+            --accent-info: #0969da;
+>>>>>>> dev
             --radius-sm: 6px;
             --radius-md: 8px;
         }
@@ -150,6 +182,32 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-weight: 600;
             flex: 1;
         }
+<<<<<<< HEAD
+=======
+        #themeToggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-sm);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: var(--text-secondary);
+        }
+        #themeToggle:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+        #themeToggle svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+>>>>>>> dev
 
         /* Metrics Row */
         .metrics-row {
@@ -196,6 +254,11 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             border-radius: var(--radius-md);
             overflow: hidden;
         }
+<<<<<<< HEAD
+=======
+        .nodes-section .chart-card { margin-bottom: 16px; overflow: visible; }
+        .nodes-section .chart-card:last-child { margin-bottom: 0; }
+>>>>>>> dev
         .chart-card.wide {
             grid-column: span 2;
         }
@@ -264,7 +327,11 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             border-radius: var(--radius-sm);
             font-size: 12px;
             font-weight: 600;
+<<<<<<< HEAD
             background: rgba(8,145,178,0.1);
+=======
+            background: rgba(45,212,191,0.1);
+>>>>>>> dev
             color: var(--accent-primary);
         }
         .actual-val {
@@ -279,10 +346,17 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             font-weight: 600;
             letter-spacing: 0.04em;
         }
+<<<<<<< HEAD
         .status-badge.success { background: rgba(22,163,74,0.15); color: #16a34a; }
         .status-badge.partial { background: rgba(217,119,6,0.15); color: #d97706; }
         .status-badge.failed { background: rgba(220,38,38,0.15); color: #dc2626; }
         .status-badge.running { background: rgba(8,145,178,0.15); color: #0891b2; }
+=======
+        .status-badge.success { background: rgba(26,127,55,0.15); color: #1a7f37; }
+        .status-badge.partial { background: rgba(191,135,0,0.15); color: #bf8700; }
+        .status-badge.failed { background: rgba(207,34,46,0.15); color: #cf222e; }
+        .status-badge.running { background: rgba(13,148,136,0.15); color: #0d9488; }
+>>>>>>> dev
         .status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
         .status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
@@ -415,9 +489,236 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
             background: var(--bg-tertiary);
             color: var(--text-secondary);
         }
+<<<<<<< HEAD
         .node-chart-body {
             height: 280px;
         }
+=======
+        .node-chart-body { height: 200px; }
+
+        /* Failed Nodes Section */
+        .failed-nodes-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .failed-nodes-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .failed-nodes-search-hint {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        .failed-nodes-search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .search-field {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .search-input {
+            width: 100%;
+            padding: 8px 28px 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .search-input:focus {
+            border-color: var(--accent-primary);
+        }
+        .search-input::placeholder {
+            color: var(--text-tertiary);
+        }
+        .search-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        .search-select:focus {
+            border-color: var(--accent-primary);
+        }
+        .search-clear {
+            position: absolute;
+            right: 6px;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            line-height: 1;
+        }
+        .search-clear:hover {
+            color: var(--text-primary);
+        }
+        .failed-nodes-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .failed-nodes-empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+        .failed-node-card {
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--danger, #cf222e);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .failed-node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            flex-wrap: wrap;
+        }
+        .failed-node-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .failed-node-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+        .failed-node-badge.http {
+            background: rgba(9,105,218,0.12);
+            color: #0969da;
+        }
+        .failed-node-error-code {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            background: rgba(207,34,46,0.12);
+            color: var(--danger, #cf222e);
+        }
+        .failed-node-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-left: auto;
+        }
+        .failed-node-error {
+            padding: 10px 14px;
+            font-size: 13px;
+        }
+        .error-text {
+            color: var(--danger, #cf222e);
+        }
+        .failed-node-details {
+            padding: 8px 14px;
+            border-top: 1px solid var(--border-color);
+        }
+        .failed-node-details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-secondary);
+            user-select: none;
+            font-size: 12px;
+        }
+        .failed-node-detail-body {
+            margin-top: 8px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .failed-node-detail-body pre {
+            margin: 4px 0;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
+        .node-chart-panel { position: relative; }
+        .node-chart-panel-label {
+            font-size: 11px; font-weight: 600; color: var(--text-secondary);
+            letter-spacing: 0.02em; margin-bottom: 2px;
+            padding-left: 12px;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .tooltip-wrapper.node-chart-help {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px;
+            color: var(--text-tertiary);
+            background: transparent; border: none;
+            line-height: 1; cursor: help; position: relative;
+        }
+        .node-chart-help-icon {
+            display: block; flex: 0 0 auto;
+            transition: color 0.15s ease;
+        }
+        .tooltip-wrapper.node-chart-help:hover .node-chart-help-icon {
+            color: var(--accent-primary);
+        }
+        /* 悬浮注释：从 ? 右侧弹出，与标签同行，箭头朝左 */
+        .tooltip-wrapper.node-chart-help::before {
+            content: attr(data-tooltip);
+            position: absolute; visibility: hidden; opacity: 0;
+            white-space: normal; width: 240px; text-align: left; line-height: 1.5;
+            font-size: 11px; font-weight: 400; color: #475569;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px; padding: 10px 14px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+            bottom: auto; top: 50%;
+            left: calc(100% + 10px);
+            transform: translateY(-50%) translateX(-6px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            z-index: 100; pointer-events: none;
+        }
+        .tooltip-wrapper.node-chart-help::after {
+            content: ''; position: absolute; visibility: hidden; opacity: 0;
+            width: 0; height: 0;
+            border-style: solid; border-width: 6px;
+            border-color: transparent;
+            border-top-color: transparent;
+            border-bottom-color: transparent;
+            border-right-color: rgba(255, 255, 255, 0.96);
+            bottom: auto; top: 50%;
+            left: 100%;
+            transform: translateY(-50%) translateX(-2px);
+            transition: opacity 0.15s ease;
+            z-index: 101; pointer-events: none;
+        }
+        .tooltip-wrapper.node-chart-help:hover::before,
+        .tooltip-wrapper.node-chart-help:hover::after {
+            visibility: visible; opacity: 1;
+        }
+        .tooltip-wrapper.node-chart-help:hover::before { transform: translateY(-50%) translateX(0); }
+        .node-band-legend { margin-top: 6px; line-height: 1.5; }
+        .node-qps-chart { height: 160px; }
+        .node-latency-chart { height: 220px; }
+>>>>>>> dev
 
         /* Chart Type Toggle */
         .chart-type-toggle {
@@ -459,12 +760,254 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
         @media (max-width: 520px) {
             .metrics-row { grid-template-columns: 1fr 1fr; gap: 8px; }
         }
+<<<<<<< HEAD
+=======
+
+        /* System Performance Section */
+        .sys-summary-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .sys-summary-card {
+            flex: 1;
+            min-width: 140px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            text-align: center;
+        }
+        .sys-summary-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .sys-summary-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: -apple-system, 'SF Mono', 'Monaco', 'Menlo', monospace;
+        }
+        .sys-summary-sub {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+        .sys-charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .sys-table-section {
+            margin-top: 16px;
+        }
+
+        .table-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .table-header-row h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .table-info {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-card);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table thead {
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .data-table th.sortable {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .data-table th.sortable:hover {
+            background: var(--bg-hover);
+        }
+
+        .sort-icon {
+            margin-left: 4px;
+            opacity: 0.5;
+            font-size: 11px;
+        }
+
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-primary);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .danger-row {
+            background: rgba(239, 68, 68, 0.05) !important;
+        }
+
+        .danger-cell {
+            color: var(--accent-danger) !important;
+            font-weight: 600;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+            border-color: var(--accent-info);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        html.dark-theme {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --text-tertiary: #6e7681;
+            --border-primary: #30363d;
+            --border-secondary: #30363d;
+            --border-color: #30363d;
+            --border-light: #21262d;
+            --accent-primary: #2dd4bf;
+            --accent-success: #3fb950;
+            --accent-danger: #f85149;
+            --accent-warning: #e3b341;
+            --accent-info: #58a6ff;
+        }
+        html.dark-theme body { background: var(--bg-primary); color: var(--text-primary); }
+        html.dark-theme .container { background: var(--bg-primary); }
+        html.dark-theme .metric-card, html.dark-theme .chart-card, html.dark-theme .sys-summary-card, html.dark-theme .nodes-section, html.dark-theme .charts-section { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .metric-label, html.dark-theme .sys-summary-label, html.dark-theme .chart-header h3, html.dark-theme h2, html.dark-theme h3, html.dark-theme h4, html.dark-theme .charts-toolbar h3, html.dark-theme .nodes-section h3 { color: var(--text-primary); }
+        html.dark-theme .metric-sub, html.dark-theme .sys-summary-sub, html.dark-theme .table-info { color: var(--text-secondary); }
+        html.dark-theme .table-wrapper { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .data-table thead { background: var(--bg-secondary); }
+        html.dark-theme .data-table th { color: var(--text-primary); border-bottom-color: var(--border-color); }
+        html.dark-theme .data-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        html.dark-theme .data-table tbody tr:hover { background: var(--bg-hover); }
+        html.dark-theme .page-btn { background: var(--bg-card); color: var(--text-primary); border-color: var(--border-color); }
+        html.dark-theme .page-btn:hover:not(:disabled) { background: var(--bg-hover); }
+        html.dark-theme .type-btn { background: transparent; color: var(--text-secondary); border-color: var(--border-color); }
+        html.dark-theme .type-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+        html.dark-theme .type-btn:hover:not(.active) { background: var(--bg-hover); border-color: var(--accent-primary); }
+        html.dark-theme .node-badge { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        html.dark-theme .info-card { background: var(--bg-card); border-color: var(--border-color); }
+        html.dark-theme .perf-divider { background: var(--border-color); }
+        html.dark-theme .info-table td { color: var(--text-primary); border-bottom-color: var(--border-light); }
+        html.dark-theme .status-badge { border: 1px solid var(--border-color); }
+        html.dark-theme .page-info { color: var(--text-secondary); }
+        html.dark-theme .info-banner { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.15)); border-color: rgba(59, 130, 246, 0.3); }
+        html.dark-theme .banner-text strong { color: var(--text-primary); }
+        html.dark-theme .banner-text p { color: var(--text-secondary); }
+        html.dark-theme .tooltip-wrapper.node-chart-help { color: var(--text-secondary); }
+        html.dark-theme .tooltip-wrapper.node-chart-help::before {
+            background: rgba(22, 27, 34, 0.96);
+            border-color: rgba(48, 54, 61, 0.8);
+            color: #e6edf3;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        }
+        html.dark-theme .tooltip-wrapper.node-chart-help::after { border-right-color: rgba(22, 27, 34, 0.96); }
+
+        @media print {
+            body { background: white; color: black; }
+            .container { max-width: 100%; padding: 0; }
+            .page-header, .metrics-row, .charts-row, .nodes-section, .sys-table-section { page-break-inside: avoid; }
+            .chart-card { page-break-inside: avoid; border: 1px solid #ddd; margin-bottom: 16px; }
+            .chart-body canvas { max-width: 100% !important; height: auto !important; }
+            .data-table { font-size: 11px; }
+            .pagination-controls, .chart-type-toggle, .btn-back, button { display: none !important; }
+            .danger-cell { color: black !important; font-weight: bold; background: #f0f0f0; }
+            .danger-row { background: #f5f5f5 !important; }
+            h2, h3, h4 { page-break-after: avoid; }
+        }
+>>>>>>> dev
     </style>
 </head>
 <body>
 <div class="container">
     <div class="page-header">
         <h2>测试报告</h2>
+<<<<<<< HEAD
+=======
+        <button id="themeToggle" onclick="toggleTheme()" title="切换主题">
+            <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <span id="themeText">深色</span>
+        </button>
+>>>>>>> dev
     </div>
 
     {{if .Metrics}}
@@ -472,14 +1015,22 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
     <div class="metrics-row">
         <div class="metric-card">
             <div class="metric-label">成功率</div>
+<<<<<<< HEAD
             <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#16a34a{{else if gt .Metrics.SuccessRate 70.0}}#d97706{{else}}#dc2626{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
+=======
+            <div class="metric-value" style="color: {{if gt .Metrics.SuccessRate 90.0}}#1a7f37{{else if gt .Metrics.SuccessRate 70.0}}#bf8700{{else}}#cf222e{{end}}">{{formatSuccessRate .Metrics.SuccessRate}}</div>
+>>>>>>> dev
             <div class="metric-sub">{{formatNumber .Metrics.SuccessCount}} / {{formatNumber .Metrics.TotalRequests}} 次请求</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-label">总请求数</div>
             <div class="metric-value" style="color: var(--accent-primary)">{{formatNumber .Metrics.TotalRequests}}</div>
+<<<<<<< HEAD
             <div class="metric-sub">{{if .Metrics.DurationS}}{{printf "%.1f" .Metrics.DurationS}}s{{else}}--{{end}} 持续时间</div>
+=======
+            <div class="metric-sub">{{if .Metrics.DurationS}}{{printf "%.2f" .Metrics.DurationS}}s{{else}}--{{end}} 持续时间</div>
+>>>>>>> dev
         </div>
 
         <div class="metric-card">
@@ -696,7 +1247,23 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
                     <span class="node-badge">TTFB {{formatLatencyMs $node.Summary.TTFBMs}}</span>
                 </div>
             </div>
+<<<<<<< HEAD
             <div class="chart-body node-chart-body" id="nodeChart{{$idx}}"></div>
+=======
+            <div class="node-chart-grid">
+                <div class="node-chart-panel">
+                    <div class="node-chart-panel-label">QPS</div>
+                    <div class="chart-body node-chart-body node-qps-chart" id="nodeQpsChart{{$idx}}"></div>
+                </div>
+                <div class="node-chart-panel">
+                    <div class="node-chart-panel-label">延迟百分位带<span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。"><svg class="node-chart-help-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="4.6" r="0.9" fill="currentColor"/><path d="M8 7v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></div>
+                    <div class="chart-body node-chart-body node-latency-chart" id="nodeLatencyChart{{$idx}}"></div>
+                </div>
+            </div>
+            <div class="chart-tip node-band-legend">
+                色带含义：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大。
+            </div>
+>>>>>>> dev
             <div class="chart-type-toggle">
                 <button class="type-btn active" onclick="switchChartType('node-{{$idx}}', 'smooth')">平滑</button>
                 <button class="type-btn" onclick="switchChartType('node-{{$idx}}', 'step')">阶梯</button>
@@ -708,6 +1275,228 @@ var enhancedReportTemplate = template.Must(template.New("enhanced-report").Funcs
 
     {{end}}
 
+<<<<<<< HEAD
+=======
+    {{if .SystemMetrics}}
+    <!-- System Performance Analysis Section -->
+    <section class="nodes-section">
+        <h3>系统性能分析</h3>
+        <div class="sys-summary-row">
+            <div class="sys-summary-card" style="border-color: #0d9488;">
+                <div class="sys-summary-label">Goroutine 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.GoroutineMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.GoroutineAvg}}</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #58a6ff;">
+                <div class="sys-summary-label">Heap 峰值</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.HeapAllocMaxMB}} MB</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.HeapAllocAvgMB}} MB</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #bf8700;">
+                <div class="sys-summary-label">CPU 峰值</div>
+                <div class="sys-summary-value" style="color: {{if gt .SystemMetrics.Summary.CPUMax 90.0}}#cf222e{{else if gt .SystemMetrics.Summary.CPUMax 70.0}}#bf8700{{else}}#bf8700{{end}}">{{printf "%.3f" .SystemMetrics.Summary.CPUMax}}%</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.CPUAvg}}%</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #cf222e;">
+                <div class="sys-summary-label">GC 暂停</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.GCPauseTotalMs}} ms</div>
+                <div class="sys-summary-sub">共 {{.SystemMetrics.Summary.GCCount}} 次</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #cf222e;">
+                <div class="sys-summary-label">任务等待 P99 峰值</div>
+                <div class="sys-summary-value">{{printf "%.3f" .SystemMetrics.Summary.TaskWaitP99MaxMs}} ms</div>
+                <div class="sys-summary-sub">平均 {{printf "%.3f" .SystemMetrics.Summary.TaskWaitAvgMs}} ms</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #0969da;">
+                <div class="sys-summary-label">Pending Queue 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.PendingQueueMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.PendingQueueAvg}}</div>
+            </div>
+            <div class="sys-summary-card" style="border-color: #1a7f37;">
+                <div class="sys-summary-label">Active Workers 峰值</div>
+                <div class="sys-summary-value">{{.SystemMetrics.Summary.ActiveWorkersMax}}</div>
+                <div class="sys-summary-sub">平均 {{printf "%.0f" .SystemMetrics.Summary.ActiveWorkersAvg}}</div>
+            </div>
+        </div>
+        {{if gt (len .SystemMetrics.TimeSeries) 1}}
+        <div class="sys-charts-row">
+            <div class="chart-card">
+                <div class="chart-header"><h3>Goroutine 趋势</h3></div>
+                <div class="chart-body" id="sysGoroutineChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysGoroutine', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>Heap 内存趋势</h3></div>
+                <div class="chart-body" id="sysHeapChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysHeap', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysHeap', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>CPU 使用率趋势</h3></div>
+                <div class="chart-body" id="sysCpuChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysCpu', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysCpu', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>任务等待时间趋势</h3></div>
+                <div class="chart-body" id="sysTaskWaitChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysTaskWait', 'step')">阶梯</button>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header"><h3>Pending Queue 趋势</h3></div>
+                <div class="chart-body" id="sysQueueChart"></div>
+                <div class="chart-type-toggle">
+                    <button class="type-btn active" onclick="switchChartType('sysQueue', 'smooth')">平滑</button>
+                    <button class="type-btn" onclick="switchChartType('sysQueue', 'step')">阶梯</button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </section>
+    {{end}}
+
+    {{if and .SystemMetrics (gt (len .SystemMetrics.TimeSeries) 0)}}
+    <div class="sys-table-section">
+        <div class="table-header-row">
+            <h4>系统指标详细数据</h4>
+            <div class="table-info">共 {{len .SystemMetrics.TimeSeries}} 条记录</div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table" id="sysMetricsTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="toggleSort('timestamp')">时间戳 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('goroutine_count')">Goroutines <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('heap_alloc_mb')">Heap (MB) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('cpu_percent')">CPU (%) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('gc_pause_last_ms')">GC 暂停 (ms) <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('active_workers')">Workers <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('pending_queue_len')">队列长度 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" onclick="toggleSort('task_wait_p99_ms')">Wait P99 (ms) <span class="sort-icon">⇅</span></th>
+                    </tr>
+                </thead>
+                <tbody id="sysMetricsTableBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination-controls" id="tablePagination" style="display: none;">
+            <button class="page-btn" onclick="goToPage(1)">首页</button>
+            <button class="page-btn" onclick="prevPage()">上一页</button>
+            <span class="page-info" id="pageInfo"></span>
+            <button class="page-btn" onclick="nextPage()">下一页</button>
+            <button class="page-btn" onclick="goToPage(totalPages)">末页</button>
+        </div>
+    </div>
+    {{end}}
+
+    {{if .FailedNodes}}
+    <!-- Failed Nodes Detail Section (moved to end) -->
+    <section class="nodes-section">
+        <div class="failed-nodes-header">
+            <h3>失败节点详情</h3>
+            <div class="chart-tip">共 {{len .FailedNodes}} 条失败记录</div>
+        </div>
+
+        <!-- Multi-field Search -->
+        <div class="failed-nodes-search-hint">多个字段同时匹配（AND）</div>
+        <div class="failed-nodes-search-grid">
+            <div class="search-field">
+                <input id="fnSearchName" type="text" class="search-input" placeholder="节点名" oninput="filterFailedNodes()"/>
+                <button id="fnSearchNameClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchName')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchId" type="text" class="search-input" placeholder="NodeID" oninput="filterFailedNodes()"/>
+                <button id="fnSearchIdClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchId')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchCode" type="text" class="search-input" placeholder="错误码（如 504、timeout）" oninput="filterFailedNodes()"/>
+                <button id="fnSearchCodeClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchCode')">✕</button>
+            </div>
+            <div class="search-field">
+                <input id="fnSearchMsg" type="text" class="search-input" placeholder="错误信息" oninput="filterFailedNodes()"/>
+                <button id="fnSearchMsgClear" class="search-clear" style="display:none;" onclick="clearField('fnSearchMsg')">✕</button>
+            </div>
+            <div class="search-field">
+                <select id="fnSearchProtocol" class="search-select" onchange="filterFailedNodes()">
+                    <option value="">全部协议</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="failed-nodes-list" id="failedNodesList">
+            {{range $idx, $fn := .FailedNodes}}
+            <div class="failed-node-card" data-name="{{$fn.NodeName}}" data-id="{{$fn.NodeID}}" data-code="{{$fn.ErrorCode}}" data-msg="{{$fn.ErrorMessage}}" data-protocol="{{if $fn.Protocol}}{{$fn.Protocol}}{{else}}http{{end}}">
+                <div class="failed-node-header">
+                    <span class="failed-node-name">{{$fn.NodeName}}</span>
+                    <span class="failed-node-badge {{if $fn.Protocol}}{{$fn.Protocol}}{{else}}http{{end}}">{{$fn.Protocol}}</span>
+                    {{if $fn.ErrorCode}}<span class="failed-node-error-code">{{$fn.ErrorCode}}</span>{{end}}
+                    <span class="failed-node-time">{{$fn.Timestamp.Format "15:04:05"}}</span>
+                </div>
+                <div class="failed-node-error">
+                    <strong>错误信息:</strong> <span class="error-text">{{$fn.ErrorMessage}}</span>
+                </div>
+                {{if $fn.RequestURL}}
+                <details class="failed-node-details">
+                    <summary>请求详情</summary>
+                    <div class="failed-node-detail-body">
+                        <div><strong>Method:</strong> {{$fn.RequestMethod}}</div>
+                        <div><strong>URL:</strong> <code>{{$fn.RequestURL}}</code></div>
+                        {{if $fn.RequestHeaders}}
+                        <div><strong>Headers:</strong></div>
+                        <pre>{{range $k, $v := $fn.RequestHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.RequestBody}}
+                        <div><strong>Body:</strong></div>
+                        <pre>{{$fn.RequestBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+                {{if or $fn.ResponseBody $fn.ResponseStatus}}
+                <details class="failed-node-details">
+                    <summary>响应详情</summary>
+                    <div class="failed-node-detail-body">
+                        <div><strong>Status:</strong> <span class="error-text">{{$fn.ResponseStatus}}</span></div>
+                        {{if $fn.ResponseHeaders}}
+                        <div><strong>Headers:</strong></div>
+                        <pre>{{range $k, $v := $fn.ResponseHeaders}}{{$k}}: {{range $i, $vv := $v}}{{if $i}}, {{end}}{{$vv}}{{end}}
+{{end}}</pre>
+                        {{end}}
+                        {{if $fn.ResponseBody}}
+                        <div><strong>Body:</strong></div>
+                        <pre>{{$fn.ResponseBody}}</pre>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+                {{if $fn.Attributes}}
+                <details class="failed-node-details">
+                    <summary>扩展属性</summary>
+                    <div class="failed-node-detail-body">
+                        {{range $k, $v := $fn.Attributes}}
+                        <div><strong>{{$k}}:</strong> <span>{{$v}}</span></div>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        <div class="failed-nodes-empty" id="failedNodesEmpty" style="display:none;">没有匹配的记录</div>
+    </section>
+    {{end}}
+
+>>>>>>> dev
     <footer style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
         <p>Generated by Salvo at {{now.Format "2006-01-02 15:04:05"}}</p>
     </footer>
@@ -719,11 +1508,22 @@ const reportData = {{.JSONData}};
 
 // Theme colors
 const tc = {
+<<<<<<< HEAD
     bg: '#ffffff',
     textColor: '#111827',
     lineColor: '#e5e7eb',
     colors: ['#0891b2', '#0891b2', '#d97706', '#dc2626'],
     dangerColor: '#dc2626'
+=======
+    bg: '#0d1117',
+    textColor: '#c9d1d9',
+    lineColor: '#30363d',
+    // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
+    colors: ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8'],
+    // 延迟曲线语义色：P50 绿 → P90 黄 → P95 蓝 → P99 橙
+    latencyColors: ['#3fb950', '#e3b341', '#58a6ff', '#f0883e'],
+    dangerColor: '#f0883e'
+>>>>>>> dev
 };
 
 let errorRateType = 'smooth';
@@ -731,7 +1531,11 @@ let qpsType = 'smooth';
 let latTrendType = 'smooth';
 let nodeType = 'smooth';
 
+<<<<<<< HEAD
 const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth' };
+=======
+const chartTypes = { errorRate: 'smooth', qpsTrend: 'smooth', latTrend: 'smooth', sysGoroutine: 'smooth', sysHeap: 'smooth', sysCpu: 'smooth', sysTaskWait: 'smooth', sysQueue: 'smooth' };
+>>>>>>> dev
 
 function initNodeChartTypes() {
     if (reportData.node_metrics) {
@@ -747,11 +1551,331 @@ function switchChartType(chartId, type) {
     else if (chartId === 'qpsTrend') { updateToggleButtons('qpsChart'); renderQPSTrend(); }
     else if (chartId === 'latTrend') { updateToggleButtons('latencyTrendChart'); renderLatencyTrend(); }
     else if (chartId.startsWith('node-')) { updateNodeToggleButtons(chartId); renderNodeCharts(); }
+<<<<<<< HEAD
+=======
+    else if (chartId === 'sysGoroutine') { updateSysToggleButtons('sysGoroutineChart'); renderSysGoroutineChart(); }
+    else if (chartId === 'sysHeap') { updateSysToggleButtons('sysHeapChart'); renderSysHeapChart(); }
+    else if (chartId === 'sysCpu') { updateSysToggleButtons('sysCpuChart'); renderSysCpuChart(); }
+    else if (chartId === 'sysTaskWait') { updateSysToggleButtons('sysTaskWaitChart'); renderSysTaskWaitChart(); }
+    else if (chartId === 'sysQueue') { updateSysToggleButtons('sysQueueChart'); renderSysQueueChart(); }
+}
+
+function updateSysToggleButtons(chartId) {
+    var el = document.getElementById(chartId);
+    if (!el) return;
+    var card = el.closest('.chart-card');
+    if (!card) return;
+    var btns = card.querySelectorAll('.type-btn');
+    btns.forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === chartTypes[chartId]);
+    });
+}
+
+function renderSysGoroutineChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysGoroutineChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysGoroutine === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var data = ts.map(function(s) { return s.goroutine_count; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        series: [{ name: 'Goroutines', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: tc.colors[2] }, label: { formatter: '10K', color: tc.colors[2], fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' ' + params[0].seriesName + ': <strong>' + Number(params[0].value).toFixed(3) + '</strong>';
+            }
+        },
+        legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysHeapChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysHeapChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysHeap === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var allocData = ts.map(function(s) { return s.heap_alloc_mb; });
+    var sysData = ts.map(function(s) { return s.heap_sys_mb; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}MB' } },
+        series: [
+            { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
+            { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2, type: 'dashed' }, itemStyle: { color: tc.colors[5] } },
+        ],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' HeapAlloc: <strong>' + Number(params[0].value).toFixed(3) + ' MB</strong><br/>' +
+                       params[1].marker + ' HeapSys: <strong>' + Number(params[1].value).toFixed(3) + ' MB</strong>';
+            }
+        },
+        legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysCpuChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysCpuChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysCpu === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var data = ts.map(function(s) { return s.cpu_percent; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 60, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
+        series: [{ name: 'CPU', data: data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(88,166,255,0.2)' }, { offset: 1, color: 'rgba(88,166,255,0.01)' }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: tc.colors[5] }, label: { formatter: '70%', color: tc.colors[5], fontSize: 10, position: 'end' } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10, position: 'end' } }] } }],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' CPU: <strong>' + Number(params[0].value).toFixed(3) + '%</strong>';
+            }
+        },
+        legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysTaskWaitChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysTaskWaitChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysTaskWait === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var p50 = ts.map(function(s) { return s.task_wait_p50_ms; });
+    var p95 = ts.map(function(s) { return s.task_wait_p95_ms; });
+    var p99 = ts.map(function(s) { return s.task_wait_p99_ms; });
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+        series: [
+            { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.latencyColors[0], width: 2 }, itemStyle: { color: tc.latencyColors[0] } },
+            { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.latencyColors[2], width: 2 }, itemStyle: { color: tc.latencyColors[2] } },
+            { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
+        ],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' P50: <strong>' + Number(params[0].value).toFixed(3) + ' ms</strong><br/>' +
+                       params[1].marker + ' P95: <strong>' + Number(params[1].value).toFixed(3) + ' ms</strong><br/>' +
+                       params[2].marker + ' P99: <strong>' + Number(params[2].value).toFixed(3) + ' ms</strong>';
+            }
+        },
+        legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+function renderSysQueueChart() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length < 2) return;
+    var el = document.getElementById('sysQueueChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var isSmooth = chartTypes.sysQueue === 'smooth';
+    var ts = sm.time_series;
+    var labels = ts.map(function(s) { return s.timestamp.substring(11, 19); });
+    var queueData = ts.map(function(s) { return s.pending_queue_len; });
+    // Track historical max for y-axis scaling
+    var maxVal = 0;
+    queueData.forEach(function(v) { if (v > maxVal) maxVal = v; });
+    if (maxVal < 10) maxVal = 10;
+    chart.setOption({
+        backgroundColor: tc.bg,
+        grid: { top: 30, right: 20, bottom: 50, left: 50 },
+        xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', min: 0, max: maxVal, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        series: [
+            { name: 'Pending Queue', data: queueData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2 }, itemStyle: { color: tc.colors[6] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(148,163,184,0.25)' }, { offset: 1, color: 'rgba(148,163,184,0.02)' }]) } },
+        ],
+        tooltip: {
+            trigger: 'axis',
+            confine: true,
+            formatter: function(params) {
+                return params[0].axisValue + '<br/>' +
+                       params[0].marker + ' Pending Queue: <strong>' + Number(params[0].value) + '</strong>';
+            }
+        },
+        legend: { data: ['Pending Queue'], textStyle: { color: tc.textColor }, top: 0 },
+    }, true);
+}
+
+// System Metrics Table Functions
+let tableSortKey = 'timestamp';
+let tableSortOrder = 'asc';
+let currentPage = 1;
+let totalPages = 1;
+const pageSize = 20;
+let tableData = [];
+
+function initSysMetricsTable() {
+    var sm = reportData.system_metrics;
+    if (!sm || !sm.time_series || sm.time_series.length === 0) return;
+    tableData = sm.time_series.slice();
+    renderTablePage();
+    updatePagination();
+}
+
+function formatTimestamp(ts) {
+    if (!ts) return '-';
+    try {
+        var d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        return d.toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    } catch (e) {
+        return ts;
+    }
+}
+
+function isDangerRow(row) {
+    return (row.goroutine_count > 50000) ||
+           (row.heap_alloc_mb > 500) ||
+           (row.cpu_percent > 90) ||
+           (row.gc_pause_last_ms > 10) ||
+           (row.pending_queue_len > 100) ||
+           (row.task_wait_p99_ms > 100);
+}
+
+function getSortedData() {
+    if (!tableSortKey) return tableData;
+    var key = tableSortKey;
+    var order = tableSortOrder === 'asc' ? 1 : -1;
+    return tableData.slice().sort(function(a, b) {
+        var valA = a[key] !== undefined ? a[key] : 0;
+        var valB = b[key] !== undefined ? b[key] : 0;
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return order * valA.localeCompare(valB);
+        }
+        return order * (valA - valB);
+    });
+}
+
+function toggleSort(key) {
+    if (tableSortKey === key) {
+        tableSortOrder = tableSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        tableSortKey = key;
+        tableSortOrder = 'asc';
+    }
+    currentPage = 1;
+    renderTablePage();
+    updatePagination();
+    updateSortIcons();
+}
+
+function updateSortIcons() {
+    var headers = document.querySelectorAll('#sysMetricsTable th.sortable');
+    headers.forEach(function(th) {
+        var icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        var col = th.getAttribute('onclick').match(/toggleSort\('(.+?)'\)/)[1];
+        if (col === tableSortKey) {
+            icon.textContent = tableSortOrder === 'asc' ? '↑' : '↓';
+        } else {
+            icon.textContent = '⇅';
+        }
+    });
+}
+
+function getTotalPages() {
+    return Math.ceil(tableData.length / pageSize);
+}
+
+function renderTablePage() {
+    var tbody = document.getElementById('sysMetricsTableBody');
+    if (!tbody) return;
+    var sorted = getSortedData();
+    var start = (currentPage - 1) * pageSize;
+    var pageData = sorted.slice(start, start + pageSize);
+    var html = '';
+    pageData.forEach(function(row) {
+        var dangerClass = isDangerRow(row) ? 'danger-row' : '';
+        html += '<tr class="' + dangerClass + '">';
+        html += '<td>' + formatTimestamp(row.timestamp) + '</td>';
+        html += '<td class="' + (row.goroutine_count > 50000 ? 'danger-cell' : '') + '">' + Number(row.goroutine_count || 0).toLocaleString() + '</td>';
+        html += '<td class="' + (row.heap_alloc_mb > 500 ? 'danger-cell' : '') + '">' + (row.heap_alloc_mb || 0).toFixed(1) + '</td>';
+        html += '<td class="' + (row.cpu_percent > 90 ? 'danger-cell' : '') + '">' + (row.cpu_percent || 0).toFixed(1) + '</td>';
+        html += '<td class="' + (row.gc_pause_last_ms > 10 ? 'danger-cell' : '') + '">' + (row.gc_pause_last_ms || 0).toFixed(1) + '</td>';
+        html += '<td>' + (row.active_workers || 0) + '</td>';
+        html += '<td class="' + (row.pending_queue_len > 100 ? 'danger-cell' : '') + '">' + (row.pending_queue_len || 0) + '</td>';
+        html += '<td class="' + (row.task_wait_p99_ms > 100 ? 'danger-cell' : '') + '">' + (row.task_wait_p99_ms || 0).toFixed(1) + '</td>';
+        html += '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function updatePagination() {
+    totalPages = getTotalPages();
+    var pagination = document.getElementById('tablePagination');
+    var pageInfo = document.getElementById('pageInfo');
+    if (!pagination || !pageInfo) return;
+
+    if (totalPages <= 1) {
+        pagination.style.display = 'none';
+    } else {
+        pagination.style.display = 'flex';
+        pageInfo.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 页';
+    }
+}
+
+function goToPage(page) {
+    totalPages = getTotalPages();
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    currentPage = page;
+    renderTablePage();
+    updatePagination();
+}
+
+function prevPage() {
+    goToPage(currentPage - 1);
+}
+
+function nextPage() {
+    goToPage(currentPage + 1);
+>>>>>>> dev
 }
 
 function updateNodeToggleButtons(chartId) {
     const idx = parseInt(chartId.slice(5));
+<<<<<<< HEAD
     const el = document.getElementById('nodeChart' + idx);
+=======
+    const el = document.getElementById('nodeQpsChart' + idx) || document.getElementById('nodeLatencyChart' + idx);
+>>>>>>> dev
     if (!el) return;
     const card = el.closest('.chart-card');
     if (!card) return;
@@ -772,11 +1896,23 @@ function initCharts() {
     {{if gt (len .ErrorBreakdown) 0}}
     renderErrorBreakdownChart();
     {{end}}
+<<<<<<< HEAD
+=======
+    {{if .SystemMetrics}}
+    renderSysGoroutineChart();
+    renderSysHeapChart();
+    renderSysCpuChart();
+    renderSysTaskWaitChart();
+    renderSysQueueChart();
+    initSysMetricsTable();
+    {{end}}
+>>>>>>> dev
 }
 
 function renderOverviewChart() {
     const m = reportData.metrics || {};
     const chart = echarts.init(document.getElementById('overviewChart'));
+<<<<<<< HEAD
     
     const total = Number(m.total_reqs || 0);
     const success = Number(m.success_reqs || 0);
@@ -797,6 +1933,30 @@ function renderOverviewChart() {
             extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
             formatter: function(p) {
                 const pct = ((p.value / Math.max(total, 1)) * 100).toFixed(1);
+=======
+
+    const total = Number(m.total_reqs || 0);
+    const success = Number(m.success_reqs || 0);
+    const failed = Number(m.failed_reqs || 0);
+
+    const isDark = document.documentElement.classList.contains('dark-theme');
+
+    chart.setOption({
+        backgroundColor: tc.bg,
+        color: [tc.colors[1], tc.colors[4]],
+        tooltip: {
+            trigger: 'item',
+            confine: true,
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: [12, 16],
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
+            extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
+            formatter: function(p) {
+                const pct = ((p.value / Math.max(total, 1)) * 100).toFixed(3);
+>>>>>>> dev
                 return '<div style="font-weight:600;margin-bottom:4px">' + p.name + '</div>' +
                        '<div style="font-size:13px"><strong>' + p.value.toLocaleString() + '</strong> requests (' + pct + '%)</div>';
             }
@@ -821,7 +1981,11 @@ function renderOverviewChart() {
                 style: {
                     text: '总请求',
                     fontSize: 11,
+<<<<<<< HEAD
                     fill: '#8c959f',
+=======
+                    fill: tc.textColor,
+>>>>>>> dev
                     textAlign: 'center'
                 }
             }
@@ -832,13 +1996,22 @@ function renderOverviewChart() {
             icon: 'roundRect',
             formatter: function(name) {
                 const val = name === 'Success' ? success : failed;
+<<<<<<< HEAD
                 const pct = (val / Math.max(total, 1) * 100).toFixed(1);
+=======
+                const pct = (val / Math.max(total, 1) * 100).toFixed(3);
+>>>>>>> dev
                 return '{name|' + name + '}   {val|' + pct + '%}';
             },
             textStyle: {
                 rich: {
+<<<<<<< HEAD
                     name: { color: '#24292f', fontWeight: 500, fontSize: 13 },
                     val: { color: '#8c959f', fontSize: 12, fontWeight: 400 }
+=======
+                    name: { color: tc.textColor, fontWeight: 500, fontSize: 13 },
+                    val: { color: tc.lineColor, fontSize: 12, fontWeight: 400 }
+>>>>>>> dev
                 }
             }
         },
@@ -863,10 +2036,17 @@ function renderOverviewChart() {
             },
             data: [
                 { value: success, name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+<<<<<<< HEAD
                     { offset: 0, color: '#16a34a' }, { offset: 1, color: '#15803d' }
                 ])}},
                 { value: failed, name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
                     { offset: 0, color: '#dc2626' }, { offset: 1, color: '#b91c1c' }
+=======
+                    { offset: 0, color: isDark ? '#3fb950' : '#1a7f37' }, { offset: 1, color: isDark ? '#46c759' : '#15803d' }
+                ])}},
+                { value: failed, name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+                    { offset: 0, color: isDark ? '#f85149' : '#cf222e' }, { offset: 1, color: isDark ? '#da3633' : '#a40e26' }
+>>>>>>> dev
                 ])}}
             ]
         }]
@@ -878,11 +2058,16 @@ function renderErrorRateChart() {
     const timestamps = m.timestamps || [];
     const totals = m.ts_total || [];
     const fails = m.ts_fail || [];
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> dev
     const errRates = [];
     for (let i = 0; i < totals.length; i++) {
         errRates.push(totals[i] > 0 ? (fails[i] / totals[i]) * 100 : 0);
     }
+<<<<<<< HEAD
     
     if (!timestamps.length || !errRates.length) return;
     
@@ -891,11 +2076,24 @@ function renderErrorRateChart() {
     const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100);
     
     const chart = echarts.init(document.getElementById('errorRateChart'));
+=======
+
+    if (!timestamps.length || !errRates.length) return;
+
+    const timeLabels = timestamps.map(ts => ts.substring(11, 19));
+    const maxErrRate = Math.max(...errRates, 0.01);
+    const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100);
+
+    const chart = echarts.init(document.getElementById('errorRateChart'));
+    const isDark = document.documentElement.classList.contains('dark-theme');
+
+>>>>>>> dev
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'axis',
             confine: true,
+<<<<<<< HEAD
             backgroundColor: 'rgba(255,255,255,0.96)',
             borderColor: 'rgba(148,163,184,0.2)',
             borderWidth: 1,
@@ -905,16 +2103,36 @@ function renderErrorRateChart() {
             formatter: function(params) {
                 const idx = params[0].dataIndex;
                 return timeLabels[idx] + '<br/>Error Rate: <strong>' + params[0].value.toFixed(2) + '%</strong><br/>' +
+=======
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: [10, 14],
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+            formatter: function(params) {
+                const idx = params[0].dataIndex;
+                return timeLabels[idx] + '<br/>Error Rate: <strong>' + params[0].value.toFixed(3) + '%</strong><br/>' +
+>>>>>>> dev
                        'Failed: ' + (fails[idx] || 0) + ' / Total: ' + (totals[idx] || 0);
             }
         },
         grid: { left: 50, right: 16, top: 20, bottom: 44 },
+<<<<<<< HEAD
         dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) } },
         yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
         markLine: {
             silent: true,
             data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(2) + '%', color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+=======
+        dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
+        xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) } },
+        yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) + '%' } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+        markLine: {
+            silent: true,
+            data: [{ yAxis: globalErrRate, label: { formatter: 'Total: ' + globalErrRate.toFixed(3) + '%', color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+>>>>>>> dev
             symbol: 'none'
         },
         series: [{
@@ -925,7 +2143,11 @@ function renderErrorRateChart() {
             data: errRates,
             lineStyle: { width: 2, color: tc.dangerColor },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+<<<<<<< HEAD
                 { offset: 0, color: 'rgba(220,38,38,0.18)' }, { offset: 1, color: 'rgba(220,38,38,0.01)' }
+=======
+                { offset: 0, color: isDark ? 'rgba(239,68,68,0.18)' : 'rgba(220,38,38,0.18)' }, { offset: 1, color: isDark ? 'rgba(239,68,68,0.01)' : 'rgba(220,38,38,0.01)' }
+>>>>>>> dev
             ])},
             symbol: 'none'
         }]
@@ -935,24 +2157,43 @@ function renderErrorRateChart() {
 function renderLatencyChart() {
     const m = reportData.metrics || {};
     const chart = echarts.init(document.getElementById('latencyChart'));
+<<<<<<< HEAD
     
+=======
+
+    const isDark = document.documentElement.classList.contains('dark-theme');
+
+>>>>>>> dev
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
             confine: true,
+<<<<<<< HEAD
             backgroundColor: 'rgba(255,255,255,0.97)',
             borderColor: 'rgba(208,215,222,0.5)',
             borderWidth: 1,
             borderRadius: 10,
             padding: [12, 16],
             textStyle: { fontSize: 12, color: '#24292f' },
+=======
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: [12, 16],
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
+>>>>>>> dev
             extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
             formatter: function(params) {
                 const labels = { Avg: '平均延迟', P50: '中位数 (50%)', P90: 'P90 延迟', P95: 'P95 延迟', P99: 'P99 尾部延迟' };
                 return '<div style="font-weight:600;margin-bottom:4px">' + (labels[params[0].name] || params[0].name) + '</div>' +
+<<<<<<< HEAD
                        '<div style="font-size:13px"><strong>' + params[0].value.toFixed(1) + '</strong> ms</div>';
+=======
+                       '<div style="font-size:13px"><strong>' + params[0].value.toFixed(3) + '</strong> ms</div>';
+>>>>>>> dev
             }
         },
         grid: { left: 44, right: 20, top: 24, bottom: 32 },
@@ -961,20 +2202,30 @@ function renderLatencyChart() {
             data: ['Avg', 'P50', 'P90', 'P95', 'P99'],
             axisLine: { show: false },
             axisTick: { show: false },
+<<<<<<< HEAD
             axisLabel: { color: '#656d76', fontSize: 12, fontWeight: 600, margin: 12 }
+=======
+            axisLabel: { color: tc.textColor, fontSize: 12, fontWeight: 600, margin: 12 }
+>>>>>>> dev
         },
         yAxis: {
             type: 'value',
             axisLine: { show: false },
             axisTick: { show: false },
+<<<<<<< HEAD
             axisLabel: { color: '#8c959f', fontSize: 10, formatter: function(v) { return v.toFixed(0) } },
             splitLine: { lineStyle: { color: 'rgba(208,215,222,0.6)', type: 'dashed' } }
+=======
+            axisLabel: { color: tc.lineColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } },
+            splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }
+>>>>>>> dev
         },
         series: [{
             type: 'bar',
             barWidth: '40%',
             data: [
                 { value: parseFloat(m.avg_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+<<<<<<< HEAD
                     { offset: 0, color: '#0891b2' }, { offset: 1, color: '#0e7490' }
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p50_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -988,12 +2239,32 @@ function renderLatencyChart() {
                 ]), borderRadius: [6, 6, 2, 2] }},
                 { value: parseFloat(m.p99_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                     { offset: 0, color: '#8b5cf6' }, { offset: 1, color: '#7c3aed' }
+=======
+                    { offset: 0, color: tc.latencyColors[0] }, { offset: 1, color: isDark ? '#2ea043' : '#15803d' }
+                ]), borderRadius: [6, 6, 2, 2] }},
+                { value: parseFloat(m.p50_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: tc.latencyColors[0] }, { offset: 1, color: isDark ? '#2ea043' : '#15803d' }
+                ]), borderRadius: [6, 6, 2, 2] }},
+                { value: parseFloat(m.p90_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: tc.latencyColors[1] }, { offset: 1, color: isDark ? '#d29922' : '#9a6700' }
+                ]), borderRadius: [6, 6, 2, 2] }},
+                { value: parseFloat(m.p95_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: tc.latencyColors[2] }, { offset: 1, color: isDark ? '#db6d28' : '#8a3a00' }
+                ]), borderRadius: [6, 6, 2, 2] }},
+                { value: parseFloat(m.p99_latency_s || 0) * 1000, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: tc.latencyColors[3] }, { offset: 1, color: isDark ? '#da3633' : '#a40e26' }
+>>>>>>> dev
                 ]), borderRadius: [6, 6, 2, 2] }}
             ],
             label: {
                 show: true, position: 'top',
+<<<<<<< HEAD
                 formatter: function(p) { return p.value.toFixed(1); },
                 color: '#656d76', fontSize: 11, fontWeight: 600, offset: [0, -4]
+=======
+                formatter: function(p) { return p.value.toFixed(3); },
+                color: tc.textColor, fontSize: 11, fontWeight: 600, offset: [0, -4]
+>>>>>>> dev
             }
         }]
     });
@@ -1008,6 +2279,10 @@ function renderQPSTrend() {
     
     const timeLabels = timestamps.map(ts => ts.substring(11, 19));
     const isSmooth = chartTypes.qpsTrend === 'smooth';
+<<<<<<< HEAD
+=======
+    const isDark = document.documentElement.classList.contains('dark-theme');
+>>>>>>> dev
     
     const chart = echarts.init(document.getElementById('qpsChart'));
     chart.setOption({
@@ -1015,6 +2290,7 @@ function renderQPSTrend() {
         tooltip: {
             trigger: 'axis',
             confine: true,
+<<<<<<< HEAD
             backgroundColor: 'rgba(255,255,255,0.96)',
             borderColor: 'rgba(148,163,184,0.2)',
             borderWidth: 1,
@@ -1032,6 +2308,25 @@ function renderQPSTrend() {
         dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+=======
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1,
+            borderRadius: 12,
+            padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: function(params) {
+                const idx = params[0].dataIndex;
+                return '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[idx] + '</div>' +
+                       'QPS: <strong>' + params[0].value.toFixed(3) + '</strong>';
+            }
+        },
+        grid: { left: 50, right: 20, top: 20, bottom: 50 },
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(3) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+>>>>>>> dev
         series: [{
             name: 'QPS',
             type: 'line',
@@ -1041,7 +2336,11 @@ function renderQPSTrend() {
             lineStyle: { width: 2, color: tc.colors[0] },
             itemStyle: { color: tc.colors[0] },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+<<<<<<< HEAD
                 { offset: 0, color: 'rgba(8,145,178, 0.15)' }, { offset: 1, color: 'rgba(8,145,178, 0.01)' }
+=======
+                { offset: 0, color: 'rgba(45,212,191, 0.15)' }, { offset: 1, color: 'rgba(45,212,191, 0.01)' }
+>>>>>>> dev
             ])},
             symbol: 'none'
         }]
@@ -1052,6 +2351,10 @@ function renderLatencyTrend() {
     const m = reportData.metrics || {};
     const timestamps = m.timestamps || [];
     const isSmooth = chartTypes.latTrend === 'smooth';
+<<<<<<< HEAD
+=======
+    const isDark = document.documentElement.classList.contains('dark-theme');
+>>>>>>> dev
     
     if (!timestamps.length) return;
     
@@ -1063,6 +2366,7 @@ function renderLatencyTrend() {
         tooltip: {
             trigger: 'axis',
             confine: true,
+<<<<<<< HEAD
             backgroundColor: 'rgba(255,255,255,0.96)',
             borderColor: 'rgba(148,163,184,0.2)',
             borderWidth: 1,
@@ -1074,11 +2378,25 @@ function renderLatencyTrend() {
                 let h = '<div style="font-size:11.5px;color:#1e293b;margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
                 params.forEach(function(item) {
                     h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(1) + '</strong>ms<br/>';
+=======
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1,
+            borderRadius: 12,
+            padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: function(params) {
+                let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>';
+                params.forEach(function(item) {
+                    h += item.marker + ' ' + item.seriesName + ': <strong>' + item.value.toFixed(3) + '</strong>ms<br/>';
+>>>>>>> dev
                 });
                 return h;
             }
         },
         grid: { top: 30, right: 20, bottom: 50, left: 50 },
+<<<<<<< HEAD
         dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(8,145,178, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
         xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
         yAxis: [
@@ -1090,12 +2408,26 @@ function renderLatencyTrend() {
             { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
             { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#d97706' }, itemStyle: { color: '#d97706' }, symbol: 'none' },
             { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
+=======
+        dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+        xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+        yAxis: [
+            { type: 'value', position: 'left', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(1) } }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+            { type: 'value', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: function(v) { return v.toFixed(2) } } }
+        ],
+        series: [
+            { name: 'P50', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p50 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[0] }, itemStyle: { color: tc.latencyColors[0] }, symbol: 'none' },
+            { name: 'P90', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p90 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[1] }, itemStyle: { color: tc.latencyColors[1] }, symbol: 'none' },
+            { name: 'P95', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p95 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[2] }, itemStyle: { color: tc.latencyColors[2] }, symbol: 'none' },
+            { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: m.ts_p99 || [], yAxisIndex: 0, lineStyle: { width: 2, color: tc.latencyColors[3] }, itemStyle: { color: tc.latencyColors[3] }, symbol: 'none' }
+>>>>>>> dev
         ]
     });
 }
 
 function renderNodeCharts() {
     const nodes = reportData.node_metrics || [];
+<<<<<<< HEAD
     nodes.forEach(function(node, idx) {
         const el = document.getElementById('nodeChart' + idx);
         if (!el) return;
@@ -1146,23 +2478,142 @@ function renderNodeCharts() {
                 { name: 'P99', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', data: node.ts_p99 || [], yAxisIndex: 1, lineStyle: { width: 2, color: '#8b5cf6' }, itemStyle: { color: '#8b5cf6' }, symbol: 'none' }
             ]
         });
+=======
+    const isDark = document.documentElement.classList.contains('dark-theme');
+    nodes.forEach(function(node, idx) {
+        const timestamps = node.timestamps || [];
+        const qpsData = node.ts_qps || [];
+        const timeLabels = timestamps.map(ts => ts.substring(11, 19));
+        const isSmooth = chartTypes['node-' + idx] === 'smooth';
+
+        if (!timestamps.length) return;
+
+        // ===== QPS 面板 =====
+        const qpsEl = document.getElementById('nodeQpsChart' + idx);
+        let qChart = null;
+        if (qpsEl) {
+            qChart = echarts.init(qpsEl);
+            qChart.setOption({
+                backgroundColor: tc.bg,
+                tooltip: {
+                    trigger: 'axis', confine: true,
+                    backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+                    borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+                    borderWidth: 1, borderRadius: 12, padding: [12, 16],
+                    textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+                    extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+                    formatter: function(params) {
+                        return '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[params[0].dataIndex] + '</div>' +
+                               params[0].marker + ' QPS: <strong>' + params[0].value.toFixed(3) + '</strong> req/s';
+                    }
+                },
+                grid: { left: 50, right: 20, top: 16, bottom: 28 },
+                xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                yAxis: { type: 'value', name: 'req/s', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                series: [{
+                    name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle',
+                    data: qpsData, lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, symbol: 'none',
+                    areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(45,212,191, 0.35)' }, { offset: 1, color: 'rgba(45,212,191, 0.03)' }
+                    ]) }
+                }]
+            });
+        }
+
+        // ===== 延迟百分位带面板 =====
+        const latEl = document.getElementById('nodeLatencyChart' + idx);
+        let lChart = null;
+        if (latEl) {
+            const p50 = node.ts_p50 || [];
+            const p90 = node.ts_p90 || [];
+            const p95 = node.ts_p95 || [];
+            const p99 = node.ts_p99 || [];
+            const lc = tc.latencyColors;
+            lChart = echarts.init(latEl);
+            lChart.setOption({
+                backgroundColor: tc.bg,
+                tooltip: {
+                    trigger: 'axis', confine: true,
+                    backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+                    borderColor: isDark ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+                    borderWidth: 1, borderRadius: 12, padding: [12, 16],
+                    textStyle: { fontSize: 11, color: isDark ? '#cbd5e1' : '#475569' },
+                    extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+                    formatter: function(params) {
+                        const i = params[0].dataIndex;
+                        let h = '<div style="font-size:11.5px;color:' + (isDark ? '#e6edf3' : '#1e293b') + ';margin-bottom:6px;font-weight:600">' + timeLabels[i] + '</div>';
+                        var rows = [
+                            { name: 'P50', val: p50[i], color: lc[0] },
+                            { name: 'P90', val: p90[i], color: lc[1] },
+                            { name: 'P95', val: p95[i], color: lc[2] },
+                            { name: 'P99', val: p99[i], color: lc[3] }
+                        ];
+                        rows.forEach(function(r) {
+                            h += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + r.color + ';margin-right:6px"></span>' + r.name + ': <strong>' + Number(r.val).toFixed(3) + ' ms</strong><br/>';
+                        });
+                        return h;
+                    }
+                },
+                legend: { data: ['P50','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+                grid: { left: 50, right: 20, top: 30, bottom: 50 },
+                dataZoom: [
+                    { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: 'rgba(45,212,191, 0.15)', handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
+                    { type: 'inside' }
+                ],
+                xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+                yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+                series: [
+                    // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
+                    // 深色模式：alpha 递增 (0.22→0.30→0.38) 避免层次模糊；浅色保持不变
+                    { name: 'P95-P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(248,81,73,0.38)' : 'rgba(248,81,73,0.16)' }, z: 2 },
+                    { name: 'P90-P95', type: 'line', smooth: isSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(240,136,62,0.30)' : 'rgba(240,136,62,0.16)' }, z: 2 },
+                    { name: 'P50-P90', type: 'line', smooth: isSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(227,179,65,0.22)' : 'rgba(227,179,65,0.14)' }, z: 2 },
+                    { name: 'P50', type: 'line', smooth: isSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark ? 'rgba(63,185,80,0.10)' : 'rgba(63,185,80,0.04)' }, z: 3 },
+                    // P99 顶层边界线（独立非堆叠）
+                    { name: 'P99', type: 'line', smooth: isSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 }
+                ]
+            });
+        }
+
+        // 同步 dataZoom：延迟面板是主控（有 slider），QPS 单向跟随避免循环
+        if (qChart && lChart) {
+            lChart.on('dataZoom', function(params) {
+                var start = (params.batch && params.batch[0]) ? params.batch[0].start : params.start;
+                var end = (params.batch && params.batch[0]) ? params.batch[0].end : params.end;
+                if (typeof start === 'number' && typeof end === 'number') {
+                    qChart.dispatchAction({ type: 'dataZoom', start: start, end: end });
+                }
+            });
+        }
+>>>>>>> dev
     });
 }
 
 function renderErrorBreakdownChart() {
     const errors = reportData.error_breakdown || [];
     if (!errors.length) return;
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> dev
     const chart = echarts.init(document.getElementById('errorBreakdownChart'));
     const data = errors.map(function(e) {
         return { value: e.count, name: e.code || e.status || e.error_type || 'Unknown' };
     });
+<<<<<<< HEAD
     
+=======
+
+    const isDark = document.documentElement.classList.contains('dark-theme');
+
+>>>>>>> dev
     chart.setOption({
         backgroundColor: tc.bg,
         tooltip: {
             trigger: 'item',
             confine: true,
+<<<<<<< HEAD
             backgroundColor: 'rgba(255,255,255,0.97)',
             borderColor: 'rgba(208,215,222,0.5)',
             borderWidth: 1,
@@ -1176,12 +2627,34 @@ function renderErrorBreakdownChart() {
             }
         },
         legend: { orient: 'vertical', right: 20, top: 'center' },
+=======
+            backgroundColor: isDark ? 'rgba(22,27,34,0.96)' : 'rgba(255,255,255,0.97)',
+            borderColor: isDark ? 'rgba(48,54,61,0.8)' : 'rgba(208,215,222,0.5)',
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: [12, 16],
+            textStyle: { fontSize: 12, color: isDark ? '#e6edf3' : '#24292f' },
+            extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
+            formatter: function(p) {
+                return '<div style="font-weight:600;margin-bottom:4px">' + p.name + '</div>' +
+                       '<div style="font-size:13px"><strong>' + p.value.toLocaleString() + '</strong> occurrences (' + p.percent.toFixed(3) + '%)</div>';
+            }
+        },
+        legend: {
+            orient: 'vertical', right: 20, top: 'center',
+            textStyle: { color: tc.textColor }
+        },
+>>>>>>> dev
         series: [{
             type: 'pie',
             radius: ['45%', '70%'],
             center: ['40%', '50%'],
             data: data,
+<<<<<<< HEAD
             label: { show: true, formatter: '{b}: {c}' },
+=======
+            label: { show: true, formatter: '{b}: {c}', color: tc.textColor },
+>>>>>>> dev
             emphasis: { itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0,0,0,0.15)' } }
         }]
     });
@@ -1205,10 +2678,195 @@ window.addEventListener('resize', function() {
     echarts.getInstanceByDom(document.getElementById('latencyTrendChart'))?.resize();
     if (reportData.node_metrics) {
         reportData.node_metrics.forEach(function(_, idx) {
+<<<<<<< HEAD
             echarts.getInstanceByDom(document.getElementById('nodeChart' + idx))?.resize();
         });
     }
 });
+=======
+            echarts.getInstanceByDom(document.getElementById('nodeQpsChart' + idx))?.resize();
+            echarts.getInstanceByDom(document.getElementById('nodeLatencyChart' + idx))?.resize();
+        });
+    }
+});
+
+window.addEventListener('beforeprint', function() {
+    var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
+                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart'];
+    if (reportData.node_metrics) {
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeQpsChart' + idx); chartIds.push('nodeLatencyChart' + idx); });
+    }
+    chartIds.forEach(function(id) {
+        var chart = echarts.getInstanceByDom(document.getElementById(id));
+        if (chart) {
+            var url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+            var img = document.createElement('img');
+            img.src = url;
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            var container = document.getElementById(id);
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(img);
+            }
+        }
+    });
+});
+
+function applyDarkMode(isDark) {
+    tc.bg = isDark ? '#0d1117' : '#ffffff';
+    tc.textColor = isDark ? '#c9d1d9' : '#656d76';
+    tc.lineColor = isDark ? '#30363d' : '#dde2e8';
+    // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
+    tc.colors = isDark
+        ? ['#2dd4bf', '#3fb950', '#e3b341', '#f0883e', '#f85149', '#58a6ff', '#94a3b8']
+        : ['#0d9488', '#1a7f37', '#bf8700', '#bc4c00', '#cf222e', '#0969da', '#64748b'];
+    // 延迟曲线语义色：P50 绿(好) → P90 黄(注意) → P95 蓝(信息) → P99 橙(危险)
+    tc.latencyColors = isDark
+        ? ['#3fb950', '#e3b341', '#58a6ff', '#f0883e']
+        : ['#1a7f37', '#bf8700', '#0969da', '#f0883e'];
+    tc.dangerColor = '#f0883e';
+
+    var chartIds = ['overviewChart', 'errorRateChart', 'latencyChart', 'qpsChart', 'latencyTrendChart',
+                     'sysGoroutineChart', 'sysHeapChart', 'sysCpuChart', 'sysTaskWaitChart', 'sysQueueChart'];
+    if (reportData.node_metrics) {
+        reportData.node_metrics.forEach(function(_, idx) { chartIds.push('nodeQpsChart' + idx); chartIds.push('nodeLatencyChart' + idx); });
+    }
+
+    chartIds.forEach(function(id) {
+        var chart = echarts.getInstanceByDom(document.getElementById(id));
+        if (chart) {
+            chart.dispose();
+        }
+    });
+
+    renderOverviewChart();
+    renderErrorRateChart();
+    renderLatencyChart();
+    renderQPSTrend();
+    renderLatencyTrend();
+    renderNodeCharts();
+    {{if .SystemMetrics}}
+    renderSysGoroutineChart();
+    renderSysHeapChart();
+    renderSysCpuChart();
+    renderSysTaskWaitChart();
+    renderSysQueueChart();
+    {{end}}
+}
+
+let isDarkMode = false;
+
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    applyTheme();
+}
+
+function updateThemeIcon() {
+    var sunIcon = document.getElementById('themeIconSun');
+    var moonIcon = document.getElementById('themeIconMoon');
+    var themeText = document.getElementById('themeText');
+    if (sunIcon && moonIcon) {
+        sunIcon.style.display = isDarkMode ? 'block' : 'none';
+        moonIcon.style.display = isDarkMode ? 'none' : 'block';
+    }
+    if (themeText) {
+        themeText.textContent = isDarkMode ? '浅色' : '深色';
+    }
+}
+
+function applyTheme() {
+    applyDarkMode(isDarkMode);
+    document.documentElement.classList.toggle('dark-theme', isDarkMode);
+    updateThemeIcon();
+    // Re-render error breakdown chart so it picks up the new tc.bg
+    if (reportData.error_breakdown && reportData.error_breakdown.length) {
+        var ebChart = echarts.getInstanceByDom(document.getElementById('errorBreakdownChart'));
+        if (ebChart) { ebChart.dispose(); }
+        renderErrorBreakdownChart();
+    }
+}
+
+applyTheme();
+
+// Failed Nodes Multi-field Search (AND logic)
+function populateProtocolOptions() {
+    var select = document.getElementById('fnSearchProtocol');
+    if (!select) return;
+    var protocols = {};
+    document.querySelectorAll('.failed-node-card').forEach(function(card) {
+        var p = card.getAttribute('data-protocol') || 'http';
+        protocols[p] = true;
+    });
+    Object.keys(protocols).sort().forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        select.appendChild(opt);
+    });
+}
+
+function filterFailedNodes() {
+    var qName = (document.getElementById('fnSearchName') || {}).value || '';
+    var qId = (document.getElementById('fnSearchId') || {}).value || '';
+    var qCode = (document.getElementById('fnSearchCode') || {}).value || '';
+    var qMsg = (document.getElementById('fnSearchMsg') || {}).value || '';
+    var qProto = (document.getElementById('fnSearchProtocol') || {}).value || '';
+
+    qName = qName.toLowerCase().trim();
+    qId = qId.toLowerCase().trim();
+    qCode = qCode.toLowerCase().trim();
+    qMsg = qMsg.toLowerCase().trim();
+
+    // Show/hide clear buttons
+    var fields = ['fnSearchName', 'fnSearchId', 'fnSearchCode', 'fnSearchMsg'];
+    fields.forEach(function(id) {
+        var inp = document.getElementById(id);
+        var btn = document.getElementById(id + 'Clear');
+        if (btn) btn.style.display = (inp && inp.value) ? 'block' : 'none';
+    });
+
+    var cards = document.querySelectorAll('.failed-node-card');
+    var emptyMsg = document.getElementById('failedNodesEmpty');
+    var visibleCount = 0;
+
+    cards.forEach(function(card) {
+        var name = (card.getAttribute('data-name') || '').toLowerCase();
+        var id = (card.getAttribute('data-id') || '').toLowerCase();
+        var code = (card.getAttribute('data-code') || '').toLowerCase();
+        var msg = (card.getAttribute('data-msg') || '').toLowerCase();
+        var proto = card.getAttribute('data-protocol') || 'http';
+
+        var match = true;
+        if (qName && !name.includes(qName)) match = false;
+        if (qId && !id.includes(qId)) match = false;
+        if (qCode && !code.includes(qCode)) match = false;
+        if (qMsg && !msg.includes(qMsg)) match = false;
+        if (qProto && proto !== qProto) match = false;
+
+        if (match) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    if (emptyMsg) emptyMsg.style.display = (visibleCount === 0 && (qName || qId || qCode || qMsg || qProto)) ? 'block' : 'none';
+}
+
+function clearField(fieldId) {
+    var inp = document.getElementById(fieldId);
+    if (inp) {
+        inp.value = '';
+        filterFailedNodes();
+        inp.focus();
+    }
+}
+
+// Initialize protocol options on load
+populateProtocolOptions();
+>>>>>>> dev
 </script>
 </body>
 </html>`))
@@ -1218,7 +2876,53 @@ type EnhancedReportContext struct {
 	NodeMetrics    []EnhancedNodeMetric     `json:"node_metrics"`
 	ErrorBreakdown []map[string]interface{} `json:"error_breakdown"`
 	Metadata       *EnhancedMetadata        `json:"metadata"`
+<<<<<<< HEAD
 	JSONData       template.JS              `json:"-"`
+=======
+	SystemMetrics  *EnhancedSystemMetrics   `json:"system_metrics,omitempty"`
+	FailedNodes    []runner.FailedNodeDetail `json:"failed_nodes,omitempty"`
+	JSONData       template.JS              `json:"-"`
+	EChartsJS      template.JS              `json:"-"`
+}
+
+// EnhancedSystemMetrics holds system performance data for the exported HTML report.
+type EnhancedSystemMetrics struct {
+	Summary    EnhancedSystemMetricsSummary  `json:"summary"`
+	TimeSeries []EnhancedSystemMetricsSample `json:"time_series,omitempty"`
+}
+
+// EnhancedSystemMetricsSummary holds aggregated system metrics for the exported HTML report.
+type EnhancedSystemMetricsSummary struct {
+	SampleCount      int     `json:"sample_count"`
+	GoroutineMax     int64   `json:"goroutine_max"`
+	GoroutineAvg     float64 `json:"goroutine_avg"`
+	HeapAllocMaxMB   float64 `json:"heap_alloc_max_mb"`
+	HeapAllocAvgMB   float64 `json:"heap_alloc_avg_mb"`
+	CPUMax           float64 `json:"cpu_max"`
+	CPUAvg           float64 `json:"cpu_avg"`
+	GCPauseTotalMs   float64 `json:"gc_pause_total_ms"`
+	GCCount          uint32  `json:"gc_count"`
+	TaskWaitAvgMs    float64 `json:"task_wait_avg_ms"`
+	TaskWaitP99MaxMs float64 `json:"task_wait_p99_max_ms"`
+	PendingQueueMax  int     `json:"pending_queue_max"`
+	PendingQueueAvg  float64 `json:"pending_queue_avg"`
+	ActiveWorkersMax int     `json:"active_workers_max"`
+	ActiveWorkersAvg float64 `json:"active_workers_avg"`
+}
+
+// EnhancedSystemMetricsSample holds a single system metrics sample for the exported HTML report.
+type EnhancedSystemMetricsSample struct {
+	Timestamp       string  `json:"timestamp"`
+	GoroutineCount  int64   `json:"goroutine_count"`
+	HeapAllocMB     float64 `json:"heap_alloc_mb"`
+	HeapSysMB       float64 `json:"heap_sys_mb"`
+	CPUUsagePercent float64 `json:"cpu_percent"`
+	ActiveWorkers   int     `json:"active_workers"`
+	PendingQueueLen int     `json:"pending_queue_len"`
+	TaskWaitP50Ms   float64 `json:"task_wait_p50_ms"`
+	TaskWaitP95Ms   float64 `json:"task_wait_p95_ms"`
+	TaskWaitP99Ms   float64 `json:"task_wait_p99_ms"`
+>>>>>>> dev
 }
 
 type EnhancedMetrics struct {
@@ -1308,6 +3012,10 @@ func GenerateEnhancedHTML(detailJSON string) (string, error) {
 		return "", fmt.Errorf("failed to marshal context: %w", err)
 	}
 	ctx.JSONData = template.JS(jsonBytes)
+<<<<<<< HEAD
+=======
+	ctx.EChartsJS = template.JS(echartsMinJS)
+>>>>>>> dev
 
 	var buf strings.Builder
 	if err := enhancedReportTemplate.Execute(&buf, ctx); err != nil {
@@ -1432,5 +3140,50 @@ func buildEnhancedContext(detail *runner.ReportDetail) *EnhancedReportContext {
 		ctx.Metadata.RunMode = mode
 	}
 
+<<<<<<< HEAD
+=======
+	// Populate failed nodes if available.
+	ctx.FailedNodes = detail.FailedNodes
+
+	// Populate system metrics if available.
+	if detail.SystemMetrics != nil {
+		sm := detail.SystemMetrics
+		enhancedSM := &EnhancedSystemMetrics{
+			Summary: EnhancedSystemMetricsSummary{
+				SampleCount:      sm.Summary.SampleCount,
+				GoroutineMax:     sm.Summary.GoroutineMax,
+				GoroutineAvg:     sm.Summary.GoroutineAvg,
+				HeapAllocMaxMB:   sm.Summary.HeapAllocMaxMB,
+				HeapAllocAvgMB:   sm.Summary.HeapAllocAvgMB,
+				CPUMax:           sm.Summary.CPUMax,
+				CPUAvg:           sm.Summary.CPUAvg,
+				GCPauseTotalMs:   sm.Summary.GCPauseTotalMs,
+				GCCount:          sm.Summary.GCCount,
+				TaskWaitAvgMs:    sm.Summary.TaskWaitAvgMs,
+				TaskWaitP99MaxMs: sm.Summary.TaskWaitP99MaxMs,
+				PendingQueueMax:  sm.Summary.PendingQueueMax,
+				PendingQueueAvg:  sm.Summary.PendingQueueAvg,
+				ActiveWorkersMax: sm.Summary.ActiveWorkersMax,
+				ActiveWorkersAvg: sm.Summary.ActiveWorkersAvg,
+			},
+		}
+		for _, s := range sm.TimeSeries {
+			enhancedSM.TimeSeries = append(enhancedSM.TimeSeries, EnhancedSystemMetricsSample{
+				Timestamp:       s.Timestamp.Format("2006-01-02 15:04:05"),
+				GoroutineCount:  s.GoroutineCount,
+				HeapAllocMB:     s.HeapAllocMB,
+				HeapSysMB:       s.HeapSysMB,
+				CPUUsagePercent: s.CPUUsagePercent,
+				ActiveWorkers:   s.ActiveWorkers,
+				PendingQueueLen: s.PendingQueueLen,
+				TaskWaitP50Ms:   s.TaskWaitP50Ms,
+				TaskWaitP95Ms:   s.TaskWaitP95Ms,
+				TaskWaitP99Ms:   s.TaskWaitP99Ms,
+			})
+		}
+		ctx.SystemMetrics = enhancedSM
+	}
+
+>>>>>>> dev
 	return ctx
 }

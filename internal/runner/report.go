@@ -9,15 +9,54 @@ import (
 
 // ReportDetail represents a complete test report with all metrics and time-series data.
 type ReportDetail struct {
+<<<<<<< HEAD
 	Metadata       ReportMetadata     `json:"metadata"`
 	GlobalSummary  GlobalSummary      `json:"global_summary"`
 	GlobalTimeSeries []Sample         `json:"global_time_series,omitempty"`
 	NodeMetrics    []NodeMetricDetail `json:"node_metrics"`
 	ErrorSummary   []ErrorItem        `json:"error_summary,omitempty"`
+=======
+	Metadata                 ReportMetadata     `json:"metadata"`
+	GlobalSummary            GlobalSummary      `json:"global_summary"`
+	GlobalTimeSeries         []Sample           `json:"global_time_series,omitempty"`
+	HttpOnlyGlobalTimeSeries []Sample           `json:"http_only_global_time_series,omitempty"`
+	NodeMetrics              []NodeMetricDetail `json:"node_metrics"`
+	ErrorSummary             []ErrorItem        `json:"error_summary,omitempty"`
+	SystemMetrics            *SystemMetricsData `json:"system_metrics,omitempty"`
+	FailedNodes              []FailedNodeDetail `json:"failed_nodes,omitempty"`
+}
+
+// FailedNodeDetail represents detailed information about a failed node execution.
+// This is a universal format that works for all node types.
+type FailedNodeDetail struct {
+	NodeID       string            `json:"node_id"`
+	NodeName     string            `json:"node_name"`
+	NodeType     string            `json:"node_type"`
+	Protocol     string            `json:"protocol,omitempty"`       // http, db, mq, etc.
+	ErrorCode    string            `json:"error_code,omitempty"`     // e.g. "504", "timeout", "connection_refused"
+	ErrorMessage string            `json:"error_message"`
+	Timestamp    time.Time         `json:"timestamp"`
+	RequestURL   string            `json:"request_url,omitempty"`
+	RequestMethod string           `json:"request_method,omitempty"`
+	RequestHeaders map[string]string `json:"request_headers,omitempty"`
+	RequestBody  string            `json:"request_body,omitempty"`
+	ResponseStatus int             `json:"response_status,omitempty"`
+	ResponseHeaders map[string][]string `json:"response_headers,omitempty"`
+	ResponseBody string            `json:"response_body,omitempty"`
+	Attributes   map[string]string `json:"attributes,omitempty"`     // protocol-specific key-value pairs
+}
+
+// SystemMetricsData holds runtime and system performance metrics collected
+// during a test run. It is nil for legacy reports that predate this feature.
+type SystemMetricsData struct {
+	TimeSeries []RuntimeMetricsSnapshot `json:"time_series,omitempty"`
+	Summary    SystemMetricsSummary     `json:"summary"`
+>>>>>>> dev
 }
 
 // ReportMetadata contains metadata about the test run.
 type ReportMetadata struct {
+<<<<<<< HEAD
 	RunID       snowflake.ID `json:"run_id"`
 	SceneID     snowflake.ID `json:"scene_id"`
 	SceneName   string       `json:"scene_name,omitempty"`
@@ -32,6 +71,22 @@ type ReportMetadata struct {
 	PlannedCount   int64         `json:"planned_count,omitempty"`
 	GeneratedAt time.Time    `json:"generated_at"`
 	Version     string       `json:"version"`
+=======
+	RunID           snowflake.ID `json:"run_id"`
+	SceneID         snowflake.ID `json:"scene_id"`
+	SceneName       string       `json:"scene_name,omitempty"`
+	Status          string       `json:"status"`
+	StartedAt       time.Time    `json:"started_at"`
+	FinishedAt      time.Time    `json:"finished_at"`
+	DurationSec     float64      `json:"duration_sec"`
+	WorkerCount     int          `json:"worker_count"`
+	RunMode         string       `json:"run_mode"`
+	Count           int64        `json:"count"`
+	PlannedDuration float64      `json:"planned_duration,omitempty"`
+	PlannedCount    int64        `json:"planned_count,omitempty"`
+	GeneratedAt     time.Time    `json:"generated_at"`
+	Version         string       `json:"version"`
+>>>>>>> dev
 }
 
 // GlobalSummary contains aggregated global statistics.

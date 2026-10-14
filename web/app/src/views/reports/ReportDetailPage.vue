@@ -6,7 +6,11 @@
         返回
       </button>
       <h2>测试报告</h2>
+<<<<<<< HEAD
       <button class="btn-login-primary" @click="exportHTML" :disabled="!report">
+=======
+      <button class="btn-primary" @click="exportHTML" :disabled="!report">
+>>>>>>> dev
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         导出 HTML
       </button>
@@ -25,7 +29,11 @@
         <div class="metric-card">
           <div class="metric-label tooltip-wrapper" data-tooltip="测试期间发送的 HTTP 请求总数">总请求数</div>
           <div class="metric-value" style="color: var(--accent-primary)">{{ Number(metrics.total_reqs || 0).toLocaleString() }}</div>
+<<<<<<< HEAD
           <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(1) + 's' : '-' }} 持续时间</div>
+=======
+          <div class="metric-sub">{{ metrics.duration_s ? Number(metrics.duration_s).toFixed(3) + 's' : '-' }} 持续时间</div>
+>>>>>>> dev
         </div>
 
         <div class="metric-card">
@@ -119,7 +127,11 @@
             <tr><td class="info-label">运行模式</td><td><span class="mode-tag">{{ getRunModeLabel() }}</span></td></tr>
             <tr v-if="metrics.run_mode === 'duration'"><td class="info-label">计划持续时间</td><td>{{ getPlannedDuration() }}s</td></tr>
             <tr v-if="metrics.run_mode === 'count'"><td class="info-label">计划请求数</td><td>{{ getPlannedCount() }} 次</td></tr>
+<<<<<<< HEAD
             <tr><td class="info-label">实际{{ metrics.run_mode === 'duration' ? '持续时间' : '请求数' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(2) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' 次' }}</td></tr>
+=======
+            <tr><td class="info-label">实际{{ metrics.run_mode === 'duration' ? '持续时间' : '请求数' }}</td><td class="actual-val">{{ metrics.run_mode === 'duration' ? (Number(metrics.duration_s) || 0).toFixed(3) + 's' : (Number(metrics.total_reqs) || 0).toLocaleString() + ' 次' }}</td></tr>
+>>>>>>> dev
             <tr><td class="info-label">并发数</td><td>{{ metrics.worker_count || '-' }}</td></tr>
             <tr><td class="info-label">状态</td><td>
               <span :class="['status-badge', report.status]" class="tooltip-wrapper" :data-tooltip="getStatusTooltip(report.status)">{{ getStatusLabel(report.status) }}</span>
@@ -214,8 +226,13 @@
                 <td>{{ fmtLatencyMs(node.summary?.p50_latency_ms) }}</td>
                 <td>{{ fmtLatencyMs(node.summary?.p90_latency_ms) }}</td>
                 <td>{{ fmtLatencyMs(node.summary?.p95_latency_ms) }}</td>
+<<<<<<< HEAD
                 <td>{{ (node.summary?.avg_qps || 0).toFixed(1) }}</td>
                 <td>{{ (node.summary?.peak_qps || 0).toFixed(1) }}</td>
+=======
+                <td>{{ (node.summary?.avg_qps || 0).toFixed(3) }}</td>
+                <td>{{ (node.summary?.peak_qps || 0).toFixed(3) }}</td>
+>>>>>>> dev
               </tr>
             </tbody>
           </table>
@@ -229,20 +246,315 @@
           <div class="chart-header">
             <h3>{{ node.name || node.node_id }}</h3>
             <div class="node-badges" v-if="node.summary">
+<<<<<<< HEAD
               <span class="node-badge">QPS {{ (node.summary.avg_qps || 0).toFixed(1) }}</span>
+=======
+              <span class="node-badge">QPS {{ (node.summary.avg_qps || 0).toFixed(3) }}</span>
+>>>>>>> dev
               <span class="node-badge">P50 {{ fmtLatencyMs(node.summary.p50_latency_ms) }}</span>
               <span class="node-badge">P90 {{ fmtLatencyMs(node.summary.p90_latency_ms) }}</span>
               <span class="node-badge">P95 {{ fmtLatencyMs(node.summary.p95_latency_ms) }}</span>
               <span class="node-badge">TTFB {{ fmtLatencyMs(node.summary.ttfb_ms) }}</span>
             </div>
           </div>
+<<<<<<< HEAD
           <div :ref="el => setNodeChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body"></div>
+=======
+          <div class="node-chart-grid">
+            <div class="node-chart-panel">
+              <div class="node-chart-panel-label">QPS</div>
+              <div :ref="el => setNodeQpsChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body node-qps-chart"></div>
+            </div>
+            <div class="node-chart-panel">
+              <div class="node-chart-panel-label">
+                延迟百分位带
+                <span class="tooltip-wrapper node-chart-help" data-tooltip="百分位带：P50-P90 绿带=常规波动，P90-P95 黄带=注意，P95-P99 橙带=尾部警告。带越厚=延迟波动越大，带越薄=稳定。P50(底线)与P99(顶线)为分布边界。">
+                  <svg class="node-chart-help-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                    <circle cx="8" cy="4.6" r="0.9" fill="currentColor"/>
+                    <path d="M8 7v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </div>
+              <div :ref="el => setNodeLatencyChartRef(idx, el as HTMLElement)" class="chart-body node-chart-body node-latency-chart"></div>
+            </div>
+          </div>
+>>>>>>> dev
           <div class="chart-type-toggle center">
             <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'smooth' }]" @click.stop="switchChartType(`node-${idx}`, 'smooth')">平滑</button>
             <button :class="['type-btn', { active: chartTypes[`node-${idx}`] === 'step' }]" @click.stop="switchChartType(`node-${idx}`, 'step')">阶梯</button>
           </div>
         </div>
       </section>
+<<<<<<< HEAD
+=======
+
+      <!-- System Performance Analysis Section -->
+      <section v-if="metrics?.system_metrics" class="nodes-section">
+        <h3>系统性能分析</h3>
+
+        <!-- Legacy Report Info Banner -->
+        <div v-if="!metrics.system_metrics.time_series?.length && !metrics.system_metrics.summary" class="info-banner">
+          <span class="banner-icon">ℹ️</span>
+          <div class="banner-text">
+            <strong>无系统性能数据</strong>
+            <p>此报告生成时未启用系统指标采集，或测试运行时间过短未能收集到有效数据。建议在后续测试中开启系统监控以获取完整的性能分析。</p>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div v-if="metrics.system_metrics.summary || metrics.system_metrics.time_series?.length" class="sys-summary-row">
+          <div class="sys-summary-card" style="border-color: #0d9488;" title="Goroutine 峰值：测试运行期间 Go 运行时中活跃协程的最大数量。包含 Worker、HTTP 连接池、内部管理协程等。100 Worker 通常对应 1000-1500 Goroutine 属于正常范围">
+            <div class="sys-summary-label">Goroutine 峰值</div>
+            <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.goroutine_max || 0).toLocaleString() }}</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.goroutine_avg || 0).toFixed(0) }}</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #58a6ff;" title="Heap 峰值：测试运行期间堆内存分配的最大值（MB）。反映应用程序的内存使用峰值">
+            <div class="sys-summary-label">Heap 峰值</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.heap_alloc_max_mb || 0).toFixed(3) }} MB</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.heap_alloc_avg_mb || 0).toFixed(3) }} MB</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #bf8700;" title="CPU 峰值：测试运行期间进程 CPU 占用的最大百分比。基于两次采样间 CPU 时间差计算。多核环境可能超过 100%">
+            <div class="sys-summary-label">CPU 峰值</div>
+            <div class="sys-summary-value" :style="{ color: (metrics.system_metrics.summary?.cpu_max || 0) > 90 ? 'var(--accent-danger)' : (metrics.system_metrics.summary?.cpu_max || 0) > 70 ? 'var(--accent-warning)' : 'var(--text-primary)' }">{{ (metrics.system_metrics.summary?.cpu_max || 0).toFixed(3) }}%</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.cpu_avg || 0).toFixed(3) }}%</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #cf222e;" title="GC 暂停：测试运行期间垃圾回收暂停的总时间和次数。频繁或长时间的 GC 暂停会影响测试精度">
+            <div class="sys-summary-label">GC 暂停</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.gc_pause_total_ms || 0).toFixed(3) }} ms</div>
+            <div class="sys-summary-sub">共 {{ metrics.system_metrics.summary?.gc_count || 0 }} 次</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #cf222e;" title="任务等待 P99 峰值：99% 的任务从进入队列到被 Worker 取出的最大等待时间（ms）。&gt;100ms 说明 Worker 不够用，应增加 Worker 数量">
+            <div class="sys-summary-label">任务等待 P99 峰值</div>
+            <div class="sys-summary-value">{{ (metrics.system_metrics.summary?.task_wait_p99_max_ms || 0).toFixed(3) }} ms</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.task_wait_avg_ms || 0).toFixed(3) }} ms</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #0969da;" title="Pending Queue 峰值：待处理队列中积压任务的最大数量。0 表示所有任务被即时消费">
+            <div class="sys-summary-label">Pending Queue 峰值</div>
+            <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.pending_queue_max || 0).toLocaleString() }}</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.pending_queue_avg || 0).toFixed(0) }}</div>
+          </div>
+          <div class="sys-summary-card" style="border-color: #1a7f37;" title="Active Workers 峰值：当前正在执行任务的 Worker 协程最大数量">
+            <div class="sys-summary-label">Active Workers 峰值</div>
+            <div class="sys-summary-value">{{ Number(metrics.system_metrics.summary?.active_workers_max || 0).toLocaleString() }}</div>
+            <div class="sys-summary-sub">平均 {{ (metrics.system_metrics.summary?.active_workers_avg || 0).toFixed(0) }}</div>
+          </div>
+        </div>
+
+        <!-- System Trend Charts -->
+        <div v-if="metrics.system_metrics.time_series?.length >= 2" class="sys-charts-row">
+          <div class="chart-card">
+            <div class="chart-header"><h3>Goroutine 趋势</h3></div>
+            <div class="chart-body" ref="sysGoroutineChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'smooth' }]" @click.stop="switchChartType('sysGoroutine', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysGoroutine === 'step' }]" @click.stop="switchChartType('sysGoroutine', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Heap 内存趋势</h3></div>
+            <div class="chart-body" ref="sysHeapChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'smooth' }]" @click.stop="switchChartType('sysHeap', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysHeap === 'step' }]" @click.stop="switchChartType('sysHeap', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>CPU 使用率趋势</h3></div>
+            <div class="chart-body" ref="sysCpuChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'smooth' }]" @click.stop="switchChartType('sysCpu', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysCpu === 'step' }]" @click.stop="switchChartType('sysCpu', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>任务等待时间趋势</h3></div>
+            <div class="chart-body" ref="sysTaskWaitChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'smooth' }]" @click.stop="switchChartType('sysTaskWait', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysTaskWait === 'step' }]" @click.stop="switchChartType('sysTaskWait', 'step')">阶梯</button>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Pending Queue 趋势</h3></div>
+            <div class="chart-body" ref="sysQueueChartRef"></div>
+            <div class="chart-type-toggle center">
+              <button :class="['type-btn', { active: chartTypes.sysQueue === 'smooth' }]" @click.stop="switchChartType('sysQueue', 'smooth')">平滑</button>
+              <button :class="['type-btn', { active: chartTypes.sysQueue === 'step' }]" @click.stop="switchChartType('sysQueue', 'step')">阶梯</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Metrics Data Table -->
+        <div v-if="metrics.system_metrics.time_series?.length > 0" class="sys-table-section">
+          <div class="table-header-row">
+            <h4>系统指标详细数据</h4>
+            <div class="table-info">共 {{ metrics.system_metrics.time_series.length }} 条记录</div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="sortable" @click="toggleSort('timestamp')">
+                    时间戳
+                    <span class="sort-icon">{{ getSortIcon('timestamp') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('goroutine_count')">
+                    Goroutines
+                    <span class="sort-icon">{{ getSortIcon('goroutine_count') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('heap_alloc_mb')">
+                    Heap (MB)
+                    <span class="sort-icon">{{ getSortIcon('heap_alloc_mb') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('cpu_percent')">
+                    CPU (%)
+                    <span class="sort-icon">{{ getSortIcon('cpu_percent') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('gc_pause_last_ms')">
+                    GC 暂停 (ms)
+                    <span class="sort-icon">{{ getSortIcon('gc_pause_last_ms') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('active_workers')">
+                    Workers
+                    <span class="sort-icon">{{ getSortIcon('active_workers') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('pending_queue_len')">
+                    队列长度
+                    <span class="sort-icon">{{ getSortIcon('pending_queue_len') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('task_wait_p99_ms')">
+                    Wait P99 (ms)
+                    <span class="sort-icon">{{ getSortIcon('task_wait_p99_ms') }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in paginatedTableData" :key="idx"
+                    :class="{ 'danger-row': isDangerRow(row) }">
+                  <td>{{ formatTimestamp(row.timestamp) }}</td>
+                  <td :class="{ 'danger-cell': row.goroutine_count > 50000 }">
+                    {{ Number(row.goroutine_count || 0).toLocaleString() }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.heap_alloc_mb > 500 }">
+                    {{ (row.heap_alloc_mb || 0).toFixed(3) }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.cpu_percent > 90 }">
+                    {{ (row.cpu_percent || 0).toFixed(3) }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.gc_pause_last_ms > 10 }">
+                    {{ (row.gc_pause_last_ms || 0).toFixed(3) }}
+                  </td>
+                  <td>{{ row.active_workers || 0 }}</td>
+                  <td :class="{ 'danger-cell': row.pending_queue_len > 100 }">
+                    {{ row.pending_queue_len || 0 }}
+                  </td>
+                  <td :class="{ 'danger-cell': row.task_wait_p99_ms > 100 }">
+                    {{ (row.task_wait_p99_ms || 0).toFixed(3) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="pagination-controls" v-if="totalPages > 1">
+            <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+            <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+            <span class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</span>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">末页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Failed Nodes Detail (moved to end) -->
+      <section v-if="failedNodes.length > 0" class="nodes-section">
+        <div class="failed-nodes-header">
+          <h3>失败节点详情</h3>
+          <div class="chart-tip">共 {{ failedNodes.length }} 条失败记录</div>
+        </div>
+
+        <!-- Multi-field Search -->
+        <div class="failed-nodes-search-hint">多个字段同时匹配（AND）</div>
+        <div class="failed-nodes-search-grid">
+          <div class="search-field">
+            <input v-model="failedNodeSearchName" type="text" class="search-input" placeholder="节点名" />
+            <button v-if="failedNodeSearchName" class="search-clear" @click="failedNodeSearchName = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchId" type="text" class="search-input" placeholder="NodeID" />
+            <button v-if="failedNodeSearchId" class="search-clear" @click="failedNodeSearchId = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchCode" type="text" class="search-input" placeholder="错误码（如 504、timeout）" />
+            <button v-if="failedNodeSearchCode" class="search-clear" @click="failedNodeSearchCode = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <input v-model="failedNodeSearchMsg" type="text" class="search-input" placeholder="错误信息" />
+            <button v-if="failedNodeSearchMsg" class="search-clear" @click="failedNodeSearchMsg = ''">✕</button>
+          </div>
+          <div class="search-field">
+            <select v-model="failedNodeSearchProtocol" class="search-select">
+              <option value="">全部协议</option>
+              <option v-for="p in availableProtocols" :key="p" :value="p">{{ p }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="failed-nodes-list">
+          <div v-for="(fn, idx) in filteredFailedNodes" :key="idx" class="failed-node-card">
+            <div class="failed-node-header">
+              <span class="failed-node-name">{{ fn.node_name }}</span>
+              <span class="failed-node-badge" :class="fn.protocol || 'http'">{{ fn.protocol || 'http' }}</span>
+              <span v-if="fn.error_code" class="failed-node-error-code">{{ fn.error_code }}</span>
+              <span class="failed-node-time">{{ formatFailedNodeTime(fn.timestamp) }}</span>
+            </div>
+            <div class="failed-node-error">
+              <strong>错误信息:</strong> <span class="error-text">{{ fn.error_message }}</span>
+            </div>
+            <details v-if="fn.request_url" class="failed-node-details">
+              <summary>请求详情</summary>
+              <div class="failed-node-detail-body">
+                <div><strong>Method:</strong> {{ fn.request_method }}</div>
+                <div><strong>URL:</strong> <code>{{ fn.request_url }}</code></div>
+                <div v-if="fn.request_headers"><strong>Headers:</strong>
+                  <pre>{{ formatHeaders(fn.request_headers) }}</pre>
+                </div>
+                <div v-if="fn.request_body"><strong>Body:</strong>
+                  <pre>{{ fn.request_body }}</pre>
+                </div>
+              </div>
+            </details>
+            <details v-if="fn.response_body || fn.response_status" class="failed-node-details">
+              <summary>响应详情</summary>
+              <div class="failed-node-detail-body">
+                <div><strong>Status:</strong> <span class="error-text">{{ fn.response_status }}</span></div>
+                <div v-if="fn.response_headers"><strong>Headers:</strong>
+                  <pre>{{ formatResponseHeaders(fn.response_headers) }}</pre>
+                </div>
+                <div v-if="fn.response_body"><strong>Body:</strong>
+                  <pre>{{ fn.response_body }}</pre>
+                </div>
+              </div>
+            </details>
+            <!-- Protocol-specific attributes -->
+            <details v-if="fn.attributes && Object.keys(fn.attributes).length > 0" class="failed-node-details">
+              <summary>扩展属性</summary>
+              <div class="failed-node-detail-body">
+                <div v-for="(val, key) in fn.attributes" :key="key">
+                  <strong>{{ key }}:</strong> <span>{{ val }}</span>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div v-if="filteredFailedNodes.length === 0" class="failed-nodes-empty">
+            没有匹配的记录
+          </div>
+        </div>
+      </section>
+>>>>>>> dev
     </div>
 
     <div v-else-if="!report" class="empty-state">
@@ -269,6 +581,14 @@ const latencyChartRef = ref<HTMLElement>()
 const overviewChartRef = ref<HTMLElement>()
 const errorRateChartRef = ref<HTMLElement>()
 const errorBreakdownChartRef = ref<HTMLElement>()
+<<<<<<< HEAD
+=======
+const sysGoroutineChartRef = ref<HTMLElement>()
+const sysHeapChartRef = ref<HTMLElement>()
+const sysCpuChartRef = ref<HTMLElement>()
+const sysTaskWaitChartRef = ref<HTMLElement>()
+const sysQueueChartRef = ref<HTMLElement>()
+>>>>>>> dev
 
 let qpsChart: echarts.ECharts | null = null
 let latTrendChart: echarts.ECharts | null = null
@@ -276,6 +596,14 @@ let latChart: echarts.ECharts | null = null
 let ovChart: echarts.ECharts | null = null
 let errRateChart: echarts.ECharts | null = null
 let errBreakdownChart: echarts.ECharts | null = null
+<<<<<<< HEAD
+=======
+let sysGoroutineChart: echarts.ECharts | null = null
+let sysHeapChart: echarts.ECharts | null = null
+let sysCpuChart: echarts.ECharts | null = null
+let sysTaskWaitChart: echarts.ECharts | null = null
+let sysQueueChart: echarts.ECharts | null = null
+>>>>>>> dev
 let themeObserver: MutationObserver | null = null
 
 interface NodeTimeSeries {
@@ -300,6 +628,7 @@ interface ErrorItem {
 }
 
 const nodeTimeSeries = ref<NodeTimeSeries[]>([])
+<<<<<<< HEAD
 const nodeChartRefs = new Map<number, HTMLElement>()
 const nodeCharts = new Map<number, echarts.ECharts>()
 const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
@@ -308,6 +637,88 @@ const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
   latTrend: 'smooth'
 })
 
+=======
+const nodeQpsChartRefs = new Map<number, HTMLElement>()
+const nodeLatencyChartRefs = new Map<number, HTMLElement>()
+const nodeQpsCharts = new Map<number, echarts.ECharts>()
+const nodeLatencyCharts = new Map<number, echarts.ECharts>()
+const chartTypes = ref<Record<string, 'smooth' | 'step'>>({
+  errorRate: 'smooth',
+  qpsTrend: 'smooth',
+  latTrend: 'smooth',
+  sysGoroutine: 'smooth',
+  sysHeap: 'smooth',
+  sysCpu: 'smooth',
+  sysTaskWait: 'smooth',
+  sysQueue: 'smooth',
+})
+
+const tableSortKey = ref<string>('timestamp')
+const tableSortOrder = ref<'asc' | 'desc'>('asc')
+const currentPage = ref<number>(1)
+const pageSize = 20
+
+const sortedTableData = computed(() => {
+  const ts = metrics.value?.system_metrics?.time_series || []
+  if (!tableSortKey.value) return ts
+  const key = tableSortKey.value
+  const order = tableSortOrder.value === 'asc' ? 1 : -1
+  return [...ts].sort((a: any, b: any) => {
+    const valA = a[key] ?? 0
+    const valB = b[key] ?? 0
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      return order * valA.localeCompare(valB)
+    }
+    return order * ((valA as number) - (valB as number))
+  })
+})
+
+const totalPages = computed(() => Math.ceil(sortedTableData.value.length / pageSize))
+
+const paginatedTableData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return sortedTableData.value.slice(start, start + pageSize)
+})
+
+function toggleSort(key: string) {
+  if (tableSortKey.value === key) {
+    tableSortOrder.value = tableSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    tableSortKey.value = key
+    tableSortOrder.value = 'asc'
+  }
+  currentPage.value = 1
+}
+
+function getSortIcon(key: string): string {
+  if (tableSortKey.value !== key) return '⇅'
+  return tableSortOrder.value === 'asc' ? '↑' : '↓'
+}
+
+function formatTimestamp(ts: string): string {
+  if (!ts) return '-'
+  try {
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return ts
+    return d.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    })
+  } catch {
+    return ts
+  }
+}
+
+function isDangerRow(row: any): boolean {
+  return (row.goroutine_count > 50000) ||
+         (row.heap_alloc_mb > 500) ||
+         (row.cpu_percent > 90) ||
+         (row.gc_pause_last_ms > 10) ||
+         (row.pending_queue_len > 100) ||
+         (row.task_wait_p99_ms > 100)
+}
+
+>>>>>>> dev
 function initNodeChartTypes() {
   nodeTimeSeries.value.forEach((_, idx) => {
     chartTypes.value[`node-${idx}`] = 'smooth'
@@ -322,10 +733,26 @@ function switchChartType(chartId: string, type: 'smooth' | 'step') {
   else if (chartId === 'qpsTrend') renderQPSTrend(tc, m)
   else if (chartId === 'latTrend') renderLatencyTrend(tc, m)
   else if (chartId.startsWith('node-')) renderNodeCharts(tc)
+<<<<<<< HEAD
 }
 
 function setNodeChartRef(idx: number, el: HTMLElement | null) {
   if (el) nodeChartRefs.set(idx, el)
+=======
+  else if (chartId === 'sysGoroutine') renderSysGoroutineChart(tc)
+  else if (chartId === 'sysHeap') renderSysHeapChart(tc)
+  else if (chartId === 'sysCpu') renderSysCpuChart(tc)
+  else if (chartId === 'sysTaskWait') renderSysTaskWaitChart(tc)
+  else if (chartId === 'sysQueue') renderSysQueueChart(tc)
+}
+
+function setNodeQpsChartRef(idx: number, el: HTMLElement | null) {
+  if (el) nodeQpsChartRefs.set(idx, el)
+}
+
+function setNodeLatencyChartRef(idx: number, el: HTMLElement | null) {
+  if (el) nodeLatencyChartRefs.set(idx, el)
+>>>>>>> dev
 }
 
 function parseMetrics(r: ReportDTO): Record<string, any> {
@@ -371,7 +798,17 @@ function parseMetrics(r: ReportDTO): Record<string, any> {
           ts_p99: (node.time_series || []).map((s: any) => s.p99_ms || s.P99LatencyMs || 0),
         }))
       }
+<<<<<<< HEAD
       if (detailData.metadata) result = { ...result, ...detailData.metadata }
+=======
+      if (detailData.failed_nodes && Array.isArray(detailData.failed_nodes)) {
+        result.failed_nodes = detailData.failed_nodes
+      }
+      if (detailData.metadata) result = { ...result, ...detailData.metadata }
+      if (detailData.system_metrics) {
+        result.system_metrics = detailData.system_metrics
+      }
+>>>>>>> dev
     }
     return result
   } catch (e) {
@@ -386,7 +823,11 @@ const calcQPS = computed(() => {
   const dur = Number(m.duration_s || 0)
   const total = Number(m.total_reqs || 0)
   if (dur <= 0 || total <= 0) return '-'
+<<<<<<< HEAD
   return (total / dur).toFixed(1)
+=======
+  return (total / dur).toFixed(3)
+>>>>>>> dev
 })
 
 const fmtPeakQPS = computed(() => {
@@ -394,7 +835,11 @@ const fmtPeakQPS = computed(() => {
   if (!m) return '-'
   const peak = Number(m.peak_qps || 0)
   if (peak <= 0) return '-'
+<<<<<<< HEAD
   return peak.toFixed(1)
+=======
+  return peak.toFixed(3)
+>>>>>>> dev
 })
 
 const fmtThroughput = computed(() => {
@@ -402,7 +847,11 @@ const fmtThroughput = computed(() => {
   if (!m) return '-'
   const tp = Number(m.throughput || 0)
   if (tp <= 0) return '-'
+<<<<<<< HEAD
   return tp.toFixed(1) + '/s'
+=======
+  return tp.toFixed(3) + '/s'
+>>>>>>> dev
 })
 
 const fmtTTFB = computed(() => {
@@ -429,7 +878,11 @@ const fmtErrorRate = computed(() => {
   const total = Number(m.total_reqs || 0)
   const fail = Number(m.failed_reqs || 0)
   if (total <= 0) return '0%'
+<<<<<<< HEAD
   return ((fail / total) * 100).toFixed(2) + '%'
+=======
+  return ((fail / total) * 100).toFixed(3) + '%'
+>>>>>>> dev
 })
 
 const successRateColor = computed(() => {
@@ -464,6 +917,66 @@ const errorBreakdown = computed((): ErrorItem[] => {
   return m.error_breakdown as ErrorItem[]
 })
 
+<<<<<<< HEAD
+=======
+interface FailedNode {
+  node_id: string
+  node_name: string
+  node_type: string
+  protocol?: string
+  error_code?: string
+  error_message: string
+  timestamp: string
+  request_url?: string
+  request_method?: string
+  request_headers?: Record<string, string>
+  request_body?: string
+  response_status?: number
+  response_headers?: Record<string, string[]>
+  response_body?: string
+  attributes?: Record<string, string>
+}
+
+const failedNodes = computed((): FailedNode[] => {
+  const m = metrics.value
+  if (!m?.failed_nodes) return []
+  return m.failed_nodes as FailedNode[]
+})
+
+const failedNodeSearchName = ref('')
+const failedNodeSearchId = ref('')
+const failedNodeSearchCode = ref('')
+const failedNodeSearchMsg = ref('')
+const failedNodeSearchProtocol = ref('')
+
+// Derive available protocols from data
+const availableProtocols = computed(() => {
+  const set = new Set<string>()
+  failedNodes.value.forEach(fn => {
+    if (fn.protocol) set.add(fn.protocol)
+  })
+  return Array.from(set).sort()
+})
+
+const filteredFailedNodes = computed((): FailedNode[] => {
+  const nodes = failedNodes.value
+  const qName = failedNodeSearchName.value.trim().toLowerCase()
+  const qId = failedNodeSearchId.value.trim().toLowerCase()
+  const qCode = failedNodeSearchCode.value.trim().toLowerCase()
+  const qMsg = failedNodeSearchMsg.value.trim().toLowerCase()
+  const qProto = failedNodeSearchProtocol.value
+
+  return nodes.filter(fn => {
+    if (qName && !(fn.node_name || '').toLowerCase().includes(qName)) return false
+    if (qId && !(fn.node_id || '').toLowerCase().includes(qId)) return false
+    if (qCode && !(fn.error_code || '').toLowerCase().includes(qCode)) return false
+    if (qMsg && !(fn.error_message || '').toLowerCase().includes(qMsg)) return false
+    if (qProto && (fn.protocol || 'http') !== qProto) return false
+    return true
+  })
+})
+
+>>>>>>> dev
 async function fetchReport() {
   const id = route.params.id as string
   if (!id) return
@@ -492,6 +1005,7 @@ function themeColors() {
     gridColor: dark ? '#21262d' : '#f6f8fa',
     bg: 'transparent',
     gridLineDash: dark ? [4, 3] : [4, 3],
+<<<<<<< HEAD
     colors: [
       dark ? '#00E5FF' : '#0891b2',
       dark ? '#4ade80' : '#16a34a',
@@ -516,6 +1030,163 @@ function themeColors() {
   }
 }
 
+=======
+    // 主色系：蓝绿/绿/黄/橙/红/蓝/灰
+    colors: [
+      dark ? '#2dd4bf' : '#0d9488',   // 蓝绿 Teal
+      dark ? '#3fb950' : '#1a7f37',   // 绿
+      dark ? '#e3b341' : '#bf8700',   // 黄
+      dark ? '#f0883e' : '#bc4c00',   // 橙
+      dark ? '#f85149' : '#cf222e',   // 红
+      dark ? '#58a6ff' : '#0969da',   // 蓝
+      dark ? '#94a3b8' : '#64748b',   // 灰
+    ],
+    // 延迟曲线语义色：P50 绿(好) → P90 黄(注意) → P95 橙(警告) → P99 红(危险)
+    latencyColors: [
+      dark ? '#3fb950' : '#1a7f37',   // P50 绿
+      dark ? '#e3b341' : '#bf8700',   // P90 黄
+      dark ? '#f0883e' : '#bc4c00',   // P95 橙
+      dark ? '#f85149' : '#cf222e',   // P99 红
+    ],
+    dangerColor: dark ? '#f85149' : '#cf222e',
+  }
+}
+
+function renderSysGoroutineChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysGoroutineChartRef.value || !sm?.time_series?.length) return
+  if (sysGoroutineChart) sysGoroutineChart.dispose()
+  sysGoroutineChart = echarts.init(sysGoroutineChartRef.value)
+  const isSmooth = chartTypes.value.sysGoroutine === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const data = ts.map((s: any) => s.goroutine_count || s.GoroutineCount || 0)
+  sysGoroutineChart.setOption({
+    backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    series: [{ name: 'Goroutines', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 10000, lineStyle: { color: tc.colors[5] }, label: { formatter: '10K', color: tc.colors[5], fontSize: 10 } }, { yAxis: 50000, lineStyle: { color: tc.dangerColor }, label: { formatter: '50K', color: tc.dangerColor, fontSize: 10 } }] } }],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)}</strong><br/>` }); return h } },
+    legend: { data: ['Goroutines'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysHeapChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysHeapChartRef.value || !sm?.time_series?.length) return
+  if (sysHeapChart) sysHeapChart.dispose()
+  sysHeapChart = echarts.init(sysHeapChartRef.value)
+  const isSmooth = chartTypes.value.sysHeap === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const allocData = ts.map((s: any) => s.heap_alloc_mb || s.HeapAllocMB || 0)
+  const sysData = ts.map((s: any) => s.heap_sys_mb || s.HeapSysMB || 0)
+  sysHeapChart.setOption({
+    backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}MB' } },
+    series: [
+      { name: 'HeapAlloc', data: allocData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[0], width: 2 }, itemStyle: { color: tc.colors[0] } },
+      { name: 'HeapSys', data: sysData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2, type: 'dashed' }, itemStyle: { color: tc.colors[6] } },
+    ],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)} MB</strong><br/>` }); return h } },
+    legend: { data: ['HeapAlloc', 'HeapSys'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysCpuChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysCpuChartRef.value || !sm?.time_series?.length) return
+  if (sysCpuChart) sysCpuChart.dispose()
+  sysCpuChart = echarts.init(sysCpuChartRef.value)
+  const isSmooth = chartTypes.value.sysCpu === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const data = ts.map((s: any) => s.cpu_percent || s.CPUUsagePercent || 0)
+  sysCpuChart.setOption({
+    backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: 100, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}%' } },
+    series: [{ name: 'CPU', data, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `rgba(${isDark() ? '88,166,255' : '9,105,218'}, 0.2)` }, { offset: 1, color: `rgba(${isDark() ? '88,166,255' : '9,105,218'}, 0.01)` }]) }, markLine: { silent: true, lineStyle: { type: 'dashed' }, data: [{ yAxis: 70, lineStyle: { color: tc.colors[5] }, label: { formatter: '70%', color: tc.colors[5], fontSize: 10 } }, { yAxis: 90, lineStyle: { color: tc.dangerColor }, label: { formatter: '90%', color: tc.dangerColor, fontSize: 10 } }] } }],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)}%</strong><br/>` }); return h } },
+    legend: { data: ['CPU'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysTaskWaitChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysTaskWaitChartRef.value || !sm?.time_series?.length) return
+  if (sysTaskWaitChart) sysTaskWaitChart.dispose()
+  sysTaskWaitChart = echarts.init(sysTaskWaitChartRef.value)
+  const isSmooth = chartTypes.value.sysTaskWait === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const p50 = ts.map((s: any) => s.task_wait_p50_ms || s.TaskWaitP50Ms || 0)
+  const p95 = ts.map((s: any) => s.task_wait_p95_ms || s.TaskWaitP95Ms || 0)
+  const p99 = ts.map((s: any) => s.task_wait_p99_ms || s.TaskWaitP99Ms || 0)
+  sysTaskWaitChart.setOption({
+    backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+    series: [
+      { name: 'P50', data: p50, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2 }, itemStyle: { color: tc.colors[6] } },
+      { name: 'P95', data: p95, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[5], width: 2 }, itemStyle: { color: tc.colors[5] } },
+      { name: 'P99', data: p99, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.dangerColor, width: 2 }, itemStyle: { color: tc.dangerColor } },
+    ],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value).toFixed(3)} ms</strong><br/>` }); return h } },
+    legend: { data: ['P50', 'P95', 'P99'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
+function renderSysQueueChart(tc: any) {
+  const sm = metrics.value?.system_metrics
+  if (!sysQueueChartRef.value || !sm?.time_series?.length) return
+  if (sysQueueChart) sysQueueChart.dispose()
+  sysQueueChart = echarts.init(sysQueueChartRef.value)
+  const isSmooth = chartTypes.value.sysQueue === 'smooth'
+  const ts = sm.time_series
+  const labels = ts.map((s: any) => {
+    const t = new Date(s.timestamp || s.Timestamp)
+    return t.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  })
+  const queueData = ts.map((s: any) => s.pending_queue_len || s.PendingQueueLen || 0)
+  // Track historical max for y-axis scaling
+  const maxVal = Math.max(...queueData, 10)
+  sysQueueChart.setOption({
+    backgroundColor: tc.bg,
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    grid: { top: 30, right: 20, bottom: 50, left: 50 },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', min: 0, max: maxVal, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    series: [
+      { name: 'Pending Queue', data: queueData, type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle', symbol: 'none', lineStyle: { color: tc.colors[6], width: 2 }, itemStyle: { color: tc.colors[6] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(148,163,184,0.25)' }, { offset: 1, color: 'rgba(148,163,184,0.02)' }]) } },
+    ],
+    tooltip: { trigger: 'axis', confine: true, backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 12, padding: [12, 16], textStyle: { fontSize: 11, color: '#475569' }, formatter: (params: any) => { let h = `<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">${(params[0]?.axisValue || '')}</div>`; params.forEach((p: any) => { h += `${p.marker} ${p.seriesName}: <strong>${Number(p.value)}</strong><br/>` }); return h } },
+    legend: { data: ['Pending Queue'], textStyle: { color: tc.textColor }, top: 0 },
+  }, true)
+}
+
+>>>>>>> dev
 function renderErrorRateChart(tc: any, m: any) {
   if (!errorRateChartRef.value) return
   if (errRateChart) errRateChart.dispose()
@@ -536,18 +1207,33 @@ function renderErrorRateChart(tc: any, m: any) {
     const globalErrRate = ((Number(m.failed_reqs || 0) / Math.max(Number(m.total_reqs || 1), 1)) * 100)
     errRateChart.setOption({
       backgroundColor: tc.bg,
+<<<<<<< HEAD
       tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const idx = p[0]?.dataIndex ?? 0
         return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p[0]?.value || 0).toFixed(2)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+=======
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+      tooltip: { trigger: 'axis', confine: true, backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)', borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)', borderWidth: 1, borderRadius: 8, padding: [10,14], textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' }, formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        const idx = p?.dataIndex ?? 0
+        return `${timeLabels[idx]}<br/>Error Rate: <strong>${Number(p?.value || 0).toFixed(3)}%</strong><br/>Failed: ${fails[idx] || 0} / Total: ${totals[idx] || 0}`
+>>>>>>> dev
       }},
       grid: { left: 50, right: 16, top: 20, bottom: 44 },
       dataZoom: [{ type: 'slider', height: 14, bottom: 2, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: isDark() ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.10)', handleStyle: { color: tc.dangerColor }, textStyle: { color: tc.textColor, fontSize: 9 }, showDetail: false }],
       xAxis: { type: 'category', data: timeLabels, axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 9, interval: Math.floor(timeLabels.length / 8) }, splitLine: { show: false } },
+<<<<<<< HEAD
       yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(2) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
       markLine: {
         silent: true,
         data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(2)}%`, color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+=======
+      yAxis: { type: 'value', name: '%', min: 0, max: Math.max(maxErrRate * 1.5, globalErrRate * 1.5, 1), axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(3) + '%' }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } } },
+      markLine: {
+        silent: true,
+        data: [{ yAxis: globalErrRate, label: { formatter: `Total: ${globalErrRate.toFixed(3)}%`, color: tc.dangerColor, fontSize: 9 }, lineStyle: { color: tc.dangerColor, type: 'dashed', width: 1 } }],
+>>>>>>> dev
         symbol: 'none',
       },
       series: [{
@@ -577,6 +1263,10 @@ function renderAll() {
   ovChart = echarts.init(overviewChartRef.value)
   ovChart.setOption({
     backgroundColor: tc.bg,
+<<<<<<< HEAD
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
     color: [tc.colors[1], tc.colors[3]],
     tooltip: {
       trigger: 'item',
@@ -586,11 +1276,19 @@ function renderAll() {
       borderWidth: 1,
       borderRadius: 10,
       padding: [12, 16],
+<<<<<<< HEAD
       textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
       formatter: (p: any) => {
         const total = Number(m.total_reqs || 1)
         const pct = ((p.value / total) * 100).toFixed(1)
+=======
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12);',
+      formatter: (p: any) => {
+        const total = Number(m.total_reqs || 1)
+        const pct = ((p.value / total) * 100).toFixed(3)
+>>>>>>> dev
         return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> requests <span style="color:${isDark()?'#8b949e':'#656d76'}">(${pct}%)</span></div>`
       }
     },
@@ -626,10 +1324,17 @@ function renderAll() {
       formatter: (name: string) => {
         const val = name === 'Success' ? Number(m.success_reqs || 0) : Number(m.failed_reqs || 0)
         const total = Number(m.total_reqs || 1)
+<<<<<<< HEAD
         const pct = (val / total * 100).toFixed(1)
         return `{name|${name}}   {val|${pct}%}`
       },
       textStyle: { rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
+=======
+        const pct = (val / total * 100).toFixed(3)
+        return `{name|${name}}   {val|${pct}%}`
+      },
+      textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif', rich: { name: { color: isDark() ? '#c9d1d9' : '#24292f', fontWeight: 500, fontSize: 13 }, val: { color: isDark() ? '#8b949e' : '#8c959f', fontSize: 12, fontWeight: 400 } } }
+>>>>>>> dev
     },
     series: [{
       type: 'pie',
@@ -652,12 +1357,21 @@ function renderAll() {
       },
       data: [
         { value: Number(m.success_reqs || 0), name: 'Success', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+<<<<<<< HEAD
           { offset: 0, color: isDark() ? '#4ade80' : '#16a34a' },
           { offset: 1, color: isDark() ? '#22c55e' : '#15803d' }
         ])}},
         { value: Number(m.failed_reqs || 0), name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
           { offset: 0, color: isDark() ? '#ef4444' : '#dc2626' },
           { offset: 1, color: isDark() ? '#dc2626' : '#b91c1c' }
+=======
+          { offset: 0, color: isDark() ? '#3fb950' : '#1a7f37' },
+          { offset: 1, color: isDark() ? '#46c759' : '#15803d' }
+        ])}},
+        { value: Number(m.failed_reqs || 0), name: 'Failed', itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+          { offset: 0, color: isDark() ? '#f85149' : '#cf222e' },
+          { offset: 1, color: isDark() ? '#da3633' : '#a40e26' }
+>>>>>>> dev
         ])}},
       ],
     }],
@@ -671,8 +1385,14 @@ function renderAll() {
   latChart = echarts.init(latencyChartRef.value)
   latChart.setOption({
     backgroundColor: tc.bg,
+<<<<<<< HEAD
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(0,229,255,0.05)' : 'rgba(8,145,178,0.04)' } },
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(45,212,191,0.05)' : 'rgba(13,148,136,0.04)' } },
+>>>>>>> dev
       confine: true,
       position: function (point: number[], params: any, dom: HTMLElement, rect: DOMRect, size: { contentSize: [number, number]; viewSize: [number, number] }) {
         const x = point[0]
@@ -687,12 +1407,20 @@ function renderAll() {
       borderWidth: 1,
       borderRadius: 10,
       padding: [12, 16],
+<<<<<<< HEAD
       textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f' },
+=======
+      textStyle: { fontSize: 12, color: isDark() ? '#e6edf3' : '#24292f', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
         const labels: Record<string, string> = { Avg: '平均延迟', P50: '中位数 (50%)', P90: 'P90 延迟', P95: 'P95 延迟', P99: 'P99 尾部延迟' }
+<<<<<<< HEAD
         return `<div style="font-weight:600;margin-bottom:4px">${labels[p.name] || p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toFixed(1)}</strong> ms</div>`
+=======
+        return `<div style="font-weight:600;margin-bottom:4px">${labels[p.name] || p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toFixed(3)}</strong> ms</div>`
+>>>>>>> dev
       }
     },
     grid: { left: 44, right: 20, top: 24, bottom: 32 },
@@ -713,7 +1441,11 @@ function renderAll() {
       name: '',
       axisLine: { show: false },
       axisTick: { show: false },
+<<<<<<< HEAD
       axisLabel: { color: isDark() ? '#6e7681' : '#8c959f', fontSize: 10, formatter: (v: number) => v.toFixed(0) },
+=======
+      axisLabel: { color: isDark() ? '#6e7681' : '#8c959f', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
+>>>>>>> dev
       splitLine: { lineStyle: { color: isDark() ? 'rgba(48,54,61,0.5)' : 'rgba(208,215,222,0.6)', type: 'dashed' as const } }
     },
     series: [{
@@ -728,7 +1460,11 @@ function renderAll() {
       ],
       label: {
         show: true, position: 'top',
+<<<<<<< HEAD
         formatter: (p: any) => Number(p.value).toFixed(1),
+=======
+        formatter: (p: any) => Number(p.value).toFixed(3),
+>>>>>>> dev
         color: isDark() ? '#8b949e' : '#656d76',
         fontSize: 11,
         fontWeight: 600,
@@ -746,6 +1482,14 @@ function renderAll() {
   renderLatencyTrend(tc, m)
   renderNodeCharts(tc)
   renderErrorBreakdownChart(tc)
+<<<<<<< HEAD
+=======
+  renderSysGoroutineChart(tc)
+  renderSysHeapChart(tc)
+  renderSysCpuChart(tc)
+  renderSysTaskWaitChart(tc)
+  renderSysQueueChart(tc)
+>>>>>>> dev
 }
 
 function renderQPSTrend(tc: any, m: any) {
@@ -758,7 +1502,11 @@ function renderQPSTrend(tc: any, m: any) {
   const qpsData = (m.ts_qps as number[] | undefined) || []
 
   if (!timestamps?.length || !qpsData.length) {
+<<<<<<< HEAD
     qpsChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+=======
+    qpsChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+>>>>>>> dev
     return
   }
 
@@ -766,6 +1514,10 @@ function renderQPSTrend(tc: any, m: any) {
 
   qpsChart.setOption({
     backgroundColor: tc.bg,
+<<<<<<< HEAD
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
     tooltip: {
       trigger: 'axis' as const,
       confine: true,
@@ -774,6 +1526,7 @@ function renderQPSTrend(tc: any, m: any) {
       borderWidth: 1,
       borderRadius: 12,
       padding: [12, 16],
+<<<<<<< HEAD
       textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
       extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
@@ -786,6 +1539,20 @@ function renderQPSTrend(tc: any, m: any) {
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
     xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(1) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+=======
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+      extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        const idx = p?.dataIndex ?? 0
+        return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[idx]}</div>QPS: <strong>${Number(p?.value || 0).toFixed(3)}</strong>`
+      }
+    },
+    grid: { left: 50, right: 20, top: 20, bottom: 50 },
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+    xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+    yAxis: { type: 'value', axisLine: { show: false }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: (v: number) => v.toFixed(3) }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } } },
+>>>>>>> dev
     series: [{
       name: 'QPS',
       type: 'line',
@@ -795,8 +1562,13 @@ function renderQPSTrend(tc: any, m: any) {
       lineStyle: { width: 2, color: tc.colors[0] },
       itemStyle: { color: tc.colors[0] },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+<<<<<<< HEAD
         { offset: 0, color: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)` },
         { offset: 1, color: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.01)` }
+=======
+        { offset: 0, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)` },
+        { offset: 1, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.01)` }
+>>>>>>> dev
       ])},
       symbol: 'none',
     }]
@@ -816,7 +1588,11 @@ function renderLatencyTrend(tc: any, m: any) {
   const p99 = (m.ts_p99 as number[]|undefined)||[]
 
   if (!timestamps?.length) {
+<<<<<<< HEAD
     latTrendChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+=======
+    latTrendChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+>>>>>>> dev
     return
   }
 
@@ -825,6 +1601,10 @@ function renderLatencyTrend(tc: any, m: any) {
 
   latTrendChart.setOption({
     backgroundColor: tc.bg,
+<<<<<<< HEAD
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
     tooltip: {
       trigger: 'axis' as const,
       confine: true,
@@ -833,19 +1613,31 @@ function renderLatencyTrend(tc: any, m: any) {
       borderWidth: 1,
       borderRadius: 12,
       padding: [12, 16],
+<<<<<<< HEAD
       textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569' },
+=======
+      textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
       extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
         if (!Array.isArray(params)) return ''
         const i = params[0]?.dataIndex ?? 0
         let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
+<<<<<<< HEAD
         params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(1)}</strong>ms<br/>` })
+=======
+        params.forEach((item: any) => { h += `${item.marker} ${item.seriesName}: <strong>${Number(item.value).toFixed(3)}</strong>ms<br/>` })
+>>>>>>> dev
         return h
       }
     },
     legend: { data: ['P50','P90','P95','P99'], textStyle: { color: tc.textColor }, top: 0 },
     grid: { top: 30, right: 20, bottom: 50, left: 50 },
+<<<<<<< HEAD
     dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '0,229,255' : '8,145,178'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+=======
+    dataZoom: [{ type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true }],
+>>>>>>> dev
     xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
     yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
     series: [
@@ -860,6 +1652,7 @@ function renderLatencyTrend(tc: any, m: any) {
 function renderNodeCharts(tc: any) {
   nodeTimeSeries.value.forEach((node, idx) => {
     const isSmooth = chartTypes.value[`node-${idx}`] === 'smooth'
+<<<<<<< HEAD
     const el = nodeChartRefs.get(idx)
     if (!el) return
     const oldChart = nodeCharts.get(idx)
@@ -912,6 +1705,134 @@ function renderNodeCharts(tc: any) {
         { name:'P99', type:'line', smooth: isSmooth, step: isSmooth?false:'middle', data:node.ts_p99||[], yAxisIndex:1, lineStyle:{width:2,color:lc[3]}, itemStyle:{color:lc[3]}, symbol:'none' },
       ]
     }, true)
+=======
+    const timestamps = node.timestamps || []
+    const timeLabels = timestamps.map((ts: string) => formatTimeShort(ts))
+
+    // ===== QPS 面板 =====
+    const qpsEl = nodeQpsChartRefs.get(idx)
+    if (qpsEl) {
+      const oldQ = nodeQpsCharts.get(idx)
+      if (oldQ) { oldQ.dispose(); nodeQpsCharts.delete(idx) }
+      const qChart = echarts.init(qpsEl)
+      nodeQpsCharts.set(idx, qChart)
+
+      if (!timeLabels.length) {
+        qChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+      } else {
+        qChart.setOption({
+          backgroundColor: 'transparent',
+          textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+          tooltip: {
+            trigger: 'axis' as const, confine: true,
+            backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1, borderRadius: 12, padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: (params: any) => {
+              if (!Array.isArray(params)) return ''
+              const i = params[0]?.dataIndex ?? 0
+              return `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>${params[0].marker} QPS: <strong>${Number(params[0].value).toFixed(3)}</strong> req/s`
+            }
+          },
+          grid: { left: 50, right: 20, top: 16, bottom: 28 },
+          xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          yAxis: { type: 'value', name: 'req/s', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          series: [{
+            name: 'QPS', type: 'line', smooth: isSmooth, step: isSmooth ? false : 'middle' as const,
+            data: node.ts_qps || [],
+            lineStyle: { width: 2, color: tc.colors[0] }, itemStyle: { color: tc.colors[0] }, symbol: 'none',
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.35)` },
+              { offset: 1, color: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.03)` }
+            ]) }
+          }]
+        }, true)
+      }
+    }
+
+    // ===== 延迟百分位带面板 =====
+    const latEl = nodeLatencyChartRefs.get(idx)
+    if (latEl) {
+      const oldL = nodeLatencyCharts.get(idx)
+      if (oldL) { oldL.dispose(); nodeLatencyCharts.delete(idx) }
+      const lChart = echarts.init(latEl)
+      nodeLatencyCharts.set(idx, lChart)
+
+      if (!timeLabels.length) {
+        lChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+      } else {
+        const lc = tc.latencyColors
+        const p50 = node.ts_p50 || []
+        const p90 = node.ts_p90 || []
+        const p95 = node.ts_p95 || []
+        const p99 = node.ts_p99 || []
+        // 阶梯模式对堆叠面积会产生错位，百分位带强制使用平滑/直线
+        const bandSmooth = isSmooth
+        lChart.setOption({
+          backgroundColor: 'transparent',
+          textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+          tooltip: {
+            trigger: 'axis' as const, confine: true,
+            backgroundColor: isDark() ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.96)',
+            borderColor: isDark() ? 'rgba(71,85,105,0.3)' : 'rgba(148,163,184,0.2)',
+            borderWidth: 1, borderRadius: 12, padding: [12, 16],
+            textStyle: { fontSize: 11, color: isDark() ? '#cbd5e1' : '#475569', fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+            extraCssText: 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08); backdrop-filter: blur(8px);',
+            formatter: (params: any) => {
+              if (!Array.isArray(params)) return ''
+              const i = params[0]?.dataIndex ?? 0
+              let h = `<div style="font-size:11.5px;color:${isDark()?'#e2e8f0':'#1e293b'};margin-bottom:6px;font-weight:600">${timeLabels[i]}</div>`
+              const rows = [
+                { name: 'P50', val: p50[i], color: lc[0] },
+                { name: 'P90', val: p90[i], color: lc[1] },
+                { name: 'P95', val: p95[i], color: lc[2] },
+                { name: 'P99', val: p99[i], color: lc[3] },
+              ]
+              rows.forEach(r => {
+                h += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:6px"></span>${r.name}: <strong>${Number(r.val).toFixed(3)} ms</strong><br/>`
+              })
+              return h
+            }
+          },
+          legend: { data: ['P50','P99'], textStyle: { color: tc.textColor, fontSize: 10 }, top: 0, itemWidth: 14, itemHeight: 8 },
+          grid: { left: 50, right: 20, top: 30, bottom: 50 },
+          dataZoom: [
+            { type: 'slider', height: 18, bottom: 4, borderColor: 'transparent', backgroundColor: tc.lineColor, fillerColor: `rgba(${isDark() ? '45,212,191' : '13,148,136'}, 0.15)`, handleStyle: { color: tc.colors[0] }, textStyle: { color: tc.textColor, fontSize: 10 }, brushSelect: true },
+            { type: 'inside' }
+          ],
+          xAxis: { type: 'category', data: timeLabels, axisLine: { lineStyle: { color: tc.lineColor } }, axisLabel: { color: tc.textColor, fontSize: 10 } },
+          yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: tc.textColor, fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: tc.lineColor, type: 'dashed' as const } }, axisLabel: { color: tc.textColor, fontSize: 10, formatter: '{value}ms' } },
+          series: [
+            // 百分位带（堆叠）：P99>P95>P90>P50 从上到下，色带宽度=差值
+            // 深色模式：alpha 递增 (0.22→0.30→0.38) + 更亮色相，避免层次模糊
+            // 浅色模式：保持原值不变
+            { name: 'P95-P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { opacity: 0 }, itemStyle: { color: lc[3] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(248,81,73,0.38)' : 'rgba(207,34,46,0.16)' }, z: 2 },
+            { name: 'P90-P95', type: 'line', smooth: bandSmooth, data: p95, lineStyle: { opacity: 0 }, itemStyle: { color: lc[2] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(227,179,65,0.30)' : 'rgba(188,76,0,0.16)' }, z: 2 },
+            { name: 'P50-P90', type: 'line', smooth: bandSmooth, data: p90, lineStyle: { opacity: 0 }, itemStyle: { color: lc[1] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(63,185,80,0.22)' : 'rgba(26,127,55,0.14)' }, z: 2 },
+            { name: 'P50', type: 'line', smooth: bandSmooth, data: p50, lineStyle: { width: 1.5, color: lc[0] }, itemStyle: { color: lc[0] }, stack: 'lat-band', symbol: 'none', areaStyle: { color: isDark() ? 'rgba(63,185,80,0.10)' : 'rgba(26,127,55,0.04)' }, z: 3 },
+            // P99 顶层边界线（独立非堆叠）
+            { name: 'P99', type: 'line', smooth: bandSmooth, data: p99, lineStyle: { width: 2.5, color: lc[3] }, itemStyle: { color: lc[3] }, symbol: 'none', z: 4 },
+          ]
+        }, true)
+      }
+    }
+
+    // 同步 dataZoom：延迟面板是主控（有 slider），QPS 单向跟随避免循环
+    const qChart = nodeQpsCharts.get(idx)
+    const lChart = nodeLatencyCharts.get(idx)
+    if (qChart && lChart) {
+      lChart.off('dataZoom')
+      lChart.on('dataZoom', (params: any) => {
+        const start = params?.batch?.[0]?.start ?? params?.start
+        const end = params?.batch?.[0]?.end ?? params?.end
+        if (typeof start === 'number' && typeof end === 'number') {
+          qChart.dispatchAction({ type: 'dataZoom', start, end })
+        }
+      })
+    }
+>>>>>>> dev
   })
 }
 
@@ -922,7 +1843,11 @@ function renderErrorBreakdownChart(tc: any) {
 
   const items = errorBreakdown.value
   if (!items.length) {
+<<<<<<< HEAD
     errBreakdownChart.setOption({ title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+=======
+    errBreakdownChart.setOption({ textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' }, title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: tc.textColor, fontSize: 14 } } })
+>>>>>>> dev
     return
   }
 
@@ -934,6 +1859,10 @@ function renderErrorBreakdownChart(tc: any) {
 
   errBreakdownChart.setOption({
     backgroundColor: tc.bg,
+<<<<<<< HEAD
+=======
+    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'PingFang SC\', \'Microsoft YaHei\', \'Helvetica Neue\', Arial, sans-serif' },
+>>>>>>> dev
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: isDark() ? 'rgba(225,29,72,0.06)' : 'rgba(225,29,72,0.04)' } },
       confine: true,
@@ -946,7 +1875,11 @@ function renderErrorBreakdownChart(tc: any) {
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.10);',
       formatter: (params: any) => {
         const p = Array.isArray(params) ? params[0] : params
+<<<<<<< HEAD
         return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> <span style="color:${isDark()?'#8b949e':'#656d76'}">(${(Number(p.value)/totalCount*100).toFixed(1)}%)</span></div>`
+=======
+        return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div style="font-size:13px"><strong>${Number(p.value).toLocaleString()}</strong> <span style="color:${isDark()?'#8b949e':'#656d76'}">(${(Number(p.value)/totalCount*100).toFixed(3)}%)</span></div>`
+>>>>>>> dev
       }
     },
     grid: { left: 105, right: 36, top: 16, bottom: 12 },
@@ -1000,7 +1933,11 @@ function formatSuccessRate(v: any): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return '-'
+<<<<<<< HEAD
   return n.toFixed(2) + '%'
+=======
+  return n.toFixed(3) + '%'
+>>>>>>> dev
 }
 
 function fmtLatency3(v: any): string {
@@ -1023,7 +1960,11 @@ function fmtPercent(v: any): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return '-'
+<<<<<<< HEAD
   return n.toFixed(2) + '%'
+=======
+  return n.toFixed(3) + '%'
+>>>>>>> dev
 }
 
 function formatTime(t: any): string {
@@ -1046,6 +1987,21 @@ function formatTimeShort(t: string): string {
   } catch { return t }
 }
 
+<<<<<<< HEAD
+=======
+function formatFailedNodeTime(t: string): string {
+  return formatTimeShort(t)
+}
+
+function formatHeaders(headers: Record<string, string>): string {
+  return Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('\n')
+}
+
+function formatResponseHeaders(headers: Record<string, string[]>): string {
+  return Object.entries(headers).map(([k, vs]) => `${k}: ${vs.join(', ')}`).join('\n')
+}
+
+>>>>>>> dev
 function getRunModeLabel(): string {
   const m = metrics.value
   if (!m) return '-'
@@ -1122,7 +2078,12 @@ window.addEventListener('resize', () => {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
     qpsChart?.resize(); latTrendChart?.resize(); latChart?.resize(); ovChart?.resize(); errRateChart?.resize()
+<<<<<<< HEAD
     nodeCharts.forEach(c => c.resize())
+=======
+    nodeQpsCharts.forEach(c => c.resize())
+    nodeLatencyCharts.forEach(c => c.resize())
+>>>>>>> dev
   }, 150)
 })
 
@@ -1135,8 +2096,15 @@ onMounted(() => {
     ovChart?.dispose(); ovChart = null
     errRateChart?.dispose(); errRateChart = null
     errBreakdownChart?.dispose(); errBreakdownChart = null
+<<<<<<< HEAD
     nodeCharts.forEach((c) => { c.dispose() })
     nodeCharts.clear()
+=======
+    nodeQpsCharts.forEach((c) => { c.dispose() })
+    nodeQpsCharts.clear()
+    nodeLatencyCharts.forEach((c) => { c.dispose() })
+    nodeLatencyCharts.clear()
+>>>>>>> dev
     requestAnimationFrame(() => renderAll())
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
@@ -1144,7 +2112,13 @@ onMounted(() => {
 onUnmounted(() => {
   themeObserver?.disconnect()
   qpsChart?.dispose(); latTrendChart?.dispose(); latChart?.dispose(); ovChart?.dispose(); errRateChart?.dispose()
+<<<<<<< HEAD
   nodeCharts.forEach(c => c.dispose())
+=======
+  sysGoroutineChart?.dispose(); sysHeapChart?.dispose(); sysCpuChart?.dispose(); sysTaskWaitChart?.dispose(); sysQueueChart?.dispose()
+  nodeQpsCharts.forEach(c => c.dispose())
+  nodeLatencyCharts.forEach(c => c.dispose())
+>>>>>>> dev
 })
 </script>
 
@@ -1185,7 +2159,11 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.15s;
 }
+<<<<<<< HEAD
 .btn-export:hover:not(:disabled) { background: rgba(0,229,255,0.08); }
+=======
+.btn-export:hover:not(:disabled) { background: rgba(13,148,136,0.08); }
+>>>>>>> dev
 .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ===== Metrics Row ===== */
@@ -1210,12 +2188,146 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   overflow: hidden;
 }
+<<<<<<< HEAD
+=======
+.nodes-section .chart-card { margin-bottom: 16px; overflow: visible; }
+.nodes-section .chart-card:last-child { margin-bottom: 0; }
+>>>>>>> dev
 .chart-card.wide { grid-column: span 2; }
 .chart-header { padding: 14px 16px 10px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
 .chart-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .chart-tip { font-size: 11px; color: var(--text-tertiary); }
 .chart-body { height: 260px; }
 
+<<<<<<< HEAD
+=======
+/* ===== Failed Nodes ===== */
+.failed-nodes-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.failed-nodes-header h3 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0; }
+.failed-nodes-search-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.failed-nodes-search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-input {
+  width: 100%;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.search-input:focus { border-color: var(--accent-primary); }
+.search-input::placeholder { color: var(--text-tertiary); }
+.search-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.search-select:focus { border-color: var(--accent-primary); }
+.search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+}
+.search-clear:hover { color: var(--text-primary); }
+.failed-nodes-list { max-height: 600px; overflow-y: auto; }
+.failed-nodes-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.failed-node-card {
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--danger, #cf222e);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.failed-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  flex-wrap: wrap;
+}
+.failed-node-name { font-weight: 600; font-size: 13px; }
+.failed-node-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.failed-node-badge.http { background: rgba(9,105,218,0.12); color: #0969da; }
+.failed-node-error-code {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(207,34,46,0.12);
+  color: var(--danger, #cf222e);
+}
+.failed-node-time { font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
+.failed-node-error { padding: 10px 14px; font-size: 13px; }
+.error-text { color: var(--danger, #cf222e); }
+.failed-node-details { padding: 8px 14px; border-top: 1px solid var(--border-color); }
+.failed-node-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+  font-size: 12px;
+}
+.failed-node-detail-body { margin-top: 8px; font-size: 12px; font-family: monospace; }
+.failed-node-detail-body pre {
+  margin: 4px 0;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+>>>>>>> dev
 /* ===== Info Section ===== */
 .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .info-card {
@@ -1230,7 +2342,11 @@ onUnmounted(() => {
 .info-table td { padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--border-secondary); }
 .info-table tr:last-child td { border-bottom: none; }
 .info-label { color: var(--text-secondary); min-width: 110px; }
+<<<<<<< HEAD
 .mono-sm { font-family: monospace; font-size: 12px; }
+=======
+.mono-sm { font-family: var(--font-mono); font-size: 12px; }
+>>>>>>> dev
 
 .mode-tag {
   display: inline-block;
@@ -1238,7 +2354,11 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
+<<<<<<< HEAD
   background: rgba(0,229,255,0.1);
+=======
+  background: rgba(13,148,136,0.1);
+>>>>>>> dev
   color: var(--accent-primary);
 }
 .actual-val { color: var(--accent-success); font-weight: 500; }
@@ -1250,10 +2370,17 @@ onUnmounted(() => {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
+<<<<<<< HEAD
 .status-badge.success { background: rgba(163,230,53,0.15); color: #65a30d; }
 .status-badge.partial { background: rgba(251,146,60,0.15); color: #ea580c; }
 .status-badge.failed { background: rgba(225,29,72,0.15); color: #be123c; }
 .status-badge.running { background: rgba(0,229,255,0.15); color: #0891b2; }
+=======
+.status-badge.success { background: rgba(26,127,55,0.15); color: #1a7f37; }
+.status-badge.partial { background: rgba(191,135,0,0.15); color: #bf8700; }
+.status-badge.failed { background: rgba(207,34,46,0.15); color: #cf222e; }
+.status-badge.running { background: rgba(13,148,136,0.15); color: #0d9488; }
+>>>>>>> dev
 .status-badge.pending { background: rgba(139,148,158,0.15); color: #656d76; }
 .status-badge.canceled { background: rgba(139,148,158,0.12); color: #8b949e; }
 
@@ -1323,7 +2450,69 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
+<<<<<<< HEAD
 .node-chart-body { height: 280px; }
+=======
+.node-chart-body { height: 200px; }
+.node-chart-grid { display: flex; flex-direction: column; gap: 8px; }
+.node-chart-panel { position: relative; }
+.node-chart-panel-label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-bottom: 2px;
+  padding-left: 12px;
+}
+.tooltip-wrapper.node-chart-help {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  line-height: 1;
+  cursor: help;
+}
+.node-chart-help-icon {
+  display: block;
+  flex: 0 0 auto;
+  transition: color 0.15s ease;
+}
+.tooltip-wrapper.node-chart-help:hover .node-chart-help-icon {
+  color: var(--accent-primary);
+}
+/* 悬浮注释：从 ? 右侧弹出，与标签同行，箭头朝左 */
+.tooltip-wrapper.node-chart-help::before {
+  white-space: normal !important;
+  width: 240px !important;
+  text-align: left !important;
+  line-height: 1.5 !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  padding: 10px 14px !important;
+  letter-spacing: normal !important;
+  bottom: auto !important;
+  top: 50% !important;
+  left: calc(100% + 10px) !important;
+  transform: translateY(-50%) translateX(-6px) !important;
+}
+.tooltip-wrapper.node-chart-help::after {
+  bottom: auto !important;
+  top: 50% !important;
+  left: 100% !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-right-color: rgba(255, 255, 255, 0.96) !important;
+  transform: translateY(-50%) translateX(-2px) !important;
+}
+.tooltip-wrapper.node-chart-help:hover::before {
+  transform: translateY(-50%) translateX(0) !important;
+}
+.node-qps-chart { height: 160px; }
+.node-latency-chart { height: 220px; }
+>>>>>>> dev
 
 /* ===== Empty State ===== */
 .empty-state {
@@ -1368,9 +2557,15 @@ onUnmounted(() => {
   border-color: var(--accent-primary);
 }
 [data-theme='dark'] .type-btn.active {
+<<<<<<< HEAD
   background: rgba(0,229,255,0.15);
   color: #00E5FF;
   border-color: rgba(0,229,255,0.3);
+=======
+  background: rgba(45,212,191,0.15);
+  color: #2dd4bf;
+  border-color: rgba(45,212,191,0.3);
+>>>>>>> dev
 }
 .type-btn:hover:not(.active) {
   background: var(--bg-hover);
@@ -1440,6 +2635,39 @@ onUnmounted(() => {
   visibility: visible;
 }
 
+<<<<<<< HEAD
+=======
+/* ===== Tooltip Dark Mode ===== */
+/* Keep light theme unchanged; override only in dark mode to match ECharts dark tooltip. */
+[data-theme='dark'] .tooltip-wrapper::before {
+  background: rgba(22, 27, 34, 0.96);
+  color: #e6edf3;
+  border-color: rgba(48, 54, 61, 0.8);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.5),
+    0 10px 24px -4px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .tooltip-wrapper::after {
+  border-top-color: rgba(22, 27, 34, 0.96);
+  filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Latency band help tooltip (pops to the right) — keep light colors, override arrow + bg in dark */
+[data-theme='dark'] .tooltip-wrapper.node-chart-help::before {
+  background: rgba(22, 27, 34, 0.96) !important;
+  color: #e6edf3 !important;
+  border-color: rgba(48, 54, 61, 0.8) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme='dark'] .tooltip-wrapper.node-chart-help::after {
+  border-right-color: rgba(22, 27, 34, 0.96) !important;
+}
+
+>>>>>>> dev
 /* ===== Responsive ===== */
 @media (max-width: 1100px) {
   .metrics-row { grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -1453,4 +2681,209 @@ onUnmounted(() => {
 @media (max-width: 520px) {
   .metrics-row { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
+<<<<<<< HEAD
+=======
+
+/* System Performance Section */
+.sys-summary-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.sys-summary-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.sys-summary-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.sys-summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-sans), var(--font-mono);
+}
+
+.sys-summary-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.sys-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* System Metrics Data Table */
+.sys-table-section {
+  margin-top: 16px;
+}
+
+.info-banner {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(147, 197, 253, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+}
+
+.banner-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-text strong {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.banner-text p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.table-header-row h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.table-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: var(--bg-card, white);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table thead {
+  background: var(--bg-secondary, #f9fafb);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color, #e5e7eb);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.data-table th.sortable:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.sort-icon {
+  margin-left: 4px;
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
+  color: var(--text-primary);
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-hover, #f9fafb);
+}
+
+.danger-row {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.danger-cell {
+  color: #cf222e !important;
+  font-weight: 600;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.page-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-card, white);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #f3f4f6);
+  border-color: var(--accent-primary, #58a6ff);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 100px;
+  text-align: center;
+}
+
+>>>>>>> dev
 </style>

@@ -6,7 +6,14 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+<<<<<<< HEAD
 	"fmt"
+=======
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+>>>>>>> dev
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -68,23 +75,38 @@ func (r *SceneRepo) Create(ctx context.Context, scene *model.Scene) error {
 	scene.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		INSERT INTO scenes (id, name, description, dag_json, variables, plugins, status, created_at, updated_at, deleted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		scene.ID, scene.Name, scene.Description, scene.DAGJSON,
 		scene.Variables, scene.Plugins, scene.Status,
+=======
+		INSERT INTO scenes (id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		scene.ID, scene.Name, scene.Description, scene.DAGJSON,
+		scene.Variables, scene.ConfigParams, scene.DerivedParams, scene.Plugins, scene.Status, scene.DefaultTimeout,
+>>>>>>> dev
 		scene.CreatedAt, scene.UpdatedAt)
 	return err
 }
 
 func (r *SceneRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Scene, error) {
 	row := r.db.QueryRowContext(ctx, `
+<<<<<<< HEAD
 		SELECT id, name, description, dag_json, variables, plugins, status, created_at, updated_at
+=======
+		SELECT id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at
+>>>>>>> dev
 		FROM scenes WHERE id = ? AND deleted_at IS NULL`, id)
 	return scanScene(row)
 }
 
 func (r *SceneRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Scene, error) {
+<<<<<<< HEAD
 	query := `SELECT id, name, description, dag_json, variables, plugins, status, created_at, updated_at
+=======
+	query := `SELECT id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at
+>>>>>>> dev
 		FROM scenes WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -115,19 +137,35 @@ func (r *SceneRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Scen
 func (r *SceneRepo) Update(ctx context.Context, scene *model.Scene) error {
 	scene.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		UPDATE scenes SET name=?, description=?, dag_json=?, variables=?, plugins=?, status=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		scene.Name, scene.Description, scene.DAGJSON, scene.Variables,
 		scene.Plugins, scene.Status, scene.UpdatedAt, scene.ID)
+=======
+		UPDATE scenes SET name=?, description=?, dag_json=?, variables=?, config_params=?, derived_params=?, plugins=?, status=?, default_timeout=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		scene.Name, scene.Description, scene.DAGJSON, scene.Variables,
+		scene.ConfigParams, scene.DerivedParams, scene.Plugins, scene.Status, scene.DefaultTimeout, scene.UpdatedAt, scene.ID)
+>>>>>>> dev
 	return err
 }
 
 func (r *SceneRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
+<<<<<<< HEAD
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE scenes SET status=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		status, now, id)
+=======
+	// Status transitions (running/completed on start/stop) intentionally do
+	// not touch updated_at: it reflects configuration changes only.
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE scenes SET status=?
+		WHERE id=? AND deleted_at IS NULL`,
+		status, id)
+>>>>>>> dev
 	return err
 }
 
@@ -137,12 +175,249 @@ func (r *SceneRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	return err
 }
 
+<<<<<<< HEAD
+=======
+// CopyTx duplicates a scene with all its nodes, edges and data sources in a
+// single transaction. Node ID references (edges.from/to, group config
+// node_ids) are rewritten to the new node IDs. Run records and reports are
+// intentionally not copied.
+func (r *SceneRepo) CopyTx(ctx context.Context, srcID snowflake.ID, newName, newDesc string) (*model.Scene, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// 读源场景（同事务快照，避免复制期间被并发修改）
+	src, err := r.getSceneForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	copied := &model.Scene{
+		Name:          newName,
+		Description:   newDesc,
+		DAGJSON:       "",
+		Variables:     src.Variables,
+		ConfigParams:  src.ConfigParams,
+		DerivedParams: src.DerivedParams,
+		Plugins:       src.Plugins,
+		Status:        model.SceneStatusDraft,
+		DefaultTimeout: src.DefaultTimeout,
+	}
+	copied.CreatedAt = now
+	copied.UpdatedAt = now
+	copied.ID = r.db.NextID()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO scenes (id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		copied.ID, copied.Name, copied.Description, copied.DAGJSON,
+		copied.Variables, copied.ConfigParams, copied.DerivedParams, copied.Plugins,
+		copied.Status, copied.DefaultTimeout, copied.CreatedAt, copied.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	// 复制节点并建立 oldID→newID 映射
+	srcNodes, err := r.listNodesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	idMap := make(map[snowflake.ID]snowflake.ID, len(srcNodes))
+	for _, n := range srcNodes {
+		newID := r.db.NextID()
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			newID, copied.ID, n.Name, n.Type, n.Config, n.Position,
+			n.LoopCount, n.BlockOnError, n.Lifecycle, now, now); err != nil {
+			return nil, err
+		}
+		idMap[n.ID] = newID
+	}
+
+	// 复制连线：from/to 经映射重写，映射缺失（悬空边）则失败回滚
+	srcEdges, err := r.listEdgesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range srcEdges {
+		newFrom, ok := idMap[e.FromNode]
+		if !ok {
+			return nil, fmt.Errorf("edge %d references missing source node %d", e.ID, e.FromNode)
+		}
+		newTo, ok := idMap[e.ToNode]
+		if !ok {
+			return nil, fmt.Errorf("edge %d references missing target node %d", e.ID, e.ToNode)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO edges (id, scene_id, from_node, to_node, condition, priority, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			r.db.NextID(), copied.ID, newFrom, newTo, e.Condition, e.Priority, now, now); err != nil {
+			return nil, err
+		}
+	}
+
+	// 重写 group 节点 config.node_ids：未知引用则失败回滚
+	for _, n := range srcNodes {
+		if n.Type != model.NodeTypeGroup {
+			continue
+		}
+		rewritten, err := rewriteGroupNodeIDs(n.Config, idMap)
+		if err != nil {
+			return nil, fmt.Errorf("group node %q: %w", n.Name, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE nodes SET config=?, updated_at=? WHERE id=?`,
+			rewritten, now, idMap[n.ID]); err != nil {
+			return nil, err
+		}
+	}
+
+	// 复制数据源（rows 字符串整体搬运，不经反序列化）
+	srcDS, err := r.listDataSourcesForCopy(ctx, tx, srcID)
+	if err != nil {
+		return nil, err
+	}
+	for _, ds := range srcDS {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO data_sources (id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at, deleted_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			r.db.NextID(), copied.ID, ds.Name, ds.FileName, ds.Columns, ds.Rows,
+			ds.RowCount, ds.Source, now, now); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return copied, nil
+}
+
+// rewriteGroupNodeIDs maps group config node_ids to the copied node IDs.
+func rewriteGroupNodeIDs(config string, idMap map[snowflake.ID]snowflake.ID) (string, error) {
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return "", fmt.Errorf("invalid config json: %w", err)
+	}
+	raw, ok := cfg["node_ids"]
+	if !ok {
+		return config, nil
+	}
+	var ids []string
+	if err := json.Unmarshal(raw, &ids); err != nil {
+		return "", fmt.Errorf("node_ids must be strings: %w", err)
+	}
+	mapped := make([]string, 0, len(ids))
+	for _, idStr := range ids {
+		var id snowflake.ID
+		if err := id.Parse(idStr); err != nil {
+			return "", fmt.Errorf("invalid node id %q: %w", idStr, err)
+		}
+		newID, ok := idMap[id]
+		if !ok {
+			return "", fmt.Errorf("node id %q not found in copied scene", idStr)
+		}
+		mapped = append(mapped, newID.String())
+	}
+	newRaw, err := json.Marshal(mapped)
+	if err != nil {
+		return "", err
+	}
+	cfg["node_ids"] = newRaw
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// getSceneForCopy reads the source scene inside the copy transaction.
+func (r *SceneRepo) getSceneForCopy(ctx context.Context, tx *sql.Tx, id snowflake.ID) (*model.Scene, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT id, name, description, dag_json, variables, config_params, derived_params, plugins, status, default_timeout, created_at, updated_at
+		FROM scenes WHERE id = ? AND deleted_at IS NULL`, id)
+	return scanScene(row)
+}
+
+func (r *SceneRepo) listNodesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.Node, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at
+		FROM nodes WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY created_at ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var nodes []*model.Node
+	for rows.Next() {
+		n := &model.Node{}
+		if err := rows.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
+			&n.Position, &n.LoopCount, &n.BlockOnError, &n.Lifecycle, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}
+
+func (r *SceneRepo) listEdgesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.Edge, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, from_node, to_node, condition, priority, created_at, updated_at
+		FROM edges WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY priority ASC, created_at ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var edges []*model.Edge
+	for rows.Next() {
+		e := &model.Edge{}
+		if err := rows.Scan(&e.ID, &e.SceneID, &e.FromNode, &e.ToNode,
+			&e.Condition, &e.Priority, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		edges = append(edges, e)
+	}
+	return edges, rows.Err()
+}
+
+func (r *SceneRepo) listDataSourcesForCopy(ctx context.Context, tx *sql.Tx, sceneID snowflake.ID) ([]*model.DataSource, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY name ASC, source ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sources []*model.DataSource
+	for rows.Next() {
+		ds := &model.DataSource{}
+		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sources = append(sources, ds)
+	}
+	return sources, rows.Err()
+}
+
+>>>>>>> dev
 func scanScene(row interface {
 	Scan(dest ...any) error
 }) (*model.Scene, error) {
 	s := &model.Scene{}
 	err := row.Scan(&s.ID, &s.Name, &s.Description, &s.DAGJSON,
+<<<<<<< HEAD
 		&s.Variables, &s.Plugins, &s.Status, &s.CreatedAt, &s.UpdatedAt)
+=======
+		&s.Variables, &s.ConfigParams, &s.DerivedParams, &s.Plugins, &s.Status, &s.DefaultTimeout, &s.CreatedAt, &s.UpdatedAt)
+>>>>>>> dev
 	if err != nil {
 		return nil, err
 	}
@@ -172,20 +447,35 @@ func (r *NodeRepo) Create(ctx context.Context, node *model.Node) error {
 	node.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, created_at, updated_at, deleted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		node.ID, node.SceneID, node.Name, node.Type, node.Config,
 		node.Position, node.LoopCount, node.CreatedAt, node.UpdatedAt)
+=======
+		INSERT INTO nodes (id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		node.ID, node.SceneID, node.Name, node.Type, node.Config,
+		node.Position, node.LoopCount, node.BlockOnError, node.Lifecycle, node.CreatedAt, node.UpdatedAt)
+>>>>>>> dev
 	return err
 }
 
 func (r *NodeRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Node, error) {
 	row := r.db.QueryRowContext(ctx, `
+<<<<<<< HEAD
 		SELECT id, scene_id, name, type, config, position, loop_count, created_at, updated_at
 		FROM nodes WHERE id=? AND deleted_at IS NULL`, id)
 	n := &model.Node{}
 	err := row.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
 		&n.Position, &n.LoopCount, &n.CreatedAt, &n.UpdatedAt)
+=======
+		SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at
+		FROM nodes WHERE id=? AND deleted_at IS NULL`, id)
+	n := &model.Node{}
+	err := row.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
+		&n.Position, &n.LoopCount, &n.BlockOnError, &n.Lifecycle, &n.CreatedAt, &n.UpdatedAt)
+>>>>>>> dev
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +483,11 @@ func (r *NodeRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Node, e
 }
 
 func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node, error) {
+<<<<<<< HEAD
 	query := `SELECT id, scene_id, name, type, config, position, loop_count, created_at, updated_at
+=======
+	query := `SELECT id, scene_id, name, type, config, position, loop_count, block_on_error, lifecycle, created_at, updated_at
+>>>>>>> dev
 		FROM nodes WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -214,7 +508,11 @@ func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node,
 	for rows.Next() {
 		n := &model.Node{}
 		if err := rows.Scan(&n.ID, &n.SceneID, &n.Name, &n.Type, &n.Config,
+<<<<<<< HEAD
 			&n.Position, &n.LoopCount, &n.CreatedAt, &n.UpdatedAt); err != nil {
+=======
+			&n.Position, &n.LoopCount, &n.BlockOnError, &n.Lifecycle, &n.CreatedAt, &n.UpdatedAt); err != nil {
+>>>>>>> dev
 			return nil, err
 		}
 		nodes = append(nodes, n)
@@ -225,10 +523,17 @@ func (r *NodeRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Node,
 func (r *NodeRepo) Update(ctx context.Context, node *model.Node) error {
 	node.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		UPDATE nodes SET name=?, type=?, config=?, position=?, loop_count=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		node.Name, node.Type, node.Config, node.Position, node.LoopCount,
 		node.UpdatedAt, node.ID)
+=======
+		UPDATE nodes SET name=?, type=?, config=?, position=?, loop_count=?, block_on_error=?, lifecycle=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		node.Name, node.Type, node.Config, node.Position, node.LoopCount,
+		node.BlockOnError, node.Lifecycle, node.UpdatedAt, node.ID)
+>>>>>>> dev
 	return err
 }
 
@@ -499,6 +804,7 @@ func (r *ReportRepo) Create(ctx context.Context, report *model.Report) error {
 	report.CreatedAt = now
 	report.UpdatedAt = now
 
+<<<<<<< HEAD
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO reports (id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at, deleted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
@@ -506,38 +812,109 @@ func (r *ReportRepo) Create(ctx context.Context, report *model.Report) error {
 		report.Summary, report.Detail, report.StartedAt, report.FinishedAt,
 		report.CreatedAt, report.UpdatedAt)
 	return err
+=======
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 插入 reports 表（不包含 detail）
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reports (id, scene_id, run_id, status, summary, started_at, finished_at, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		report.ID, report.SceneID, report.RunID, report.Status,
+		report.Summary, report.StartedAt, report.FinishedAt,
+		report.CreatedAt, report.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	// 如果有 detail，插入 report_details 表
+	if report.Detail != "" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO report_details (report_id, detail)
+			VALUES (?, ?)`,
+			report.ID, report.Detail)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+>>>>>>> dev
 }
 
 func (r *ReportRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Report, error) {
 	row := r.db.QueryRowContext(ctx, `
+<<<<<<< HEAD
 		SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
 		FROM reports WHERE id=? AND deleted_at IS NULL`, id)
 	rp := &model.Report{}
 	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
 		&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+=======
+		SELECT r.id, r.scene_id, r.run_id, r.status, r.summary, rd.detail, r.started_at, r.finished_at, r.created_at, r.updated_at
+		FROM reports r
+		LEFT JOIN report_details rd ON r.id = rd.report_id
+		WHERE r.id=? AND r.deleted_at IS NULL`, id)
+	rp := &model.Report{}
+	var detail sql.NullString
+	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
+		&rp.Summary, &detail, &rp.StartedAt, &rp.FinishedAt,
+>>>>>>> dev
 		&rp.CreatedAt, &rp.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
+=======
+	if detail.Valid {
+		rp.Detail = detail.String
+	}
+>>>>>>> dev
 	return rp, nil
 }
 
 func (r *ReportRepo) GetByRunID(ctx context.Context, runID snowflake.ID) (*model.Report, error) {
 	row := r.db.QueryRowContext(ctx, `
+<<<<<<< HEAD
 		SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
 		FROM reports WHERE run_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, runID)
 	rp := &model.Report{}
 	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
 		&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+=======
+		SELECT r.id, r.scene_id, r.run_id, r.status, r.summary, rd.detail, r.started_at, r.finished_at, r.created_at, r.updated_at
+		FROM reports r
+		LEFT JOIN report_details rd ON r.id = rd.report_id
+		WHERE r.run_id=? AND r.deleted_at IS NULL 
+		ORDER BY r.created_at DESC LIMIT 1`, runID)
+	rp := &model.Report{}
+	var detail sql.NullString
+	err := row.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
+		&rp.Summary, &detail, &rp.StartedAt, &rp.FinishedAt,
+>>>>>>> dev
 		&rp.CreatedAt, &rp.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
+=======
+	if detail.Valid {
+		rp.Detail = detail.String
+	}
+>>>>>>> dev
 	return rp, nil
 }
 
 func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Report, error) {
+<<<<<<< HEAD
 	query := `SELECT id, scene_id, run_id, status, summary, detail, started_at, finished_at, created_at, updated_at
+=======
+	query := `SELECT id, scene_id, run_id, status, summary, started_at, finished_at, created_at, updated_at
+>>>>>>> dev
 		FROM reports WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -562,7 +939,11 @@ func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Rep
 	for rows.Next() {
 		rp := &model.Report{}
 		if err := rows.Scan(&rp.ID, &rp.SceneID, &rp.RunID, &rp.Status,
+<<<<<<< HEAD
 			&rp.Summary, &rp.Detail, &rp.StartedAt, &rp.FinishedAt,
+=======
+			&rp.Summary, &rp.StartedAt, &rp.FinishedAt,
+>>>>>>> dev
 			&rp.CreatedAt, &rp.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -573,18 +954,76 @@ func (r *ReportRepo) List(ctx context.Context, filter repo.Filter) ([]*model.Rep
 
 func (r *ReportRepo) Update(ctx context.Context, report *model.Report) error {
 	report.UpdatedAt = time.Now().UTC()
+<<<<<<< HEAD
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE reports SET status=?, summary=?, detail=?, started_at=?, finished_at=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		report.Status, report.Summary, report.Detail,
 		report.StartedAt, report.FinishedAt, report.UpdatedAt, report.ID)
 	return err
+=======
+
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 更新 reports 表（不包含 detail）
+	_, err = tx.ExecContext(ctx, `
+		UPDATE reports SET status=?, summary=?, started_at=?, finished_at=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		report.Status, report.Summary, report.StartedAt, report.FinishedAt,
+		report.UpdatedAt, report.ID)
+	if err != nil {
+		return err
+	}
+
+	// 更新或插入 report_details
+	if report.Detail != "" {
+		// 使用 INSERT OR REPLACE (SQLite 的 upsert)
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO report_details (report_id, detail)
+			VALUES (?, ?)`,
+			report.ID, report.Detail)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+>>>>>>> dev
 }
 
 func (r *ReportRepo) Delete(ctx context.Context, id snowflake.ID) error {
 	now := time.Now().UTC()
+<<<<<<< HEAD
 	_, err := r.db.ExecContext(ctx, `UPDATE reports SET deleted_at=? WHERE id=?`, now, id)
 	return err
+=======
+
+	// 开始事务
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 软删除 reports
+	_, err = tx.ExecContext(ctx, `UPDATE reports SET deleted_at=? WHERE id=?`, now, id)
+	if err != nil {
+		return err
+	}
+
+	// 手动删除 report_details（保持数据一致性）
+	_, err = tx.ExecContext(ctx, `DELETE FROM report_details WHERE report_id=?`, id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+>>>>>>> dev
 }
 
 // --- RunRecordRepo ---
@@ -604,11 +1043,19 @@ func (r *RunRecordRepo) Create(ctx context.Context, rec *model.RunRecord) error 
 	rec.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		INSERT INTO run_records (id, scene_id, status, worker_count, run_mode, duration, count,
 			total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 			error_msg, started_at, finished_at, created_at, updated_at, deleted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		rec.ID, rec.SceneID, rec.Status, rec.WorkerCount, rec.RunMode, rec.Duration, rec.Count,
+=======
+		INSERT INTO run_records (id, scene_id, run_id, status, worker_count, run_mode, duration, count,
+			total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
+			error_msg, started_at, finished_at, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		rec.ID, rec.SceneID, rec.RunID, rec.Status, rec.WorkerCount, rec.RunMode, rec.Duration, rec.Count,
+>>>>>>> dev
 		rec.TotalReqs, rec.SuccessReqs, rec.FailedReqs,
 		rec.AvgLatency, rec.P50Latency, rec.P90Latency, rec.P95Latency, rec.P99Latency,
 		rec.ErrorMsg, rec.StartedAt, rec.FinishedAt,
@@ -618,7 +1065,11 @@ func (r *RunRecordRepo) Create(ctx context.Context, rec *model.RunRecord) error 
 
 func (r *RunRecordRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.RunRecord, error) {
 	row := r.db.QueryRowContext(ctx, `
+<<<<<<< HEAD
 		SELECT id, scene_id, status, worker_count, run_mode, duration, count,
+=======
+		SELECT id, run_id, scene_id, status, worker_count, run_mode, duration, count,
+>>>>>>> dev
 			total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 			error_msg, started_at, finished_at, created_at, updated_at
 		FROM run_records WHERE id=? AND deleted_at IS NULL`, id)
@@ -626,7 +1077,11 @@ func (r *RunRecordRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.Ru
 }
 
 func (r *RunRecordRepo) List(ctx context.Context, filter repo.Filter) ([]*model.RunRecord, error) {
+<<<<<<< HEAD
 	query := `SELECT id, scene_id, status, worker_count, run_mode, duration, count,
+=======
+	query := `SELECT id, run_id, scene_id, status, worker_count, run_mode, duration, count,
+>>>>>>> dev
 		total_reqs, success_reqs, failed_reqs, avg_latency, p50_latency, p90_latency, p95_latency, p99_latency,
 		error_msg, started_at, finished_at, created_at, updated_at
 		FROM run_records WHERE deleted_at IS NULL`
@@ -685,7 +1140,11 @@ func scanRunRecord(row interface {
 	Scan(dest ...any) error
 }) (*model.RunRecord, error) {
 	rec := &model.RunRecord{}
+<<<<<<< HEAD
 	err := row.Scan(&rec.ID, &rec.SceneID, &rec.Status, &rec.WorkerCount,
+=======
+	err := row.Scan(&rec.ID, &rec.RunID, &rec.SceneID, &rec.Status, &rec.WorkerCount,
+>>>>>>> dev
 		&rec.RunMode, &rec.Duration, &rec.Count, &rec.TotalReqs, &rec.SuccessReqs,
 		&rec.FailedReqs, &rec.AvgLatency, &rec.P50Latency, &rec.P90Latency, &rec.P95Latency,
 		&rec.P99Latency, &rec.ErrorMsg, &rec.StartedAt, &rec.FinishedAt,
@@ -727,6 +1186,51 @@ func (r *UserRepo) Create(ctx context.Context, user *model.User) error {
 	return err
 }
 
+<<<<<<< HEAD
+=======
+// CreateOrRestore inserts a new user, or — when a soft-deleted user with
+// the same email exists — restores that row with the new values (keeping
+// the original id and created_at so the UNIQUE constraint is respected
+// without leaking soft-deleted rows into normal queries).
+func (r *UserRepo) CreateOrRestore(ctx context.Context, user *model.User) error {
+	var existingID snowflake.ID
+	var isDeleted bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, deleted_at IS NOT NULL FROM users WHERE email=?`, user.Email,
+	).Scan(&existingID, &isDeleted)
+	switch {
+	case err == nil:
+		if !isDeleted {
+			// An active user already owns this email.
+			return repo.ErrEmailTaken
+		}
+		// Restore the soft-deleted row: keep id/created_at, reset the
+		// business fields, clear deleted_at and last_login_at.
+		now := time.Now().UTC()
+		user.ID = existingID
+		user.UpdatedAt = now
+		_, err = r.db.ExecContext(ctx, `
+			UPDATE users SET password_hash=?, nickname=?, role_id=?, status=?,
+				last_login_at=NULL, updated_at=?, deleted_at=NULL
+			WHERE id=?`,
+			user.PasswordHash, user.Nickname, user.RoleID, user.Status, now, existingID)
+		return err
+	case errors.Is(err, sql.ErrNoRows):
+		// No row at all — insert a new one. A concurrent insert racing us
+		// still hits the UNIQUE constraint; map it to ErrEmailTaken.
+		if err := r.Create(ctx, user); err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				return repo.ErrEmailTaken
+			}
+			return err
+		}
+		return nil
+	default:
+		return err
+	}
+}
+
+>>>>>>> dev
 func (r *UserRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.User, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, email, password_hash, nickname, role_id, status, last_login_at, created_at, updated_at
@@ -773,9 +1277,15 @@ func (r *UserRepo) List(ctx context.Context, filter repo.Filter) ([]*model.User,
 func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
 	user.UpdatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
+<<<<<<< HEAD
 		UPDATE users SET email=?, nickname=?, role_id=?, status=?, last_login_at=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
 		user.Email, user.Nickname, user.RoleID, user.Status,
+=======
+		UPDATE users SET email=?, password_hash=?, nickname=?, role_id=?, status=?, last_login_at=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		user.Email, user.PasswordHash, user.Nickname, user.RoleID, user.Status,
+>>>>>>> dev
 		user.LastLoginAt, user.UpdatedAt, user.ID)
 	return err
 }
@@ -1048,3 +1558,218 @@ func (r *RolePermissionRepo) ListPermissions(ctx context.Context, roleID snowfla
 	}
 	return perms, rows.Err()
 }
+<<<<<<< HEAD
+=======
+
+// --- DataSourceRepo ---
+
+type DataSourceRepo struct {
+	db *DB
+}
+
+func NewDataSourceRepo(db *DB) *DataSourceRepo {
+	return &DataSourceRepo{db: db}
+}
+
+func (r *DataSourceRepo) Create(ctx context.Context, ds *model.DataSource) error {
+	now := time.Now().UTC()
+	ds.ID = r.db.NextID()
+	ds.CreatedAt = now
+	ds.UpdatedAt = now
+
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO data_sources (id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		ds.ID, ds.SceneID, ds.Name, ds.FileName, ds.Columns, ds.Rows,
+		ds.RowCount, ds.Source, ds.CreatedAt, ds.UpdatedAt)
+	return err
+}
+
+func (r *DataSourceRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.DataSource, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE id=? AND deleted_at IS NULL`, id)
+	ds := &model.DataSource{}
+	err := row.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return ds, nil
+}
+
+func (r *DataSourceRepo) GetBySceneIDAndName(ctx context.Context, sceneID snowflake.ID, name string) ([]*model.DataSource, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND name=? AND deleted_at IS NULL
+		ORDER BY source ASC`, sceneID, name) // "csv" < "yaml" lexicographically, so csv comes first
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var results []*model.DataSource
+	for rows.Next() {
+		ds := &model.DataSource{}
+		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			return nil, err
+		}
+		results = append(results, ds)
+	}
+	return results, nil
+}
+
+func (r *DataSourceRepo) GetBySceneIDAndNameAndSource(ctx context.Context, sceneID snowflake.ID, name string, source string) (*model.DataSource, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND name=? AND source=? AND deleted_at IS NULL`, sceneID, name, source)
+	ds := &model.DataSource{}
+	err := row.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+		&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return ds, nil
+}
+
+func (r *DataSourceRepo) ListBySceneID(ctx context.Context, sceneID snowflake.ID) ([]*model.DataSource, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, scene_id, name, file_name, columns, rows, row_count, source, created_at, updated_at
+		FROM data_sources WHERE scene_id=? AND deleted_at IS NULL
+		ORDER BY name ASC, source ASC`, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sources []*model.DataSource
+	for rows.Next() {
+		ds := &model.DataSource{}
+		if err := rows.Scan(&ds.ID, &ds.SceneID, &ds.Name, &ds.FileName,
+			&ds.Columns, &ds.Rows, &ds.RowCount, &ds.Source, &ds.CreatedAt, &ds.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sources = append(sources, ds)
+	}
+	return sources, rows.Err()
+}
+
+func (r *DataSourceRepo) Update(ctx context.Context, ds *model.DataSource) error {
+	ds.UpdatedAt = time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE data_sources SET columns=?, rows=?, row_count=?, updated_at=?
+		WHERE id=? AND deleted_at IS NULL`,
+		ds.Columns, ds.Rows, ds.RowCount, ds.UpdatedAt, ds.ID)
+	return err
+}
+
+func (r *DataSourceRepo) Delete(ctx context.Context, id snowflake.ID) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `UPDATE data_sources SET deleted_at=? WHERE id=?`, now, id)
+	return err
+}
+
+// SOPluginRepo implements repo.SOPluginRepo using SQLite.
+type SOPluginRepo struct {
+	db *DB
+}
+
+func NewSOPluginRepo(db *DB) *SOPluginRepo {
+	return &SOPluginRepo{db: db}
+}
+
+func (r *SOPluginRepo) Create(ctx context.Context, p *model.SOPlugin) error {
+	now := time.Now().UTC()
+	nowStr := now.Format("2006-01-02 15:04:05.000")
+
+	// Dedup: soft-delete any existing plugin with the same name+version.
+	var existingID snowflake.ID
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id FROM so_plugins WHERE name=? AND version=? AND deleted_at IS NULL LIMIT 1`,
+		p.Name, p.Version).Scan(&existingID)
+	if err == nil {
+		// Soft-delete the old record so the new one becomes the latest active version.
+		_, _ = r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, nowStr, existingID)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check duplicate plugin: %w", err)
+	}
+
+	p.ID = snowflake.ID(r.db.NextID())
+	p.CreatedAt = now
+	p.UpdatedAt = now
+
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO so_plugins (id, name, version, file_path, status, config, created_at, updated_at, deleted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		p.ID, p.Name, p.Version, p.FilePath, p.Status, p.Config, nowStr, nowStr)
+	return err
+}
+
+func (r *SOPluginRepo) GetByID(ctx context.Context, id snowflake.ID) (*model.SOPlugin, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, name, version, file_path, status, config, created_at, updated_at
+		FROM so_plugins WHERE id=? AND deleted_at IS NULL`, id)
+	p := &model.SOPlugin{}
+	err := row.Scan(&p.ID, &p.Name, &p.Version, &p.FilePath, &p.Status, &p.Config, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *SOPluginRepo) List(ctx context.Context, filter repo.Filter) ([]*model.SOPlugin, error) {
+	query := `SELECT id, name, version, file_path, status, config, created_at, updated_at
+		FROM so_plugins WHERE deleted_at IS NULL`
+	args := make([]any, 0)
+
+	if filter.Status != "" {
+		query += ` AND status=?`
+		args = append(args, filter.Status)
+	}
+	query += ` ORDER BY name ASC, version DESC`
+
+	if filter.Limit > 0 {
+		query += fmt.Sprintf(` LIMIT %d`, filter.Limit)
+	} else {
+		query += ` LIMIT 50`
+	}
+	if filter.Offset > 0 {
+		query += fmt.Sprintf(` OFFSET %d`, filter.Offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var plugins []*model.SOPlugin
+	for rows.Next() {
+		p := &model.SOPlugin{}
+		if err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.FilePath, &p.Status, &p.Config, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		plugins = append(plugins, p)
+	}
+	return plugins, rows.Err()
+}
+
+func (r *SOPluginRepo) UpdateStatus(ctx context.Context, id snowflake.ID, status string) error {
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET status=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, status, nowStr, id)
+	return err
+}
+
+func (r *SOPluginRepo) UpdateConfig(ctx context.Context, id snowflake.ID, config string) error {
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET config=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, config, nowStr, id)
+	return err
+}
+
+func (r *SOPluginRepo) Delete(ctx context.Context, id snowflake.ID) error {
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	_, err := r.db.ExecContext(ctx, `UPDATE so_plugins SET deleted_at=? WHERE id=?`, nowStr, id)
+	return err
+}
+>>>>>>> dev

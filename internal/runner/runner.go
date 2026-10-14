@@ -5,11 +5,23 @@
 package runner
 
 import (
+<<<<<<< HEAD
 	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
+=======
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"runtime/debug"
+	"sort"
+	"strconv"
+>>>>>>> dev
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +29,10 @@ import (
 
 	"github.com/yannick2025-tech/Salvo/internal/core/cascade"
 	"github.com/yannick2025-tech/Salvo/internal/core/dag"
+<<<<<<< HEAD
+=======
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+>>>>>>> dev
 	"github.com/yannick2025-tech/Salvo/internal/core/lifecycle"
 	"github.com/yannick2025-tech/Salvo/internal/core/pool"
 	"github.com/yannick2025-tech/Salvo/internal/core/variable"
@@ -29,8 +45,44 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/store/model"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
 	tracelib "github.com/yannick2025-tech/Salvo/internal/trace"
+<<<<<<< HEAD
 )
 
+=======
+	sharedcrypto "github.com/yannick2025-tech/Salvo/plugins/shared/crypto"
+)
+
+// genLogAdapter adapts logger.Logger to the generator.Logger interface so that
+// the generator registry can log function-level spans through the runner's logger.
+type genLogAdapter struct {
+	log logger.Logger
+}
+
+func (a *genLogAdapter) Debug(msg string, fields ...any) {
+	a.log.Debug(msg, toFields(fields...)...)
+}
+
+func (a *genLogAdapter) Info(msg string, fields ...any) {
+	a.log.Info(msg, toFields(fields...)...)
+}
+
+func (a *genLogAdapter) Error(msg string, fields ...any) {
+	a.log.Error(msg, toFields(fields...)...)
+}
+
+// toFields converts a variadic any slice to logger.Field slice.
+// Pairs of (string, any) are expected, matching the standard log field pattern.
+func toFields(pairs ...any) []logger.Field {
+	fields := make([]logger.Field, 0, len(pairs)/2)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		key, _ := pairs[i].(string)
+		fields = append(fields, logger.F(key, pairs[i+1]))
+	}
+	return fields
+}
+
+// RunMode is the execution mode for a test scene.
+>>>>>>> dev
 type RunMode string
 
 const (
@@ -39,6 +91,7 @@ const (
 )
 
 type Config struct {
+<<<<<<< HEAD
 	SceneID   snowflake.ID
 	Workers   int
 	RunMode   RunMode
@@ -46,6 +99,17 @@ type Config struct {
 	Duration  time.Duration
 	Timeout   time.Duration
 	Variables map[string]string
+=======
+	SceneID             snowflake.ID
+	Workers             int
+	RunMode             RunMode
+	Count               int64
+	Duration            time.Duration
+	Timeout             time.Duration
+	Variables           map[string]string
+	EnableSystemMetrics bool                   // Enable runtime/system metrics collection (default: true)
+	ExprRegistry        *expr.FunctionRegistry // Expression engine registry with __so and builtins registered
+>>>>>>> dev
 }
 
 func (c Config) Validate() error {
@@ -80,6 +144,7 @@ const (
 	StatusCanceled Status = "canceled"
 )
 
+<<<<<<< HEAD
 type Stats struct {
 	TotalReqs   atomic.Int64
 	SuccessReqs atomic.Int64
@@ -88,6 +153,31 @@ type Stats struct {
 	TTFB        atomic.Int64
 	latencies   sync.Mutex
 	latencyList []time.Duration
+=======
+// manualCancelKey is a context key used to propagate the manual-cancel flag
+// from the Runner down to sceneNode and the DAG executor. The value stored
+// is a *atomic.Bool that is set to true when the user manually stops the run.
+// The key type is defined in the dag package (dag.ManualCancelKey) to avoid
+// circular imports — both runner and dag reference it.
+
+type Stats struct {
+	TotalReqs    atomic.Int64
+	SuccessReqs  atomic.Int64
+	FailedReqs   atomic.Int64
+	CanceledReqs atomic.Int64
+	MinLatency   atomic.Int64
+	TTFB         atomic.Int64
+	latencies    sync.Mutex
+	latencyList  []time.Duration
+}
+
+// RecordCanceled records a request that was aborted due to manual scene
+// cancellation. Canceled requests are NOT counted in TotalReqs (which
+// tracks requests that reached a server), keeping the error rate
+// (FailedReqs / TotalReqs) consistent with the configured error rate.
+func (s *Stats) RecordCanceled() {
+	s.CanceledReqs.Add(1)
+>>>>>>> dev
 }
 
 func (s *Stats) RecordLatency(d time.Duration, success bool) {
@@ -167,6 +257,7 @@ func percentile(sorted []time.Duration, p int) time.Duration {
 }
 
 type Runner struct {
+<<<<<<< HEAD
 	cfg    Config
 	status atomic.Value
 	stats  *Stats
@@ -184,10 +275,40 @@ type Runner struct {
 	tracer  *tracelib.Tracer
 	runID   snowflake.ID
 	nodeGen *snowflake.Node
+=======
+	cfg           Config
+	status        atomic.Value
+	stats         *Stats
+	httpOnlyStats *Stats
+	cancel        context.CancelFunc
+	ctx           context.Context
+	mu            sync.Mutex
+	done          chan struct{}
+	log           logger.Logger
+	runErr        atomic.Value // stores error for Error() method
+	// manualCanceled is set to true when the user manually stops the run
+	// via Stop(). It is propagated through the context so that sceneNode
+	// and the DAG executor can distinguish manual cancellation (→ "canceled"
+	// status, excluded from error rate) from request timeouts and other
+	// errors (→ "error" status, counted as failures).
+	manualCanceled atomic.Bool
+
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	runs        repo.RunRecordRepo
+	reports     repo.ReportRepo
+	dataSources repo.DataSourceRepo
+	tracer      *tracelib.Tracer
+	runID       snowflake.ID
+	dbRecordID  snowflake.ID // DB-assigned PK after runs.Create(), used for Update/Delete queries
+	nodeGen     *snowflake.Node
+>>>>>>> dev
 
 	startedAt  time.Time
 	finishedAt time.Time
 
+<<<<<<< HEAD
 	nodeStats map[string]*NodeStats
 	collector *TimeSeriesCollector
 	tsStore   TimeSeriesStore
@@ -195,6 +316,27 @@ type Runner struct {
 }
 
 func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
+=======
+	// rowIterators maps data source name to its RowIterator.
+	// Each task execution advances the iterator to get the next row.
+	rowIterators map[string]*RowIterator
+
+	nodeStats        map[string]*NodeStats
+	collector        *TimeSeriesCollector
+	tsStore          TimeSeriesStore
+	runtimeCollector *RuntimeMetricsCollector
+	stopWg           sync.WaitGroup
+
+	// exprReg holds the expression engine registry with __so and builtins registered.
+	exprReg *expr.FunctionRegistry
+
+	// failedNodes stores detailed information about failed node executions
+	failedNodes   []FailedNodeDetail
+	failedNodesMu sync.Mutex
+}
+
+func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger) (*Runner, error) {
+>>>>>>> dev
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -204,6 +346,7 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		return nil, fmt.Errorf("runner: create snowflake node: %w", err)
 	}
 
+<<<<<<< HEAD
 	r := &Runner{
 		cfg:       cfg,
 		stats:     &Stats{},
@@ -218,13 +361,42 @@ func New(cfg Config, scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.Edge
 		done:      make(chan struct{}),
 		log:       log,
 		nodeStats: make(map[string]*NodeStats),
+=======
+	// Generate runID once and share it between Runner and TimeSeriesCollector
+	// so that time series data can be queried by run_record ID.
+	runID := n.Generate()
+
+	r := &Runner{
+		cfg:           cfg,
+		stats:         &Stats{},
+		httpOnlyStats: &Stats{},
+		scenes:        scenes,
+		nodes:         nodes,
+		edges:         edges,
+		runs:          runs,
+		reports:       reports,
+		dataSources:   dataSources,
+		tracer:        tracer,
+		nodeGen:       n,
+		runID:         runID,
+		done:          make(chan struct{}),
+		log:           log,
+		nodeStats:     make(map[string]*NodeStats),
+		exprReg:       cfg.ExprRegistry,
+>>>>>>> dev
 		collector: NewTimeSeriesCollector(TimeSeriesConfig{
 			SampleInterval:  1 * time.Second,
 			FlushInterval:   10 * time.Second,
 			MemoryWindowSec: 300,
 			MaxNodes:        100,
+<<<<<<< HEAD
 		}, n.Generate(), tsStore, nil),
 		tsStore: tsStore,
+=======
+		}, runID, tsStore, nil),
+		tsStore:          tsStore,
+		runtimeCollector: NewRuntimeMetricsCollector(2*time.Second, cfg.EnableSystemMetrics),
+>>>>>>> dev
 	}
 	r.status.Store(StatusPending)
 	return r, nil
@@ -238,16 +410,31 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	r.ctx, r.cancel = context.WithCancel(ctx)
+<<<<<<< HEAD
+=======
+	// Propagate the manual-cancel flag through the context tree so that
+	// sceneNode and the DAG executor can detect manual stops.
+	r.ctx = context.WithValue(r.ctx, dag.ManualCancelKey{}, &r.manualCanceled)
+>>>>>>> dev
 	r.status.Store(StatusRunning)
 	r.startedAt = time.Now().UTC()
 	r.mu.Unlock()
 
+<<<<<<< HEAD
 	traceID := r.runID.String()
 	runLog := r.log.With(
 		logger.F("trace_id", traceID),
 		logger.F("scene_id", r.cfg.SceneID.String()),
 		logger.F("run_id", traceID),
 	)
+=======
+	// Create a context with run context for logging. run_id is the business
+	// run identifier users search backend logs with (not the trace DB key).
+	runCtx := logger.ContextWithRunID(r.ctx, r.runID.String())
+	runCtx = logger.ContextWithSceneID(runCtx, r.cfg.SceneID.String())
+
+	runLog := r.log.WithContext(runCtx)
+>>>>>>> dev
 
 	r.collector.SetStatsProvider(r)
 
@@ -255,7 +442,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		runLog.Error("failed to start timeseries collector", logger.F("error", err))
 	}
 
+<<<<<<< HEAD
 	defer func() {
+=======
+	r.runtimeCollector.Start()
+
+	defer func() {
+		r.runtimeCollector.Stop()
+>>>>>>> dev
 		if stopErr := r.collector.Stop(); stopErr != nil {
 			runLog.Error("failed to stop timeseries collector", logger.F("error", stopErr))
 		}
@@ -289,6 +483,10 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		r.status.Store(StatusFailed)
 		runLog.Error("failed to build DAG", logger.F("error", err))
+<<<<<<< HEAD
+=======
+		r.createFailedRunRecord(runLog, err, "build_dag")
+>>>>>>> dev
 		return fmt.Errorf("runner: build dag: %w", err)
 	}
 	runLog.Info("DAG built", logger.F("nodes", len(dagObj.Nodes())), logger.F("edges", len(dagObj.Edges())))
@@ -297,8 +495,46 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		r.status.Store(StatusFailed)
 		runLog.Error("failed to build scope", logger.F("error", err))
+<<<<<<< HEAD
 		return fmt.Errorf("runner: build scope: %w", err)
 	}
+=======
+		r.createFailedRunRecord(runLog, err, "build_scope")
+		return fmt.Errorf("runner: build scope: %w", err)
+	}
+	runLog.Info("scope built", logger.F("variable_count", len(scope.Keys())))
+
+	// Load data sources and create row iterators.
+	// When YAML and CSV data sources share the same name, CSV takes priority.
+	if r.dataSources != nil {
+		dSources, dsErr := r.dataSources.ListBySceneID(r.ctx, r.cfg.SceneID)
+		if dsErr != nil {
+			runLog.Warn("failed to load data sources", logger.F("error", dsErr))
+		} else if len(dSources) > 0 {
+			r.rowIterators = make(map[string]*RowIterator, len(dSources))
+			for _, ds := range dSources {
+				// Skip YAML data source if a CSV one with the same name was already loaded
+				if _, exists := r.rowIterators[ds.Name]; exists {
+					runLog.Info("skipped data source (CSV takes priority)",
+						logger.F("name", ds.Name), logger.F("source", ds.Source))
+					continue
+				}
+				var rows []map[string]string
+				if err := json.Unmarshal([]byte(ds.Rows), &rows); err != nil {
+					runLog.Warn("failed to parse data source rows",
+						logger.F("name", ds.Name), logger.F("error", err))
+					continue
+				}
+				r.rowIterators[ds.Name] = NewRowIterator(rows)
+				runLog.Info("loaded data source",
+					logger.F("name", ds.Name),
+					logger.F("source", ds.Source),
+					logger.F("rows", len(rows)),
+				)
+			}
+		}
+	}
+>>>>>>> dev
 
 	lc := lifecycle.New()
 	lc.Register(lifecycle.HookSceneSetup, func(ctx context.Context) error {
@@ -309,12 +545,25 @@ func (r *Runner) Run(ctx context.Context) error {
 	})
 
 	if err := lc.Run(r.ctx, lifecycle.HookSceneSetup); err != nil {
+<<<<<<< HEAD
 		r.status.Store(StatusFailed)
 		return fmt.Errorf("runner: scene setup: %w", err)
 	}
 
 	runRecord := &model.RunRecord{
 		Model:       model.Model{ID: r.runID},
+=======
+		runLog.Error("scene setup lifecycle hook failed", logger.F("error", err))
+		r.status.Store(StatusFailed)
+		r.createFailedRunRecord(runLog, err, "scene_setup")
+		return fmt.Errorf("runner: scene setup: %w", err)
+	}
+	runLog.Info("lifecycle setup done")
+
+	runRecord := &model.RunRecord{
+		Model:       model.Model{ID: r.runID},
+		RunID:       r.runID,
+>>>>>>> dev
 		SceneID:     r.cfg.SceneID,
 		Status:      model.RunStatusRunning,
 		WorkerCount: r.cfg.Workers,
@@ -324,15 +573,37 @@ func (r *Runner) Run(ctx context.Context) error {
 		StartedAt:   &r.startedAt,
 	}
 	if err := r.runs.Create(r.ctx, runRecord); err != nil {
+<<<<<<< HEAD
 		r.status.Store(StatusFailed)
+=======
+		runLog.Error("failed to create run record", logger.F("error", err))
+		r.status.Store(StatusFailed)
+		// Restore the scene status: the setup hook already marked the scene
+		// running, and the teardown hook at the end of Run is unreachable on
+		// this early-return path — without this reset the scene list would
+		// show 实时 forever while no run record exists.
+		if err := r.scenes.UpdateStatus(context.Background(), r.cfg.SceneID, model.SceneStatusCompleted); err != nil {
+			runLog.Error("failed to restore scene status after run-record create failure",
+				logger.F("scene_id", r.cfg.SceneID.String()),
+				logger.F("error", err))
+		}
+>>>>>>> dev
 		return fmt.Errorf("runner: create run record: %w", err)
 	}
 
 	r.mu.Lock()
+<<<<<<< HEAD
 	r.runID = runRecord.ID
 	r.mu.Unlock()
 
 	err = r.execute(dagObj, scope)
+=======
+	r.dbRecordID = runRecord.ID
+	r.mu.Unlock()
+	runLog.Info("run started", logger.F("run_id", r.runID.String()))
+
+	err = r.execute(dagObj, scope, scene)
+>>>>>>> dev
 
 	r.finishedAt = time.Now().UTC()
 	runRecord.Status = model.RunStatusCompleted
@@ -361,6 +632,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		} else if totalReqs > 0 {
 			rate := float64(successReqs) / float64(totalReqs)
 			if rate < 0.95 {
+<<<<<<< HEAD
+=======
+				runLog.Warn("success rate below 95%% threshold",
+					logger.F("rate", fmt.Sprintf("%.1f%%", rate*100)),
+					logger.F("total", totalReqs),
+					logger.F("success", successReqs),
+					logger.F("failed", totalReqs-successReqs))
+>>>>>>> dev
 				runRecord.Status = model.RunStatusFailed
 				if err != nil {
 					runRecord.ErrorMsg = err.Error()
@@ -400,10 +679,25 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 	}
 
+<<<<<<< HEAD
 	_ = lc.Run(context.Background(), lifecycle.HookSceneTeardown)
 
 	r.stopWg.Wait()
 
+=======
+	if err := lc.Run(context.Background(), lifecycle.HookSceneTeardown); err != nil {
+		runLog.Error("scene teardown lifecycle hook failed",
+			logger.F("scene_id", r.cfg.SceneID.String()),
+			logger.F("error", err))
+	}
+
+	r.stopWg.Wait()
+
+	runLog.Info("scene run completed",
+		logger.F("elapsed_ms", time.Since(r.startedAt).Milliseconds()),
+	)
+
+>>>>>>> dev
 	return err
 }
 
@@ -411,6 +705,13 @@ func (r *Runner) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.cancel != nil {
+<<<<<<< HEAD
+=======
+		// Mark as manually canceled BEFORE calling cancel() so that
+		// in-flight requests can detect this via the context flag and
+		// record themselves as "canceled" instead of "failed".
+		r.manualCanceled.Store(true)
+>>>>>>> dev
 		r.cancel()
 		r.status.Store(StatusCanceled)
 		r.stopWg.Add(1)
@@ -423,11 +724,19 @@ func (r *Runner) Stop() {
 
 func (r *Runner) saveFinalSnapshot() {
 	r.mu.Lock()
+<<<<<<< HEAD
 	if r.runID == 0 || r.runs == nil {
 		r.mu.Unlock()
 		return
 	}
 	runID := r.runID
+=======
+	if r.dbRecordID == 0 || r.runs == nil {
+		r.mu.Unlock()
+		return
+	}
+	runID := r.dbRecordID
+>>>>>>> dev
 	sceneID := r.cfg.SceneID
 	startedAt := r.startedAt
 	r.mu.Unlock()
@@ -491,10 +800,79 @@ func (r *Runner) Status() Status {
 	return r.status.Load().(Status)
 }
 
+<<<<<<< HEAD
+=======
+// Error returns the error stored by setError, or nil if no error occurred.
+func (r *Runner) Error() error {
+	if v := r.runErr.Load(); v != nil {
+		return v.(error)
+	}
+	return nil
+}
+
+// setError stores the error for later retrieval via Error().
+// Only the first error is stored.
+func (r *Runner) setError(err error) {
+	if err == nil {
+		return
+	}
+	r.runErr.CompareAndSwap(nil, err)
+}
+
+// createFailedRunRecord creates a run record with Status=failed and the given
+// error message. It is called when Runner.Run() fails during early
+// initialization steps (buildDAG, buildScope, lifecycle setup) before the
+// normal run record is created.
+func (r *Runner) createFailedRunRecord(log logger.Logger, runErr error, failedStep string) {
+	now := time.Now().UTC()
+	record := &model.RunRecord{
+		Model:       model.Model{ID: r.runID},
+		RunID:       r.runID,
+		SceneID:     r.cfg.SceneID,
+		Status:      model.RunStatusFailed,
+		ErrorMsg:    runErr.Error(),
+		WorkerCount: r.cfg.Workers,
+		RunMode:     string(r.cfg.RunMode),
+		Duration:    r.cfg.Duration.Seconds(),
+		Count:       r.cfg.Count,
+		StartedAt:   &now,
+	}
+	if err := r.runs.Create(r.ctx, record); err != nil {
+		log.Error("failed to create failed run record",
+			logger.F("error", err),
+			logger.F("step", failedStep),
+		)
+	} else {
+		r.mu.Lock()
+		r.dbRecordID = record.ID
+		r.mu.Unlock()
+		log.Info("created failed run record for early initialization failure",
+			logger.F("step", failedStep),
+			logger.F("error_msg", runErr.Error()),
+		)
+	}
+}
+
+>>>>>>> dev
 func (r *Runner) Stats() *Stats {
 	return r.stats
 }
 
+<<<<<<< HEAD
+=======
+func (r *Runner) HttpOnlyStats() *Stats {
+	return r.httpOnlyStats
+}
+
+func (r *Runner) HttpOnlyGlobalTimeSeries() []Sample {
+	if r.collector == nil {
+		return nil
+	}
+	data := r.collector.GetCollectedData()
+	return data.HttpOnlyGlobalSamples
+}
+
+>>>>>>> dev
 func (r *Runner) RunID() snowflake.ID {
 	return r.runID
 }
@@ -503,6 +881,40 @@ func (r *Runner) Workers() int {
 	return r.cfg.Workers
 }
 
+<<<<<<< HEAD
+=======
+// RuntimeMetricsSnapshots returns the collected runtime metrics snapshots.
+// Returns nil if system metrics collection is disabled.
+func (r *Runner) RuntimeMetricsSnapshots() []RuntimeMetricsSnapshot {
+	if r.runtimeCollector == nil {
+		return nil
+	}
+	return r.runtimeCollector.Snapshots()
+}
+
+// RuntimeMetricsSummary returns the aggregated runtime metrics summary.
+// Returns an empty summary if system metrics collection is disabled.
+func (r *Runner) RuntimeMetricsSummary() SystemMetricsSummary {
+	if r.runtimeCollector == nil {
+		return SystemMetricsSummary{}
+	}
+	return r.runtimeCollector.ComputeSummary()
+}
+
+// poolStateAdapter adapts a pool.Pool to the RunnerStateProvider
+// interface without importing the pool package directly in the
+// runtime_metrics.go interface definition.
+type poolStateAdapter struct {
+	p interface {
+		ActiveWorkers() int
+		PendingQueueLen() int
+	}
+}
+
+func (a *poolStateAdapter) ActiveWorkers() int   { return a.p.ActiveWorkers() }
+func (a *poolStateAdapter) PendingQueueLen() int { return a.p.PendingQueueLen() }
+
+>>>>>>> dev
 func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	successRate := float64(0)
 	if runRecord.TotalReqs > 0 {
@@ -519,17 +931,28 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		"total_reqs":     runRecord.TotalReqs,
 		"success_reqs":   runRecord.SuccessReqs,
 		"failed_reqs":    runRecord.FailedReqs,
+<<<<<<< HEAD
 		"success_rate":   fmt.Sprintf("%.1f%%", successRate),
+=======
+		"success_rate":   fmt.Sprintf("%.2f%%", successRate),
+>>>>>>> dev
 		"avg_latency_s":  runRecord.AvgLatency,
 		"p50_latency_s":  runRecord.P50Latency,
 		"p90_latency_s":  runRecord.P90Latency,
 		"p95_latency_s":  runRecord.P95Latency,
 		"p99_latency_s":  runRecord.P99Latency,
 		"min_latency_ms": time.Duration(r.stats.MinLatency.Load()).Seconds() * 1000,
+<<<<<<< HEAD
 		"p50":            fmt.Sprintf("%.1fms", runRecord.P50Latency*1000),
 		"p90":            fmt.Sprintf("%.1fms", runRecord.P90Latency*1000),
 		"p95":            fmt.Sprintf("%.1fms", runRecord.P95Latency*1000),
 		"p99":            fmt.Sprintf("%.1fms", runRecord.P99Latency*1000),
+=======
+		"p50":            fmt.Sprintf("%.3fms", runRecord.P50Latency*1000),
+		"p90":            fmt.Sprintf("%.3fms", runRecord.P90Latency*1000),
+		"p95":            fmt.Sprintf("%.3fms", runRecord.P95Latency*1000),
+		"p99":            fmt.Sprintf("%.3fms", runRecord.P99Latency*1000),
+>>>>>>> dev
 	}
 	summaryBytes, _ := json.Marshal(summary)
 
@@ -543,7 +966,11 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 	reportCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+<<<<<<< HEAD
 	dbRecords, dbErr := r.tsStore.QueryByRunID(reportCtx, r.runID)
+=======
+	dbRecords, dbErr := r.tsStore.QueryByRunID(reportCtx, r.dbRecordID)
+>>>>>>> dev
 	if dbErr != nil {
 		r.log.Warn("failed to query full time series from db, falling back to in-memory", logger.F("error", dbErr))
 	} else {
@@ -601,9 +1028,17 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 			Throughput:    calculateThroughput(runRecord),
 			PeakQPS:       collectorData.GlobalPeakQPS,
 		},
+<<<<<<< HEAD
 		GlobalTimeSeries: globalTimeSeries,
 		NodeMetrics:      []NodeMetricDetail{},
 		ErrorSummary:     collectorData.ErrorItems,
+=======
+		GlobalTimeSeries:         globalTimeSeries,
+		HttpOnlyGlobalTimeSeries: collectorData.HttpOnlyGlobalSamples,
+		NodeMetrics:              []NodeMetricDetail{},
+		ErrorSummary:             collectorData.ErrorItems,
+		FailedNodes:              r.failedNodes,
+>>>>>>> dev
 	}
 
 	nodeNameMap := make(map[string]string)
@@ -652,13 +1087,32 @@ func (r *Runner) createReport(runRecord *model.RunRecord) error {
 		})
 	}
 
+<<<<<<< HEAD
+=======
+	// Populate system metrics if available.
+	if r.runtimeCollector != nil && r.cfg.EnableSystemMetrics {
+		snapshots := r.runtimeCollector.Snapshots()
+		summary := r.runtimeCollector.ComputeSummary()
+		if len(snapshots) > 0 {
+			detail.SystemMetrics = &SystemMetricsData{
+				TimeSeries: snapshots,
+				Summary:    summary,
+			}
+		}
+	}
+
+>>>>>>> dev
 	detailJSON, err := json.Marshal(detail)
 	if err != nil {
 		r.log.Error("failed to marshal report detail", logger.F("error", err))
 	}
 
 	reportStatus := model.ReportStatusSuccess
+<<<<<<< HEAD
 	if runRecord.Status == model.RunStatusFailed || runRecord.Status == model.RunStatusCancelled {
+=======
+	if runRecord.Status == model.RunStatusFailed {
+>>>>>>> dev
 		reportStatus = model.ReportStatusFailed
 	} else if runRecord.TotalReqs > 0 && runRecord.SuccessReqs > 0 {
 		successRate := float64(runRecord.SuccessReqs) / float64(runRecord.TotalReqs) * 100
@@ -697,12 +1151,19 @@ func (r *Runner) Duration() time.Duration {
 	return r.finishedAt.Sub(r.startedAt)
 }
 
+<<<<<<< HEAD
 func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 	traceID := r.runID.String()
 	execLog := r.log.With(
 		logger.F("trace_id", traceID),
 		logger.F("scene_id", r.cfg.SceneID.String()),
 	)
+=======
+func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope, scene *model.Scene) error {
+	execCtx := logger.ContextWithRunID(r.ctx, r.runID.String())
+	execCtx = logger.ContextWithSceneID(execCtx, r.cfg.SceneID.String())
+	execLog := r.log.WithContext(execCtx)
+>>>>>>> dev
 
 	poolCfg := pool.Config{
 		RunMode:  pool.RunModeCount,
@@ -720,35 +1181,117 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 	}
 	execLog.Info("worker pool created", logger.F("workers", r.cfg.Workers), logger.F("run_mode", r.cfg.RunMode))
 
+<<<<<<< HEAD
+=======
+	// Connect Pool's wait time stats to the runtime metrics collector.
+	r.runtimeCollector.SetWaitTimeStatsProvider(WaitTimeStatsFunc(func() PoolWaitTimeStats {
+		ws := p.TaskWaitStats()
+		return PoolWaitTimeStats{
+			Avg:         ws.Avg,
+			P50:         ws.P50,
+			P95:         ws.P95,
+			P99:         ws.P99,
+			Max:         ws.Max,
+			SampleCount: ws.SampleCount,
+		}
+	}))
+
+	// Connect Pool's runner state (active workers, queue length) to the
+	// runtime metrics collector.
+	r.runtimeCollector.SetRunnerStateProvider(&poolStateAdapter{p: p})
+
+>>>>>>> dev
 	genRegistry := generator.NewRegistry()
 	httpProto := httpprotocol.NewProtocol()
 	pluginReg := plugin.NewRegistry()
 
 	task := func(ctx context.Context) error {
+<<<<<<< HEAD
 		sceneTimeout := r.cfg.Timeout
 		if sceneTimeout <= 0 {
 			sceneTimeout = 30 * time.Second
+=======
+		defer func() {
+			if p := recover(); p != nil {
+				execLog.Error("task panicked",
+					logger.F("panic", fmt.Sprintf("%v", p)),
+					logger.F("stacktrace", string(debug.Stack())),
+				)
+				r.stats.RecordLatency(0, false)
+			}
+		}()
+
+		sceneTimeout := r.cfg.Timeout
+		if sceneTimeout <= 0 {
+			// 优先使用场景配置的默认超时
+			if scene.DefaultTimeout > 0 {
+				sceneTimeout = time.Duration(scene.DefaultTimeout) * time.Second
+			} else {
+				sceneTimeout = 600 * time.Second // 系统默认 10 分钟
+			}
+>>>>>>> dev
 		}
 		taskCtx, cancel := cascade.NewContext(ctx, r.cfg.SceneID.String(), sceneTimeout)
 		defer cancel()
 
 		chainID := r.nodeGen.Generate()
+<<<<<<< HEAD
 		taskCtx = context.WithValue(taskCtx, dag.ChainIDKey, chainID.String())
 
+=======
+		taskCtx = logger.ContextWithChainID(taskCtx, chainID.String())
+		taskCtx = context.WithValue(taskCtx, dag.ChainIDKey, chainID.String())
+
+		// Use context-based logger so chain_id is automatically injected.
+		chainLog := r.log.WithContext(taskCtx)
+		chainLog.Info("chain execution started")
+
+>>>>>>> dev
 		var execOpts []dag.ExecutorOption
 		if r.tracer != nil {
 			hook := &dag.HookAdapter{Tracer: r.tracer}
 			execOpts = append(execOpts, dag.WithTraceHook(hook, r.cfg.SceneID, r.runID))
 		}
 		execOpts = append(execOpts, dag.WithConditionEvaluator(r.evalCondition))
+<<<<<<< HEAD
+=======
+		execOpts = append(execOpts, dag.WithConditionWarnLogger(func(msg string, kv ...any) {
+			chainLog.Warn(msg, toFields(kv...)...)
+		}))
+		execOpts = append(execOpts, dag.WithConditionErrorLogger(func(msg string, kv ...any) {
+			chainLog.Error(msg, toFields(kv...)...)
+		}))
+>>>>>>> dev
 
 		exec := dag.NewExecutor(dagObj, execOpts...)
 
 		resolvedVars := variable.ResolveAll(scope)
+<<<<<<< HEAD
 		execLog.Info("resolved scene variables",
 			logger.F("chain_id", chainID.String()),
 			logger.F("variable_count", len(resolvedVars)),
 			logger.F("variables", fmt.Sprintf("%v", resolvedVars)),
+=======
+
+		// Inject data source row variables: ${ds_name.column} pattern
+		for dsName, it := range r.rowIterators {
+			row := it.Next()
+			for col, val := range row {
+				key := dsName + "." + col
+				resolvedVars[key] = val
+			}
+			execLog.Debug("data source row injected",
+				logger.F("chain_id", chainID.String()),
+				logger.F("data_source", dsName),
+				logger.F("row", fmt.Sprintf("%v", row)))
+		}
+
+		jsonResolvedVars, _ := json.Marshal(resolvedVars)
+		execLog.Info("resolved scene variables",
+			logger.F("chain_id", chainID.String()),
+			logger.F("variable_count", len(resolvedVars)),
+			logger.F("variables", string(jsonResolvedVars)),
+>>>>>>> dev
 		)
 
 		_ = genRegistry
@@ -757,8 +1300,20 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 		_, err := exec.ExecuteWithTrace(taskCtx, resolvedVars)
 		if err != nil {
+<<<<<<< HEAD
 			r.stats.RecordLatency(0, false)
 			return err
+=======
+			r.log.Error("DAG chain failed; other chains continue",
+				logger.F("error", err),
+				logger.F("chain_id", chainID.String()),
+			)
+			r.stats.RecordLatency(0, false)
+			// Swallow the chain error: a failed chain must not cancel the
+			// worker pool — the run keeps going so every chain's counts
+			// (including the failing node's) land in the report.
+			return nil
+>>>>>>> dev
 		}
 
 		return nil
@@ -766,10 +1321,18 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 
 	switch r.cfg.RunMode {
 	case RunModeCount:
+<<<<<<< HEAD
+=======
+		execLog.Info("worker pool starting", logger.F("mode", "count"), logger.F("count", r.cfg.Count))
+>>>>>>> dev
 		for i := int64(0); i < r.cfg.Count; i++ {
 			p.Submit(task)
 		}
 	case RunModeDuration:
+<<<<<<< HEAD
+=======
+		execLog.Info("worker pool starting", logger.F("mode", "duration"), logger.F("duration", r.cfg.Duration))
+>>>>>>> dev
 		go func() {
 			ticker := time.NewTicker(10 * time.Millisecond)
 			defer ticker.Stop()
@@ -784,11 +1347,35 @@ func (r *Runner) execute(dagObj *dag.DAG, scope *variable.Scope) error {
 		}()
 	}
 
+<<<<<<< HEAD
 	return p.Wait()
+=======
+	err = p.Wait()
+	if r.tracer != nil {
+		// The run is over: no chain is in flight anymore. Drop running
+		// markers while keeping the cumulative counters, so subscribers
+		// opening the page after the run still see the final totals.
+		r.tracer.FinishRun(r.runID)
+	}
+	execLog.Info("worker pool stopped",
+		logger.F("submitted", p.Submitted()),
+		logger.F("completed", p.Completed()),
+	)
+	return err
+}
+
+// isCompositeType reports whether the node type is a composite node whose
+// children are referenced via config.node_ids (group/while/loop). Composite
+// children are excluded from the main DAG topology and executed by their
+// parent composite node instead.
+func isCompositeType(t string) bool {
+	return t == model.NodeTypeGroup || t == model.NodeTypeWhile || t == model.NodeTypeLoop
+>>>>>>> dev
 }
 
 func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	dagObj := dag.New()
+<<<<<<< HEAD
 
 	nodeList, err := r.nodes.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000})
 	if err != nil {
@@ -798,24 +1385,119 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 	nodeMap := make(map[string]snowflake.ID)
 	for _, n := range nodeList {
 		nodeIDStr := n.ID.String()
+=======
+	buildLog := r.log.With(
+		logger.F("run_id", r.runID.String()),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+	)
+
+	nodeList, err := r.nodes.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000})
+	if err != nil {
+		buildLog.Error("failed to list nodes for DAG", logger.F("error", err))
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+
+	// Collect nodes that are referenced as children of any composite node
+	// (group/while/loop), so they are NOT added as independent DAG nodes —
+	// the composite node executes them. node_ids in YAML may contain either
+	// node names or snowflake IDs (depends on how the scene was
+	// imported/saved), so we resolve both to actual Node models.
+	compositeChildIDs := make(map[string]bool)        // key = node.Name (for skip check)
+	compositeChildRef := make(map[string]*model.Node) // key = raw value from YAML (name or ID) → resolved Node
+	for _, n := range nodeList {
+		if isCompositeType(n.Type) {
+			var ccfg struct {
+				NodeIDs []string `json:"node_ids"`
+			}
+			if json.Unmarshal([]byte(n.Config), &ccfg) == nil {
+				for _, ref := range ccfg.NodeIDs {
+					// Resolve ref → actual Node: try name first, then ID
+					var child *model.Node
+					for _, cn := range nodeList {
+						if cn.Name == ref || cn.ID.String() == ref {
+							child = cn
+							break
+						}
+					}
+					if child != nil {
+						compositeChildIDs[child.Name] = true
+						compositeChildRef[ref] = child
+					} else {
+						buildLog.Warn("composite child reference could not be resolved",
+							logger.F("node_name", n.Name),
+							logger.F("node_type", n.Type),
+							logger.F("ref", ref))
+					}
+				}
+			}
+		}
+	}
+	if len(compositeChildIDs) > 0 {
+		names := make([]string, 0, len(compositeChildIDs))
+		for name := range compositeChildIDs {
+			names = append(names, name)
+		}
+		buildLog.Debug("excluding composite child nodes from DAG",
+			logger.F("excluded_nodes", names))
+	}
+
+	nodeMap := make(map[string]snowflake.ID)
+	dagNodeMap := make(map[string]string) // nodeID → nodeName, for diagnostics
+	for _, n := range nodeList {
+		// Skip composite child nodes — they are executed by their parent
+		// composite node (group/while/loop), not by the DAG directly.
+		if compositeChildIDs[n.Name] {
+			buildLog.Debug("skipping composite child node from DAG",
+				logger.F("node_id", n.ID.String()),
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type))
+			continue
+		}
+		nodeIDStr := n.ID.String()
+		dagNodeMap[nodeIDStr] = n.Name
+>>>>>>> dev
 		nodeMap[nodeIDStr] = n.ID
 
 		r.nodeStats[nodeIDStr] = NewNodeStats(10000)
 
 		dagNode, buildErr := r.buildDAGNode(n, r.nodeStats[nodeIDStr])
 		if buildErr != nil {
+<<<<<<< HEAD
 			return nil, buildErr
 		}
 		if addErr := dagObj.AddNode(dagNode); addErr != nil {
+=======
+			buildLog.Error("failed to build DAG node",
+				logger.F("node_id", nodeIDStr),
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
+				logger.F("error", buildErr))
+			return nil, buildErr
+		}
+		if addErr := dagObj.AddNode(dagNode); addErr != nil {
+			buildLog.Error("failed to add node to DAG",
+				logger.F("node_id", nodeIDStr),
+				logger.F("error", addErr))
+>>>>>>> dev
 			return nil, fmt.Errorf("add node %s: %w", nodeIDStr, addErr)
 		}
 	}
 
 	edgeList, err := r.edges.List(r.ctx, repo.Filter{SceneID: r.cfg.SceneID, Limit: 1000})
 	if err != nil {
+<<<<<<< HEAD
 		return nil, fmt.Errorf("list edges: %w", err)
 	}
 
+=======
+		buildLog.Error("failed to list edges for DAG", logger.F("error", err))
+		return nil, fmt.Errorf("list edges: %w", err)
+	}
+
+	buildLog.Debug("building DAG edges",
+		logger.F("edge_count", len(edgeList)))
+
+>>>>>>> dev
 	for _, e := range edgeList {
 		fromStr := e.FromNode.String()
 		toStr := e.ToNode.String()
@@ -823,11 +1505,26 @@ func (r *Runner) buildDAG(scene *model.Scene) (*dag.DAG, error) {
 		if e.Condition != "" {
 			edgeType = dag.EdgeCondition
 		}
+<<<<<<< HEAD
 		if addErr := dagObj.AddEdge(fromStr, toStr, edgeType, e.Condition); addErr != nil {
+=======
+		buildLog.Debug("adding edge to DAG",
+			logger.F("from", fromStr),
+			logger.F("to", toStr),
+			logger.F("edge_type", edgeType),
+			logger.F("condition", e.Condition))
+		if addErr := dagObj.AddEdge(fromStr, toStr, edgeType, e.Condition); addErr != nil {
+			buildLog.Error("failed to add edge to DAG",
+				logger.F("from", fromStr),
+				logger.F("to", toStr),
+				logger.F("condition", e.Condition),
+				logger.F("error", addErr))
+>>>>>>> dev
 			return nil, fmt.Errorf("add edge %s->%s: %w", fromStr, toStr, addErr)
 		}
 	}
 
+<<<<<<< HEAD
 	return dagObj, nil
 }
 
@@ -842,12 +1539,202 @@ type sceneNode struct {
 	nodeStats *NodeStats
 	log       logger.Logger
 	traceID   string
+=======
+	// Resolve composite node (group/while/loop) children: look up child nodes
+	// by name/ID from nodeList (not from DAG, since composite children are
+	// intentionally excluded from DAG topology) and build sceneNode instances
+	// for them. Composite children nested inside a group (e.g. a while node
+	// selected as a group child) get their own children resolved recursively.
+	for _, n := range nodeList {
+		if !isCompositeType(n.Type) {
+			continue
+		}
+		var cfg struct {
+			NodeIDs   []string `json:"node_ids"`
+			LoopCount int      `json:"loop_count"`
+		}
+		if err := json.Unmarshal([]byte(n.Config), &cfg); err != nil {
+			buildLog.Error("failed to parse composite node config",
+				logger.F("node_id", n.ID.String()),
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
+				logger.F("error", err))
+			return nil, fmt.Errorf("parse %s node %s config: %w", n.Type, n.ID, err)
+		}
+		compositeDagNode, ok := dagObj.Node(n.ID.String())
+		if !ok {
+			// This composite node is itself a child of another composite
+			// node; its children are resolved recursively when the parent
+			// mounts it (see buildCompositeChildSN).
+			continue
+		}
+		sn, ok := compositeDagNode.(*sceneNode)
+		if !ok {
+			continue
+		}
+		for _, childRef := range cfg.NodeIDs {
+			// Use pre-resolved reference (supports both name and ID as ref)
+			childModel := compositeChildRef[childRef]
+			if childModel == nil {
+				buildLog.Error("composite node references non-existent child",
+					logger.F("node_id", n.ID.String()),
+					logger.F("node_name", n.Name),
+					logger.F("node_type", n.Type),
+					logger.F("child_ref", childRef))
+				return nil, fmt.Errorf("%s node %s references non-existent child %s", n.Type, n.ID, childRef)
+			}
+			childSN, buildErr := r.buildCompositeChildSN(buildLog, compositeChildRef, n, childModel)
+			if buildErr != nil {
+				return nil, buildErr
+			}
+			sn.childNodes = append(sn.childNodes, childSN)
+			buildLog.Debug("resolved composite child",
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
+				logger.F("child_ref", childRef),
+				logger.F("child_name", childModel.Name),
+				logger.F("child_id", childModel.ID.String()),
+				logger.F("child_type", childModel.Type))
+		}
+		if len(sn.childNodes) > 0 {
+			buildLog.Info("composite node resolved",
+				logger.F("node_name", n.Name),
+				logger.F("node_type", n.Type),
+				logger.F("child_count", len(sn.childNodes)),
+				logger.F("loop_count", cfg.LoopCount))
+		}
+	}
+
+	// Log final DAG composition for diagnostics
+	buildLog.Info("DAG built successfully",
+		logger.F("total_nodes_in_dag", len(dagNodeMap)),
+		logger.F("dag_nodes", dagNodeMap))
+
+	return dagObj, nil
+}
+
+// buildCompositeChildSN builds a sceneNode for a node referenced as a child of
+// a composite node (group/while/loop). The sceneNode is NOT added to the DAG —
+// the parent composite executes it. When the child is itself composite (a
+// while/loop nested inside a group), its own node_ids children are resolved
+// recursively, subject to the same nesting rules.
+func (r *Runner) buildCompositeChildSN(buildLog logger.Logger, refMap map[string]*model.Node, parent *model.Node, childModel *model.Node) (*sceneNode, error) {
+	// Nesting validation: group cannot contain another group (existing rule);
+	// while/loop cannot contain composite nodes at all (composite types are
+	// not allowed inside a loop body).
+	if parent.Type == model.NodeTypeGroup && childModel.Type == model.NodeTypeGroup {
+		buildLog.Error("group node cannot contain another group",
+			logger.F("group_node_id", parent.ID.String()),
+			logger.F("child_name", childModel.Name))
+		return nil, fmt.Errorf("group node %s cannot contain group child %s", parent.ID, childModel.Name)
+	}
+	if parent.Type != model.NodeTypeGroup && isCompositeType(childModel.Type) {
+		buildLog.Error("while/loop node cannot contain composite child",
+			logger.F("node_id", parent.ID.String()),
+			logger.F("node_type", parent.Type),
+			logger.F("child_name", childModel.Name),
+			logger.F("child_type", childModel.Type))
+		return nil, fmt.Errorf("%s node %s cannot contain %s child %s", parent.Type, parent.ID, childModel.Type, childModel.Name)
+	}
+
+	childStatKey := childModel.ID.String()
+	if _, exists := r.nodeStats[childStatKey]; !exists {
+		r.nodeStats[childStatKey] = NewNodeStats(10000)
+	}
+	childSN := &sceneNode{
+		id:            childModel.ID.String(),
+		name:          childModel.Name,
+		nodeType:      childModel.Type,
+		config:        childModel.Config,
+		loopCount:     childModel.LoopCount,
+		mode:          dag.ExecSync,
+		stats:         r.stats,
+		httpOnlyStats: r.httpOnlyStats,
+		nodeStats:     r.nodeStats[childStatKey],
+		log:           r.log,
+		traceID:       r.runID.String(),
+	}
+	if childSN.loopCount <= 0 {
+		childSN.loopCount = 1
+	}
+
+	// Recursively resolve the child's own children when it is composite
+	// (e.g. a while/loop node nested inside a group). Recursion is bounded:
+	// while/loop may not contain composite children, so nesting depth is at
+	// most group → while/loop → plain nodes.
+	if isCompositeType(childModel.Type) {
+		var ccfg struct {
+			NodeIDs []string `json:"node_ids"`
+		}
+		if err := json.Unmarshal([]byte(childModel.Config), &ccfg); err != nil {
+			buildLog.Error("failed to parse composite child node config",
+				logger.F("node_id", childModel.ID.String()),
+				logger.F("node_name", childModel.Name),
+				logger.F("node_type", childModel.Type),
+				logger.F("error", err))
+			return nil, fmt.Errorf("parse %s node %s config: %w", childModel.Type, childModel.ID, err)
+		}
+		for _, ref := range ccfg.NodeIDs {
+			grandChildModel := refMap[ref]
+			if grandChildModel == nil {
+				buildLog.Error("composite node references non-existent child",
+					logger.F("node_id", childModel.ID.String()),
+					logger.F("node_name", childModel.Name),
+					logger.F("node_type", childModel.Type),
+					logger.F("child_ref", ref))
+				return nil, fmt.Errorf("%s node %s references non-existent child %s", childModel.Type, childModel.ID, ref)
+			}
+			grandChildSN, err := r.buildCompositeChildSN(buildLog, refMap, childModel, grandChildModel)
+			if err != nil {
+				return nil, err
+			}
+			childSN.childNodes = append(childSN.childNodes, grandChildSN)
+			buildLog.Debug("resolved nested composite child",
+				logger.F("parent_name", childModel.Name),
+				logger.F("child_ref", ref),
+				logger.F("child_name", grandChildModel.Name),
+				logger.F("child_id", grandChildModel.ID.String()),
+				logger.F("child_type", grandChildModel.Type))
+		}
+	}
+	return childSN, nil
+}
+
+type sceneNode struct {
+	id            string
+	name          string
+	nodeType      string
+	config        string
+	timeout       time.Duration
+	loopCount     int
+	mode          dag.ExecMode
+	blockOnError  bool
+	stats         *Stats
+	httpOnlyStats *Stats
+	nodeStats     *NodeStats
+	log           logger.Logger
+	traceID       string
+	// executor is set by Runner for generator nodes to write back variables.
+	executor *dag.Executor
+	// childNodes holds references to child nodes for Group execution.
+	// Populated after DAG construction via resolveGroupChildren.
+	childNodes []dag.Node
+	// subFlowRunner is set by Runner for sub-flow nodes to load and execute
+	// a sub-scene dynamically. Nil when not a sub-flow or in tests.
+	subFlowRunner func(ctx context.Context, sceneID string, variables map[string]any) (*dag.Output, error)
+	// exprReg holds the expression engine registry with __so and builtins registered.
+	exprReg *expr.FunctionRegistry
+	// failedNodes is a pointer to the Runner's failedNodes slice for recording failures
+	failedNodes   *[]FailedNodeDetail
+	failedNodesMu *sync.Mutex
+>>>>>>> dev
 }
 
 func (n *sceneNode) ID() string             { return n.id }
 func (n *sceneNode) Timeout() time.Duration { return n.timeout }
 func (n *sceneNode) LoopCount() int         { return n.loopCount }
 func (n *sceneNode) Mode() dag.ExecMode     { return n.mode }
+<<<<<<< HEAD
 
 func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
 	chainID, _ := ctx.Value(dag.ChainIDKey).(string)
@@ -860,15 +1747,209 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 
 	nodeLog.Info("node execution started")
 
+=======
+func (n *sceneNode) BlockOnError() bool     { return n.blockOnError }
+
+// AlwaysRun marks teardown nodes as mandatory: they must execute even when
+// the chain is cancelled (e.g. a block_on_error hard failure upstream), so
+// per-chain cleanup always runs and is counted in the report.
+func (n *sceneNode) AlwaysRun() bool {
+	return n.nodeType == model.NodeTypeTeardown
+}
+
+// recordFailedNode records detailed information about a failed node execution.
+// errCode overrides the derived error code when non-empty (e.g. "ASSERT-FAIL"
+// for expect_body failures on HTTP 2xx responses).
+func (n *sceneNode) recordFailedNode(method, url string, reqHeaders map[string]string, reqBody string,
+	respStatus int, respHeaders map[string][]string, respBody string, errMsg string, errCode string) {
+	if n.failedNodes == nil || n.failedNodesMu == nil {
+		return
+	}
+
+	// Derive error code from response status or error message
+	errorCode := errCode
+	if errorCode == "" {
+		if respStatus > 0 {
+			errorCode = fmt.Sprintf("%d", respStatus)
+		} else if strings.Contains(errMsg, "timeout") {
+			errorCode = "timeout"
+		} else if strings.Contains(errMsg, "connection refused") {
+			errorCode = "connection_refused"
+		}
+	}
+
+	detail := FailedNodeDetail{
+		NodeID:          n.id,
+		NodeName:        n.name,
+		NodeType:        n.nodeType,
+		Protocol:        "http",
+		ErrorCode:       errorCode,
+		ErrorMessage:    errMsg,
+		Timestamp:       time.Now(),
+		RequestURL:      url,
+		RequestMethod:   method,
+		RequestHeaders:  reqHeaders,
+		RequestBody:     reqBody,
+		ResponseStatus:  respStatus,
+		ResponseHeaders: respHeaders,
+		ResponseBody:    respBody,
+	}
+
+	n.failedNodesMu.Lock()
+	*n.failedNodes = append(*n.failedNodes, detail)
+	n.failedNodesMu.Unlock()
+}
+
+// variablesOrNil returns the variables map from input, or nil if input is nil
+// or has no variables. This avoids verbose nil-checking at every call site.
+func variablesOrNil(input *dag.Input) map[string]any {
+	if input == nil {
+		return nil
+	}
+	return input.Variables
+}
+
+// resolveAllExpressions resolves all expression patterns (variable references,
+// function calls, math) in str using the unified expr.Resolve engine.
+// Falls back to the legacy two-step resolveGeneratorRefs + resolveWithVariables
+// when the expr registry is unavailable or resolution fails.
+func (n *sceneNode) resolveAllExpressions(str string, vars map[string]any, nodeLog logger.Logger) string {
+	if str == "" {
+		return str
+	}
+	if n.exprReg != nil {
+		result, err := expr.Resolve(str, vars, n.exprReg)
+		if err == nil {
+			return result
+		}
+		nodeLog.Warn("expression resolution failed, falling back to legacy resolution",
+			logger.F("error", err),
+			logger.F("input", str),
+		)
+	}
+	// Fallback: legacy two-step resolution
+	genReg := builtin.DefaultRegistry()
+	genReg.SetLogger(&genLogAdapter{nodeLog})
+	result := resolveGeneratorRefs(str, genReg, nodeLog)
+	if vars != nil {
+		result = resolveWithVariables(result, vars)
+	}
+	return result
+}
+
+func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output, error) {
+	// Use context-based logging so that trace_id, chain_id, node_id etc.
+	// are automatically injected by logger.WithContext.
+	logCtx := logger.ContextWithNodeID(ctx, n.id)
+	nodeLog := n.log.WithContext(logCtx)
+
+	nodeLog.Info("node execution started",
+		logger.F("node_name", n.name),
+		logger.F("block_on_error", n.blockOnError))
+
+	// Parse retry and extract configs
+	retryCfg := n.parseRetryConfig()
+	extractCfg := n.parseExtractConfig()
+
+	// Determine max attempts
+	maxAttempts := 1
+	if retryCfg != nil && retryCfg.MaxAttempts > 1 {
+		maxAttempts = retryCfg.MaxAttempts
+	}
+
+	var out *dag.Output
+	var err error
+
+	// Execute with retry logic
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Apply backoff delay if retrying
+		if attempt > 0 && retryCfg != nil {
+			backoff := calculateBackoff(retryCfg, attempt-1)
+			nodeLog.Info("retry backoff",
+				logger.F("attempt", attempt+1),
+				logger.F("max_attempts", maxAttempts),
+				logger.F("backoff", backoff.String()),
+			)
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		// Execute node logic
+		out, err = n.executeNodeLogic(ctx, input, nodeLog)
+
+		// Check if we should retry
+		if err == nil || !shouldRetry(retryCfg, err) {
+			break
+		}
+
+		nodeLog.Warn("node execution failed, will retry",
+			logger.F("attempt", attempt+1),
+			logger.F("max_attempts", maxAttempts),
+			logger.F("error", err),
+		)
+	}
+
+	// Apply extract post-processing if successful
+	if err == nil && out != nil && len(extractCfg) > 0 {
+		n.applyExtract(out, extractCfg, input, nodeLog)
+	}
+
+	if err != nil {
+		nodeLog.Error("node execution failed",
+			logger.F("error", err),
+			logger.F("node_type", n.nodeType),
+			logger.F("node_name", n.name),
+			logger.F("block_on_error", n.blockOnError),
+			logger.F("status", "failed"),
+		)
+	} else {
+		nodeLog.Info("node execution completed",
+			logger.F("node_type", n.nodeType),
+			logger.F("node_name", n.name),
+			logger.F("block_on_error", n.blockOnError),
+			logger.F("status", "success"),
+		)
+	}
+
+	return out, err
+}
+
+// executeNodeLogic executes the actual node logic based on node type
+func (n *sceneNode) executeNodeLogic(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+>>>>>>> dev
 	switch n.nodeType {
 	case model.NodeTypeHTTP, model.NodeTypeSetup, model.NodeTypeTeardown:
 		return n.executeHTTP(ctx, input, nodeLog)
 	case model.NodeTypeDelay:
+<<<<<<< HEAD
 		return n.executeDelay(ctx, nodeLog)
+=======
+		return n.executeDelay(ctx, input, nodeLog)
+>>>>>>> dev
 	case model.NodeTypeCondition:
 		return n.executeCondition(input, nodeLog)
 	case model.NodeTypeIfElse:
 		return n.executeIfElse(input, nodeLog)
+<<<<<<< HEAD
+=======
+	case model.NodeTypeGroup:
+		return n.executeGroup(ctx, input, nodeLog)
+	case model.NodeTypeWhile:
+		return n.executeWhile(ctx, input, nodeLog)
+	case model.NodeTypeParallel:
+		return n.executeParallel(ctx, input, nodeLog)
+	case model.NodeTypeLoop:
+		return n.executeLoop(ctx, input, nodeLog)
+	case model.NodeTypeSubFlow:
+		return n.executeSubFlow(ctx, input, nodeLog)
+	case model.NodeTypeTimer:
+		return n.executeTimer(ctx, input, nodeLog)
+	case model.NodeTypeGenerator:
+		return n.executeGenerator(ctx, input, nodeLog)
+>>>>>>> dev
 	default:
 		nodeLog.Warn("unknown node type, skipping")
 		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": n.nodeType}}, nil
@@ -876,6 +1957,7 @@ func (n *sceneNode) Execute(ctx context.Context, input *dag.Input) (*dag.Output,
 }
 
 func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+<<<<<<< HEAD
 	var cfg struct {
 		Method  string            `json:"method"`
 		URL     string            `json:"url"`
@@ -908,6 +1990,34 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			logger.F("variables_nil", input != nil && input.Variables == nil),
 		)
 	}
+=======
+	// Soft-failure errors (block_on_error=false): carried on the output so
+	// downstream nodes keep executing while the trace span marks failure.
+	var assertionErr error // first expect_body assertion failure
+	var non2xxErr string   // non-2xx HTTP status when not blocking
+
+	var cfg struct {
+		Method     string            `json:"method"`
+		URL        string            `json:"url"`
+		Headers    map[string]string `json:"headers"`
+		Body       string            `json:"body"`
+		Timeout    any               `json:"timeout"`     // float64 or string (variable ref like ${timeout_ms})
+		ExpectBody map[string]any    `json:"expect_body"` // JSON body assertions like {"errorCode": 0}
+		Form       json.RawMessage   `json:"form"`
+		AesDecrypt string            `json:"aes_decrypt"` // AES key (base64) for decrypting encrypted response body
+		AesMode    *int              `json:"aes_mode"`    // AES mode: 0=CBC, 1=GCM (default). nil=GCM.
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse http config",
+			logger.F("error", err),
+			logger.F("config", n.config),
+		)
+		return nil, fmt.Errorf("parse http config: %w", err)
+	}
+
+	url := n.resolveAllExpressions(cfg.URL, variablesOrNil(input), nodeLog)
+	nodeLog.Info("resolved URL", logger.F("url", url))
+>>>>>>> dev
 
 	method := cfg.Method
 	if method == "" {
@@ -915,10 +2025,57 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	timeout := n.timeout
+<<<<<<< HEAD
 	if cfg.Timeout > 0 {
 		timeout = time.Duration(cfg.Timeout * float64(time.Second))
 	}
 
+=======
+	// Resolve timeout: support both numeric value and variable reference string
+	if cfg.Timeout != nil {
+		switch v := cfg.Timeout.(type) {
+		case float64:
+			if v > 0 {
+				timeout = time.Duration(v * float64(time.Second))
+			}
+		case string:
+			// Resolve variable reference, e.g. ${timeout_ms} → "5000"
+			resolved := n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
+			if sec, err := strconv.ParseFloat(resolved, 64); err == nil && sec > 0 {
+				timeout = time.Duration(sec * float64(time.Second))
+			} else if ms, err := strconv.ParseFloat(resolved, 64); err == nil && ms > 0 {
+				// If value looks like milliseconds (e.g. "5000"), treat as seconds
+				timeout = time.Duration(ms * float64(time.Millisecond))
+			} else {
+				nodeLog.Warn("failed to parse timeout value",
+					logger.F("raw", v),
+					logger.F("resolved", resolved),
+					logger.F("err", err),
+				)
+			}
+		case int:
+			if v > 0 {
+				timeout = time.Duration(float64(v) * float64(time.Second))
+			}
+		case int64:
+			if v > 0 {
+				timeout = time.Duration(float64(v) * float64(time.Second))
+			}
+		default:
+			nodeLog.Warn("unsupported timeout type",
+				logger.F("type", fmt.Sprintf("%T", cfg.Timeout)),
+				logger.F("value", cfg.Timeout),
+			)
+		}
+	}
+
+	nodeLog.Debug("HTTP request fields after variable resolution",
+		logger.F("method", method),
+		logger.F("timeout_ms", timeout.Milliseconds()),
+		logger.F("header_count", len(cfg.Headers)),
+	)
+
+>>>>>>> dev
 	req := &httpprotocol.HTTPRequest{
 		Method:  httpprotocol.Method(method),
 		URL:     url,
@@ -927,6 +2084,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	}
 
 	for k, v := range req.Headers {
+<<<<<<< HEAD
 		req.Headers[k] = resolveGeneratorRefs(v, genReg, nodeLog)
 	}
 
@@ -941,20 +2099,145 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 	proto := httpprotocol.NewProtocol()
 	resp, err := proto.Execute(ctx, req)
 	if err != nil {
+=======
+		req.Headers[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
+	}
+
+	if len(req.Headers) > 0 {
+		nodeLog.Debug("resolved headers",
+			logger.F("headers", req.Headers),
+		)
+	}
+
+	if cfg.Body != "" {
+		body := n.resolveAllExpressions(cfg.Body, variablesOrNil(input), nodeLog)
+		req.Body = []byte(body)
+		nodeLog.Debug("resolved body",
+			logger.F("body", body),
+		)
+	}
+
+	// multipart/form-data: takes precedence over Body when both present.
+	// File paths and field values are variable-resolved the same way as Body.
+	// Supports two JSON formats:
+	//   Nested: {"fields": {"k":"v"}, "files": {"k":"/path"}}
+	//   Flat:   {"username":"admin", "avatar":"/path/to/avatar.jpg"}
+	// When flat, each value is auto-classified as field or file by isLikelyFilePath.
+	if len(cfg.Form) > 0 {
+		var fields, files map[string]string
+
+		// Try nested format first: {"fields": {...}, "files": {...}}
+		var nested struct {
+			Fields map[string]string `json:"fields"`
+			Files  map[string]string `json:"files"`
+		}
+		if err := json.Unmarshal(cfg.Form, &nested); err == nil && (len(nested.Fields) > 0 || len(nested.Files) > 0) {
+			fields = nested.Fields
+			files = nested.Files
+		} else {
+			// Fall back to flat format: {"username":"admin", "avatar":"/path/to/avatar.jpg"}
+			var flat map[string]string
+			if err := json.Unmarshal(cfg.Form, &flat); err != nil {
+				nodeLog.Error("failed to parse form, expected nested or flat format",
+					logger.F("error", err),
+				)
+				return nil, fmt.Errorf("parse form: %w", err)
+			}
+			fields = make(map[string]string)
+			files = make(map[string]string)
+			for k, v := range flat {
+				if isLikelyFilePath(v) {
+					files[k] = v
+				} else {
+					fields[k] = v
+				}
+			}
+		}
+
+		form := &httpprotocol.FormData{
+			Fields: make(map[string]string, len(fields)),
+			Files:  make(map[string]string, len(files)),
+		}
+		for k, v := range fields {
+			form.Fields[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
+		}
+		for k, v := range files {
+			form.Files[k] = n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
+		}
+		req.Form = form
+		nodeLog.Debug("resolved multipart form",
+			logger.F("field_count", len(form.Fields)),
+			logger.F("file_count", len(form.Files)),
+		)
+	}
+
+	proto := httpprotocol.NewProtocol()
+	httpStart := time.Now()
+	resp, err := proto.Execute(ctx, req)
+	httpLatency := time.Since(httpStart)
+	if err != nil {
+		// Manual scene cancellation: the user clicked Stop. These in-flight
+		// requests never reached the server, so they should be recorded as
+		// "canceled" (not "failed") to keep the error rate consistent with
+		// the configured value. Request-level timeouts (DeadlineExceeded)
+		// and other errors are still counted as failures.
+		if dag.IsManualCancel(ctx) {
+			nodeLog.Warn("HTTP request canceled by manual stop",
+				logger.F("method", method),
+				logger.F("url", url),
+			)
+			if n.stats != nil {
+				n.stats.RecordCanceled()
+			}
+			if n.httpOnlyStats != nil {
+				n.httpOnlyStats.RecordCanceled()
+			}
+			if n.nodeStats != nil {
+				n.nodeStats.RecordCanceled()
+			}
+			return &dag.Output{Error: err}, nil
+		}
+
+>>>>>>> dev
 		nodeLog.Error("HTTP request failed",
 			logger.F("method", method),
 			logger.F("url", url),
 			logger.F("error", err),
+<<<<<<< HEAD
 		)
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
+=======
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+		)
+		if n.stats != nil {
+			n.stats.RecordLatency(httpLatency, false)
+		}
+		if n.httpOnlyStats != nil {
+			n.httpOnlyStats.RecordLatency(httpLatency, false)
+		}
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(httpLatency, false)
+		}
+
+		// Record failed node details
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), 0, nil, "", err.Error(), "")
+
+>>>>>>> dev
 		return &dag.Output{Error: err}, nil
 	}
 
 	if n.stats != nil {
 		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
 			n.stats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+<<<<<<< HEAD
+=======
+			if n.httpOnlyStats != nil {
+				n.httpOnlyStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
+			}
+>>>>>>> dev
 			nodeLog.Info("HTTP request completed",
 				logger.F("method", method),
 				logger.F("url", url),
@@ -962,6 +2245,7 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 				logger.F("latency_ms", httpResp.Latency.Milliseconds()),
 				logger.F("success", httpResp.IsSuccess()),
 			)
+<<<<<<< HEAD
 		}
 	}
 
@@ -970,44 +2254,436 @@ func (n *sceneNode) executeHTTP(ctx context.Context, input *dag.Input, nodeLog l
 			n.nodeStats.RecordLatency(httpResp.Latency, httpResp.IsSuccess())
 			if !httpResp.IsSuccess() {
 				n.nodeStats.RecordError(fmt.Sprintf("HTTP-%d", httpResp.StatusCode))
+=======
+			if !httpResp.IsSuccess() && len(httpResp.Body) > 0 {
+				nodeLog.Debug("HTTP response body (non-2xx)",
+					logger.F("status", httpResp.StatusCode),
+					logger.F("body", string(httpResp.Body)),
+				)
+			} else if len(httpResp.Body) > 0 {
+				nodeLog.Debug("HTTP response body",
+					logger.F("status", httpResp.StatusCode),
+					logger.F("body", string(httpResp.Body)),
+				)
+>>>>>>> dev
 			}
 		}
 	}
 
+<<<<<<< HEAD
 	return &dag.Output{Response: resp}, nil
 }
 
 func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*dag.Output, error) {
 	var cfg struct {
 		Ms int64 `json:"ms"`
+=======
+	// Check if HTTP response is non-2xx
+	if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && !httpResp.IsSuccess() {
+		// Log ERROR with full request/response details for observability at INFO level.
+		nodeLog.Error("HTTP request failed with non-2xx status",
+			logger.F("method", method),
+			logger.F("url", url),
+			logger.F("status", httpResp.StatusCode),
+			logger.F("latency_ms", httpResp.Latency.Milliseconds()),
+			logger.F("request_headers", req.Headers),
+			logger.F("request_body", string(req.Body)),
+			logger.F("response_headers", httpResp.Headers),
+			logger.F("response_body", string(httpResp.Body)),
+		)
+		errMsg := fmt.Sprintf("HTTP %d: %s", httpResp.StatusCode, string(httpResp.Body))
+
+		if n.blockOnError {
+			nodeLog.Error("HTTP request failed with non2xx status and block_on_error enabled",
+				logger.F("method", method),
+				logger.F("url", url),
+				logger.F("status", httpResp.StatusCode),
+				logger.F("block_on_error", true),
+			)
+			n.recordHardFailNodeStats(httpResp, false)
+			// Record failed node details
+			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "")
+			return nil, fmt.Errorf("%s", errMsg)
+		}
+
+		// Record failed node details even without block_on_error
+		n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "")
+		// Soft failure: carry the HTTP error on the output so the trace span
+		// reflects the real node outcome while the chain continues.
+		non2xxErr = errMsg
+	}
+
+	// AES decrypt: if aes_decrypt is configured and the response body is
+	// not plain JSON (doesn't start with '{'), decrypt it before further processing.
+	if cfg.AesDecrypt != "" {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
+			// Resolve variable references in the AES key (e.g. "${aes_key}")
+			aesKeyStr := n.resolveAllExpressions(cfg.AesDecrypt, variablesOrNil(input), nodeLog)
+			// Default aes_mode to 1 (GCM) if not explicitly configured.
+			// Manhattan UAT environment currently uses GCM; use aes_mode: 0 for legacy CBC.
+			aesMode := 1 // default GCM
+			if cfg.AesMode != nil {
+				aesMode = *cfg.AesMode
+			}
+			if len(httpResp.Body) > 0 && httpResp.Body[0] != '{' {
+				decrypted, decryptErr := aesDecryptResponse(httpResp.Body, aesKeyStr, aesMode)
+				if decryptErr != nil {
+					nodeLog.Error("AES decrypt failed",
+						logger.F("error", decryptErr),
+						logger.F("aes_mode", aesMode),
+						logger.F("body", string(httpResp.Body)),
+					)
+				} else {
+					httpResp.Body = []byte(decrypted)
+					nodeLog.Info("AES decrypt succeeded",
+						logger.F("decrypted_len", len(decrypted)),
+						logger.F("body", decrypted),
+					)
+				}
+			} else {
+				nodeLog.Debug("AES decrypt skipped: response is plain JSON")
+			}
+		}
+	}
+
+	// Validate expect_body assertions against the JSON response body
+	if len(cfg.ExpectBody) > 0 {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok && len(httpResp.Body) > 0 {
+			var bodyJSON map[string]any
+			// Use json.Number to avoid scientific notation for large integers (e.g. 700000028 → 7.00000028e+08)
+			dec := json.NewDecoder(bytes.NewReader(httpResp.Body))
+			dec.UseNumber()
+			if err := dec.Decode(&bodyJSON); err != nil {
+				nodeLog.Error("failed to parse response body for expect_body validation",
+					logger.F("error", err),
+					logger.F("body", string(httpResp.Body)),
+				)
+			} else {
+				for key, expectedVal := range cfg.ExpectBody {
+					// Support JSONPath keys with "$." prefix for nested/penetrating
+					// lookups (e.g., "$.Data.FailReasonMsg"). Plain keys use
+					// top-level field lookup for backward compatibility.
+					var actualVal any
+					if strings.HasPrefix(key, "$.") {
+						actualVal = resolveJSONPath(bodyJSON, key)
+						// Distinguish "field is null" from "field not found":
+						// nil result with non-nil expected → not found error.
+						if actualVal == nil && expectedVal != nil {
+							errMsg := fmt.Sprintf("expect_body path %q not found in response", key)
+							nodeLog.Error("expect_body validation failed",
+								logger.F("field", key),
+								logger.F("error", errMsg),
+							)
+							if n.blockOnError {
+								n.recordHardFailNodeStats(httpResp, true)
+								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
+								return nil, fmt.Errorf("%s", errMsg)
+							}
+							assertionErr = fmt.Errorf("%s", errMsg)
+							break
+						}
+					} else {
+						var exists bool
+						actualVal, exists = bodyJSON[key]
+						if !exists {
+							errMsg := fmt.Sprintf("expect_body field %q not found in response", key)
+							nodeLog.Error("expect_body validation failed",
+								logger.F("field", key),
+								logger.F("error", errMsg),
+							)
+							if n.blockOnError {
+								n.recordHardFailNodeStats(httpResp, true)
+								n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
+								return nil, fmt.Errorf("%s", errMsg)
+							}
+							assertionErr = fmt.Errorf("%s", errMsg)
+							break
+						}
+					}
+					if !compareJSONValues(actualVal, expectedVal) {
+						errMsg := fmt.Sprintf("expect_body field %q: expected %v, got %v", key, formatJSONValue(expectedVal), formatJSONValue(actualVal))
+						nodeLog.Error("expect_body validation failed",
+							logger.F("field", key),
+							logger.F("expected", expectedVal),
+							logger.F("actual", actualVal),
+						)
+						if n.blockOnError {
+							n.recordHardFailNodeStats(httpResp, true)
+							n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), errMsg, "ASSERT-FAIL")
+							return nil, fmt.Errorf("%s", errMsg)
+						}
+						assertionErr = fmt.Errorf("%s", errMsg)
+						break
+					}
+				}
+				if assertionErr == nil {
+					nodeLog.Info("expect_body validation passed",
+						logger.F("assertions", cfg.ExpectBody),
+					)
+				} else {
+					nodeLog.Warn("expect_body validation failed (soft failure, continuing)",
+						logger.F("error", assertionErr),
+					)
+				}
+			}
+		}
+	}
+
+	// Body-assertion failure on an HTTP 2xx response: capture the full
+	// request/response context for the report's failure-record section,
+	// mirroring the non-2xx path above (which already recorded). The
+	// non2xxErr guard prevents double-recording when both checks fail.
+	if assertionErr != nil && non2xxErr == "" {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+			n.recordFailedNode(method, url, req.Headers, string(req.Body), httpResp.StatusCode, httpResp.Headers, string(httpResp.Body), assertionErr.Error(), "ASSERT-FAIL")
+		}
+	}
+
+	softFailed := assertionErr != nil || non2xxErr != ""
+
+	if n.nodeStats != nil {
+		if httpResp, ok := resp.(*httpprotocol.HTTPResponse); ok {
+			// Node stats must reflect the real outcome: a soft failure
+			// (assertion or non-2xx) counts as failed even when HTTP 200.
+			success := httpResp.IsSuccess() && !softFailed
+			n.nodeStats.RecordLatency(httpResp.Latency, success)
+			if !success {
+				reason := fmt.Sprintf("HTTP-%d", httpResp.StatusCode)
+				if assertionErr != nil {
+					reason = "ASSERT-FAIL"
+				}
+				n.nodeStats.RecordError(reason)
+			}
+		}
+	}
+
+	out := &dag.Output{Response: resp}
+	if assertionErr != nil {
+		out.Error = assertionErr
+	} else if non2xxErr != "" {
+		out.Error = fmt.Errorf("%s", non2xxErr)
+	}
+	return out, nil
+}
+
+// recordHardFailNodeStats records a failed request on the node-level stats
+// before a hard-failure early return (block_on_error=true). Those returns
+// skip the shared node-stats block at the end of executeHTTP, which would
+// otherwise leave the node's totals at zero in the report's node ranking.
+func (n *sceneNode) recordHardFailNodeStats(httpResp *httpprotocol.HTTPResponse, assertionFailed bool) {
+	if n.nodeStats == nil || httpResp == nil {
+		return
+	}
+	n.nodeStats.RecordLatency(httpResp.Latency, false)
+	reason := fmt.Sprintf("HTTP-%d", httpResp.StatusCode)
+	if assertionFailed {
+		reason = "ASSERT-FAIL"
+	}
+	n.nodeStats.RecordError(reason)
+}
+
+// compareJSONValues compares an actual value from a JSON response body (decoded
+// with UseNumber, so numbers are json.Number) against an expected value from the
+// node configuration (decoded with standard json.Unmarshal, so numbers are float64).
+// It normalises both sides to a canonical string representation so that large
+// integers like 700000028 match regardless of whether they arrive as json.Number
+// "700000028" or float64 700000028.
+func compareJSONValues(actualVal, expectedVal any) bool {
+	return formatJSONValue(actualVal) == formatJSONValue(expectedVal)
+}
+
+// formatJSONValue returns a canonical string for a JSON value that may be
+// json.Number, float64, int, string, bool, or nil.  Numbers are formatted at
+// full precision without scientific notation.
+func formatJSONValue(v any) string {
+	switch val := v.(type) {
+	case json.Number:
+		// json.Number preserves the original text, e.g. "700000028".
+		// Try to format as integer when possible to avoid trailing ".0".
+		if s, err := val.Int64(); err == nil {
+			return strconv.FormatInt(s, 10)
+		}
+		return string(val)
+	case float64:
+		// Use 'g' format with enough precision to avoid scientific notation
+		// for typical integers, and strip trailing ".0" for clean output.
+		s := strconv.FormatFloat(val, 'f', -1, 64)
+		return s
+	case int:
+		return strconv.Itoa(val)
+	case int64:
+		return strconv.FormatInt(val, 10)
+	case string:
+		return val
+	case bool:
+		return strconv.FormatBool(val)
+	case nil:
+		return "null"
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+func (n *sceneNode) executeGenerator(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	startTime := time.Now()
+
+	var cfg struct {
+		Expression string `json:"expression"`
+		Variable   string `json:"variable"`
+>>>>>>> dev
 	}
 	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
 		}
+<<<<<<< HEAD
+=======
+		nodeLog.Error("failed to parse generator config", logger.F("error", err))
+		return nil, fmt.Errorf("parse generator config: %w", err)
+	}
+
+	if cfg.Expression == "" || cfg.Variable == "" {
+		if n.stats != nil {
+			n.stats.RecordLatency(0, false)
+		}
+		return nil, fmt.Errorf("generator requires expression and variable fields")
+	}
+
+	nodeLog.Info("executing generator",
+		logger.F("expression", cfg.Expression),
+		logger.F("variable", cfg.Variable),
+	)
+
+	genReg := builtin.DefaultRegistry()
+
+	// Resolve variables in the expression first
+	exprStr := cfg.Expression
+	if input != nil && input.Variables != nil {
+		exprStr = resolveWithVariables(exprStr, input.Variables)
+	}
+
+	// Resolve generator refs (${generator.xxx} patterns)
+	result := resolveGeneratorRefs(exprStr, genReg, nodeLog)
+
+	// Resolve expression engine functions (${__so(...)}, ${__random(...)}, etc.)
+	// and evaluate pure math expressions (e.g. "1100000001 / 100" after variable
+	// resolution). The expression engine's FunctionRegistry handles __so() and
+	// other system functions, which resolveGeneratorRefs does not handle.
+	if n.exprReg != nil {
+		resolved, err := expr.Resolve(result, nil, n.exprReg)
+		if err != nil {
+			nodeLog.Warn("expression engine resolve failed, using original",
+				logger.F("expression", result),
+				logger.F("error", err),
+			)
+			// SO plugin execution failed: record as a failed request so that
+			// the request count is consistent with HTTP nodes (the generator
+			// counts as one request regardless of success/failure).
+			if n.stats != nil {
+				n.stats.RecordLatency(0, false)
+			}
+			return nil, fmt.Errorf("generator expression resolve failed: %w", err)
+		}
+		result = resolved
+	}
+
+	// Generator succeeded: record as a successful request so that the total
+	// request count includes generator nodes (consistent with HTTP nodes).
+	if n.stats != nil {
+		n.stats.RecordLatency(time.Since(startTime), true)
+	}
+
+	nodeLog.Info("generator result",
+		logger.F("variable", cfg.Variable),
+		logger.F("value", result),
+	)
+
+	// Write back to variables if executor is available
+	if input != nil && input.Executor != nil {
+		input.Executor.SetVariable(cfg.Variable, result)
+	}
+
+	return &dag.Output{
+		Response: result,
+		Variables: map[string]any{
+			cfg.Variable: result,
+		},
+	}, nil
+}
+
+func (n *sceneNode) executeDelay(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		Ms any `json:"ms"` // float64, int, or string (variable ref like ${delay_ms})
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+>>>>>>> dev
 		nodeLog.Error("failed to parse delay config", logger.F("error", err))
 		return nil, fmt.Errorf("parse delay config: %w", err)
 	}
 
+<<<<<<< HEAD
 	dur := time.Duration(cfg.Ms) * time.Millisecond
+=======
+	var ms int64
+	switch v := cfg.Ms.(type) {
+	case float64:
+		ms = int64(v)
+	case int:
+		ms = int64(v)
+	case int64:
+		ms = v
+	case string:
+		resolved := n.resolveAllExpressions(v, variablesOrNil(input), nodeLog)
+		// Support math expressions: "600 * 0.25" → "150"
+		if mathResult, err := expr.EvalMath(resolved); err == nil {
+			resolved = mathResult
+		}
+		parsed, err := strconv.ParseInt(resolved, 10, 64)
+		if err != nil {
+			nodeLog.Warn("failed to parse delay ms value",
+				logger.F("raw", v),
+				logger.F("resolved", resolved),
+				logger.F("err", err),
+			)
+			ms = 100
+		} else {
+			ms = parsed
+		}
+	default:
+		ms = 100
+	}
+
+	dur := time.Duration(ms) * time.Millisecond
+>>>>>>> dev
 	if dur <= 0 {
 		dur = 100 * time.Millisecond
 	}
 
 	nodeLog.Info("delay node started",
+<<<<<<< HEAD
 		logger.F("duration_ms", cfg.Ms),
+=======
+		logger.F("duration_ms", ms),
+>>>>>>> dev
 		logger.F("resolved_duration", dur.String()),
 	)
 
 	select {
 	case <-time.After(dur):
+<<<<<<< HEAD
 		if n.stats != nil {
 			n.stats.RecordLatency(dur, true)
 		}
+=======
+>>>>>>> dev
 		if n.nodeStats != nil {
 			n.nodeStats.RecordLatency(dur, true)
 		}
 		nodeLog.Info("delay node completed",
+<<<<<<< HEAD
 			logger.F("duration_ms", cfg.Ms),
 			logger.F("actual_ms", dur.Milliseconds()),
 		)
@@ -1015,6 +2691,15 @@ func (n *sceneNode) executeDelay(ctx context.Context, nodeLog logger.Logger) (*d
 	case <-ctx.Done():
 		if n.stats != nil {
 			n.stats.RecordLatency(0, false)
+=======
+			logger.F("duration_ms", ms),
+			logger.F("actual_ms", dur.Milliseconds()),
+		)
+		return &dag.Output{Response: map[string]any{"delay_ms": ms}}, nil
+	case <-ctx.Done():
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+>>>>>>> dev
 		}
 		nodeLog.Warn("delay node cancelled", logger.F("error", ctx.Err()))
 		return nil, ctx.Err()
@@ -1030,6 +2715,7 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 		return nil, fmt.Errorf("parse condition config: %w", err)
 	}
 
+<<<<<<< HEAD
 	resolvedExpr := cfg.Expr
 	if input != nil && input.Variables != nil {
 		resolvedExpr = resolveWithVariables(cfg.Expr, input.Variables)
@@ -1043,6 +2729,21 @@ func (n *sceneNode) executeCondition(input *dag.Input, nodeLog logger.Logger) (*
 	)
 	if n.stats != nil {
 		n.stats.RecordLatency(0, true)
+=======
+	var variables map[string]any
+	if input != nil && input.Variables != nil {
+		variables = input.Variables
+	}
+	startTime := time.Now()
+	result := expr.EvaluateConditionExpr(cfg.Expr, variables)
+	nodeLog.Info("condition node evaluated",
+		logger.F("expr", cfg.Expr),
+		logger.F("result", result),
+	)
+	if n.nodeStats != nil {
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, true)
+>>>>>>> dev
 	}
 	return &dag.Output{Response: map[string]any{"condition": result}}, nil
 }
@@ -1056,18 +2757,29 @@ func (n *sceneNode) executeIfElse(input *dag.Input, nodeLog logger.Logger) (*dag
 		return nil, fmt.Errorf("parse if-else config: %w", err)
 	}
 
+<<<<<<< HEAD
+=======
+	startTime := time.Now()
+>>>>>>> dev
 	result := evaluateExpression(cfg.Expr, input)
 	nodeLog.Info("if-else node evaluated",
 		logger.F("expr", cfg.Expr),
 		logger.F("result", result),
 		logger.F("branch", map[bool]string{true: "if_true", false: "if_false"}[result]),
 	)
+<<<<<<< HEAD
 	if n.stats != nil {
 		n.stats.RecordLatency(0, true)
+=======
+	if n.nodeStats != nil {
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, true)
+>>>>>>> dev
 	}
 	return &dag.Output{Response: map[string]any{"if_else_result": result}}, nil
 }
 
+<<<<<<< HEAD
 func evaluateExpression(expr string, input *dag.Input) bool {
 	if expr == "" {
 		return true
@@ -1078,6 +2790,273 @@ func evaluateExpression(expr string, input *dag.Input) bool {
 	}
 
 	return expr != "" && expr != "false" && expr != "0" && expr != "''" && expr != "\"\""
+=======
+// childChainResult carries the outcome of one pass of runChildChain.
+type childChainResult struct {
+	// LastOutput is the output of the last executed child step (may be nil).
+	LastOutput *dag.Output
+	// FirstSoftErr is the first child soft failure (failure reported via
+	// Output.Error without aborting the chain), nil when all children
+	// succeeded.
+	FirstSoftErr error
+}
+
+// runChildChain executes the composite node's child nodes sequentially for
+// one pass. It is shared by group/while/loop composite execution.
+//
+// Variable freshness: after each child step, input.Variables is refreshed
+// from the executor's shared variable scope via SnapshotVariables(), so
+// variables extracted by one child (via SetVariable) are immediately visible
+// to the next child and — for while/loop — to exit-condition evaluation.
+// Without the refresh, children would keep reading the stale snapshot taken
+// when the parent composite node's input was built.
+//
+// A non-nil return error is a hard failure that aborts the whole chain.
+func (n *sceneNode) runChildChain(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (childChainResult, error) {
+	var res childChainResult
+	for _, child := range n.childNodes {
+		select {
+		case <-ctx.Done():
+			nodeLog.Error("child chain execution cancelled by context",
+				logger.F("error", ctx.Err()),
+				logger.F("child_id", child.ID()))
+			return res, fmt.Errorf("child chain cancelled: %w", ctx.Err())
+		default:
+		}
+
+		childLoopCount := child.LoopCount()
+		if childLoopCount <= 0 {
+			childLoopCount = 1
+		}
+
+		for j := 0; j < childLoopCount; j++ {
+			output, err := child.Execute(ctx, input)
+			if err != nil {
+				nodeLog.Error("child execution failed",
+					logger.F("child_id", child.ID()),
+					logger.F("error", err),
+				)
+				return res, fmt.Errorf("child %s: %w", child.ID(), err)
+			}
+			// Soft failure: the child reports failure via Output.Error while
+			// the chain continues executing its remaining children. Keep the
+			// first one so the span and stats reflect the real outcome.
+			if output != nil && output.Error != nil && res.FirstSoftErr == nil {
+				res.FirstSoftErr = output.Error
+			}
+			res.LastOutput = output
+			// Refresh variables so later children (and loop exit conditions)
+			// see values extracted by earlier children.
+			if input != nil && input.Executor != nil {
+				input.Variables = input.Executor.SnapshotVariables()
+			}
+		}
+	}
+	return res, nil
+}
+
+func (n *sceneNode) executeGroup(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	var cfg struct {
+		NodeIDs   []string `json:"node_ids"`
+		LoopCount int      `json:"loop_count"`
+		Async     bool     `json:"async"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse group config", logger.F("error", err))
+		return nil, fmt.Errorf("parse group config: %w", err)
+	}
+
+	loopCount := cfg.LoopCount
+	if loopCount <= 0 {
+		loopCount = 1
+	}
+
+	if len(n.childNodes) == 0 {
+		nodeLog.Warn("group node has no children, skipping")
+		return &dag.Output{Response: map[string]any{"node_id": n.id, "type": "group", "iterations": 0}}, nil
+	}
+
+	nodeLog.Info("executing group",
+		logger.F("child_count", len(n.childNodes)),
+		logger.F("loop_count", loopCount),
+		logger.F("async", cfg.Async),
+	)
+
+	// firstChildSoftErr keeps the FIRST child soft failure (reported via
+	// Output.Error with no Execute error) so the group's span and stats
+	// reflect the real outcome; execution still continues within the group.
+	var firstChildSoftErr error
+
+	var lastOutput *dag.Output
+	startTime := time.Now()
+	for i := 0; i < loopCount; i++ {
+		if loopCount > 1 {
+			nodeLog.Debug("group iteration started",
+				logger.F("iteration", i+1),
+				logger.F("total", loopCount))
+		}
+		res, err := n.runChildChain(ctx, input, nodeLog)
+		if err != nil {
+			return nil, err
+		}
+		if res.FirstSoftErr != nil && firstChildSoftErr == nil {
+			firstChildSoftErr = res.FirstSoftErr
+		}
+		lastOutput = res.LastOutput
+	}
+
+	if n.nodeStats != nil {
+		elapsed := time.Since(startTime)
+		n.nodeStats.RecordLatency(elapsed, firstChildSoftErr == nil)
+	}
+
+	return &dag.Output{Response: map[string]any{
+		"node_id":    n.id,
+		"type":       "group",
+		"iterations": loopCount,
+		"last_child": lastOutput,
+	}, Error: firstChildSoftErr}, nil
+}
+
+func (n *sceneNode) executeTimer(ctx context.Context, input *dag.Input, nodeLog logger.Logger) (*dag.Output, error) {
+	// Field units: `seconds` is in seconds (legacy alias); `delay`,
+	// `duration` and `interval` are in milliseconds.
+	var cfg struct {
+		Mode     string  `json:"mode"`
+		Seconds  float64 `json:"seconds"`
+		Delay    float64 `json:"delay"`
+		Duration float64 `json:"duration"`
+		Interval float64 `json:"interval"`
+	}
+	if err := json.Unmarshal([]byte(n.config), &cfg); err != nil {
+		nodeLog.Error("failed to parse timer config", logger.F("error", err))
+		return nil, fmt.Errorf("parse timer config: %w", err)
+	}
+
+	startTime := time.Now()
+
+	switch cfg.Mode {
+	case "delay":
+		// delay/duration are milliseconds; seconds is the legacy seconds alias.
+		delayMs := cfg.Delay
+		if delayMs <= 0 {
+			delayMs = cfg.Duration
+		}
+		if delayMs <= 0 && cfg.Seconds > 0 {
+			delayMs = cfg.Seconds * 1000
+		}
+		if delayMs <= 0 {
+			nodeLog.Warn("timer delay is zero or missing, using default 1000ms",
+				logger.F("raw_seconds", cfg.Seconds),
+				logger.F("raw_delay", cfg.Delay),
+				logger.F("raw_duration", cfg.Duration),
+				logger.F("mode", cfg.Mode))
+			delayMs = 1000
+		}
+		nodeLog.Info("timer delay started", logger.F("ms", delayMs))
+		select {
+		case <-time.After(time.Duration(delayMs * float64(time.Millisecond))):
+			nodeLog.Info("timer delay completed")
+		case <-ctx.Done():
+			nodeLog.Info("timer delay cancelled")
+			elapsed := time.Since(startTime)
+			if n.nodeStats != nil {
+				n.nodeStats.RecordLatency(elapsed, false)
+			}
+			return nil, fmt.Errorf("timer cancelled: %w", ctx.Err())
+		}
+	case "interval":
+		// interval is the tick period in ms; duration is the total run
+		// time in ms. Without duration the timer runs until the chain
+		// context is cancelled (heartbeat semantics).
+		intervalMs := cfg.Interval
+		if intervalMs <= 0 && cfg.Seconds > 0 {
+			intervalMs = cfg.Seconds * 1000
+		}
+		if intervalMs <= 0 {
+			nodeLog.Warn("timer interval is zero or missing, using default 1000ms",
+				logger.F("raw_interval", cfg.Interval),
+				logger.F("mode", cfg.Mode))
+			intervalMs = 1000
+		}
+		nodeLog.Info("timer interval started",
+			logger.F("interval_ms", intervalMs),
+			logger.F("duration_ms", cfg.Duration))
+		ticker := time.NewTicker(time.Duration(intervalMs * float64(time.Millisecond)))
+		defer ticker.Stop()
+
+		var deadline <-chan time.Time
+		if cfg.Duration > 0 {
+			deadline = time.After(time.Duration(cfg.Duration * float64(time.Millisecond)))
+		}
+
+		tickCount := 0
+		for {
+			select {
+			case <-ticker.C:
+				tickCount++
+				nodeLog.Info("timer tick", logger.F("tick", tickCount))
+			case <-deadline:
+				nodeLog.Info("timer interval duration elapsed", logger.F("ticks", tickCount))
+				elapsed := time.Since(startTime)
+				if n.nodeStats != nil {
+					n.nodeStats.RecordLatency(elapsed, true)
+				}
+				return &dag.Output{Response: map[string]any{
+					"node_id": n.id,
+					"type":    "timer",
+					"mode":    "interval",
+					"ticks":   tickCount,
+				}}, nil
+			case <-ctx.Done():
+				nodeLog.Info("timer interval stopped", logger.F("ticks", tickCount))
+				elapsed := time.Since(startTime)
+				if n.nodeStats != nil {
+					n.nodeStats.RecordLatency(elapsed, true)
+				}
+				return &dag.Output{Response: map[string]any{
+					"node_id": n.id,
+					"type":    "timer",
+					"mode":    "interval",
+					"ticks":   tickCount,
+				}}, nil
+			}
+		}
+	default:
+		nodeLog.Warn("invalid timer mode",
+			logger.F("mode", cfg.Mode),
+			logger.F("valid_modes", []string{"delay", "interval"}))
+		if n.nodeStats != nil {
+			n.nodeStats.RecordLatency(0, false)
+		}
+		return nil, fmt.Errorf("invalid timer mode %q, must be \"delay\" or \"interval\"", cfg.Mode)
+	}
+
+	// delay mode completed successfully
+	elapsed := time.Since(startTime)
+	if n.nodeStats != nil {
+		n.nodeStats.RecordLatency(elapsed, true)
+	}
+
+	return &dag.Output{Response: map[string]any{
+		"node_id": n.id,
+		"type":    "timer",
+		"mode":    cfg.Mode,
+	}}, nil
+}
+
+func evaluateExpression(exprStr string, input *dag.Input) bool {
+	if exprStr == "" {
+		return true
+	}
+
+	var variables map[string]any
+	if input != nil && input.Variables != nil {
+		variables = input.Variables
+	}
+
+	return expr.EvaluateConditionExpr(exprStr, variables)
+>>>>>>> dev
 }
 
 func (r *Runner) evalCondition(ctx context.Context, condition string, output *dag.Output) bool {
@@ -1085,14 +3064,56 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 		return true
 	}
 
+<<<<<<< HEAD
+=======
+	// Debug log: condition evaluation details
+	var chainID string
+	if ctx != nil {
+		chainID, _ = ctx.Value(dag.ChainIDKey).(string)
+	}
+	if r.log != nil {
+		outputDebug := "<nil>"
+		if output != nil {
+			outputDebug = fmt.Sprintf("%v", output.Response)
+		}
+		r.log.Debug("evalCondition called",
+			logger.F("chain_id", chainID),
+			logger.F("condition", condition),
+			logger.F("output_nil", output == nil),
+			logger.F("output_response", outputDebug),
+		)
+	}
+
+>>>>>>> dev
 	if condition == "__if_true__" {
 		if output != nil {
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
+<<<<<<< HEAD
 					return result == true
 				}
 			}
 		}
+=======
+					evalResult := result == true
+					if r.log != nil {
+						r.log.Debug("evalCondition __if_true__ resolved",
+							logger.F("chain_id", chainID),
+							logger.F("if_else_result", result),
+							logger.F("eval_result", evalResult),
+						)
+					}
+					return evalResult
+				}
+			}
+		}
+		if r.log != nil {
+			r.log.Warn("evalCondition __if_true__ fallback: if_else_result not found, defaulting to true",
+				logger.F("chain_id", chainID),
+				logger.F("output_nil", output == nil),
+			)
+		}
+>>>>>>> dev
 		return true
 	}
 
@@ -1100,6 +3121,7 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 		if output != nil {
 			if resp, ok := output.Response.(map[string]any); ok {
 				if result, exists := resp["if_else_result"]; exists {
+<<<<<<< HEAD
 					return result != true
 				}
 			}
@@ -1108,10 +3130,44 @@ func (r *Runner) evalCondition(ctx context.Context, condition string, output *da
 	}
 
 	return condition != "false" && condition != "0"
+=======
+					evalResult := result != true
+					if r.log != nil {
+						r.log.Debug("evalCondition __if_false__ resolved",
+							logger.F("chain_id", chainID),
+							logger.F("if_else_result", result),
+							logger.F("eval_result", evalResult),
+						)
+					}
+					return evalResult
+				}
+			}
+		}
+		if r.log != nil {
+			r.log.Warn("evalCondition __if_false__ fallback: if_else_result not found, defaulting to false",
+				logger.F("chain_id", chainID),
+				logger.F("output_nil", output == nil),
+			)
+		}
+		return false
+	}
+
+	// For generic DAG edge conditions, build variables from the upstream
+	// node's output response (if it's a map) and evaluate the expression.
+	var variables map[string]any
+	if output != nil {
+		if resp, ok := output.Response.(map[string]any); ok {
+			variables = resp
+		}
+	}
+
+	return expr.EvaluateConditionExpr(condition, variables)
+>>>>>>> dev
 }
 
 func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, error) {
 	sn := &sceneNode{
+<<<<<<< HEAD
 		id:        n.ID.String(),
 		nodeType:  n.Type,
 		config:    n.Config,
@@ -1121,30 +3177,123 @@ func (r *Runner) buildDAGNode(n *model.Node, nodeStat *NodeStats) (*sceneNode, e
 		nodeStats: nodeStat,
 		log:       r.log,
 		traceID:   r.runID.String(),
+=======
+		id:            n.ID.String(),
+		name:          n.Name,
+		nodeType:      n.Type,
+		config:        n.Config,
+		loopCount:     n.LoopCount,
+		mode:          dag.ExecSync,
+		blockOnError:  n.BlockOnError,
+		stats:         r.stats,
+		httpOnlyStats: r.httpOnlyStats,
+		nodeStats:     nodeStat,
+		log:           r.log,
+		traceID:       r.runID.String(),
+		exprReg:       r.exprReg,
+		failedNodes:   &r.failedNodes,
+		failedNodesMu: &r.failedNodesMu,
+>>>>>>> dev
 	}
 
 	if n.LoopCount <= 0 {
 		sn.loopCount = 1
 	}
 
+<<<<<<< HEAD
+=======
+	// Timer execution mode depends on its timer mode:
+	//   - delay: think-time, downstream nodes must wait for the delay to
+	//     complete, so it runs synchronously.
+	//   - interval: heartbeat that runs in the background; downstream nodes
+	//     proceed immediately, so it runs asynchronously.
+	if n.Type == model.NodeTypeTimer {
+		var tcfg struct {
+			Mode string `json:"mode"`
+		}
+		_ = json.Unmarshal([]byte(n.Config), &tcfg)
+		if tcfg.Mode == "interval" {
+			sn.mode = dag.ExecAsync
+		}
+		// delay mode (and unset) stays ExecSync
+	}
+
+>>>>>>> dev
 	return sn, nil
 }
 
 func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
+<<<<<<< HEAD
 	globalScope := variable.NewScope(variable.WithLevel(variable.ScopeGlobal))
 
 	if scene.Variables != "" {
 		var vars map[string]string
 		if err := json.Unmarshal([]byte(scene.Variables), &vars); err != nil {
+=======
+	scopeLog := r.log.With(
+		logger.F("run_id", r.runID.String()),
+		logger.F("scene_id", r.cfg.SceneID.String()),
+	)
+
+	globalScope := variable.NewScope(variable.WithLevel(variable.ScopeGlobal))
+
+	// Global config variables (salvo.yaml) are set FIRST as base defaults.
+	// Scene variables are set AFTER and take precedence, ensuring that
+	// DAG-defined variables (e.g. order_id: "") are not polluted by
+	// unrelated global defaults (e.g. mock-server order_id: "67890").
+	for k, v := range r.cfg.Variables {
+		globalScope.Set(k, v)
+	}
+
+	if scene.Variables != "" {
+		var vars map[string]string
+		if err := json.Unmarshal([]byte(scene.Variables), &vars); err != nil {
+			scopeLog.Error("failed to parse scene variables JSON",
+				logger.F("error", err),
+				logger.F("variables", scene.Variables))
+>>>>>>> dev
 			return nil, fmt.Errorf("parse scene variables: %w", err)
 		}
 		for k, v := range vars {
 			globalScope.Set(k, v)
 		}
+<<<<<<< HEAD
 	}
 
 	for k, v := range r.cfg.Variables {
 		globalScope.Set(k, v)
+=======
+		jsonVars, _ := json.Marshal(vars)
+		scopeLog.Debug("scene variables loaded",
+			logger.F("variable_count", len(vars)),
+			logger.F("variables", string(jsonVars)))
+	}
+	// Merge config_params and derived_params into scope (stored separately
+	// for YAML export fidelity, but unified at runtime).
+	for _, src := range []struct{ name, data string }{
+		{"config_params", scene.ConfigParams},
+		{"derived_params", scene.DerivedParams},
+	} {
+		if src.data == "" {
+			continue
+		}
+		var m map[string]string
+		if err := json.Unmarshal([]byte(src.data), &m); err != nil {
+			scopeLog.Error("failed to parse scene "+src.name+" JSON",
+				logger.F("error", err),
+				logger.F(src.name, src.data))
+			return nil, fmt.Errorf("parse scene %s: %w", src.name, err)
+		}
+		for k, v := range m {
+			globalScope.Set(k, v)
+		}
+	}
+
+	// Resolve nested variable references in all variable values.
+	if err := resolveNestedVariables(globalScope); err != nil {
+		scopeLog.Error("failed to resolve nested variable references", logger.F("error", err))
+		return nil, fmt.Errorf("resolve nested variables: %w", err)
+>>>>>>> dev
 	}
 
 	sceneScope := variable.NewScope(
@@ -1155,6 +3304,28 @@ func (r *Runner) buildScope(scene *model.Scene) (*variable.Scope, error) {
 	return sceneScope, nil
 }
 
+<<<<<<< HEAD
+=======
+// resolveNestedVariables iterates over all variables in a scope and resolves
+// any ${var} references in their values using the scope itself.
+func resolveNestedVariables(scope *variable.Scope) error {
+	keys := scope.Keys()
+	for _, k := range keys {
+		val, _ := scope.Get(k)
+		strVal := fmt.Sprintf("%v", val)
+		if !strings.Contains(strVal, "${") {
+			continue
+		}
+		resolved, err := variable.ResolveString(scope, strVal)
+		if err != nil {
+			return fmt.Errorf("variable %q: %w", k, err)
+		}
+		scope.Set(k, resolved)
+	}
+	return nil
+}
+
+>>>>>>> dev
 func resolveWithVariables(str string, vars map[string]any) string {
 	if str == "" || vars == nil {
 		return str
@@ -1258,6 +3429,10 @@ func (r *Runner) GlobalSnapshot() *Sample {
 	totalReqs := r.stats.TotalReqs.Load()
 	successReqs := r.stats.SuccessReqs.Load()
 	failedReqs := r.stats.FailedReqs.Load()
+<<<<<<< HEAD
+=======
+	canceledReqs := r.stats.CanceledReqs.Load()
+>>>>>>> dev
 
 	avg, p50, p90, p95, p99 := r.stats.LatencyPercentiles()
 
@@ -1274,6 +3449,10 @@ func (r *Runner) GlobalSnapshot() *Sample {
 		TotalRequests: totalReqs,
 		SuccessCount:  successReqs,
 		FailCount:     failedReqs,
+<<<<<<< HEAD
+=======
+		CanceledCount: canceledReqs,
+>>>>>>> dev
 		AvgLatencyMs:  avg.Seconds() * 1000,
 		P50LatencyMs:  p50.Seconds() * 1000,
 		P90LatencyMs:  p90.Seconds() * 1000,
@@ -1284,6 +3463,41 @@ func (r *Runner) GlobalSnapshot() *Sample {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func (r *Runner) HttpOnlySnapshot() *Sample {
+	totalReqs := r.httpOnlyStats.TotalReqs.Load()
+	successReqs := r.httpOnlyStats.SuccessReqs.Load()
+	failedReqs := r.httpOnlyStats.FailedReqs.Load()
+	canceledReqs := r.httpOnlyStats.CanceledReqs.Load()
+
+	avg, p50, p90, p95, p99 := r.httpOnlyStats.LatencyPercentiles()
+
+	duration := time.Since(r.startedAt).Seconds()
+	qps := float64(0)
+	if duration > 0 {
+		qps = float64(totalReqs) / duration
+	}
+
+	return &Sample{
+		Timestamp:     time.Now().UTC(),
+		WindowSeconds: 1,
+		QPS:           qps,
+		TotalRequests: totalReqs,
+		SuccessCount:  successReqs,
+		FailCount:     failedReqs,
+		CanceledCount: canceledReqs,
+		AvgLatencyMs:  avg.Seconds() * 1000,
+		P50LatencyMs:  p50.Seconds() * 1000,
+		P90LatencyMs:  p90.Seconds() * 1000,
+		P95LatencyMs:  p95.Seconds() * 1000,
+		P99LatencyMs:  p99.Seconds() * 1000,
+		MinLatencyMs:  time.Duration(r.httpOnlyStats.MinLatency.Load()).Seconds() * 1000,
+		MaxLatencyMs:  p99.Seconds() * 1000,
+	}
+}
+
+>>>>>>> dev
 // NodeSnapshots implements StatsProvider interface for per-node statistics.
 func (r *Runner) NodeSnapshots() map[string]*Sample {
 	result := make(map[string]*Sample)
@@ -1337,3 +3551,83 @@ func (r *Runner) NodeSnapshots() map[string]*Sample {
 
 	return result
 }
+<<<<<<< HEAD
+=======
+
+// fileExtRe matches common file extensions that indicate a file path value.
+var fileExtRe = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|bmp|svg|pdf|doc|docx|xls|xlsx|zip|tar|gz|rar|7z|mp4|mp3|wav|avi|mov|txt|csv|json|xml|yaml|yml|toml|ini|conf|log|bak|bin|exe|dmg|iso|ppt|pptx|md|rtf|odt|ods|odp)$`)
+
+// isLikelyFilePath returns true when the value looks like a file path rather
+// than a plain string field. A value is classified as a file when:
+//   - it has a recognised file extension, OR
+//   - it contains a path separator (/ or \) and does not start with "${" (a
+//     variable reference such as ${upload_dir}/file.txt is still a file, but
+//     we only trigger on the path-separator heuristic for non-variable values).
+func isLikelyFilePath(v string) bool {
+	if fileExtRe.MatchString(v) {
+		return true
+	}
+	if strings.ContainsAny(v, "/\\") && !strings.HasPrefix(v, "${") {
+		return true
+	}
+	return false
+}
+
+// isSensitiveHeader returns true for headers that carry secrets/tokens.
+func isSensitiveHeader(key string) bool {
+	lower := strings.ToLower(key)
+	switch lower {
+	case "authorization", "cookie", "x-api-key", "x-auth-token",
+		"x-csrf-token", "proxy-authorization", "set-cookie":
+		return true
+	default:
+		return strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "key")
+	}
+}
+
+// maskValue masks a sensitive value, keeping first 4 and last 4 chars.
+func maskValue(v string) string {
+	if len(v) <= 8 {
+		return "****"
+	}
+	return v[:4] + "****" + v[len(v)-4:]
+}
+
+// aesDecryptResponse decrypts an AES-encrypted HTTP response body.
+// The body is expected to be a JSON-encoded string (with surrounding quotes)
+// containing a base64-encoded ciphertext.
+// mode: 0 = AES-CBC (default, IV derived from key[:16]), 1 = AES-GCM.
+func aesDecryptResponse(body []byte, aesKeyBase64 string, mode int) (string, error) {
+	// Step 1: Parse the body as a JSON string value (strip surrounding quotes).
+	var ciphertextBase64 string
+	if err := json.Unmarshal(body, &ciphertextBase64); err != nil {
+		// If not a JSON string, try using the raw body as the ciphertext.
+		ciphertextBase64 = strings.Trim(string(body), "\"")
+	}
+
+	// Step 2: Decode the base64 AES key to get the raw key bytes.
+	keyBytes, err := base64.StdEncoding.DecodeString(aesKeyBase64)
+	if err != nil {
+		return "", fmt.Errorf("decode aes key: %w", err)
+	}
+
+	// Step 3: Decrypt based on mode.
+	switch mode {
+	case 1: // AES-GCM
+		iv := keyBytes[:16]
+		plaintext, err := sharedcrypto.GCMDecrypt(ciphertextBase64, keyBytes, iv)
+		if err != nil {
+			return "", fmt.Errorf("aes-gcm decrypt: %w", err)
+		}
+		return plaintext, nil
+	default: // AES-CBC (mode 0 or unspecified)
+		// IV is derived from the first 16 bytes of the key (Manhattan convention).
+		iv := keyBytes[:16]
+		plaintext, err := sharedcrypto.CBCDecryptWithIV(ciphertextBase64, keyBytes, iv)
+		if err != nil {
+			return "", fmt.Errorf("aes-cbc decrypt: %w", err)
+		}
+		return plaintext, nil
+	}
+}
+>>>>>>> dev

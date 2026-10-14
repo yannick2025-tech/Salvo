@@ -46,7 +46,11 @@ func TestNodeStats_LatencyPercentiles(t *testing.T) {
 		stats.RecordLatency(lat, true)
 	}
 
+<<<<<<< HEAD
 	avg, p50, p95, p99 := stats.LatencyPercentiles()
+=======
+	avg, p50, _, p95, p99 := stats.LatencyPercentiles()
+>>>>>>> dev
 
 	expectedAvg := 55 * time.Millisecond
 	if avg != expectedAvg {
@@ -69,7 +73,11 @@ func TestNodeStats_LatencyPercentiles(t *testing.T) {
 func TestNodeStats_LatencyPercentiles_Empty(t *testing.T) {
 	stats := NewNodeStats(1000)
 
+<<<<<<< HEAD
 	avg, p50, p95, p99 := stats.LatencyPercentiles()
+=======
+	avg, p50, _, p95, p99 := stats.LatencyPercentiles()
+>>>>>>> dev
 
 	if avg != 0 || p50 != 0 || p95 != 0 || p99 != 0 {
 		t.Error("expected all percentiles to be zero for empty stats")
@@ -116,7 +124,11 @@ func TestNodeStats_MaxSamplesLimit(t *testing.T) {
 		t.Errorf("total requests should count all records, not just samples: got %d", snap.TotalReqs)
 	}
 
+<<<<<<< HEAD
 	avg, _, _, _ := stats.LatencyPercentiles()
+=======
+	avg, _, _, _, _ := stats.LatencyPercentiles()
+>>>>>>> dev
 	if avg == 0 {
 		t.Error("avg latency should be calculated from retained samples")
 	}

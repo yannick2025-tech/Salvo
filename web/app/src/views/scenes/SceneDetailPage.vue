@@ -1,5 +1,6 @@
 <template>
   <div class="scene-detail">
+<<<<<<< HEAD
     <div class="page-header">
       <button class="btn-back" @click="$router.push('/scenes')">← 返回</button>
       <h2 v-if="scene">{{ scene.name }}</h2>
@@ -18,16 +19,53 @@
     </div>
 
     <div class="workspace-split">
+=======
+    <!-- ===== 紧凑工具栏 ===== -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn-back" @click="$router.push('/scenes')">← 返回</button>
+        <h2 v-if="scene" class="scene-title" :title="scene.name">{{ scene.name }}</h2>
+        <span v-if="scene" :class="['status-badge', scene.status]">{{ scene.status }}</span>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-sm toolbar-btn" :disabled="!canWriteScene" :title="canWriteScene ? '场景设置（变量 / 数据源）' : '您当前的角色没有编辑权限'" @click="$router.push(`/scenes/${$route.params.id}/settings`)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          设置
+        </button>
+        <button class="btn-outline btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="openCopyModal">复制</button>
+        <button class="btn-primary btn-sm" :disabled="!canRunScene" :title="canRunScene ? '' : '您当前的角色没有运行权限'" @click="showRunConfig = true">▶ 启动测试</button>
+      </div>
+    </div>
+
+    <!-- ===== 主工作区：DAG 画布 ===== -->
+    <div class="main-workspace">
+>>>>>>> dev
       <div class="dag-section">
         <div class="section-header">
           <h3>DAG 请求流</h3>
           <div class="dag-actions">
+<<<<<<< HEAD
             <button class="btn-sm" @click="addNode('setup')">+ 初始化</button>
             <button class="btn-sm" @click="addNode('http')">+ HTTP</button>
             <button class="btn-sm" @click="addNode('delay')">+ 延迟</button>
             <button class="btn-sm" @click="addNode('condition')">+ 条件</button>
             <button class="btn-sm" @click="addNode('if-else')">+ IF-ELSE</button>
             <button class="btn-sm" @click="addNode('teardown')">+ 清理</button>
+=======
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('setup')">+ 初始化</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('http')">+ HTTP</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('generator')">+ 生成器</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('delay')">+ 延迟</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('condition')">+ 条件</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('if-else')">+ IF-ELSE</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('group')">+ 分组</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('timer')">+ 定时器</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('while')">+ While</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('parallel')">+ 并行</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('sub_flow')">+ 子流程</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('loop')">+ 循环</button>
+            <button class="btn-sm" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="addNode('teardown')">+ 清理</button>
+>>>>>>> dev
           </div>
         </div>
 
@@ -41,11 +79,18 @@
             v-else
             :nodes="nodes"
             :edges="edges"
+<<<<<<< HEAD
+=======
+            :is-running="isSceneRunning"
+            :run-id="currentRunId"
+            :scene-id="route.params.id as string"
+>>>>>>> dev
             @edit="editNode"
             @delete-node="handleDeleteNode"
             @add-edge="onDagAddEdge"
             @delete-edge="handleDeleteEdge"
             @update-edge="handleUpdateEdge"
+<<<<<<< HEAD
             @node-select="selectNode"
             @node-position-update="saveNodePosition"
           />
@@ -58,6 +103,26 @@
           <h4>{{ selectedNode.name }} - 配置</h4>
           <button class="btn-close" @click="selectedNode = null">✕</button>
         </div>
+=======
+            @node-select="onCanvasNodeSelect"
+            @node-position-update="saveNodePosition"
+          />
+        </div>
+      </div>
+
+      <!-- 节点配置侧边栏 -->
+      <div v-if="selectedNode" class="config-sidebar">
+        <div class="node-config-panel">
+          <div class="panel-header">
+            <div class="panel-header-left">
+              <button v-if="returnToStack.length > 0" class="btn-panel-back" @click="goBackToParent" title="返回上级节点">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              </button>
+              <h4>{{ selectedNode.name }} - 配置</h4>
+            </div>
+            <button class="btn-close" @click="closeConfigPanel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+>>>>>>> dev
 
       <div v-if="selectedNode.type === 'http' || selectedNode.type === 'setup' || selectedNode.type === 'teardown'" class="config-form">
         <div class="form-row">
@@ -88,11 +153,19 @@
         </div>
         <div class="form-row inline">
           <label>超时(ms)</label>
+<<<<<<< HEAD
           <input v-model.number="httpConfig.timeout" type="number" @change="saveNodeConfig" />
         </div>
         <div class="form-row inline">
           <label>期望状态码</label>
           <input v-model.number="httpConfig.expect_status" type="number" @change="saveNodeConfig" />
+=======
+          <input v-model="httpConfig.timeout" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>期望状态码</label>
+          <input v-model="httpConfig.expect_status" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
+>>>>>>> dev
         </div>
         <div class="form-row">
           <label>变量提取 (JSON)</label>
@@ -124,7 +197,11 @@
         </div>
         <div class="form-row inline">
           <label>延迟时间(ms)</label>
+<<<<<<< HEAD
           <input v-model.number="delayConfig.ms" type="number" @change="saveNodeConfig" />
+=======
+          <input v-model="delayConfig.ms" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
+>>>>>>> dev
         </div>
       </div>
 
@@ -167,8 +244,241 @@
         </div>
       </div>
 
+<<<<<<< HEAD
       <div class="panel-footer">
         <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode">保存配置</button>
+=======
+      <div v-else-if="selectedNode.type === 'group'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
+            <div v-for="n in availableGroupChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="groupConfig.node_ids" @change="onGroupChildrenChange" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <div v-if="groupOrderedChildren.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in groupConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < groupConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(groupConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === groupConfig.node_ids.length - 1" @click="moveChildDown(groupConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(groupConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选子节点后可调整执行顺序，顺序决定内部 DAG 连线方向</label>
+        </div>
+        <div class="form-row inline">
+          <label>循环次数</label>
+          <input v-model="groupConfig.loop_count" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
+        </div>
+      </div>
+
+      <div v-else-if="selectedNode.type === 'timer'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>模式</label>
+          <select v-model="timerConfig.mode" @change="saveNodeConfig">
+            <option value="delay">延迟执行（单次）</option>
+            <option value="interval">间隔执行（循环）</option>
+          </select>
+        </div>
+        <div class="form-row inline">
+          <label>{{ timerConfig.mode === 'delay' ? '延迟时间(秒)' : '间隔时间(秒)' }}</label>
+          <input v-model="timerConfig.seconds" type="text" placeholder="数值或 ${variable} 引用" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">定时器节点始终异步执行</label>
+        </div>
+      </div>
+
+      <!-- ➕ Generator 节点配置 -->
+      <div v-else-if="selectedNode.type === 'generator'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>表达式</label>
+          <input v-model="generatorConfig.expression" placeholder='${__random(1, 100)}' @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>变量名</label>
+          <input v-model="generatorConfig.variable" placeholder="my_var" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">表达式支持 ${generator.xxx}、${__so(...)}、${__random(...)} 及变量引用，求值结果将存入指定变量</label>
+        </div>
+      </div>
+
+      <!-- ➕ While 节点配置 -->
+      <div v-else-if="selectedNode.type === 'while'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>退出条件</label>
+          <div class="condition-rows">
+            <div v-for="(cond, idx) in whileConfig.exit_conditions" :key="idx" class="condition-row">
+              <input v-model="cond.variable" placeholder="变量" class="cond-input" @change="saveNodeConfig" />
+              <select v-model="cond.operator" class="cond-op" @change="saveNodeConfig">
+                <option value="equals">==</option>
+                <option value="not_equals">!=</option>
+                <option value="greater_than">&gt;</option>
+                <option value="less_than">&lt;</option>
+                <option value="greater_than_or_equal">&gt;=</option>
+                <option value="less_than_or_equal">&lt;=</option>
+              </select>
+              <input v-model="cond.value" placeholder="值" class="cond-input" @change="saveNodeConfig" />
+              <button class="btn-icon btn-del-var" @click="removeWhileCondition(idx)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          </div>
+          <button class="btn-sm drawer-add-btn" @click="addWhileCondition">+ 添加条件</button>
+        </div>
+        <div class="form-row inline">
+          <label>轮询间隔(秒)</label>
+          <input v-model.number="whileConfig.interval_seconds" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>最大迭代</label>
+          <input v-model.number="whileConfig.max_iterations" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>最大时长(分)</label>
+          <input v-model.number="whileConfig.max_duration_minutes" type="number" min="0" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>连续失败次数</label>
+          <input v-model.number="whileConfig.fail_after_consecutive" type="number" min="0" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>失败消息</label>
+          <input v-model="whileConfig.fail_message" placeholder="可选" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
+            <div v-for="n in availableCycleChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="whileConfig.node_ids" @change="onGroupChildrenChange" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <div v-if="whileConfig.node_ids.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in whileConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < whileConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(whileConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === whileConfig.node_ids.length - 1" @click="moveChildDown(whileConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(whileConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选的子节点按顺序循环执行，直到退出条件满足或达到上限；复合节点不可作为子节点</label>
+        </div>
+        <div v-if="whileConfig.steps.length > 0" class="form-row">
+          <label class="hint-label">{{ whileConfig.steps.length }} 个 YAML 内嵌步骤（引用子节点优先生效）</label>
+        </div>
+        <div class="form-row">
+          <label class="hint-label">While 节点会循环执行子步骤，直到条件满足或达到上限</label>
+        </div>
+      </div>
+
+      <!-- ➕ Parallel 节点配置 -->
+      <div v-else-if="selectedNode.type === 'parallel'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>异步执行</label>
+          <input type="checkbox" v-model="parallelConfig.async" true-value="true" false-value="false" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">并行节点中的步骤将同时执行。启用异步后不会阻塞后续节点。</label>
+        </div>
+      </div>
+
+      <!-- ➕ Sub_flow 节点配置 -->
+      <div v-else-if="selectedNode.type === 'sub_flow'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label>目标场景</label>
+          <select v-model="subFlowConfig.scene_id" @change="saveNodeConfig">
+            <option value="">选择场景</option>
+            <option v-for="s in availableScenes" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+        <div class="form-row inline">
+          <label>异步执行</label>
+          <input type="checkbox" v-model="subFlowConfig.async" true-value="true" false-value="false" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row">
+          <label class="hint-label">子流程节点将执行另一个场景的全部 DAG 节点。异步时不等待完成。</label>
+        </div>
+      </div>
+
+      <!-- ➕ Loop 节点配置 -->
+      <div v-else-if="selectedNode.type === 'loop'" class="config-form">
+        <div class="form-row">
+          <label>节点名称</label>
+          <input v-model="editingConfig.name" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row inline">
+          <label>循环次数</label>
+          <input v-model.number="loopConfig.loop_count" type="number" min="1" @change="saveNodeConfig" />
+        </div>
+        <div class="form-row group-child-config">
+          <label>子节点（按执行顺序排列）</label>
+          <div class="group-available-nodes">
+            <div v-for="n in availableCycleChildren" :key="n.id" class="child-node-check">
+              <input type="checkbox" :value="n.id" v-model="loopConfig.node_ids" @change="onGroupChildrenChange" />
+              <span>{{ n.name }} ({{ nodeTypeLabel(n.type) }})</span>
+            </div>
+          </div>
+          <div v-if="loopConfig.node_ids.length > 0" class="group-ordered-list">
+            <div v-for="(childId, idx) in loopConfig.node_ids" :key="childId" class="ordered-child-row">
+              <span class="order-index">{{ idx + 1 }}</span>
+              <span class="order-arrow" v-if="idx < loopConfig.node_ids.length - 1">↓</span>
+              <span class="order-name">{{ getNodeName(childId) }}</span>
+              <div class="order-actions">
+                <button class="order-btn" :disabled="idx === 0" @click="moveChildUp(loopConfig.node_ids, idx)" title="上移">↑</button>
+                <button class="order-btn" :disabled="idx === loopConfig.node_ids.length - 1" @click="moveChildDown(loopConfig.node_ids, idx)" title="下移">↓</button>
+                <button class="order-btn edit-btn" @click="editChildNode(childId)" title="编辑子节点"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="order-btn remove-btn" @click="removeChild(loopConfig.node_ids, childId)" title="移除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <label class="hint-label">勾选的子节点按顺序重复执行指定的循环次数；复合节点不可作为子节点</label>
+        </div>
+        <div v-if="loopConfig.steps.length > 0" class="form-row">
+          <label class="hint-label">{{ loopConfig.steps.length }} 个 YAML 内嵌步骤（引用子节点优先生效）</label>
+        </div>
+        <div class="form-row">
+          <label class="hint-label">循环节点会重复执行子步骤指定的次数。</label>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <button class="btn-primary btn-save-panel" @click="saveNodeConfig" :disabled="!selectedNode || !canWriteScene">保存配置</button>
+>>>>>>> dev
       </div>
     </div>
     </div>
@@ -182,6 +492,7 @@
         </div>
         <div class="form-group">
           <label>并发数</label>
+<<<<<<< HEAD
           <input v-model.number="runConfig.workers" type="number" min="1" max="1000" step="1" @input="normalizeNumber($event, 'workers')" />
         </div>
         <div class="form-group">
@@ -202,6 +513,28 @@
         <div class="modal-actions">
           <button class="btn-secondary" @click="showRunConfig = false">取消</button>
           <button class="btn-login-primary" :disabled="nodes.length === 0" @click="handleStart">
+=======
+          <input v-model="runConfig.workers" type="number" min="1" max="1000" step="1" @input="normalizeNumber($event, 'workers')" />
+        </div>
+        <div class="form-group">
+          <label>运行模式</label>
+          <CustomSelect
+            v-model="runConfig.run_mode"
+            :options="runModeOptions"
+          />
+        </div>
+        <div v-if="runConfig.run_mode === 'count'" class="form-group">
+          <label>总次数</label>
+          <input v-model="runConfig.count" type="number" min="1" max="1000000" step="1" @input="normalizeNumber($event, 'count')" />
+        </div>
+        <div v-if="runConfig.run_mode === 'duration'" class="form-group">
+          <label>持续时间(秒)</label>
+          <input v-model="runConfig.duration" type="number" min="1" max="86400" step="1" @input="normalizeNumber($event, 'duration')" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showRunConfig = false">取消</button>
+          <button class="btn-primary" :disabled="nodes.length === 0 || !canRunScene" @click="handleStart">
+>>>>>>> dev
             {{ nodes.length === 0 ? '无 DAG 节点' : '启动' }}
           </button>
         </div>
@@ -217,7 +550,11 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCopyModal = false">取消</button>
+<<<<<<< HEAD
           <button class="btn-login-primary" @click="handleCopyScene">确认复制</button>
+=======
+          <button class="btn-primary" @click="handleCopyScene">确认复制</button>
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -227,16 +564,33 @@
         <h3>{{ editingNode ? '编辑节点' : '添加节点' }}</h3>
         <div class="form-group">
           <label>节点名称</label>
+<<<<<<< HEAD
           <input v-model="nodeForm.name" placeholder="如: Login / GetUsers / CreateOrder" />
+=======
+          <input v-model="nodeForm.name" placeholder="如: Login / GetUsers / CreateOrder" maxlength="50" />
+>>>>>>> dev
         </div>
         <div class="form-group">
           <label>节点类型</label>
           <select v-model="nodeForm.type" :disabled="!!editingNode">
             <option value="setup">Setup (初始化)</option>
             <option value="http">HTTP 请求</option>
+<<<<<<< HEAD
             <option value="delay">延迟</option>
             <option value="condition">条件判断</option>
             <option value="if-else">IF-ELSE 分支</option>
+=======
+            <option value="generator">Generator (变量生成)</option>
+            <option value="delay">延迟</option>
+            <option value="condition">条件判断</option>
+            <option value="if-else">IF-ELSE 分支</option>
+            <option value="group">分组</option>
+            <option value="timer">定时器</option>
+            <option value="while">While 循环</option>
+            <option value="parallel">并行执行</option>
+            <option value="sub_flow">子流程</option>
+            <option value="loop">循环</option>
+>>>>>>> dev
             <option value="teardown">Teardown (清理)</option>
           </select>
         </div>
@@ -278,7 +632,11 @@
         <template v-if="nodeForm.type === 'delay'">
           <div class="form-group">
             <label>延迟时间(ms)</label>
+<<<<<<< HEAD
             <input v-model.number="nodeForm.delayMs" type="number" min="0" />
+=======
+            <input v-model="nodeForm.delayMs" type="text" placeholder="数值或 ${variable} 引用" />
+>>>>>>> dev
           </div>
         </template>
         <template v-if="nodeForm.type === 'condition'">
@@ -293,6 +651,84 @@
             <input v-model="nodeForm.conditionExpr" placeholder='${order_id} != ""' />
           </div>
         </template>
+<<<<<<< HEAD
+=======
+        <template v-if="nodeForm.type === 'generator'">
+          <div class="form-group">
+            <label>表达式</label>
+            <input v-model="nodeForm.generatorExpr" placeholder='${__random(1, 100)}' />
+          </div>
+          <div class="form-group">
+            <label>变量名</label>
+            <input v-model="nodeForm.generatorVar" placeholder="my_var" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'timer'">
+          <div class="form-group">
+            <label>模式</label>
+            <select v-model="nodeForm.timerMode">
+              <option value="delay">延迟执行（单次）</option>
+              <option value="interval">间隔执行（循环）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>{{ nodeForm.timerMode === 'delay' ? '延迟时间(秒)' : '间隔时间(秒)' }}</label>
+            <input v-model="nodeForm.timerSeconds" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'group'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'while'">
+          <div class="form-group">
+            <label>退出条件</label>
+            <div v-for="(cond, ci) in nodeForm.whileExitConditions" :key="ci" class="exit-condition-row">
+              <input v-model="cond.variable" placeholder="变量名" class="cond-input" />
+              <select v-model="cond.operator" class="cond-select">
+                <option value="equals">等于 (==)</option>
+                <option value="not_equals">不等于 (!=)</option>
+                <option value="greater_than">大于 (&gt;)</option>
+                <option value="less_than">小于 (&lt;)</option>
+                <option value="greater_than_or_equal">大于等于 (&gt;=)</option>
+                <option value="less_than_or_equal">小于等于 (&lt;=)</option>
+              </select>
+              <input v-model="cond.value" placeholder="值" class="cond-input" />
+              <button class="btn-icon" @click="nodeForm.whileExitConditions.splice(ci, 1)" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <button class="btn-sm" @click="nodeForm.whileExitConditions.push({ variable: '', operator: 'equals', value: '' })">+ 添加条件</button>
+          </div>
+          <div class="form-group">
+            <label>循环间隔(秒)</label>
+            <input v-model="nodeForm.whileIntervalSeconds" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+          <div class="form-group">
+            <label>最大迭代次数</label>
+            <input v-model="nodeForm.whileMaxIterations" type="text" placeholder="数值或 ${variable} 引用" />
+          </div>
+          <div class="form-group">
+            <label>最大持续时间(分钟)</label>
+            <input v-model="nodeForm.whileMaxDurationMinutes" type="text" placeholder="0 表示无限制" />
+          </div>
+        </template>
+        <template v-if="nodeForm.type === 'loop'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
+        <template v-if="nodeForm.type !== 'generator' && nodeForm.type !== 'timer' && nodeForm.type !== 'group' && nodeForm.type !== 'while' && nodeForm.type !== 'loop' && nodeForm.type !== 'http' && nodeForm.type !== 'setup' && nodeForm.type !== 'teardown' && nodeForm.type !== 'delay' && nodeForm.type !== 'condition' && nodeForm.type !== 'if-else'">
+          <div class="form-group">
+            <label>循环次数</label>
+            <input v-model="nodeForm.loop_count" type="text" placeholder="数值或 ${variable} 引用" />
+            <span class="field-hint">节点执行的循环次数，默认 1 次</span>
+          </div>
+        </template>
+>>>>>>> dev
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeNodeEditor">取消</button>
           <button class="btn-primary" @click="handleSaveNode">{{ editingNode ? '保存' : '添加' }}</button>
@@ -302,6 +738,77 @@
 
     <div v-if="toastMsg" class="toast" :class="toastType">{{ toastMsg }}</div>
 
+<<<<<<< HEAD
+=======
+    <!-- ===== 全屏 CSV 数据编辑器 ===== -->
+    <div v-if="showDsPreview" class="csv-editor-overlay" @click.self="showDsPreview = false">
+      <div class="csv-editor">
+        <!-- 精简标题栏 -->
+        <div class="csv-editor-header">
+          <h3>{{ dsPreview?.file_name }}</h3>
+          <button class="btn-icon modal-close" @click="showDsPreview = false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+
+        <!-- 表格区域（含底部浮动工具栏） -->
+        <div class="csv-editor-body">
+          <div class="csv-table-card">
+          <table class="csv-table">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th v-for="(col, ci) in dsEditColumns" :key="ci" class="col-editable">
+                  <input
+                    class="col-name-input"
+                    :value="col"
+                    @change="dsRenameColumn(ci, ($event.target as HTMLInputElement).value)"
+                  />
+                  <button class="btn-icon col-del-btn" @click="dsDeleteColumn(ci)" title="删除列"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                </th>
+                <th class="col-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, ri) in pagedRows" :key="ri + (dsPage - 1) * dsPageSize">
+                <td class="col-num">{{ (dsPage - 1) * dsPageSize + ri + 1 }}</td>
+                <td v-for="col in dsEditColumns" :key="col">
+                  <input
+                    class="cell-input"
+                    :value="row[col] || ''"
+                    @change="dsUpdateCell((dsPage - 1) * dsPageSize + ri, col, ($event.target as HTMLInputElement).value)"
+                  />
+                </td>
+                <td class="col-action">
+                  <button class="btn-icon row-del-btn" @click="dsDeleteRow((dsPage - 1) * dsPageSize + ri)" title="删除行"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+
+          <!-- 底部浮动工具栏 -->
+          <div class="csv-footer-bar">
+            <span class="csv-meta">{{ dsEditColumns.length }} 列 · {{ dsEditRows.length }} 行</span>
+            <div class="csv-pagination" v-if="totalDsPages > 1">
+              <button class="btn-sm" :disabled="dsPage <= 1" @click="dsPage--">‹</button>
+              <span class="page-info">{{ dsPage }} / {{ totalDsPages }}</span>
+              <button class="btn-sm" :disabled="dsPage >= totalDsPages" @click="dsPage++">›</button>
+              <select class="page-size-select" v-model.number="dsPageSize">
+                <option :value="25">25/页</option>
+                <option :value="50">50/页</option>
+                <option :value="100">100/页</option>
+                <option :value="200">200/页</option>
+              </select>
+            </div>
+            <div style="flex:1"></div>
+            <button class="btn-sm" @click="dsAddRow">+ 行</button>
+            <button class="btn-sm" @click="dsAddColumn">+ 列</button>
+            <button class="btn-primary btn-sm" @click="dsSaveEdit" :disabled="dsSaving">{{ dsSaving ? '保存中...' : '保存' }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+>>>>>>> dev
     <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
       <div class="confirm-dialog">
         <div class="confirm-icon">
@@ -311,7 +818,26 @@
         <p class="confirm-msg">{{ confirmMessage }}</p>
         <div class="confirm-actions">
           <button class="btn-cancel" @click="showConfirm = false">取消</button>
+<<<<<<< HEAD
           <button class="btn-danger-confirm" @click="confirmDeleteNode">确认删除</button>
+=======
+          <button class="btn-danger-confirm" @click="confirmDeleteAction">确认删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CSV 添加列弹窗 ===== -->
+    <div v-if="showAddColumnModal" class="modal-overlay" @click.self="showAddColumnModal = false">
+      <div class="modal">
+        <h3>添加列</h3>
+        <div class="form-group">
+          <label>列名</label>
+          <input v-model="newColumnName" placeholder="仅支持英文字母、数字、下划线" @keyup.enter="dsConfirmAddColumn" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showAddColumnModal = false">取消</button>
+          <button class="btn-primary" @click="dsConfirmAddColumn">确认添加</button>
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -321,6 +847,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+<<<<<<< HEAD
 import { getScene, createScene, startScene } from '@/api/scene'
 import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
 import { listGenerators } from '@/api/generator'
@@ -329,11 +856,38 @@ import DagFlow from './DagFlow.vue'
 
 const route = useRoute()
 const router = useRouter()
+=======
+import { getScene, copyScene, startScene, batchSetVariables, listScenes, sceneStatus, listRuns } from '@/api/scene'
+import { listNodes, addNode as apiAddNode, updateNode as apiUpdateNode, deleteNode as apiDeleteNode, listEdges, addEdge, deleteEdge } from '@/api/node'
+import { listGenerators } from '@/api/generator'
+import { listDataSources, uploadDataSource, deleteDataSource } from '@/api/datasource'
+import { previewDataSource } from '@/api/datasource'
+import type { DataSourceDTO, DataSourcePreviewDTO } from '@/api/datasource'
+import type { SceneDTO, NodeDTO, EdgeDTO, GeneratorCategoryInfo, GeneratorInfo } from '@/types'
+import { useAuthStore } from '@/stores/auth'
+import DagFlow from './DagFlow.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const canWriteScene = computed(() => authStore.canAccess(['scene:write']))
+const canRunScene = computed(() => authStore.canAccess(['scene:run']))
+>>>>>>> dev
 
 const scene = ref<SceneDTO | null>(null)
 const nodes = ref<NodeDTO[]>([])
 const edges = ref<EdgeDTO[]>([])
 const selectedNode = ref<NodeDTO | null>(null)
+<<<<<<< HEAD
+=======
+const currentRunId = ref('')
+
+const isSceneRunning = computed(() => {
+  if (route.query.mode === 'exec') return true
+  return scene.value?.status === 'running'
+})
+>>>>>>> dev
 
 const showRunConfig = ref(false)
 const showCopyModal = ref(false)
@@ -341,11 +895,273 @@ const showNodeEditor = ref(false)
 const editingNode = ref<NodeDTO | null>(null)
 const copyName = ref('')
 
+<<<<<<< HEAD
+=======
+function openCopyModal() {
+  copyName.value = `复制-${scene.value?.name ?? ''}`
+  showCopyModal.value = true
+}
+
+const showVarPanel = ref(false)
+const varEntries = ref<{ key: string; value: string }[]>([])
+
+// Data source state
+const dataSources = ref<DataSourceDTO[]>([])
+const dsUploading = ref(false)
+// CSV editor pagination
+const dsPage = ref(1)
+const dsPageSize = ref(50)
+const totalDsPages = computed(() => Math.max(1, Math.ceil(dsEditRows.value.length / dsPageSize.value)))
+const pagedRows = computed(() => {
+  const start = (dsPage.value - 1) * dsPageSize.value
+  return dsEditRows.value.slice(start, start + dsPageSize.value)
+})
+
+// Group node config
+const groupConfig = reactive({ node_ids: [] as string[], loop_count: '1', async: false })
+// Timer node config
+const timerConfig = reactive({ mode: 'delay', seconds: '1' })
+const whileConfig = reactive({
+  exit_conditions: [{ variable: '', operator: 'equals', value: '' }],
+  interval_seconds: '1',
+  max_iterations: '100',
+  max_duration_minutes: '0',
+  fail_after_consecutive: '0',
+  fail_message: '',
+  // 引用子节点模式：勾选的子节点 ID（引用模式优先生效）；steps 为 YAML 导入的内嵌步骤（只读展示）
+  node_ids: [] as string[],
+  steps: [] as any[],
+  fail_on_max_iterations: true,
+  fail_on_max_duration: true,
+})
+const parallelConfig = reactive({ async: false })
+const subFlowConfig = reactive({ scene_id: '', async: false })
+const loopConfig = reactive({ loop_count: '3', node_ids: [] as string[], steps: [] as any[] })
+// Generator node config
+const generatorConfig = reactive({ expression: '', variable: '' })
+
+function parseVariables(sceneVars: string): { key: string; value: string }[] {
+  try {
+    const obj = JSON.parse(sceneVars)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v) }))
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function addVariableRow() {
+  varEntries.value.push({ key: '', value: '' })
+  showVarPanel.value = true
+}
+
+function removeVariableRow(idx: number) {
+  confirmMessage.value = '确定要删除变量 "' + (varEntries.value[idx]?.key || '未命名') + '" 吗？'
+  showConfirm.value = true
+  pendingDeleteAction.value = 'var'
+  pendingDeleteParam.value = idx
+}
+
+async function saveVariables() {
+  const sceneId = route.params.id as string
+  if (!sceneId) return
+  const vars: Record<string, string> = {}
+  for (const e of varEntries.value) {
+    if (e.key.trim()) {
+      vars[e.key.trim()] = e.value
+    }
+  }
+  try {
+    await batchSetVariables(sceneId, vars)
+  } catch { /* ignore */ }
+}
+
+// Data source methods
+async function fetchDataSources() {
+  const id = route.params.id as string
+  if (!id) return
+  try {
+    const resp = await listDataSources(id)
+    if (resp.code === 0) {
+      const items = Array.isArray(resp.data) ? resp.data : (resp.data?.items || [])
+      dataSources.value = items
+        .map((ds: any) => ({
+          ...ds,
+          columns: ds.columns || [],
+          row_count: ds.row_count ?? 0,
+        }))
+        .filter((ds: any) => ds.file_name && (ds.columns?.length > 0 || ds.row_count > 0))
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function handleDsUpload(file: File) {
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('文件大小不能超过 10MB', 'error')
+    return
+  }
+  dsUploading.value = true
+  try {
+    const text = await file.text()
+    const sceneId = route.params.id as string
+    const resp = await uploadDataSource(sceneId, file.name, text)
+    if (resp.code !== 0) {
+      showToast(resp.message || '上传失败', 'error')
+      return
+    }
+    showToast('上传成功', 'success')
+    fetchDataSources()
+  } catch (e) {
+    showToast('上传失败', 'error')
+  } finally {
+    dsUploading.value = false
+  }
+}
+
+async function handleDsDelete(dsId: string) {
+  pendingDeleteAction.value = 'datasource'
+  pendingDeleteParam.value = dsId
+  confirmMessage.value = '确定要删除该数据源吗？此操作不可撤销。'
+  showConfirm.value = true
+}
+
+function onDsFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files && input.files[0]) handleDsUpload(input.files[0])
+  input.value = ''
+}
+
+// Data source preview
+const showDsPreview = ref(false)
+const dsPreview = ref<DataSourcePreviewDTO | null>(null)
+const dsEditColumns = ref<string[]>([])
+const dsEditRows = ref<Record<string, string>[]>([])
+const dsSaving = ref(false)
+
+async function handleDsPreview(ds: DataSourceDTO) {
+  try {
+    const resp = await previewDataSource(ds.id)
+    if (resp.code === 0) {
+      dsPreview.value = resp.data
+      dsEditColumns.value = [...(resp.data.columns || [])]
+      // 过滤掉所有字段均为空的无效行
+      const raw = (resp.data.rows || []) as Record<string, string>[]
+      dsEditRows.value = raw
+        .filter(r => r && typeof r === 'object' && Object.keys(r).length > 0 && Object.values(r).some(v => v != null && v !== ''))
+        .map(r => ({ ...r }))
+      dsPage.value = 1
+      showDsPreview.value = true
+    }
+  } catch { showToast('预览失败', 'error') }
+}
+
+function dsUpdateCell(ri: number, col: string, value: string) {
+  if (dsEditRows.value[ri]) {
+    dsEditRows.value[ri][col] = value
+  }
+}
+
+function dsAddRow() {
+  const newRow: Record<string, string> = {}
+  for (const col of dsEditColumns.value) {
+    newRow[col] = ''
+  }
+  dsEditRows.value.push(newRow)
+}
+
+function dsDeleteRow(ri: number) {
+  pendingDeleteAction.value = 'csv-row'
+  pendingDeleteParam.value = ri
+  confirmMessage.value = '确定要删除第 ' + ((dsPage.value - 1) * dsPageSize.value + ri + 1) + ' 行吗？'
+  showConfirm.value = true
+}
+
+function dsAddColumn() {
+  newColumnName.value = ''
+  showAddColumnModal.value = true
+}
+
+function dsConfirmAddColumn() {
+  const name = newColumnName.value.trim()
+  if (!name || !/^[a-zA-Z0-9_]+$/.test(name)) {
+    showToast('列名只能包含英文字母、数字、下划线', 'error')
+    return
+  }
+  if (dsEditColumns.value.includes(name)) {
+    showToast('列名已存在', 'error')
+    return
+  }
+  dsEditColumns.value.push(name)
+  for (const row of dsEditRows.value) {
+    row[name] = ''
+  }
+  showAddColumnModal.value = false
+}
+
+function dsRenameColumn(ci: number, newName: string) {
+  const trimmed = newName.trim()
+  if (!trimmed || !/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+    showToast('列名只能包含英文字母、数字、下划线', 'error')
+    return
+  }
+  if (dsEditColumns.value.includes(trimmed) && dsEditColumns.value[ci] !== trimmed) {
+    showToast('列名已存在', 'error')
+    return
+  }
+  const oldName = dsEditColumns.value[ci]
+  dsEditColumns.value[ci] = trimmed
+  if (oldName !== trimmed) {
+    for (const row of dsEditRows.value) {
+      row[trimmed] = row[oldName] || ''
+      delete row[oldName]
+    }
+  }
+}
+
+function dsDeleteColumn(ci: number) {
+  pendingDeleteAction.value = 'csv-column'
+  pendingDeleteParam.value = ci
+  confirmMessage.value = '确定要删除列 "' + dsEditColumns.value[ci] + '" 吗？该列所有数据将被清除。'
+  showConfirm.value = true
+}
+
+async function dsSaveEdit() {
+  if (!dsPreview.value) return
+  dsSaving.value = true
+  try {
+    const csvLines: string[] = [dsEditColumns.value.join(',')]
+    for (const row of dsEditRows.value) {
+      csvLines.push(dsEditColumns.value.map(c => row[c] || '').join(','))
+    }
+    const csvContent = csvLines.join('\n')
+    const sceneId = route.params.id as string
+    await uploadDataSource(sceneId, dsPreview.value.file_name, csvContent)
+    showToast('保存成功', 'success')
+    fetchDataSources()
+    showDsPreview.value = false
+  } catch {
+    showToast('保存失败', 'error')
+  } finally {
+    dsSaving.value = false
+  }
+}
+
+>>>>>>> dev
 const toastMsg = ref('')
 const toastType = ref('info')
 const showConfirm = ref(false)
 const confirmMessage = ref('')
+<<<<<<< HEAD
 const pendingDeleteNodeId = ref('')
+=======
+// 通用确认删除状态（支持节点、数据源、CSV行/列、变量）
+const pendingDeleteAction = ref<'node' | 'datasource' | 'csv-row' | 'csv-column' | 'var'>('node')
+const pendingDeleteParam = ref<string | number>('')
+
+// CSV 添加列弹窗
+const showAddColumnModal = ref(false)
+const newColumnName = ref('')
+>>>>>>> dev
 
 const runConfig = reactive({
   workers: 10,
@@ -354,6 +1170,14 @@ const runConfig = reactive({
   duration: 60,
 })
 
+<<<<<<< HEAD
+=======
+const runModeOptions = [
+  { value: 'count', label: '按次数' },
+  { value: 'duration', label: '按时间' },
+]
+
+>>>>>>> dev
 const nodeForm = reactive({
   name: '',
   type: 'http',
@@ -361,10 +1185,26 @@ const nodeForm = reactive({
   url: '',
   headers: '',
   body: '',
+<<<<<<< HEAD
   delayMs: 1000,
   conditionExpr: '',
   extract: '',
   parentId: '',
+=======
+  delayMs: '1000',
+  conditionExpr: '',
+  extract: '',
+  parentId: '',
+  loop_count: '1',
+  generatorExpr: '',
+  generatorVar: '',
+  timerMode: 'delay',
+  timerSeconds: '1',
+  whileExitConditions: [{ variable: '', operator: 'equals', value: '' }],
+  whileIntervalSeconds: '1',
+  whileMaxIterations: '100',
+  whileMaxDurationMinutes: '0',
+>>>>>>> dev
 })
 
 const editingConfig = reactive({ name: '' })
@@ -373,12 +1213,21 @@ const httpConfig = reactive({
   url: '',
   headers: '',
   body: '',
+<<<<<<< HEAD
   timeout: 5000,
   expect_status: 200,
   extract: '',
   generator: '',
 })
 const delayConfig = reactive({ ms: 1000 })
+=======
+  timeout: '5000',
+  expect_status: '200',
+  extract: '',
+  generator: '',
+})
+const delayConfig = reactive({ ms: '1000' })
+>>>>>>> dev
 const conditionConfig = reactive({ expr: '' })
 const ifElseConfig = reactive({ expr: '', trueTarget: '', falseTarget: '' })
 
@@ -397,6 +1246,103 @@ const availableIfElseTargets = computed(() => {
   return nodes.value.filter(n => n.id !== selectedNode.value?.id)
 })
 
+<<<<<<< HEAD
+=======
+const availableGroupChildren = computed(() => {
+  if (!selectedNode.value) return []
+  return nodes.value.filter(n => n.id !== selectedNode.value?.id && n.type !== 'group')
+})
+
+const groupOrderedChildren = computed(() => {
+  const nodeMap = new Map(nodes.value.map(n => [n.id, n]))
+  return groupConfig.node_ids.map(id => nodeMap.get(id)).filter(Boolean)
+})
+
+function getNodeName(nodeId: string): string {
+  const node = nodes.value.find(n => n.id === nodeId)
+  return node ? `${node.name} (${nodeTypeLabel(node.type)})` : nodeId
+}
+
+function onGroupChildrenChange() { saveNodeConfig() }
+
+// 复合节点（group/while/loop）统一的已选子节点操作：直接操作传入的 node_ids 数组
+function moveChildUp(list: string[], idx: number) {
+  if (idx <= 0) return
+  ;[list[idx - 1], list[idx]] = [list[idx], list[idx - 1]]
+  saveNodeConfig()
+}
+
+function moveChildDown(list: string[], idx: number) {
+  if (idx >= list.length - 1) return
+  ;[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]]
+  saveNodeConfig()
+}
+
+function removeChild(list: string[], childId: string) {
+  const idx = list.indexOf(childId)
+  if (idx >= 0) list.splice(idx, 1)
+  saveNodeConfig()
+}
+
+// while/loop 子节点候选：排除自身与所有复合类型（与后端 YAML 导入嵌套校验一致，复合节点不可进循环体）
+const COMPOSITE_NODE_TYPES = new Set(['group', 'while', 'loop'])
+const availableCycleChildren = computed(() => {
+  if (!selectedNode.value) return []
+  return nodes.value.filter(n => n.id !== selectedNode.value?.id && !COMPOSITE_NODE_TYPES.has(n.type))
+})
+
+// 面板内"编辑子节点 → 返回"导航栈：只存节点 id，返回时按 id 现查，不持有节点对象引用
+const returnToStack = ref<string[]>([])
+
+function editChildNode(childId: string) {
+  const child = nodes.value.find(n => n.id === childId)
+  if (!child) return
+  if (selectedNode.value) returnToStack.value.push(selectedNode.value.id)
+  selectNode(child)
+}
+
+function goBackToParent() {
+  const parentId = returnToStack.value.pop()
+  if (!parentId) return
+  const parent = nodes.value.find(n => n.id === parentId)
+  if (parent) selectNode(parent)
+}
+
+function closeConfigPanel() {
+  selectedNode.value = null
+  returnToStack.value = []
+}
+
+// 画布直接选节点时清空面板内导航栈（返回栈仅由面板"编辑子节点"按钮建立）
+function onCanvasNodeSelect(node: NodeDTO | null) {
+  returnToStack.value = []
+  selectNode(node)
+}
+
+function addWhileCondition() {
+  whileConfig.exit_conditions.push({ variable: '', operator: 'equals', value: '' })
+  saveNodeConfig()
+}
+
+function removeWhileCondition(idx: number) {
+  whileConfig.exit_conditions.splice(idx, 1)
+  saveNodeConfig()
+}
+
+const availableScenes = computed(() => {
+  return scenes.value.filter(s => s.id !== route.params.id)
+})
+
+const scenes = ref<{ id: string; name: string }[]>([])
+
+async function fetchSceneList() {
+  try {
+    const resp = await listScenes({ limit: 100 })
+    if (resp.code === 0) scenes.value = (resp.data.items || []).map((s: any) => ({ id: s.id, name: s.name }))
+  } catch { /* ignore */ }
+}
+
+>>>>>>> dev
 async function saveIfElseBranches() {
   if (!selectedNode.value) return
   const sceneId = route.params.id as string
@@ -575,6 +1521,12 @@ function nodeIcon(type: string) {
     case 'condition': return '◇'
     case 'if-else': return '⑂'
     case 'loop': return '↻'
+<<<<<<< HEAD
+=======
+    case 'while': return '↺'
+    case 'parallel': return '∥'
+    case 'sub_flow': return '⊞'
+>>>>>>> dev
     case 'teardown': return '■'
     default: return '○'
   }
@@ -584,10 +1536,22 @@ function nodeTypeLabel(type: string) {
   switch (type) {
     case 'setup': return 'SETUP'
     case 'http': return 'HTTP'
+<<<<<<< HEAD
+=======
+    case 'generator': return 'GENERATOR'
+>>>>>>> dev
     case 'delay': return 'DELAY'
     case 'condition': return 'CONDITION'
     case 'if-else': return 'IF-ELSE'
     case 'loop': return 'LOOP'
+<<<<<<< HEAD
+=======
+    case 'while': return 'WHILE'
+    case 'parallel': return 'PARALLEL'
+    case 'sub_flow': return 'SUBFLOW'
+    case 'group': return 'GROUP'
+    case 'timer': return 'TIMER'
+>>>>>>> dev
     case 'teardown': return 'TEARDOWN'
     default: return type.toUpperCase()
   }
@@ -601,6 +1565,7 @@ function showToast(msg: string, type = 'info') {
 
 function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') {
   const input = event.target as HTMLInputElement
+<<<<<<< HEAD
   const value = input.value
   
   // Allow empty input - user may be typing
@@ -643,6 +1608,50 @@ function normalizeNumber(event: Event, field: 'workers' | 'count' | 'duration') 
     else if (field === 'count') runConfig.count = numValue
     else if (field === 'duration') runConfig.duration = numValue
   }
+=======
+  const cursorPos = input.selectionStart
+  const raw = input.value
+
+  // Strip non-digits
+  const cleaned = raw.replace(/[^0-9]/g, '')
+
+  // Only update if content actually changed (avoids cursor jump)
+  if (cleaned !== raw) {
+    input.value = cleaned
+    // Restore cursor position, clamped to new length
+    const newPos = Math.min(cursorPos, cleaned.length)
+    input.setSelectionRange(newPos, newPos)
+  }
+
+  // Update reactive value as string (no auto-correction during typing)
+  if (field === 'workers') runConfig.workers = cleaned
+  else if (field === 'count') runConfig.count = cleaned
+  else if (field === 'duration') runConfig.duration = cleaned
+}
+
+function validateRunConfig(): string | null {
+  const limits: Record<string, { min: number; max: number; label: string }> = {
+    workers: { min: 1, max: 1000, label: '并发数' },
+    count: { min: 1, max: 1000000, label: '总次数' },
+    duration: { min: 1, max: 86400, label: '持续时间' },
+  }
+
+  // Always validate workers
+  const w = parseInt(String(runConfig.workers), 10)
+  if (isNaN(w) || w < 1) return `${limits.workers.label}必须为大于0的整数`
+  if (w > limits.workers.max) return `${limits.workers.label}不能超过${limits.workers.max}`
+
+  if (runConfig.run_mode === 'count') {
+    const c = parseInt(String(runConfig.count), 10)
+    if (isNaN(c) || c < 1) return `${limits.count.label}必须为大于0的整数`
+    if (c > limits.count.max) return `${limits.count.label}不能超过${limits.count.max}`
+  } else {
+    const d = parseInt(String(runConfig.duration), 10)
+    if (isNaN(d) || d < 1) return `${limits.duration.label}必须为大于0的整数`
+    if (d > limits.duration.max) return `${limits.duration.label}不能超过${limits.duration.max}`
+  }
+  return null
+>>>>>>> dev
 }
 
 async function fetchScene() {
@@ -650,7 +1659,50 @@ async function fetchScene() {
   if (!id) return
   try {
     const resp = await getScene(id)
+<<<<<<< HEAD
     if (resp.code === 0) scene.value = resp.data
+=======
+    if (resp.code === 0) {
+      scene.value = resp.data
+      if (resp.data.variables) {
+        varEntries.value = parseVariables(resp.data.variables)
+      }
+      // If scene is running and we don't have a runId, fetch status to get it
+      if (resp.data.status === 'running' && !currentRunId.value) {
+        fetchRunId(id)
+      }
+      // If entered via mode=exec but scene is not running in DB, still try to get runId
+      // (scene may have just finished, we want to show final status)
+      if (route.query.mode === 'exec' && !currentRunId.value) {
+        fetchRunId(id)
+      }
+      // Clear runId if scene is no longer running and not in exec mode
+      if (resp.data.status !== 'running' && !route.query.mode && currentRunId.value) {
+        currentRunId.value = ''
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+async function fetchRunId(sceneId: string) {
+  try {
+    const resp = await sceneStatus(sceneId)
+    if (resp.code === 0 && resp.data?.run_id) {
+      currentRunId.value = resp.data.run_id
+      return
+    }
+  } catch { /* scene may not be running */ }
+
+  // Fallback: get most recent run from run history
+  try {
+    const resp = await listRuns({ scene_id: sceneId, limit: 1 })
+    if (resp.code === 0 && resp.data?.items?.length) {
+      const latestRun = resp.data.items[0]
+      if (latestRun.run_id) {
+        currentRunId.value = latestRun.run_id
+      }
+    }
+>>>>>>> dev
   } catch { /* ignore */ }
 }
 
@@ -690,13 +1742,33 @@ function addNode(type: string) {
   nodeForm.url = ''
   nodeForm.headers = ''
   nodeForm.body = ''
+<<<<<<< HEAD
   nodeForm.delayMs = 1000
+=======
+  nodeForm.delayMs = '1000'
+>>>>>>> dev
   nodeForm.conditionExpr = ''
   nodeForm.extract = ''
   nodeForm.parentId = ''
   showNodeEditor.value = true
 }
 
+<<<<<<< HEAD
+=======
+// 归一化 while 退出条件 operator：旧数据可能存符号形式（==、!= 等），统一转为后端命名形式
+const SYMBOLIC_OPERATOR_MAP: Record<string, string> = {
+  '==': 'equals',
+  '!=': 'not_equals',
+  '>': 'greater_than',
+  '<': 'less_than',
+  '>=': 'greater_than_or_equal',
+  '<=': 'less_than_or_equal',
+}
+function normalizeWhileOperator(op: string): string {
+  return SYMBOLIC_OPERATOR_MAP[op] || op || 'equals'
+}
+
+>>>>>>> dev
 function editNode(node: NodeDTO) {
   editingNode.value = node
   nodeForm.name = node.name
@@ -707,17 +1779,67 @@ function editNode(node: NodeDTO) {
     nodeForm.url = cfg.url || ''
     nodeForm.headers = cfg.headers ? JSON.stringify(cfg.headers, null, 2) : ''
     nodeForm.body = cfg.body || ''
+<<<<<<< HEAD
     nodeForm.delayMs = cfg.ms || 1000
     nodeForm.conditionExpr = cfg.expr || ''
     nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
+=======
+    nodeForm.delayMs = cfg.ms != null ? String(cfg.ms) : '1000'
+    nodeForm.conditionExpr = cfg.expr || ''
+    nodeForm.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
+    nodeForm.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
+
+    // Generator
+    nodeForm.generatorExpr = cfg.expression || ''
+    nodeForm.generatorVar = cfg.variable || ''
+
+    // Timer
+    nodeForm.timerMode = cfg.mode || 'delay'
+    nodeForm.timerSeconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+
+    // While - operator names match backend directly (equals, not_equals, etc.)
+    nodeForm.whileExitConditions = cfg.exit_conditions && cfg.exit_conditions.length > 0
+      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: normalizeWhileOperator(c.operator), value: c.value != null ? String(c.value) : '' }))
+      : [{ variable: '', operator: 'equals', value: '' }]
+    nodeForm.whileIntervalSeconds = cfg.interval_seconds != null ? String(cfg.interval_seconds) : '1'
+    nodeForm.whileMaxIterations = cfg.max_iterations != null ? String(cfg.max_iterations) : '100'
+    nodeForm.whileMaxDurationMinutes = cfg.max_duration_minutes != null ? String(cfg.max_duration_minutes) : '0'
+
+    if (node.type === 'group') {
+      groupConfig.node_ids = cfg.node_ids || []
+      groupConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
+    }
+    if (node.type === 'timer') {
+      timerConfig.mode = cfg.mode || 'delay'
+      timerConfig.seconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+    }
+    if (node.type === 'loop') {
+      loopConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '3'
+    }
+>>>>>>> dev
   } catch {
     nodeForm.httpMethod = 'GET'
     nodeForm.url = ''
     nodeForm.headers = ''
     nodeForm.body = ''
+<<<<<<< HEAD
     nodeForm.delayMs = 1000
     nodeForm.conditionExpr = ''
     nodeForm.extract = ''
+=======
+    nodeForm.delayMs = '1000'
+    nodeForm.conditionExpr = ''
+    nodeForm.extract = ''
+    nodeForm.loop_count = '1'
+    nodeForm.generatorExpr = ''
+    nodeForm.generatorVar = ''
+    nodeForm.timerMode = 'delay'
+    nodeForm.timerSeconds = '1'
+    nodeForm.whileExitConditions = [{ variable: '', operator: 'equals', value: '' }]
+    nodeForm.whileIntervalSeconds = '1'
+    nodeForm.whileMaxIterations = '100'
+    nodeForm.whileMaxDurationMinutes = '0'
+>>>>>>> dev
   }
   showNodeEditor.value = true
 }
@@ -769,6 +1891,44 @@ async function handleSaveNode() {
     config = JSON.stringify({ expr: nodeForm.conditionExpr })
   } else if (nodeForm.type === 'if-else') {
     config = JSON.stringify({ expr: nodeForm.conditionExpr })
+<<<<<<< HEAD
+=======
+  } else if (nodeForm.type === 'group') {
+    config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: nodeForm.loop_count, async: false })
+  } else if (nodeForm.type === 'timer') {
+    config = JSON.stringify({ mode: nodeForm.timerMode, seconds: nodeForm.timerSeconds })
+  } else if (nodeForm.type === 'generator') {
+    config = JSON.stringify({ expression: nodeForm.generatorExpr, variable: nodeForm.generatorVar })
+  } else if (nodeForm.type === 'while') {
+    const exitConditions = nodeForm.whileExitConditions
+      .filter(c => c.variable !== '')
+      .map(c => ({ variable: c.variable, operator: c.operator, value: c.value }))
+    // 浅合并原始 config：未在弹窗表单中的键（node_ids/steps/fail_on_max_* 等）全部保留
+    const base = editingNode.value ? parseRawConfig(editingNode.value.config) : {}
+    config = JSON.stringify({
+      ...base,
+      exit_conditions: exitConditions,
+      interval_seconds: nodeForm.whileIntervalSeconds,
+      max_iterations: nodeForm.whileMaxIterations,
+      max_duration_minutes: nodeForm.whileMaxDurationMinutes,
+    })
+  } else if (nodeForm.type === 'parallel') {
+    config = JSON.stringify(parallelConfig)
+  } else if (nodeForm.type === 'sub_flow') {
+    config = JSON.stringify(subFlowConfig)
+  } else if (nodeForm.type === 'loop') {
+    const base = editingNode.value ? parseRawConfig(editingNode.value.config) : {}
+    config = JSON.stringify({ ...base, loop_count: nodeForm.loop_count })
+  }
+
+  // Add loop_count for types that support it (except group/timer/while/loop which handle it themselves)
+  if (config !== '{}' && nodeForm.type !== 'group' && nodeForm.type !== 'timer' && nodeForm.type !== 'while' && nodeForm.type !== 'loop' && parseInt(nodeForm.loop_count) > 1) {
+    try {
+      const cfg = JSON.parse(config)
+      cfg.loop_count = parseInt(nodeForm.loop_count)
+      config = JSON.stringify(cfg)
+    } catch { /* ignore */ }
+>>>>>>> dev
   }
 
   if (editingNode.value) {
@@ -820,11 +1980,17 @@ async function handleSaveNode() {
 }
 
 async function handleDeleteNode(id: string) {
+<<<<<<< HEAD
   pendingDeleteNodeId.value = id
+=======
+  pendingDeleteAction.value = 'node'
+  pendingDeleteParam.value = id
+>>>>>>> dev
   confirmMessage.value = '确定要删除该节点吗？'
   showConfirm.value = true
 }
 
+<<<<<<< HEAD
 async function confirmDeleteNode() {
   const id = pendingDeleteNodeId.value
   showConfirm.value = false
@@ -844,6 +2010,55 @@ async function confirmDeleteNode() {
   } else {
     showToast(resp.message || '删除失败', 'error')
   }
+=======
+async function confirmDeleteAction() {
+  const action = pendingDeleteAction.value
+  const param = pendingDeleteParam.value
+  showConfirm.value = false
+
+  if (action === 'node') {
+    const id = param as string
+    const relatedEdges = edges.value.filter(e => e.from_node === id || e.to_node === id)
+    for (const edge of relatedEdges) {
+      await deleteEdge(edge.id)
+    }
+    const resp = await apiDeleteNode(id)
+    if (resp.code === 0) {
+      showToast('节点已删除（关联连线已自动清理）')
+      if (selectedNode.value?.id === id) selectedNode.value = null
+      fetchNodes()
+      fetchEdges()
+    } else {
+      showToast(resp.message || '删除失败', 'error')
+    }
+  } else if (action === 'datasource') {
+    const dsId = param as string
+    try {
+      await deleteDataSource(dsId)
+      showToast('数据源已删除', 'success')
+      fetchDataSources()
+    } catch {
+      showToast('删除失败', 'error')
+    }
+  } else if (action === 'csv-row') {
+    const ri = param as number
+    dsEditRows.value.splice(ri, 1)
+  } else if (action === 'csv-column') {
+    const ci = param as number
+    const colName = dsEditColumns.value[ci]
+    dsEditColumns.value.splice(ci, 1)
+    for (const row of dsEditRows.value) {
+      delete row[colName]
+    }
+  } else if (action === 'var') {
+    const idx = param as number
+    varEntries.value.splice(idx, 1)
+    saveVariables()
+  }
+
+  pendingDeleteAction.value = 'node'
+  pendingDeleteParam.value = ''
+>>>>>>> dev
 }
 
 async function deleteEdgeBetween(idx: number) {
@@ -871,6 +2086,7 @@ function selectNode(node: NodeDTO | null) {
     httpConfig.url = cfg.url || ''
     httpConfig.headers = cfg.headers ? JSON.stringify(cfg.headers, null, 2) : ''
     httpConfig.body = cfg.body || ''
+<<<<<<< HEAD
     httpConfig.timeout = cfg.timeout || 5000
     httpConfig.expect_status = cfg.expect_status || 200
     httpConfig.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
@@ -878,6 +2094,47 @@ function selectNode(node: NodeDTO | null) {
     delayConfig.ms = cfg.ms || 1000
     conditionConfig.expr = cfg.expr || ''
     ifElseConfig.expr = cfg.expr || ''
+=======
+    httpConfig.timeout = cfg.timeout != null ? String(cfg.timeout) : '5000'
+    httpConfig.expect_status = cfg.expect_status != null ? String(cfg.expect_status) : '200'
+    httpConfig.extract = cfg.extract ? JSON.stringify(cfg.extract, null, 2) : ''
+    httpConfig.generator = cfg.generator ? JSON.stringify(cfg.generator, null, 2) : ''
+    delayConfig.ms = cfg.ms != null ? String(cfg.ms) : '1000'
+    conditionConfig.expr = cfg.expr || ''
+    ifElseConfig.expr = cfg.expr || ''
+
+    groupConfig.node_ids = cfg.node_ids || []
+    groupConfig.loop_count = cfg.loop_count != null ? String(cfg.loop_count) : '1'
+    groupConfig.async = cfg.async || false
+    timerConfig.mode = cfg.mode || 'delay'
+    timerConfig.seconds = cfg.seconds != null ? String(cfg.seconds) : '1'
+
+    generatorConfig.expression = cfg.expression || ''
+    generatorConfig.variable = cfg.variable || ''
+    
+    // Parse configs for new node types
+    whileConfig.exit_conditions = (cfg.exit_conditions && cfg.exit_conditions.length > 0)
+      ? cfg.exit_conditions.map((c: any) => ({ variable: c.variable || '', operator: normalizeWhileOperator(c.operator), value: c.value != null ? String(c.value) : '' }))
+      : [{ variable: '', operator: 'equals', value: '' }]
+    whileConfig.interval_seconds = cfg.interval_seconds || 1
+    whileConfig.max_iterations = cfg.max_iterations || 100
+    whileConfig.max_duration_minutes = cfg.max_duration_minutes || 0
+    whileConfig.fail_after_consecutive = cfg.fail_after_consecutive || 0
+    whileConfig.fail_message = cfg.fail_message || ''
+    whileConfig.node_ids = Array.isArray(cfg.node_ids) ? cfg.node_ids : []
+    whileConfig.steps = Array.isArray(cfg.steps) ? cfg.steps : []
+    whileConfig.fail_on_max_iterations = cfg.fail_on_max_iterations != null ? !!cfg.fail_on_max_iterations : true
+    whileConfig.fail_on_max_duration = cfg.fail_on_max_duration != null ? !!cfg.fail_on_max_duration : true
+    
+    parallelConfig.async = cfg.async ?? false
+    
+    subFlowConfig.scene_id = cfg.scene_id || ''
+    subFlowConfig.async = cfg.async ?? false
+    
+    loopConfig.loop_count = cfg.loop_count || 3
+    loopConfig.node_ids = Array.isArray(cfg.node_ids) ? cfg.node_ids : []
+    loopConfig.steps = Array.isArray(cfg.steps) ? cfg.steps : []
+>>>>>>> dev
     
     if (node.type === 'if-else') {
       const nodeEdges = edges.value.filter(e => e.from_node === node.id)
@@ -923,6 +2180,18 @@ async function saveNodePosition(id: string, x: number, y: number) {
   await apiUpdateNode({ id, position: JSON.stringify({ x: Math.round(x), y: Math.round(y) }) })
 }
 
+<<<<<<< HEAD
+=======
+// 解析节点 config JSON 为对象；解析失败或非对象时返回空对象（供浅合并保留未知键）
+function parseRawConfig(raw: string | null | undefined): Record<string, any> {
+  try {
+    const obj = JSON.parse(raw || '{}')
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj
+  } catch { /* ignore */ }
+  return {}
+}
+
+>>>>>>> dev
 async function saveNodeConfig() {
   if (!selectedNode.value) return
 
@@ -959,6 +2228,38 @@ async function saveNodeConfig() {
     config = JSON.stringify({ expr: conditionConfig.expr })
   } else if (nodeType === 'if-else') {
     config = JSON.stringify({ expr: ifElseConfig.expr })
+<<<<<<< HEAD
+=======
+  } else if (nodeType === 'group') {
+    config = JSON.stringify({ node_ids: groupConfig.node_ids, loop_count: groupConfig.loop_count, async: groupConfig.async })
+  } else if (nodeType === 'timer') {
+    config = JSON.stringify(timerConfig)
+  } else if (nodeType === 'while') {
+    // 基于原始 config 浅合并：表单未覆盖的键（内嵌 steps、fail_on_max_* 等未知键）全部保留，杜绝保存丢字段
+    const base = parseRawConfig(selectedNode.value.config)
+    config = JSON.stringify({
+      ...base,
+      exit_conditions: whileConfig.exit_conditions.filter(c => c.variable !== '').map(c => ({ variable: c.variable, operator: c.operator, value: c.value })),
+      interval_seconds: whileConfig.interval_seconds,
+      max_iterations: whileConfig.max_iterations,
+      max_duration_minutes: whileConfig.max_duration_minutes,
+      fail_after_consecutive: whileConfig.fail_after_consecutive,
+      fail_message: whileConfig.fail_message,
+      fail_on_max_iterations: whileConfig.fail_on_max_iterations,
+      fail_on_max_duration: whileConfig.fail_on_max_duration,
+      node_ids: [...whileConfig.node_ids],
+    })
+  } else if (nodeType === 'parallel') {
+    config = JSON.stringify(parallelConfig)
+  } else if (nodeType === 'sub_flow') {
+    config = JSON.stringify(subFlowConfig)
+  } else if (nodeType === 'loop') {
+    // 同 while：浅合并原始 config，保留 steps 及未知键
+    const base = parseRawConfig(selectedNode.value.config)
+    config = JSON.stringify({ ...base, loop_count: loopConfig.loop_count, node_ids: [...loopConfig.node_ids] })
+  } else if (nodeType === 'generator') {
+    config = JSON.stringify({ expression: generatorConfig.expression, variable: generatorConfig.variable })
+>>>>>>> dev
   }
 
   try {
@@ -969,7 +2270,17 @@ async function saveNodeConfig() {
     })
     if (resp.code === 0) {
       showToast('配置已保存')
+<<<<<<< HEAD
       fetchNodes()
+=======
+      await fetchNodes()
+      // 按 id 重同步面板节点，避免 selectedNode 持有保存前的陈旧 config（浅合并基准会读到旧值）
+      const currentId = selectedNode.value?.id
+      if (currentId) {
+        const fresh = nodes.value.find(n => n.id === currentId)
+        if (fresh) selectedNode.value = fresh
+      }
+>>>>>>> dev
     } else {
       showToast(resp.message || '保存失败', 'error')
     }
@@ -983,16 +2294,40 @@ async function handleStart() {
     showToast('请先添加 DAG 节点', 'error')
     return
   }
+<<<<<<< HEAD
+=======
+  // Validate numeric inputs
+  const validationError = validateRunConfig()
+  if (validationError) {
+    showToast(validationError, 'error')
+    return
+  }
+>>>>>>> dev
   const sceneId = route.params.id as string
   try {
     const resp = await startScene({
       scene_id: sceneId,
+<<<<<<< HEAD
       workers: runConfig.workers,
       run_mode: runConfig.run_mode,
       count: runConfig.count,
       duration: runConfig.duration,
     })
     if (resp.code === 0) {
+=======
+      workers: parseInt(String(runConfig.workers), 10),
+      run_mode: runConfig.run_mode,
+      count: parseInt(String(runConfig.count), 10),
+      duration: parseInt(String(runConfig.duration), 10),
+    })
+    if (resp.code === 0) {
+      // Store run_id for execution status tracking
+      if (resp.data?.run_id) {
+        currentRunId.value = resp.data.run_id
+      }
+      // Refresh scene to get updated status
+      fetchScene()
+>>>>>>> dev
       showToast('测试已启动')
       showRunConfig.value = false
       router.push('/runner')
@@ -1010,6 +2345,7 @@ async function handleCopyScene() {
     return
   }
   try {
+<<<<<<< HEAD
     const resp = await createScene({
       name: copyName.value,
       description: scene.value?.description ? `复制自: ${scene.value.name}` : '',
@@ -1018,11 +2354,22 @@ async function handleCopyScene() {
       showToast('场景已复制')
       showCopyModal.value = false
       router.push(`/scenes/${resp.data.id}`)
+=======
+    const resp = await copyScene(route.params.id as string, copyName.value)
+    if (resp.code === 0) {
+      showToast('场景已复制')
+      showCopyModal.value = false
+      router.push('/scenes')
+>>>>>>> dev
     } else {
       showToast(resp.message || '复制失败', 'error')
     }
   } catch (e: any) {
+<<<<<<< HEAD
     showToast('复制失败', 'error')
+=======
+    showToast(e?.message || '复制失败', 'error')
+>>>>>>> dev
   }
 }
 
@@ -1081,10 +2428,16 @@ onMounted(() => {
   fetchNodes()
   fetchEdges()
   fetchGenerators()
+<<<<<<< HEAD
+=======
+  fetchDataSources()
+  fetchSceneList()
+>>>>>>> dev
 })
 </script>
 
 <style scoped>
+<<<<<<< HEAD
 .scene-detail { display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 100px); max-height: calc(100vh - 100px); overflow: hidden; }
 
 .page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
@@ -1298,10 +2651,572 @@ onMounted(() => {
 .toast.error { background: var(--accent-danger, #e74c3c); color: #fff; }
 @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+=======
+/* ===================================================================
+   SceneDetailPage — 完整 UI 重设计
+   设计理念：年轻、扁平、清爽、信息层级清晰
+   基于 Salvo CSS 变量系统，兼容深色/浅色主题
+   =================================================================== */
+
+/* ---- 布局结构 ---- */
+.scene-detail {
+  display: flex; flex-direction: column;
+  height: calc(100vh - var(--header-height, 52px)); overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* ---- 工具栏 ---- */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0; gap: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.toolbar-left {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+.toolbar-left h2 {
+  font-size: 16px; font-weight: 700; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text-primary); letter-spacing: -0.3px;
+}
+.toolbar-right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+
+/* ---- 通用按钮系统 ---- */
+
+/* 基础按钮 mixin — 通过 class 组合使用 */
+.btn-base {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+/* 返回按钮 */
+.btn-back {
+  padding: 6px 12px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-back:hover {
+  color: var(--text-primary); border-color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
+
+/* 次要按钮 */
+.btn-secondary {
+  padding: 7px 16px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* 描边按钮（青色边框） */
+.btn-outline {
+  padding: 5px 12px; border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--accent-primary); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-outline:hover { background: rgba(0,229,255,0.08); }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 小型按钮 */
+.btn-sm {
+  padding: 5px 10px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-secondary); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+}
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.04); }
+
+/* 工具栏按钮变体 */
+.toolbar-btn { display: inline-flex; align-items: center; gap: 5px; }
+.toolbar-btn.active {
+  border-color: var(--accent-primary); color: var(--accent-primary);
+  background: rgba(0,229,255,0.1);
+}
+
+/* 关闭按钮 */
+.btn-close {
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 18px; cursor: pointer; padding: 4px 8px; line-height: 1;
+  border-radius: var(--radius-sm); transition: all 0.2s ease;
+}
+.btn-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* 面板头部：左侧（返回按钮 + 标题）。注意：独立类名，避免与顶栏 .btn-back（← 返回）冲突 */
+.panel-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.btn-panel-back {
+  border: 1px solid var(--border-primary); background: transparent; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; cursor: pointer; flex-shrink: 0;
+  border-radius: var(--radius-sm); transition: all 0.2s ease;
+}
+.btn-panel-back:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0,229,255,0.06); }
+
+/* 无样式图标按钮（用于操作列表中的小按钮） */
+.btn-icon {
+  border: none; background: transparent; cursor: pointer;
+  padding: 4px; border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+/* ---- 状态标签 ---- */
+.status-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 100px; white-space: nowrap;
+  letter-spacing: 0.2px; border: 1px solid transparent;
+}
+.status-badge.draft { background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border-primary); }
+.status-badge.ready { background: rgba(74,222,128,0.1); color: var(--accent-success); border-color: rgba(74,222,128,0.2); }
+.status-badge.running { background: rgba(0,229,255,0.08); color: var(--accent-primary); border-color: rgba(0,229,255,0.15); }
+.status-badge.completed { background: rgba(74,222,128,0.1); color: var(--accent-success); border-color: rgba(74,222,128,0.2); }
+
+/* ---- 主工作区 ---- */
+.main-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ---- DAG 区块 ---- */
+.dag-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); overflow: hidden;
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  margin: 12px;
+}
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0; background: var(--bg-secondary);
+}
+.section-header h3 {
+  font-size: 13px; font-weight: 700; margin: 0;
+  color: var(--text-primary); letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.dag-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dag-canvas { padding: 0; min-height: 200px; flex: 1; position: relative; overflow: auto; }
+.dag-empty {
+  text-align: center; padding: 80px 20px; color: var(--text-tertiary);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty-icon { font-size: 48px; opacity: 0.15; }
+.dag-empty p { font-size: 14px; margin: 0; }
+
+/* ---- 节点配置侧边栏 ---- */
+.config-sidebar {
+  width: 400px; max-width: 45%; min-width: 340px;
+  flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-primary);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+}
+.node-config-panel { padding: 20px; min-width: 0; }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-primary);
+}
+.panel-header h4 {
+  font-size: 14px; font-weight: 700; margin: 0;
+  color: var(--text-primary);
+}
+
+/* ---- 配置表单 ---- */
+.config-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: flex; flex-direction: column; gap: 5px; }
+.form-row.inline { flex-direction: row; align-items: center; gap: 10px; }
+.form-row.inline label { width: 110px; flex-shrink: 0; font-size: 12px; }
+.form-row label {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 8px 12px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: var(--bg-input);
+  color: var(--text-primary); font-size: 13px; outline: none;
+  font-family: inherit; word-break: break-all;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.form-row textarea {
+  resize: vertical; min-height: 64px;
+  font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.5;
+}
+.panel-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-primary); }
+.btn-save-panel { width: 100%; padding: 10px; font-size: 13px; }
+
+/* ---- 删除按钮 & 添加按钮（while条件等复用） ---- */
+.btn-del-var {
+  background: none; border: 1px solid transparent; color: var(--text-tertiary); cursor: pointer;
+  font-size: 12px; padding: 3px 8px; border-radius: var(--radius-md);
+  transition: all 0.2s ease; line-height: 1.4; flex-shrink: 0;
+}
+.btn-del-var:hover {
+  color: #fff; background: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+
+.drawer-add-btn {
+  margin-top: 6px; border-style: dashed !important;
+  width: 100%; justify-content: center;
+  color: var(--accent-primary) !important; border-color: var(--accent-primary) !important;
+}
+.drawer-add-btn:hover {
+  background: rgba(0,229,255,0.06) !important;
+}
+
+/* ---- 全屏 CSV 编辑器 ---- */
+.csv-editor-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.csv-editor {
+  width: 94vw; height: 90vh; max-width: 1500px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  display: flex; flex-direction: column;
+  /* 多层阴影营造立体浮起效果（参考 SettingsPage .card） */
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.04),
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 24px 64px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.csv-editor-header {
+  padding: 10px 20px; border-bottom: 1px solid var(--border-secondary);
+  flex-shrink: 0; background: var(--bg-secondary);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.csv-editor-header h3 { font-size: 14px; font-weight: 700; margin: 0; color: var(--text-primary); }
+
+/* CSV 分页 */
+.csv-pagination { display: flex; align-items: center; gap: 6px; }
+.page-info {
+  font-size: 12px; color: var(--text-secondary);
+  min-width: 50px; text-align: center; font-weight: 600;
+}
+.page-size-select {
+  padding: 4px 8px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: var(--bg-input);
+  color: var(--text-primary); font-size: 12px; outline: none; cursor: pointer;
+}
+.page-size-select:focus { border-color: var(--accent-primary); }
+
+/* CSV 表格体 — 背景块内边距，表格与背景块有间距 */
+.csv-editor-body {
+  flex: 1; overflow: auto;
+  padding: 12px 16px;
+  display: flex; flex-direction: column;
+}
+
+/* CSV 底部浮动工具栏 */
+.csv-footer-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+.csv-meta { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
+
+/* CSV 表格内层卡片 — 数据表与背景块的视觉分层 */
+.csv-table-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 0;
+  overflow-x: auto;
+}
+
+.csv-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 13px; table-layout: fixed;
+}
+.csv-table th {
+  text-align: left; padding: 10px 12px; background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--accent-primary);
+  font-weight: 600; font-size: 12px; color: var(--text-primary);
+  position: sticky; top: 0; z-index: 2;
+  white-space: nowrap; vertical-align: middle;
+}
+.csv-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border-primary);
+  color: var(--text-primary); vertical-align: middle;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.csv-table tbody tr { transition: background 0.12s ease; }
+.csv-table tbody tr:hover { background: var(--bg-hover); }
+.csv-table tbody tr:nth-child(even) { background: rgba(128,128,128,0.02); }
+.csv-table tbody tr:nth-child(even):hover { background: var(--bg-hover); }
+
+.col-num {
+  width: 44px; text-align: center; color: var(--text-tertiary);
+  font-size: 11px; user-select: none;
+}
+.col-action { width: 36px; text-align: center; }
+.col-editable { position: relative; }
+
+/* 列名输入 */
+.col-name-input {
+  background: transparent; border: none; color: var(--text-primary);
+  font-weight: 600; font-size: 12px; width: calc(100% - 20px);
+  padding: 2px 4px; outline: none; border-radius: 2px;
+}
+.col-name-input:focus { background: rgba(0,229,255,0.06); }
+.col-del-btn {
+  font-size: 10px; padding: 2px 5px; opacity: 0.3;
+  cursor: pointer; transition: all 0.15s ease;
+  vertical-align: middle; border: 1px solid transparent; background: none; color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+}
+.col-del-btn:hover { opacity: 1; color: #fff; background: var(--accent-danger); border-color: var(--accent-danger); }
+
+/* 单元格输入 */
+.cell-input {
+  background: transparent; border: none; color: var(--text-primary);
+  font-size: 13px; width: 100%; padding: 4px 6px; outline: none;
+  border-radius: var(--radius-sm); transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.cell-input:focus {
+  background: rgba(0,229,255,0.06);
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.12);
+}
+.row-del-btn {
+  font-size: 11px; padding: 2px 6px; opacity: 0.3;
+  transition: all 0.15s ease; color: var(--text-tertiary);
+  border: 1px solid transparent; background: none; border-radius: var(--radius-sm); cursor: pointer;
+}
+.row-del-btn:hover { opacity: 1; color: #fff; background: var(--accent-danger); border-color: var(--accent-danger); }
+
+/* ---- DAG 流程图元素 ---- */
+.dag-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.dag-branch-container { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 20px 0; }
+.dag-level { display: flex; justify-content: center; gap: 28px; width: 100%; position: relative; margin-bottom: 12px; }
+.dag-level-item { display: flex; flex-direction: column; align-items: center; position: relative; }
+
+.branch-item .dag-nodes-in-level::before {
+  content: ''; position: absolute; top: -24px; left: 50%;
+  width: 2px; height: 20px; background: var(--border-primary);
+}
+.branch-label { margin-bottom: 6px; }
+.label-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+  padding: 3px 12px; border-radius: 100px; text-transform: uppercase;
+}
+.true-label { background: rgba(74,222,128,0.12); color: var(--accent-success); border: 1px solid rgba(74,222,128,0.2); }
+.false-label { background: rgba(239,68,68,0.1); color: var(--accent-danger); border: 1px solid rgba(239,68,68,0.2); }
+.dag-nodes-in-level { display: flex; gap: 14px; }
+
+/* 分支线 */
+.branch-split-lines { display: flex; gap: 48px; margin-top: 6px; position: relative; }
+.split-line-wrapper { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.split-line { display: flex; flex-direction: column; align-items: center; position: relative; }
+.split-condition {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+  padding: 2px 8px; border-radius: 100px; margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.true-line .split-condition { background: rgba(74,222,128,0.1); color: var(--accent-success); }
+.false-line .split-condition { background: rgba(239,68,68,0.08); color: var(--accent-danger); }
+.split-svg { width: 40px; height: 50px; overflow: visible; }
+.true-line .split-svg path { stroke: var(--accent-success); stroke-dasharray: none; opacity: 0.6; }
+.false-line .split-svg path { stroke: var(--accent-danger); stroke-dasharray: none; opacity: 0.6; }
+
+/* DAG 节点卡片 */
+.dag-node {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); background: var(--bg-card);
+  cursor: pointer; min-width: 300px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+[data-theme='dark'] .dag-node {
+  background: #1c2333;
+  border-color: #3a4556;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.dag-node:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 12px rgba(0,229,255,0.08);
+  transform: translateY(-1px);
+}
+.dag-node.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.12), 0 2px 12px rgba(0,229,255,0.06);
+}
+.dag-node.setup { border-left: 3px solid var(--accent-success); }
+.dag-node.http { border-left: 3px solid var(--accent-primary); }
+.dag-node.delay { border-left: 3px solid var(--accent-warning); }
+.dag-node.condition { border-left: 3px solid #a78bfa; }
+.dag-node.if-else { border-left: 3px solid #fb923c; }
+.dag-node.teardown { border-left: 3px solid var(--accent-danger); }
+.dag-node.group { border-left: 3px solid #f472b6; }
+.dag-node.timer { border-left: 3px solid #38bdf8; }
+
+/* 节点图标 */
+.node-icon {
+  font-size: 14px; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); flex-shrink: 0;
+}
+.node-icon.setup { background: rgba(74,222,128,0.1); color: var(--accent-success); }
+.node-icon.http { background: rgba(0,229,255,0.08); color: var(--accent-primary); }
+.node-icon.delay { background: rgba(234,179,8,0.1); color: var(--accent-warning); }
+.node-icon.condition { background: rgba(167,139,250,0.1); color: #a78bfa; }
+.node-icon.if-else { background: rgba(251,146,60,0.1); color: #fb923c; }
+.node-icon.teardown { background: rgba(239,68,68,0.08); color: var(--accent-danger); }
+.node-icon.group { background: rgba(244,114,182,0.1); color: #f472b6; }
+.node-icon.timer { background: rgba(56,189,248,0.1); color: #38bdf8; }
+
+.node-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.node-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.node-type-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: 100px; background: var(--bg-tertiary);
+  color: var(--text-tertiary); letter-spacing: 0.3px;
+}
+.node-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
+.dag-node:hover .node-actions { opacity: 1; }
+.node-btn {
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 12px; cursor: pointer; padding: 4px 8px;
+  border-radius: var(--radius-sm); transition: all 0.15s ease;
+}
+.node-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.node-btn.danger:hover { color: var(--accent-danger); background: rgba(239,68,68,0.08); }
+
+/* DAG 边（连线） */
+.dag-edge {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; padding: 6px 0;
+}
+.edge-line { width: 2px; height: 14px; background: var(--border-primary); border-radius: 1px; }
+[data-theme='dark'] .edge-line { background: #4a5568; }
+.edge-condition {
+  font-size: 10px; font-weight: 600; padding: 2px 10px;
+  border-radius: 100px; background: rgba(167,139,250,0.1);
+  color: #a78bfa; margin: 4px 0; letter-spacing: 0.3px;
+}
+.edge-arrow { color: var(--text-tertiary); font-size: 10px; line-height: 1; }
+[data-theme='dark'] .edge-arrow { color: #718096; }
+.edge-delete {
+  position: absolute; right: -24px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 10px; cursor: pointer; opacity: 0;
+  transition: opacity 0.15s ease; padding: 4px; border-radius: var(--radius-sm);
+}
+.dag-edge:hover .edge-delete { opacity: 1; }
+.edge-delete:hover { color: var(--accent-danger); background: rgba(239,68,68,0.08); }
+
+/* 深色模式 DAG 连线增强 */
+[data-theme='dark'] .branch-item .dag-nodes-in-level::before {
+  background: #4a5568;
+}
+[data-theme='dark'] .split-svg path {
+  opacity: 0.85;
+}
+
+/* ---- 运行警告 / 弹窗 / Toast / 确认框 ---- */
+.run-warning {
+  background: rgba(234,179,8,0.08);
+  border: 1px solid rgba(234,179,8,0.2);
+  border-radius: var(--radius-md); padding: 12px 16px;
+  font-size: 13px; color: var(--accent-warning); margin-bottom: 12px;
+}
+
+/* 模态框 */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; animation: fadeIn 0.2s ease;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg); padding: 28px;
+  width: 480px; max-width: 90vw; max-height: 80vh;
+  overflow-y: auto; box-shadow: var(--shadow-lg);
+  animation: modalScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal h3 { font-size: 17px; font-weight: 700; margin: 0 0 20px; color: var(--text-primary); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 0 12px; height: 38px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-input); color: var(--text-primary);
+  font-size: 13px; outline: none; font-family: inherit;
+  box-sizing: border-box; transition: all 0.2s ease;
+}
+.form-group textarea {
+  height: auto; min-height: 64px; padding: 10px 12px;
+  resize: vertical; font-family: var(--font-mono); font-size: 12px;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.field-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; display: block; line-height: 1.4; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+/* ---- Toast 通知 ---- */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  padding: 12px 24px; border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 600; z-index: 200;
+  animation: toastSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #fff; box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 8px;
+}
+.toast.info { background: var(--accent-primary); }
+.toast.error { background: var(--accent-danger); }
+.toast.success { background: var(--accent-success); }
+@keyframes toastSlideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- 确认对话框 ---- */
+>>>>>>> dev
 .confirm-dialog {
   background: var(--bg-card);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
+<<<<<<< HEAD
   padding: 28px;
   width: 380px;
   text-align: center;
@@ -1345,5 +3260,106 @@ onMounted(() => {
   .config-sidebar { width: 100%; max-width: none; min-width: 0; }
   .dag-section { min-width: 0; }
   .scene-detail { height: auto; max-height: none; overflow: visible; }
+=======
+  padding: 32px;
+  width: 380px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: modalScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.confirm-icon {
+  width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(239,68,68,0.1); color: var(--accent-danger);
+}
+.confirm-icon svg { width: 26px; height: 26px; }
+.confirm-title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px; }
+.confirm-msg { font-size: 13px; color: var(--text-secondary); margin: 0 0 28px; line-height: 1.6; }
+.confirm-actions { display: flex; justify-content: center; gap: 12px; }
+
+.btn-cancel {
+  padding: 9px 24px; border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); background: transparent;
+  color: var(--text-primary); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-cancel:hover { background: var(--bg-hover); }
+
+.btn-danger-confirm {
+  padding: 9px 24px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-danger); color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-danger-confirm:hover { opacity: 0.88; box-shadow: 0 2px 8px rgba(239,68,68,0.25); }
+
+/* ---- 生成器选择器 ---- */
+.generator-selector { display: flex; flex-direction: column; gap: 8px; }
+.generator-dropdown-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gen-category-select, .gen-name-select {
+  flex: 1 1 120px; min-width: 0; padding: 7px 10px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  background: var(--bg-input); color: var(--text-primary);
+  font-size: 13px; outline: none; box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+.gen-category-select:focus, .gen-name-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+}
+.hint-label { font-size: 11px; color: var(--text-tertiary); line-height: 1.5; }
+
+/* ---- 子节点选择器（Group） ---- */
+.group-child-config { display: flex; flex-direction: column; gap: 8px; }
+.group-available-nodes {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 4px;
+  max-height: 140px; overflow-y: auto; padding: 4px 0;
+}
+.child-node-selector { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.child-node-check {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0;
+}
+.child-node-check input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent-primary); }
+
+.group-ordered-list {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-md);
+  padding: 8px; background: var(--bg-secondary);
+}
+.ordered-child-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border-radius: var(--radius-md); background: var(--bg-card);
+  transition: all 0.15s ease; border: 1px solid transparent;
+}
+.ordered-child-row:hover { background: var(--bg-hover); border-color: var(--border-primary); }
+.order-index {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  background: var(--accent-primary); border-radius: 50%; flex-shrink: 0;
+}
+.order-arrow { color: var(--accent-primary); font-size: 14px; font-weight: bold; flex-shrink: 0; margin-left: -2px; }
+.order-name { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.2s ease; }
+.ordered-child-row:hover .order-actions { opacity: 1; }
+.order-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-primary); border-radius: var(--radius-sm);
+  background: var(--bg-card); cursor: pointer; font-size: 12px;
+  color: var(--text-secondary); transition: all 0.15s ease; padding: 0; line-height: 1;
+}
+.order-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,229,255,0.06); }
+.order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.order-btn.remove-btn:hover { border-color: var(--accent-danger); color: var(--accent-danger); background: rgba(239,68,68,0.06); }
+
+/* ---- 响应式 ---- */
+@media (max-width: 900px) {
+  .main-workspace { flex-direction: column; overflow-y: auto; }
+  .config-sidebar { width: 100%; max-width: none; min-width: 0; border-left: none; border-top: 1px solid var(--border-primary); }
+  .dag-section { min-width: 0; margin: 8px; }
+  .scene-detail { height: auto; max-height: none; overflow: visible; }
+  .toolbar { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+  .toolbar-right { flex-wrap: wrap; }
+  .dag-actions { overflow-x: auto; flex-wrap: nowrap; }
+  .csv-editor { width: 98vw; height: 95vh; }
+>>>>>>> dev
 }
 </style>

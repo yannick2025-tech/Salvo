@@ -81,12 +81,29 @@ func init() {
 }
 
 type MockServer struct {
+<<<<<<< HEAD
 	server *http.Server
 	port   int
 }
 
 func NewMockServer(port int) *MockServer {
 	return &MockServer{port: port}
+=======
+	server       *http.Server
+	port         int
+	errorRate    float64
+	latencyMinMs int
+	latencyMaxMs int
+}
+
+func NewMockServer(port int, errorRate float64, latencyMinMs, latencyMaxMs int) *MockServer {
+	return &MockServer{
+		port:         port,
+		errorRate:    errorRate,
+		latencyMinMs: latencyMinMs,
+		latencyMaxMs: latencyMaxMs,
+	}
+>>>>>>> dev
 }
 
 func (m *MockServer) Start() error {
@@ -101,11 +118,22 @@ func (m *MockServer) Start() error {
 	logHandler("/mock/api/users", m.handleUsers)
 	logHandler("/mock/api/users/", m.handleUserDetail)
 	logHandler("/mock/api/products", m.handleProducts)
+<<<<<<< HEAD
 	logHandler("/mock/api/products/", m.handleProductDetail)
 	logHandler("/mock/api/orders", m.handleOrders)
 	logHandler("/mock/api/orders/", m.handleOrderDetail)
 	logHandler("/mock/api/auth/login", m.handleAuthLogin)
 	logHandler("/mock/api/payment", m.handlePayment)
+=======
+	logHandler("/mock/api/products/search", m.handleProductSearch)
+	logHandler("/mock/api/products/", m.handleProductDetail)
+	logHandler("/mock/api/orders", m.handleOrders)
+	logHandler("/mock/api/orders/", m.handleOrderDetail)
+	logHandler("/mock/api/inventory/", m.handleInventory)
+	logHandler("/mock/api/auth/login", m.handleAuthLogin)
+	logHandler("/mock/api/payment", m.handlePayment)
+	logHandler("/mock/api/payment/error", m.handlePaymentBizError)
+>>>>>>> dev
 	logHandler("/mock/api/notify", m.handleNotify)
 	logHandler("/mock/health", m.handleHealth)
 
@@ -200,6 +228,37 @@ func (m *MockServer) handleProducts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func (m *MockServer) handleProductSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+		return
+	}
+	q := r.URL.Query().Get("q")
+	category := r.URL.Query().Get("category")
+	products := []map[string]any{
+		{"id": 1, "name": "Widget A", "price": 29.99, "stock": 100, "category": "electronics"},
+		{"id": 2, "name": "Widget B", "price": 49.99, "stock": 50, "category": "electronics"},
+		{"id": 3, "name": "Gadget C", "price": 99.99, "stock": 25, "category": "gadgets"},
+	}
+	var results []map[string]any
+	for _, p := range products {
+		if q != "" && !strings.Contains(strings.ToLower(p["name"].(string)), strings.ToLower(q)) {
+			continue
+		}
+		if category != "" && p["category"] != category {
+			continue
+		}
+		results = append(results, p)
+	}
+	if results == nil {
+		results = []map[string]any{}
+	}
+	writeJSON(w, 200, map[string]any{"code": 0, "data": results, "total": len(results), "query": q, "category": category})
+}
+
+>>>>>>> dev
 func (m *MockServer) handleProductDetail(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/mock/api/products/")
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"id": id, "name": "Product" + id, "price": 29.99, "stock": 100}})
@@ -217,7 +276,18 @@ func (m *MockServer) handleOrders(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var req map[string]any
 		json.Unmarshal(body, &req)
+<<<<<<< HEAD
 		writeJSON(w, 201, map[string]any{"code": 0, "data": map[string]any{"id": "ORD-003", "user_id": req["user_id"], "total": req["total"], "status": "created"}})
+=======
+		// require_payment alternates randomly (50/50) so the example
+		// scene's if-else branch (支付订单 vs 跳过支付) is genuinely
+		// exercised on both sides across chains.
+		requirePayment := "yes"
+		if rand.Intn(2) == 0 {
+			requirePayment = "no"
+		}
+		writeJSON(w, 201, map[string]any{"code": 0, "data": map[string]any{"id": "ORD-003", "user_id": req["user_id"], "total": req["total"], "status": "created", "require_payment": requirePayment}})
+>>>>>>> dev
 	default:
 		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
 	}
@@ -244,12 +314,20 @@ func (m *MockServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	json.Unmarshal(body, &req)
 	email, _ := req["email"].(string)
+<<<<<<< HEAD
 	password, _ := req["password"].(string)
 	if email == "admin@example.com" && password == "admin123" {
 		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"token": "mock-jwt-token-xyz", "user": map[string]any{"id": 1, "email": email, "role": "admin"}}})
 	} else {
 		writeJSON(w, 401, map[string]any{"code": 401, "message": "invalid credentials"})
 	}
+=======
+	role := "user"
+	if email == "admin@example.com" {
+		role = "admin"
+	}
+	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"token": "mock-jwt-token-xyz", "user": map[string]any{"id": 1, "email": email, "role": role}}})
+>>>>>>> dev
 }
 
 func (m *MockServer) handlePayment(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +341,25 @@ func (m *MockServer) handlePayment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"payment_id": "PAY-" + strconv.FormatInt(time.Now().Unix(), 10), "status": "success", "amount": req["amount"]}})
 }
 
+<<<<<<< HEAD
+=======
+// handlePaymentBizError always returns HTTP 200 with a business error code
+// in the body (errorCode=5037). This is the fixture for body-assertion
+// failure scenarios: expect_body {"errorCode": 0} must mark the node as
+// failed while the HTTP layer stays 2xx.
+func (m *MockServer) handlePaymentBizError(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"errorCode": 5037,
+		"errorMsg":  "business error",
+		"data":      nil,
+	})
+}
+
+>>>>>>> dev
 func (m *MockServer) handleNotify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
@@ -271,6 +368,24 @@ func (m *MockServer) handleNotify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"notified": true, "timestamp": time.Now().Format(time.RFC3339)}})
 }
 
+<<<<<<< HEAD
+=======
+func (m *MockServer) handleInventory(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/mock/api/inventory/")
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"product_id": id, "stock": 500, "warehouse": "WH-01", "last_updated": time.Now().Format(time.RFC3339)}})
+	case http.MethodPut:
+		body, _ := io.ReadAll(r.Body)
+		var req map[string]any
+		json.Unmarshal(body, &req)
+		writeJSON(w, 200, map[string]any{"code": 0, "data": map[string]any{"product_id": id, "stock": req["stock"], "updated": true}})
+	default:
+		writeJSON(w, 405, map[string]any{"code": 405, "message": "method not allowed"})
+	}
+}
+
+>>>>>>> dev
 func (m *MockServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"status": "ok", "service": "salvo-mock", "timestamp": time.Now().Format(time.RFC3339)})
 }
@@ -281,11 +396,24 @@ func (m *MockServer) logRequest(next http.HandlerFunc) http.HandlerFunc {
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 
 		if r.URL.Path != "/mock/health" {
+<<<<<<< HEAD
 			delayMs := rand.Intn(1971) + 30
 			time.Sleep(time.Duration(delayMs) * time.Millisecond)
 		}
 
 		if r.URL.Path != "/mock/health" && rand.Float64() < 0.30 {
+=======
+			minMs := m.latencyMinMs
+			maxMs := m.latencyMaxMs
+			if maxMs <= minMs {
+				maxMs = minMs + 1
+			}
+			delayMs := rand.Intn(maxMs-minMs) + minMs
+			time.Sleep(time.Duration(delayMs) * time.Millisecond)
+		}
+
+		if r.URL.Path != "/mock/health" && rand.Float64() < m.errorRate {
+>>>>>>> dev
 			code := errorCodes[rand.Intn(len(errorCodes))]
 			writeJSON(rw, code, map[string]any{"code": code, "message": http.StatusText(code), "_injected": true})
 			reqLog.Printf("%s %s | %d | %.2fms [INJECTED]", r.Method, r.URL.Path, code, float64(time.Since(start).Microseconds())/1000)

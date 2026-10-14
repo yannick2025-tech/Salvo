@@ -1,7 +1,11 @@
 <template>
   <div class="settings-page">
     <div class="page-header">
+<<<<<<< HEAD
       <h2>系统设置</h2>
+=======
+      <h2>个人设置</h2>
+>>>>>>> dev
     </div>
 
     <div class="settings-grid">
@@ -19,7 +23,11 @@
           <label>确认新密码</label>
           <input v-model="pwdForm.confirm_password" type="password" placeholder="确认新密码" />
         </div>
+<<<<<<< HEAD
         <button class="btn-login-primary" @click="handleChangePassword">修改密码</button>
+=======
+        <button class="btn-primary" @click="handleChangePassword">修改密码</button>
+>>>>>>> dev
         <div v-if="pwdMsg" :class="['msg', pwdMsgType]">{{ pwdMsg }}</div>
       </div>
 
@@ -91,7 +99,10 @@ function formatTime(t?: string) {
 .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
 .form-group input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-group input:focus { border-color: var(--accent-primary); }
+<<<<<<< HEAD
 .btn-primary { padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer; }
+=======
+>>>>>>> dev
 .msg { margin-top: 12px; font-size: 13px; padding: 8px 12px; border-radius: var(--radius-sm); }
 .msg.success { background: rgba(63,185,80,0.15); color: var(--accent-success); }
 .msg.error { background: rgba(248,81,73,0.15); color: var(--accent-danger); }

@@ -1,0 +1,259 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">10</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold">体验二</text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 492.01 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 554.57 89.4 L 554.57 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">Lessons Learned 沉淀机制</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="63.28 154.7 113.06 27.72" data-pptx-prst="rect" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 63.28 154.7 L 176.34 154.7 L 176.34 182.42 L 63.28 182.42 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="63.28" y="170" text-anchor="start" xml:space="preserve" font-size="18" fill="#59606E">8 个详细案例</text>
+</g>
+<g id="shape-48" data-pptx-object="group" data-pptx-frame="64 200 1152 420" data-pptx-source-ref="slide:48">
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="64 200 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 64 208 A 8 8 0 0 1 72 200 L 596 200 A 8 8 0 0 1 604 208 L 604 282 A 8 8 0 0 1 596 290 L 72 290 A 8 8 0 0 1 64 282 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="87.44 216.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 87.44 216.1 L 153.84 216.1 L 153.84 237.66 L 87.44 237.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.44" y="228" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 1</text>
+</g>
+<g id="shape-10" data-pptx-object="shape" data-pptx-frame="87.36 236.4 136.96 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
+<path d="M 87.36 236.4 L 224.32 236.4 L 224.32 261.04 L 87.36 261.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.36" y="250" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">前端首屏性能优化</text>
+</g>
+<g id="shape-11" data-pptx-object="shape" data-pptx-frame="87.48 260.95 192.87 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:11" data-pptx-semantic-object="shape">
+<path d="M 87.48 260.95 L 280.35 260.95 L 280.35 280.97 L 87.48 280.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.48" y="272.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">5 轮排查迭代，时间戳日志定位</text>
+</g>
+<g id="shape-12" data-pptx-object="shape" data-pptx-frame="469.84 243.1 90.72 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:12" data-pptx-semantic-object="shape">
+<path d="M 469.84 243.1 L 560.56 243.1 L 560.56 264.66 L 469.84 264.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="560.56" y="255" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">10s → 116ms</text>
+</g>
+<g id="shape-13" data-pptx-object="shape" data-pptx-frame="676 200 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:13" data-pptx-semantic-object="shape">
+<path d="M 676 208 A 8 8 0 0 1 684 200 L 1208 200 A 8 8 0 0 1 1216 208 L 1216 282 A 8 8 0 0 1 1208 290 L 684 290 A 8 8 0 0 1 676 282 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-14" data-pptx-object="shape" data-pptx-frame="699.44 216.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:14" data-pptx-semantic-object="shape">
+<path d="M 699.44 216.1 L 765.84 216.1 L 765.84 237.66 L 699.44 237.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.44" y="228" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 2</text>
+</g>
+<g id="shape-15" data-pptx-object="shape" data-pptx-frame="699.36 236.4 136.96 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:15" data-pptx-semantic-object="shape">
+<path d="M 699.36 236.4 L 836.32 236.4 L 836.32 261.04 L 699.36 261.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.36" y="250" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">链路跟踪色块溢出</text>
+</g>
+<g id="shape-16" data-pptx-object="shape" data-pptx-frame="699.48 260.95 252.43 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:16" data-pptx-semantic-object="shape">
+<path d="M 699.48 260.95 L 951.91 260.95 L 951.91 280.97 L 699.48 280.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.48" y="272.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">可视化调试：全局边框扫描 + 祖先链追踪</text>
+</g>
+<g id="shape-17" data-pptx-object="shape" data-pptx-frame="1102.88 243.1 69.68 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:17" data-pptx-semantic-object="shape">
+<path d="M 1102.88 243.1 L 1172.56 243.1 L 1172.56 264.66 L 1102.88 264.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1172.56" y="255" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">2h → 5min</text>
+</g>
+<g id="shape-18" data-pptx-object="shape" data-pptx-frame="64 310 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:18" data-pptx-semantic-object="shape">
+<path d="M 64 318 A 8 8 0 0 1 72 310 L 596 310 A 8 8 0 0 1 604 318 L 604 392 A 8 8 0 0 1 596 400 L 72 400 A 8 8 0 0 1 64 392 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-19" data-pptx-object="shape" data-pptx-frame="87.44 326.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:19" data-pptx-semantic-object="shape">
+<path d="M 87.44 326.1 L 153.84 326.1 L 153.84 347.66 L 87.44 347.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.44" y="338" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 3</text>
+</g>
+<g id="shape-20" data-pptx-object="shape" data-pptx-frame="87.36 346.4 159.15 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:20" data-pptx-semantic-object="shape">
+<path d="M 87.36 346.4 L 246.51 346.4 L 246.51 371.04 L 87.36 371.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.36" y="360" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">Goroutine 吞没错误</text>
+</g>
+<g id="shape-21" data-pptx-object="shape" data-pptx-frame="87.48 370.95 210.88 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:21" data-pptx-semantic-object="shape">
+<path d="M 87.48 370.95 L 298.36 370.95 L 298.36 390.97 L 87.48 390.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.48" y="382.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">safeGo + atomic.Value 错误传播</text>
+</g>
+<g id="shape-22" data-pptx-object="shape" data-pptx-frame="467.32 353.1 93.24 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:22" data-pptx-semantic-object="shape">
+<path d="M 467.32 353.1 L 560.56 353.1 L 560.56 374.66 L 467.32 374.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="560.56" y="365" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">静默 → 可观测</text>
+</g>
+<g id="shape-23" data-pptx-object="shape" data-pptx-frame="676 310 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:23" data-pptx-semantic-object="shape">
+<path d="M 676 318 A 8 8 0 0 1 684 310 L 1208 310 A 8 8 0 0 1 1216 318 L 1216 392 A 8 8 0 0 1 1208 400 L 684 400 A 8 8 0 0 1 676 392 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-24" data-pptx-object="shape" data-pptx-frame="699.44 326.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:24" data-pptx-semantic-object="shape">
+<path d="M 699.44 326.1 L 765.84 326.1 L 765.84 347.66 L 699.44 347.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.44" y="338" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 4</text>
+</g>
+<g id="shape-25" data-pptx-object="shape" data-pptx-frame="699.36 346.4 149.59 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:25" data-pptx-semantic-object="shape">
+<path d="M 699.36 346.4 L 848.95 346.4 L 848.95 371.04 L 699.36 371.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.36" y="360" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">DAG AND-join 阻塞</text>
+</g>
+<g id="shape-26" data-pptx-object="shape" data-pptx-frame="699.48 370.95 111.82 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:26" data-pptx-semantic-object="shape">
+<path d="M 699.48 370.95 L 811.3 370.95 L 811.3 390.97 L 699.48 390.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.48" y="382.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">OR-join 语义设计</text>
+</g>
+<g id="shape-27" data-pptx-object="shape" data-pptx-frame="1082.4 353.1 90.16 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:27" data-pptx-semantic-object="shape">
+<path d="M 1082.4 353.1 L 1172.56 353.1 L 1172.56 374.66 L 1082.4 374.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1172.56" y="365" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">分支正常汇合</text>
+</g>
+<g id="shape-28" data-pptx-object="shape" data-pptx-frame="64 420 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:28" data-pptx-semantic-object="shape">
+<path d="M 64 428 A 8 8 0 0 1 72 420 L 596 420 A 8 8 0 0 1 604 428 L 604 502 A 8 8 0 0 1 596 510 L 72 510 A 8 8 0 0 1 64 502 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-29" data-pptx-object="shape" data-pptx-frame="87.44 436.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:29" data-pptx-semantic-object="shape">
+<path d="M 87.44 436.1 L 153.84 436.1 L 153.84 457.66 L 87.44 457.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.44" y="448" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 5</text>
+</g>
+<g id="shape-30" data-pptx-object="shape" data-pptx-frame="87.36 456.4 97.2 19.33" data-pptx-prst="rect" data-pptx-source-ref="slide:30" data-pptx-semantic-object="shape">
+<path d="M 87.36 456.4 L 184.56 456.4 L 184.56 475.73 L 87.36 475.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.36" y="470" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">dag 布局重叠</text>
+</g>
+<g id="shape-31" data-pptx-object="shape" data-pptx-frame="87.48 480.95 190.56 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:31" data-pptx-semantic-object="shape">
+<path d="M 87.48 480.95 L 278.04 480.95 L 278.04 500.97 L 87.48 500.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.48" y="492.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">替换为 ELK（支持变长节点）</text>
+</g>
+<g id="shape-32" data-pptx-object="shape" data-pptx-frame="500.08 463.1 60.48 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:32" data-pptx-semantic-object="shape">
+<path d="M 500.08 463.1 L 560.56 463.1 L 560.56 484.66 L 500.08 484.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="560.56" y="475" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">一键美化</text>
+</g>
+<g id="shape-33" data-pptx-object="shape" data-pptx-frame="676 420 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:33" data-pptx-semantic-object="shape">
+<path d="M 676 428 A 8 8 0 0 1 684 420 L 1208 420 A 8 8 0 0 1 1216 428 L 1216 502 A 8 8 0 0 1 1208 510 L 684 510 A 8 8 0 0 1 676 502 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-34" data-pptx-object="shape" data-pptx-frame="699.44 436.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:34" data-pptx-semantic-object="shape">
+<path d="M 699.44 436.1 L 765.84 436.1 L 765.84 457.66 L 699.44 457.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.44" y="448" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 6</text>
+</g>
+<g id="shape-35" data-pptx-object="shape" data-pptx-frame="699.36 456.4 133.9 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:35" data-pptx-semantic-object="shape">
+<path d="M 699.36 456.4 L 833.26 456.4 L 833.26 481.04 L 699.36 481.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.36" y="470" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">WebSocket 推送</text>
+</g>
+<g id="shape-36" data-pptx-object="shape" data-pptx-frame="699.48 480.95 275.07 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:36" data-pptx-semantic-object="shape">
+<path d="M 699.48 480.95 L 974.55 480.95 L 974.55 500.97 L 699.48 500.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.48" y="492.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">ReadPump/WritePump 分离 + channel 管理</text>
+</g>
+<g id="shape-37" data-pptx-object="shape" data-pptx-frame="1112.08 463.1 60.48 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:37" data-pptx-semantic-object="shape">
+<path d="M 1112.08 463.1 L 1172.56 463.1 L 1172.56 484.66 L 1112.08 484.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1172.56" y="475" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">稳定实时</text>
+</g>
+<g id="shape-38" data-pptx-object="shape" data-pptx-frame="64 530 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:38" data-pptx-semantic-object="shape">
+<path d="M 64 538 A 8 8 0 0 1 72 530 L 596 530 A 8 8 0 0 1 604 538 L 604 612 A 8 8 0 0 1 596 620 L 72 620 A 8 8 0 0 1 64 612 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-39" data-pptx-object="shape" data-pptx-frame="87.44 546.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:39" data-pptx-semantic-object="shape">
+<path d="M 87.44 546.1 L 153.84 546.1 L 153.84 567.66 L 87.44 567.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.44" y="558" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 7</text>
+</g>
+<g id="shape-40" data-pptx-object="shape" data-pptx-frame="87.36 566.4 177.9 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:40" data-pptx-semantic-object="shape">
+<path d="M 87.36 566.4 L 265.26 566.4 L 265.26 591.04 L 87.36 591.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.36" y="580" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">Go 1.26.2 运行时 bug</text>
+</g>
+<g id="shape-41" data-pptx-object="shape" data-pptx-frame="87.48 590.95 188.02 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:41" data-pptx-semantic-object="shape">
+<path d="M 87.48 590.95 L 275.5 590.95 L 275.5 610.97 L 87.48 610.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="87.48" y="602.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">堆栈分析区分应用/运行时 bug</text>
+</g>
+<g id="shape-42" data-pptx-object="shape" data-pptx-frame="455.56 573.1 105 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:42" data-pptx-semantic-object="shape">
+<path d="M 455.56 573.1 L 560.56 573.1 L 560.56 594.66 L 455.56 594.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="560.56" y="585" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">识别标准库问题</text>
+</g>
+<g id="shape-43" data-pptx-object="shape" data-pptx-frame="676 530 540 90" data-pptx-prst="roundRect" data-pptx-av-adj="val 8889" data-pptx-source-ref="slide:43" data-pptx-semantic-object="shape">
+<path d="M 676 538 A 8 8 0 0 1 684 530 L 1208 530 A 8 8 0 0 1 1216 538 L 1216 612 A 8 8 0 0 1 1208 620 L 684 620 A 8 8 0 0 1 676 612 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-44" data-pptx-object="shape" data-pptx-frame="699.44 546.1 66.4 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:44" data-pptx-semantic-object="shape">
+<path d="M 699.44 546.1 L 765.84 546.1 L 765.84 567.66 L 699.44 567.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.44" y="558" text-anchor="start" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">Lesson 8</text>
+</g>
+<g id="shape-45" data-pptx-object="shape" data-pptx-frame="699.36 566.4 133.22 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:45" data-pptx-semantic-object="shape">
+<path d="M 699.36 566.4 L 832.58 566.4 L 832.58 591.04 L 699.36 591.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.36" y="580" text-anchor="start" xml:space="preserve" font-size="16" fill="#1A1D26" font-weight="bold">多字段 AND 查询</text>
+</g>
+<g id="shape-46" data-pptx-object="shape" data-pptx-frame="699.48 590.95 226.95 20.02" data-pptx-prst="rect" data-pptx-source-ref="slide:46" data-pptx-semantic-object="shape">
+<path d="M 699.48 590.95 L 926.43 590.95 L 926.43 610.97 L 699.48 610.97 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="699.48" y="602.06" text-anchor="start" xml:space="preserve" font-size="13.07" fill="#59606E">双套实现：Vue computed + 原生 JS</text>
+</g>
+<g id="shape-47" data-pptx-object="shape" data-pptx-frame="1097.24 573.1 75.32 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:47" data-pptx-semantic-object="shape">
+<path d="M 1097.24 573.1 L 1172.56 573.1 L 1172.56 594.66 L 1097.24 594.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1172.56" y="585" text-anchor="end" xml:space="preserve" font-size="14" fill="#3458B0" font-weight="bold">前后端一致</text>
+</g>
+</g></svg>

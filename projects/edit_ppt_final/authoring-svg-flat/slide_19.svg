@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">16</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="102.9 53.1 42.2 16.93" data-pptx-prst="rect" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 102.9 53.1 L 145.1 53.1 L 145.1 70.03 L 102.9 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold"><tspan>体验</tspan><tspan>五</tspan></text>
+</g>
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="62.56 89.4 155.52 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 218.08 89.4 L 218.08 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">核心观点</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-10" data-pptx-object="group" data-pptx-frame="393.46 244.3 493.08 152.26" data-pptx-source-ref="slide:10">
+<g id="shape-7" data-pptx-object="shape" data-pptx-frame="393.46 244.3 493.08 64.68" data-pptx-prst="rect" data-pptx-source-ref="slide:7" data-pptx-semantic-object="shape">
+<path d="M 393.46 244.3 L 886.54 244.3 L 886.54 308.98 L 393.46 308.98 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="280" text-anchor="middle" xml:space="preserve" font-size="42" fill="#3458B0" font-weight="bold">高标准审美，不仅仅是快</text>
+</g>
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="420.38 319.6 439.23 36.96" data-pptx-prst="rect" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 420.38 319.6 L 859.62 319.6 L 859.62 356.56 L 420.38 356.56 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="340" text-anchor="middle" xml:space="preserve" font-size="24" fill="#1A1D26">AI 减少 coding 成本 → 有更高标准要求</text>
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="434.25 359.6 411.5 36.96" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 434.25 359.6 L 845.75 359.6 L 845.75 396.56 L 434.25 396.56 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="380" text-anchor="middle" xml:space="preserve" font-size="24" fill="#1A1D26">不满足于"能跑"，持续追求更好体验</text>
+</g>
+</g></svg>

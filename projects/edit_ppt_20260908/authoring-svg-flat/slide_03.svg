@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif"><rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-2" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-source-ref="slide:2" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">03</text>
+</g>
+<g id="shape-3" data-pptx-object="shape" data-pptx-frame="62.56 49.4 155.52 55.44" data-pptx-prst="rect" data-pptx-source-ref="slide:3" data-pptx-semantic-object="shape">
+<path d="M 62.56 49.4 L 218.08 49.4 L 218.08 104.84 L 62.56 104.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="62.56" y="80" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">核心观点</text>
+</g>
+<g id="shape-4" data-pptx-object="shape" data-pptx-frame="64 96 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-source-ref="slide:4" data-pptx-semantic-object="shape">
+<path d="M 64 97.5 A 1.5 1.5 0 0 1 65.5 96 L 110.5 96 A 1.5 1.5 0 0 1 112 97.5 L 112 97.5 A 1.5 1.5 0 0 1 110.5 99 L 65.5 99 A 1.5 1.5 0 0 1 64 97.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-7" data-pptx-object="group" data-pptx-frame="402.9 224.3 474.2 133.43" data-pptx-source-ref="slide:7">
+<g id="shape-5" data-pptx-object="shape" data-pptx-frame="444.16 224.3 391.68 64.68" data-pptx-prst="rect" data-pptx-source-ref="slide:5" data-pptx-semantic-object="shape">
+<path d="M 444.16 224.3 L 835.84 224.3 L 835.84 288.98 L 444.16 288.98 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="260" text-anchor="middle" xml:space="preserve" font-size="42" fill="#3458B0" font-weight="bold">AI 拉平了技术 GAP</text>
+</g>
+<g id="shape-6" data-pptx-object="shape" data-pptx-frame="402.9 299.6 474.2 58.13" data-pptx-prst="rect" data-pptx-source-ref="slide:6" data-pptx-semantic-object="shape">
+<path d="M 402.9 299.6 L 877.1 299.6 L 877.1 357.73 L 402.9 357.73 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="320" text-anchor="middle" xml:space="preserve" font-size="24" fill="#1A1D26" data-pptx-text-model="paragraphs" data-paragraph-line-height="28.8"><tspan><tspan>问题不再是"</tspan><tspan fill="#FF0000" font-weight="bold">能不能实现</tspan><tspan>"</tspan></tspan><tspan><tspan>而是"</tspan><tspan fill="#008342" font-weight="bold">是否定义清楚问题，是否能管控住质量</tspan><tspan>"</tspan></tspan></text>
+</g>
+</g>
+<g id="shape-19" data-pptx-object="group" data-pptx-frame="193.57 420 941.34 121.04" data-pptx-source-ref="slide:19">
+<g id="shape-8" data-pptx-object="shape" data-pptx-frame="240 420 800 60" data-pptx-prst="roundRect" data-pptx-av-adj="val 13333" data-pptx-source-ref="slide:8" data-pptx-semantic-object="shape">
+<path d="M 240 428 A 8 8 0 0 1 248 420 L 1032 420 A 8 8 0 0 1 1040 428 L 1040 472 A 8 8 0 0 1 1032 480 L 248 480 A 8 8 0 0 1 240 472 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+
+</g>
+<g id="shape-9" data-pptx-object="shape" data-pptx-frame="528.57 441 222.87 24.2" data-pptx-prst="rect" data-pptx-source-ref="slide:9" data-pptx-semantic-object="shape">
+<path d="M 528.57 441 L 751.43 441 L 751.43 465.2 L 528.57 465.2 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="640" y="458" text-anchor="middle" xml:space="preserve" font-size="20" fill="#3458B0" font-weight="bold"><tspan>接下来分享 8 点何用</tspan><tspan>体验</tspan></text>
+</g>
+<g id="shape-18" data-pptx-object="group" data-pptx-frame="193.57 516.4 941.34 24.64" data-pptx-source-ref="slide:18">
+<g id="shape-10" data-pptx-object="shape" data-pptx-frame="193.57 516.4 92.86 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:10" data-pptx-semantic-object="shape">
+<path d="M 193.57 516.4 L 286.43 516.4 L 286.43 541.04 L 193.57 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="240" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">01 定义问题</text>
+</g>
+<g id="shape-11" data-pptx-object="shape" data-pptx-frame="313.57 516.4 92.86 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:11" data-pptx-semantic-object="shape">
+<path d="M 313.57 516.4 L 406.43 516.4 L 406.43 541.04 L 313.57 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="360" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">02 知识沉淀</text>
+</g>
+<g id="shape-12" data-pptx-object="shape" data-pptx-frame="425.09 516.4 109.82 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:12" data-pptx-semantic-object="shape">
+<path d="M 425.09 516.4 L 534.91 516.4 L 534.91 541.04 L 425.09 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="480" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">03 流水线管控</text>
+</g>
+<g id="shape-13" data-pptx-object="shape" data-pptx-frame="545.09 516.4 109.82 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:13" data-pptx-semantic-object="shape">
+<path d="M 545.09 516.4 L 654.91 516.4 L 654.91 541.04 L 545.09 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="600" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">04 高标准审美</text>
+</g>
+<g id="shape-14" data-pptx-object="shape" data-pptx-frame="656.61 516.4 126.78 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:14" data-pptx-semantic-object="shape">
+<path d="M 656.61 516.4 L 783.39 516.4 L 783.39 541.04 L 656.61 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="720" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">05 懒是第一动力</text>
+</g>
+<g id="shape-15" data-pptx-object="shape" data-pptx-frame="793.57 516.4 92.86 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:15" data-pptx-semantic-object="shape">
+<path d="M 793.57 516.4 L 886.43 516.4 L 886.43 541.04 L 793.57 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="840" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">06 评估分离</text>
+</g>
+<g id="shape-16" data-pptx-object="shape" data-pptx-frame="913.57 516.4 92.86 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:16" data-pptx-semantic-object="shape">
+<path d="M 913.57 516.4 L 1006.43 516.4 L 1006.43 541.04 L 913.57 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="960" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">07 质量画像</text>
+</g>
+<g id="shape-17" data-pptx-object="shape" data-pptx-frame="1025.09 516.4 109.82 24.64" data-pptx-prst="rect" data-pptx-source-ref="slide:17" data-pptx-semantic-object="shape">
+<path d="M 1025.09 516.4 L 1134.91 516.4 L 1134.91 541.04 L 1025.09 541.04 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+
+
+<text x="1080" y="530" text-anchor="middle" xml:space="preserve" font-size="16" fill="#59606E">08 工程化流程</text>
+</g>
+</g>
+</g></svg>

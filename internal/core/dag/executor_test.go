@@ -10,6 +10,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+<<<<<<< HEAD
+=======
+
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
+>>>>>>> dev
 )
 
 // recordingNode is a test Node that records its execution order and supports
@@ -28,6 +33,10 @@ func (n *recordingNode) ID() string             { return n.id }
 func (n *recordingNode) Timeout() time.Duration { return n.timeout }
 func (n *recordingNode) LoopCount() int         { return n.loopCount }
 func (n *recordingNode) Mode() ExecMode         { return n.mode }
+<<<<<<< HEAD
+=======
+func (n *recordingNode) BlockOnError() bool     { return false }
+>>>>>>> dev
 
 func (n *recordingNode) Execute(_ context.Context, input *Input) (*Output, error) {
 	n.executed.Add(1)
@@ -276,6 +285,10 @@ func (n *slowNode) ID() string             { return n.id }
 func (n *slowNode) Timeout() time.Duration { return n.delay * 2 }
 func (n *slowNode) LoopCount() int         { return 1 }
 func (n *slowNode) Mode() ExecMode         { return n.mode }
+<<<<<<< HEAD
+=======
+func (n *slowNode) BlockOnError() bool     { return false }
+>>>>>>> dev
 
 func (n *slowNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
 	select {
@@ -286,6 +299,32 @@ func (n *slowNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// timeoutNode is a slowNode with a custom timeout field for testing timeout scenarios.
+type timeoutNode struct {
+	id      string
+	mode    ExecMode
+	delay   time.Duration
+	timeout time.Duration
+}
+
+func (n *timeoutNode) ID() string             { return n.id }
+func (n *timeoutNode) Timeout() time.Duration { return n.timeout }
+func (n *timeoutNode) LoopCount() int         { return 1 }
+func (n *timeoutNode) Mode() ExecMode         { return n.mode }
+func (n *timeoutNode) BlockOnError() bool     { return false }
+
+func (n *timeoutNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
+	select {
+	case <-time.After(n.delay):
+		return &Output{Response: n.id}, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("node %s cancelled: %w", n.id, ctx.Err())
+	}
+}
+
+>>>>>>> dev
 func TestExecutorAsyncNodeDoesNotBlock(t *testing.T) {
 	g := New()
 	a := &slowNode{id: "A", mode: ExecSync, delay: 10 * time.Millisecond}
@@ -312,3 +351,480 @@ func TestExecutorAsyncNodeDoesNotBlock(t *testing.T) {
 	assert.Less(t, elapsed, 150*time.Millisecond,
 		"async node B should not block the overall execution")
 }
+<<<<<<< HEAD
+=======
+
+// --- OR-join tests: conditional edge merge semantics ---
+
+// outputNode is a test Node that returns a pre-configured output.
+type outputNode struct {
+	id       string
+	mode     ExecMode
+	output   *Output
+	executed atomic.Int32
+}
+
+func (n *outputNode) ID() string             { return n.id }
+func (n *outputNode) Timeout() time.Duration { return 0 }
+func (n *outputNode) LoopCount() int         { return 1 }
+func (n *outputNode) Mode() ExecMode         { return n.mode }
+func (n *outputNode) BlockOnError() bool     { return false }
+
+func (n *outputNode) Execute(_ context.Context, _ *Input) (*Output, error) {
+	n.executed.Add(1)
+	return n.output, nil
+}
+
+func (n *outputNode) ExecCount() int32 {
+	return n.executed.Load()
+}
+
+// ifElseEval is a reusable condition evaluator that interprets __if_true__
+// and __if_false__ conditions based on the parent output's if_else_result field.
+func ifElseEval(_ context.Context, cond string, out *Output) bool {
+	if cond == "__if_true__" {
+		if out != nil {
+			if resp, ok := out.Response.(map[string]any); ok {
+				if r, exists := resp["if_else_result"]; exists {
+					return r == true
+				}
+			}
+		}
+		return true // fallback
+	}
+	if cond == "__if_false__" {
+		if out != nil {
+			if resp, ok := out.Response.(map[string]any); ok {
+				if r, exists := resp["if_else_result"]; exists {
+					return r != true
+				}
+			}
+		}
+		return false // fallback
+	}
+	return true
+}
+
+func TestExecutorORJoin_TwoEdgeMerge_TrueBranch(t *testing.T) {
+	// Two-way merge: if_true path executes, if_false path skips.
+	//   A →[if_true]→ B →───┐
+	//   └→[if_false]──────→ D (merge node)
+	// Condition picks if_true → B executes, D should execute (OR-join).
+	aNode := &outputNode{id: "A", mode: ExecSync, output: &Output{Response: map[string]any{"if_else_result": true}}}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	d := &recordingNode{id: "D", mode: ExecSync}
+
+	g := New()
+	require.NoError(t, g.AddNode(aNode))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(d))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("A", "D", EdgeCondition, "__if_false__"))
+	require.NoError(t, g.AddEdge("B", "D", EdgeNormal, ""))
+
+	ex := NewExecutor(g, WithConditionEvaluator(ifElseEval))
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), aNode.ExecCount(), "A should execute")
+	assert.Equal(t, int32(1), b.ExecCount(), "B (if_true branch) should execute")
+	assert.Equal(t, int32(1), d.ExecCount(), "D (merge node) should execute via B→D normal edge")
+}
+
+func TestExecutorORJoin_TwoEdgeMerge_FalseBranch(t *testing.T) {
+	// Two-way merge: if_false path fires (direct conditional edge to D).
+	//   A →[if_true]→ B →───┐
+	//   └→[if_false]──────→ D (merge node)
+	// Condition picks if_false → B skips, D should execute via A→D edge.
+	aNode := &outputNode{id: "A", mode: ExecSync, output: &Output{Response: map[string]any{"if_else_result": false}}}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	d := &recordingNode{id: "D", mode: ExecSync}
+
+	g := New()
+	require.NoError(t, g.AddNode(aNode))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(d))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("A", "D", EdgeCondition, "__if_false__"))
+	require.NoError(t, g.AddEdge("B", "D", EdgeNormal, ""))
+
+	ex := NewExecutor(g, WithConditionEvaluator(ifElseEval))
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), aNode.ExecCount(), "A should execute")
+	assert.Equal(t, int32(0), b.ExecCount(), "B (if_true branch) should NOT execute")
+	assert.Equal(t, int32(1), d.ExecCount(), "D (merge node) should execute via A→D if_false edge")
+}
+
+func TestExecutorORJoin_ThreeEdgeMerge(t *testing.T) {
+	// Three-way merge from if-else-if chain:
+	//   A →[if_true]→ B ───────────────────┐
+	//   └→[if_false]→ C →[if_true]→ D ───┐│
+	//                 └→[if_false]→ E ───┐││
+	//                                     ▼▼▼
+	//                                      F  (3 in-edges)
+	// Condition: A=false → B skips, C=true → D executes, E skips.
+	// F should execute (active path: A→C→D→F).
+	aNode := &outputNode{id: "A", mode: ExecSync, output: &Output{Response: map[string]any{"if_else_result": false}}}
+	cNode := &outputNode{id: "C", mode: ExecSync, output: &Output{Response: map[string]any{"if_else_result": true}}}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	d := &recordingNode{id: "D", mode: ExecSync}
+	e := &recordingNode{id: "E", mode: ExecSync}
+	f := &recordingNode{id: "F", mode: ExecSync}
+
+	g := New()
+	require.NoError(t, g.AddNode(aNode))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(cNode))
+	require.NoError(t, g.AddNode(d))
+	require.NoError(t, g.AddNode(e))
+	require.NoError(t, g.AddNode(f))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("A", "C", EdgeCondition, "__if_false__"))
+	require.NoError(t, g.AddEdge("C", "D", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("C", "E", EdgeCondition, "__if_false__"))
+	require.NoError(t, g.AddEdge("B", "F", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("D", "F", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("E", "F", EdgeNormal, ""))
+
+	ex := NewExecutor(g, WithConditionEvaluator(ifElseEval))
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), aNode.ExecCount(), "A should execute")
+	assert.Equal(t, int32(0), b.ExecCount(), "B should be skipped (if_true on false result)")
+	assert.Equal(t, int32(1), cNode.ExecCount(), "C should execute (if_false on false result)")
+	assert.Equal(t, int32(1), d.ExecCount(), "D should execute (if_true on true result)")
+	assert.Equal(t, int32(0), e.ExecCount(), "E should be skipped (if_false on true result)")
+	assert.Equal(t, int32(1), f.ExecCount(), "F (3-way merge) should execute via D→F")
+}
+
+func TestExecutorORJoin_AllBranchesSkipped(t *testing.T) {
+	// If ALL conditional edges leading to a merge node are not met,
+	// the merge node itself should be skipped (no active parent path).
+	//   A →[if_true]→ B ─┐
+	//                    ┌→ C (2 conditional in-edges, neither met)
+	//   A →[if_true]─────┘
+	// A produces if_else_result=false, both __if_true__ edges won't fire,
+	// B is skipped, so C has no active parent → C is also skipped.
+	aNode := &outputNode{id: "A", mode: ExecSync, output: &Output{Response: map[string]any{"if_else_result": false}}}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	c := &recordingNode{id: "C", mode: ExecSync}
+
+	g := New()
+	require.NoError(t, g.AddNode(aNode))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(c))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("B", "C", EdgeCondition, "__if_true__"))
+	require.NoError(t, g.AddEdge("A", "C", EdgeCondition, "__if_true__"))
+
+	ex := NewExecutor(g, WithConditionEvaluator(ifElseEval))
+	_, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), aNode.ExecCount(), "A should execute")
+	assert.Equal(t, int32(0), b.ExecCount(), "B should be skipped")
+	assert.Equal(t, int32(0), c.ExecCount(), "C should be skipped (no active parent path)")
+}
+
+func TestExecutorWithInitialVars(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+
+	initialVars := map[string]any{
+		"base_url": "http://api.example.com",
+		"timeout":  30,
+	}
+
+	ex := NewExecutor(g, WithInitialVars(initialVars))
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+}
+
+func TestExecutorSetVariable(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	ex.SetVariable("token", "abc123")
+	ex.SetVariable("user_id", 12345)
+
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+}
+
+func TestExecutorNodeTimeout(t *testing.T) {
+	g := New()
+	a := &slowNode{id: "A", mode: ExecSync, delay: 10 * time.Millisecond}
+	// B will timeout: delay 500ms but timeout is 50ms (delay * 2 = 1000ms, but we set custom timeout)
+	b := &timeoutNode{id: "B", mode: ExecSync, delay: 500 * time.Millisecond, timeout: 50 * time.Millisecond}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	_, err := ex.Execute(context.Background())
+	assert.Error(t, err, "B should timeout")
+}
+
+func TestExecutorMultipleRoots(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+	c := &recordingNode{id: "C", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(c))
+	require.NoError(t, g.AddEdge("A", "C", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("B", "C", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+	assert.Equal(t, int32(1), c.ExecCount())
+}
+
+func TestExecutorEmptyDAG(t *testing.T) {
+	g := New()
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestExecutorSingleNodeAsync(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecAsync}
+
+	require.NoError(t, g.AddNode(a))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	// Async node doesn't block, result may be nil
+	assert.Nil(t, result)
+}
+
+func TestExecutorChainWithMixedModes(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecAsync}
+	c := &recordingNode{id: "C", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddNode(c))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("B", "C", EdgeNormal, ""))
+
+	ex := NewExecutor(g)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, int32(1), a.ExecCount())
+	assert.Equal(t, int32(1), b.ExecCount())
+	assert.Equal(t, int32(1), c.ExecCount())
+	assert.Equal(t, "C", result.Response)
+}
+
+func TestExecutorWithLoggers(t *testing.T) {
+	g := New()
+	a := &recordingNode{id: "A", mode: ExecSync}
+	b := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(a))
+	require.NoError(t, g.AddNode(b))
+	require.NoError(t, g.AddEdge("A", "B", EdgeCondition, "test_condition"))
+
+	var warnLogs []string
+	var errorLogs []string
+
+	warnLogger := func(msg string, keysAndValues ...any) {
+		warnLogs = append(warnLogs, msg)
+	}
+	errorLogger := func(msg string, keysAndValues ...any) {
+		errorLogs = append(errorLogs, msg)
+	}
+
+	eval := func(_ context.Context, cond string, _ *Output) bool {
+		return cond == "test_condition"
+	}
+
+	ex := NewExecutor(g,
+		WithConditionEvaluator(eval),
+		WithConditionWarnLogger(warnLogger),
+		WithConditionErrorLogger(errorLogger),
+	)
+	result, err := ex.Execute(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Greater(t, len(warnLogs), 0, "should have warn logs")
+}
+
+// blockingFailNode fails on execute and blocks the chain (block_on_error=true),
+// triggering chain-wide cancellation.
+type blockingFailNode struct {
+	id string
+}
+
+func (n *blockingFailNode) ID() string             { return n.id }
+func (n *blockingFailNode) Timeout() time.Duration { return 0 }
+func (n *blockingFailNode) LoopCount() int         { return 1 }
+func (n *blockingFailNode) Mode() ExecMode         { return ExecSync }
+func (n *blockingFailNode) BlockOnError() bool     { return true }
+
+func (n *blockingFailNode) Execute(_ context.Context, _ *Input) (*Output, error) {
+	return nil, fmt.Errorf("node %s: assertion failed", n.id)
+}
+
+// teardownNode implements AlwaysRunner: it must run even when the chain is
+// cancelled by an upstream block_on_error failure.
+type teardownNode struct {
+	id       string
+	executed atomic.Int32
+	ctxErr   error
+}
+
+func (n *teardownNode) ID() string             { return n.id }
+func (n *teardownNode) Timeout() time.Duration { return 0 }
+func (n *teardownNode) LoopCount() int         { return 1 }
+func (n *teardownNode) Mode() ExecMode         { return ExecSync }
+func (n *teardownNode) BlockOnError() bool     { return false }
+func (n *teardownNode) AlwaysRun() bool        { return true }
+
+func (n *teardownNode) Execute(ctx context.Context, _ *Input) (*Output, error) {
+	n.executed.Add(1)
+	n.ctxErr = ctx.Err()
+	return &Output{Response: n.id}, nil
+}
+
+func TestExecutorTeardownRunsAfterBlockOnError(t *testing.T) {
+	g := New()
+	failing := &blockingFailNode{id: "A"}
+	cleanup1 := &teardownNode{id: "T1"}
+	cleanup2 := &teardownNode{id: "T2"}
+	blocked := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(failing))
+	require.NoError(t, g.AddNode(cleanup1))
+	require.NoError(t, g.AddNode(cleanup2))
+	require.NoError(t, g.AddNode(blocked))
+	require.NoError(t, g.AddEdge("A", "T1", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("T1", "T2", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	e := NewExecutor(g)
+	_, err := e.Execute(context.Background())
+	require.Error(t, err, "the chain must still report the block_on_error failure")
+
+	assert.Equal(t, int32(1), cleanup1.executed.Load(), "teardown T1 must run despite the chain failure")
+	assert.Equal(t, int32(1), cleanup2.executed.Load(), "teardown T2 must run after T1")
+	assert.NoError(t, cleanup1.ctxErr, "teardown must execute on a live (detached) context")
+	assert.Zero(t, blocked.ExecCount(), "non-teardown downstream nodes must stay skipped")
+}
+
+// --- fakes for the traced execution path (ExecuteWithTrace / executeTraced) ---
+
+type fakeTraceHook struct {
+	ctx *fakeTraceContext
+}
+
+func (h *fakeTraceHook) StartTrace(_ context.Context, _, _ snowflake.ID) TraceContext {
+	h.ctx = &fakeTraceContext{spans: map[string]*fakeSpan{}}
+	return h.ctx
+}
+
+type fakeTraceContext struct {
+	spans map[string]*fakeSpan
+	mu    sync.Mutex
+}
+
+func (c *fakeTraceContext) StartSpan(nodeID string) SpanContext {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := &fakeSpan{nodeID: nodeID}
+	c.spans[nodeID] = s
+	return s
+}
+func (c *fakeTraceContext) FinishTrace()                   {}
+func (c *fakeTraceContext) FinishTraceWithError(string)    {}
+func (c *fakeTraceContext) FinishTraceWithCanceled(string) {}
+
+type fakeSpan struct {
+	nodeID   string
+	skipped  bool
+	finished bool
+}
+
+func (s *fakeSpan) SetInput(string)              {}
+func (s *fakeSpan) SetChainID(string)            {}
+func (s *fakeSpan) SetParentNodeID(string)       {}
+func (s *fakeSpan) Finish(string, error)         { s.finished = true }
+func (s *fakeSpan) FinishCanceled(string, error) { s.finished = true }
+func (s *fakeSpan) Skip(string)                  { s.skipped = true }
+func (s *fakeSpan) Running(string, int)          {}
+func (s *fakeSpan) IterationResult(int, bool)    {}
+
+// TestExecuteWithTraceTeardownRunsAfterBlockOnError covers the traced
+// execution path (executeTraced), which is the one production takes when a
+// tracer is configured. The always-run (teardown) exemption must behave the
+// same as the plain Execute path.
+func TestExecuteWithTraceTeardownRunsAfterBlockOnError(t *testing.T) {
+	g := New()
+	failing := &blockingFailNode{id: "A"}
+	cleanup1 := &teardownNode{id: "T1"}
+	cleanup2 := &teardownNode{id: "T2"}
+	blocked := &recordingNode{id: "B", mode: ExecSync}
+
+	require.NoError(t, g.AddNode(failing))
+	require.NoError(t, g.AddNode(cleanup1))
+	require.NoError(t, g.AddNode(cleanup2))
+	require.NoError(t, g.AddNode(blocked))
+	require.NoError(t, g.AddEdge("A", "T1", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("T1", "T2", EdgeNormal, ""))
+	require.NoError(t, g.AddEdge("A", "B", EdgeNormal, ""))
+
+	hook := &fakeTraceHook{}
+	e := NewExecutor(g, WithTraceHook(hook, 1, 1))
+	_, err := e.ExecuteWithTrace(context.Background(), nil)
+	require.Error(t, err, "the chain must still report the block_on_error failure")
+
+	assert.Equal(t, int32(1), cleanup1.executed.Load(), "teardown T1 must run despite the chain failure (traced path)")
+	assert.Equal(t, int32(1), cleanup2.executed.Load(), "teardown T2 must run after T1 (traced path)")
+	assert.NoError(t, cleanup1.ctxErr, "teardown must execute on a detached context (traced path)")
+	assert.Zero(t, blocked.ExecCount(), "non-teardown downstream nodes must stay skipped (traced path)")
+
+	hook.ctx.mu.Lock()
+	defer hook.ctx.mu.Unlock()
+	assert.True(t, hook.ctx.spans["T1"].finished, "teardown span T1 must be finished, not skipped")
+	assert.True(t, hook.ctx.spans["T2"].finished, "teardown span T2 must be finished, not skipped")
+	assert.True(t, hook.ctx.spans["B"].skipped, "downstream span B must be skipped")
+}
+>>>>>>> dev

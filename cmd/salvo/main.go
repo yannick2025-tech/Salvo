@@ -38,6 +38,10 @@ func main() {
 		Compress:   cfg.Log.Compress,
 		TimeFormat: cfg.Log.TimeFormat,
 	})
+<<<<<<< HEAD
+=======
+
+>>>>>>> dev
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)
@@ -85,13 +89,26 @@ func main() {
 
 	var mockSrv *mock.MockServer
 	if cfg.Mock.Enabled {
+<<<<<<< HEAD
 		mockSrv = mock.NewMockServer(cfg.Mock.Port)
+=======
+		mockSrv = mock.NewMockServer(cfg.Mock.Port, cfg.Mock.ErrorRate, cfg.Mock.LatencyMinMs, cfg.Mock.LatencyMaxMs)
+>>>>>>> dev
 		go func() {
 			if err := mockSrv.Start(); err != nil {
 				log.Error("mock server stopped", logger.F("error", err))
 			}
 		}()
+<<<<<<< HEAD
 		log.Info("mock server started", logger.F("port", cfg.Mock.Port))
+=======
+		log.Info("mock server started",
+			logger.F("port", cfg.Mock.Port),
+			logger.F("error_rate", cfg.Mock.ErrorRate),
+			logger.F("latency_min_ms", cfg.Mock.LatencyMinMs),
+			logger.F("latency_max_ms", cfg.Mock.LatencyMaxMs),
+		)
+>>>>>>> dev
 	}
 
 	go func() {

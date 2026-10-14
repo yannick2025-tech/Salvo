@@ -1,6 +1,10 @@
 package runner
 
 import (
+<<<<<<< HEAD
+=======
+	"fmt"
+>>>>>>> dev
 	"testing"
 	"time"
 
@@ -63,6 +67,40 @@ func TestConfigValidate(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func TestRunnerError(t *testing.T) {
+	t.Run("nil when no error set", func(t *testing.T) {
+		r := &Runner{}
+		assert.Nil(t, r.Error(), "Error() should return nil when no error set")
+	})
+
+	t.Run("returns set error", func(t *testing.T) {
+		r := &Runner{}
+		testErr := assert.AnError
+		r.setError(testErr)
+		assert.Equal(t, testErr, r.Error(), "Error() should return the set error")
+	})
+
+	t.Run("nil error does not overwrite", func(t *testing.T) {
+		r := &Runner{}
+		testErr := assert.AnError
+		r.setError(testErr)
+		r.setError(nil)
+		assert.Equal(t, testErr, r.Error(), "setError(nil) should not clear existing error")
+	})
+
+	t.Run("only first error is stored", func(t *testing.T) {
+		r := &Runner{}
+		firstErr := assert.AnError
+		r.setError(firstErr)
+		r.setError(fmt.Errorf("second error"))
+		assert.Equal(t, firstErr, r.Error(), "setError should store only the first error")
+		assert.NotContains(t, r.Error().Error(), "second", "error message should not be overwritten")
+	})
+}
+
+>>>>>>> dev
 func TestStatsRecordLatency(t *testing.T) {
 	s := &Stats{}
 
@@ -82,7 +120,11 @@ func TestStatsLatencyPercentiles(t *testing.T) {
 		s.RecordLatency(time.Duration(i+1)*time.Millisecond, true)
 	}
 
+<<<<<<< HEAD
 	avg, p50, p95, p99 := s.LatencyPercentiles()
+=======
+	avg, p50, _, p95, p99 := s.LatencyPercentiles()
+>>>>>>> dev
 	assert.True(t, avg > 0, "avg should be positive")
 	assert.True(t, p50 > 0, "p50 should be positive")
 	assert.True(t, p95 > 0, "p95 should be positive")
@@ -93,7 +135,11 @@ func TestStatsLatencyPercentiles(t *testing.T) {
 
 func TestStatsEmptyPercentiles(t *testing.T) {
 	s := &Stats{}
+<<<<<<< HEAD
 	avg, p50, p95, p99 := s.LatencyPercentiles()
+=======
+	avg, p50, _, p95, p99 := s.LatencyPercentiles()
+>>>>>>> dev
 	assert.Equal(t, time.Duration(0), avg)
 	assert.Equal(t, time.Duration(0), p50)
 	assert.Equal(t, time.Duration(0), p95)
@@ -141,13 +187,21 @@ func TestRunnerDurationAfterFinish(t *testing.T) {
 
 func TestNewRunnerValidation(t *testing.T) {
 	cfg := Config{Workers: 0, RunMode: RunModeCount, Count: 10}
+<<<<<<< HEAD
 	_, err := New(cfg, nil, nil, nil, nil, nil, nil, nil, nil)
+=======
+	_, err := New(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+>>>>>>> dev
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "scene_id is required")
 }
 
 func TestManagerStartDuplicate(t *testing.T) {
+<<<<<<< HEAD
 	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil)
+=======
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+>>>>>>> dev
 
 	r := &Runner{
 		cfg:   Config{SceneID: 42},
@@ -161,20 +215,32 @@ func TestManagerStartDuplicate(t *testing.T) {
 }
 
 func TestManagerStopNotRunning(t *testing.T) {
+<<<<<<< HEAD
 	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil)
+=======
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+>>>>>>> dev
 	err := m.Stop(999)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not running")
 }
 
 func TestManagerGetNotRunning(t *testing.T) {
+<<<<<<< HEAD
 	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil)
+=======
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+>>>>>>> dev
 	_, ok := m.Get(999)
 	assert.False(t, ok)
 }
 
 func TestManagerList(t *testing.T) {
+<<<<<<< HEAD
 	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil)
+=======
+	m := NewManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+>>>>>>> dev
 	r1 := &Runner{cfg: Config{SceneID: 1}, stats: &Stats{}, done: make(chan struct{})}
 	r2 := &Runner{cfg: Config{SceneID: 2}, stats: &Stats{}, done: make(chan struct{})}
 	m.runners[1] = r1

@@ -1,0 +1,1 @@
+import{t as e}from"./client-rK0MEaiS.js";function t(t){return e(`/reports/list`,t)}function n(t){return e(`/reports/get`,{id:t})}export{t as n,n as t};

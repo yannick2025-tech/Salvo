@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+<<<<<<< HEAD
+=======
+	"github.com/yannick2025-tech/Salvo/internal/core/expr"
+>>>>>>> dev
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
 	"github.com/yannick2025-tech/Salvo/internal/store/repo"
@@ -15,6 +19,7 @@ type Manager struct {
 	mu      sync.Mutex
 	runners map[snowflake.ID]*Runner
 
+<<<<<<< HEAD
 	scenes   repo.SceneRepo
 	nodes    repo.NodeRepo
 	edges    repo.EdgeRepo
@@ -36,6 +41,33 @@ func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo,
 		tracer:   tracer,
 		tsStore:  tsStore,
 		log:      log,
+=======
+	scenes      repo.SceneRepo
+	nodes       repo.NodeRepo
+	edges       repo.EdgeRepo
+	runs        repo.RunRecordRepo
+	reports     repo.ReportRepo
+	dataSources repo.DataSourceRepo
+	tracer      *tracelib.Tracer
+	tsStore     TimeSeriesStore
+	log         logger.Logger
+	exprReg     *expr.FunctionRegistry
+}
+
+func NewManager(scenes repo.SceneRepo, nodes repo.NodeRepo, edges repo.EdgeRepo, runs repo.RunRecordRepo, reports repo.ReportRepo, dataSources repo.DataSourceRepo, tracer *tracelib.Tracer, tsStore TimeSeriesStore, log logger.Logger, exprReg *expr.FunctionRegistry) *Manager {
+	return &Manager{
+		runners:     make(map[snowflake.ID]*Runner),
+		scenes:      scenes,
+		nodes:       nodes,
+		edges:       edges,
+		runs:        runs,
+		reports:     reports,
+		dataSources: dataSources,
+		tracer:      tracer,
+		tsStore:     tsStore,
+		log:         log,
+		exprReg:     exprReg,
+>>>>>>> dev
 	}
 }
 
@@ -47,6 +79,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 		return nil, fmt.Errorf("scene %d is already running", cfg.SceneID)
 	}
 
+<<<<<<< HEAD
 	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.reports, m.tracer, m.tsStore, m.log)
 	if err != nil {
 		return nil, err
@@ -60,6 +93,31 @@ func (m *Manager) Start(ctx context.Context, cfg Config) (*Runner, error) {
 		delete(m.runners, cfg.SceneID)
 		m.mu.Unlock()
 	}()
+=======
+	r, err := New(cfg, m.scenes, m.nodes, m.edges, m.runs, m.reports, m.dataSources, m.tracer, m.tsStore, m.log)
+	if err != nil {
+		return nil, err
+	}
+	// Pass the expression registry to the runner
+	r.exprReg = m.exprReg
+
+	m.runners[cfg.SceneID] = r
+
+	safeGo(context.Background(), m.log, "manager-start", func() {
+		err := r.Run(context.Background())
+		if err != nil {
+			r.setError(err)
+			m.log.Error("runner run failed",
+				logger.F("scene_id", cfg.SceneID.String()),
+				logger.F("run_id", r.runID.String()),
+				logger.F("error", err),
+			)
+		}
+		m.mu.Lock()
+		delete(m.runners, cfg.SceneID)
+		m.mu.Unlock()
+	})
+>>>>>>> dev
 
 	return r, nil
 }
@@ -93,3 +151,14 @@ func (m *Manager) List() map[snowflake.ID]*Runner {
 	}
 	return cp
 }
+<<<<<<< HEAD
+=======
+
+// SetExprRegistry sets the expression engine registry for all runners managed
+// by this manager. Must be called before Start() to take effect.
+func (m *Manager) SetExprRegistry(reg *expr.FunctionRegistry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.exprReg = reg
+}
+>>>>>>> dev

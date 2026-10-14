@@ -3,6 +3,10 @@ package runner
 import (
 	"context"
 	"log"
+<<<<<<< HEAD
+=======
+	"runtime/debug"
+>>>>>>> dev
 	"sync"
 	"time"
 
@@ -14,10 +18,18 @@ type Sample struct {
 	Timestamp     time.Time `json:"t"`
 	WindowSeconds int       `json:"dur"`
 
+<<<<<<< HEAD
 	QPS           float64 `json:"qps"`
 	TotalRequests int64   `json:"total"`
 	SuccessCount  int64   `json:"success"`
 	FailCount     int64   `json:"fail"`
+=======
+	QPS            float64 `json:"qps"`
+	TotalRequests  int64   `json:"total"`
+	SuccessCount   int64   `json:"success"`
+	FailCount      int64   `json:"fail"`
+	CanceledCount  int64   `json:"canceled"`
+>>>>>>> dev
 
 	AvgLatencyMs float64 `json:"avg_ms"`
 	P50LatencyMs float64 `json:"p50_ms"`
@@ -39,16 +51,29 @@ type TimeSeriesConfig struct {
 // StatsProvider provides statistics snapshots for collection.
 type StatsProvider interface {
 	GlobalSnapshot() *Sample
+<<<<<<< HEAD
+=======
+	HttpOnlySnapshot() *Sample
+>>>>>>> dev
 	NodeSnapshots() map[string]*Sample
 }
 
 // CollectedData contains all collected time-series data.
 type CollectedData struct {
+<<<<<<< HEAD
 	GlobalSamples []Sample            `json:"global_samples"`
 	NodeSamples   map[string][]Sample `json:"node_samples"`
 	GlobalPeakQPS float64             `json:"global_peak_qps"`
 	NodePeakQPS   map[string]float64  `json:"node_peak_qps"`
 	ErrorItems    []ErrorItem         `json:"error_items,omitempty"`
+=======
+	GlobalSamples        []Sample            `json:"global_samples"`
+	HttpOnlyGlobalSamples []Sample            `json:"http_only_global_samples"`
+	NodeSamples          map[string][]Sample `json:"node_samples"`
+	GlobalPeakQPS        float64             `json:"global_peak_qps"`
+	NodePeakQPS          map[string]float64  `json:"node_peak_qps"`
+	ErrorItems           []ErrorItem         `json:"error_items,omitempty"`
+>>>>>>> dev
 }
 
 // ErrorItem represents an aggregated error occurrence.
@@ -68,12 +93,22 @@ type TimeSeriesCollector struct {
 	store TimeSeriesStore
 	log   *log.Logger
 
+<<<<<<< HEAD
 	mu             sync.RWMutex
 	globalSamples  []Sample
 	nodeSamples    map[string][]Sample
 	pendingFlush   []TimeSeriesRecord
 	prevGlobalReqs int64
 	prevNodeReqs   map[string]int64
+=======
+	mu                      sync.RWMutex
+	globalSamples           []Sample
+	httpOnlyGlobalSamples   []Sample
+	nodeSamples             map[string][]Sample
+	pendingFlush            []TimeSeriesRecord
+	prevGlobalReqs          int64
+	prevNodeReqs            map[string]int64
+>>>>>>> dev
 
 	statsProvider StatsProvider
 	startTime     time.Time
@@ -101,6 +136,7 @@ func NewTimeSeriesCollector(cfg TimeSeriesConfig, runID snowflake.ID, store Time
 	}
 
 	return &TimeSeriesCollector{
+<<<<<<< HEAD
 		cfg:          cfg,
 		runID:        runID,
 		store:        store,
@@ -110,6 +146,18 @@ func NewTimeSeriesCollector(cfg TimeSeriesConfig, runID snowflake.ID, store Time
 		pendingFlush: make([]TimeSeriesRecord, 0),
 		prevNodeReqs: make(map[string]int64),
 		stopCh:       make(chan struct{}),
+=======
+		cfg:                    cfg,
+		runID:                  runID,
+		store:                  store,
+		log:                    logger,
+		globalSamples:          make([]Sample, 0),
+		httpOnlyGlobalSamples:  make([]Sample, 0),
+		nodeSamples:            make(map[string][]Sample),
+		pendingFlush:           make([]TimeSeriesRecord, 0),
+		prevNodeReqs:           make(map[string]int64),
+		stopCh:                 make(chan struct{}),
+>>>>>>> dev
 	}
 }
 
@@ -146,11 +194,21 @@ func (c *TimeSeriesCollector) GetCollectedData() *CollectedData {
 	defer c.mu.RUnlock()
 
 	data := &CollectedData{
+<<<<<<< HEAD
 		GlobalSamples: make([]Sample, len(c.globalSamples)),
 		NodeSamples:   make(map[string][]Sample),
 	}
 
 	copy(data.GlobalSamples, c.globalSamples)
+=======
+		GlobalSamples:        make([]Sample, len(c.globalSamples)),
+		HttpOnlyGlobalSamples: make([]Sample, len(c.httpOnlyGlobalSamples)),
+		NodeSamples:          make(map[string][]Sample),
+	}
+
+	copy(data.GlobalSamples, c.globalSamples)
+	copy(data.HttpOnlyGlobalSamples, c.httpOnlyGlobalSamples)
+>>>>>>> dev
 
 	for nodeID, samples := range c.nodeSamples {
 		data.NodeSamples[nodeID] = make([]Sample, len(samples))
@@ -165,6 +223,14 @@ func (c *TimeSeriesCollector) GetCollectedData() *CollectedData {
 
 func (c *TimeSeriesCollector) sampleLoop() {
 	defer c.wg.Done()
+<<<<<<< HEAD
+=======
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[timeseries] sampleLoop panicked: %v\n%s", r, debug.Stack())
+		}
+	}()
+>>>>>>> dev
 
 	ticker := time.NewTicker(c.cfg.SampleInterval)
 	defer ticker.Stop()
@@ -181,6 +247,14 @@ func (c *TimeSeriesCollector) sampleLoop() {
 
 func (c *TimeSeriesCollector) flushLoop() {
 	defer c.wg.Done()
+<<<<<<< HEAD
+=======
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[timeseries] flushLoop panicked: %v\n%s", r, debug.Stack())
+		}
+	}()
+>>>>>>> dev
 
 	ticker := time.NewTicker(c.cfg.FlushInterval)
 	defer ticker.Stop()
@@ -233,6 +307,17 @@ func (c *TimeSeriesCollector) takeSnapshot(now time.Time) {
 		c.pendingFlush = append(c.pendingFlush, record)
 	}
 
+<<<<<<< HEAD
+=======
+	httpOnlySnap := c.statsProvider.HttpOnlySnapshot()
+	if httpOnlySnap != nil && httpOnlySnap.Timestamp.IsZero() {
+		httpOnlySnap.Timestamp = now
+	}
+	if httpOnlySnap != nil {
+		c.httpOnlyGlobalSamples = append(c.httpOnlyGlobalSamples, *httpOnlySnap)
+	}
+
+>>>>>>> dev
 	for nodeID, snap := range nodeSnaps {
 		if snap == nil || snap.Timestamp.IsZero() {
 			snap.Timestamp = now
@@ -266,6 +351,10 @@ func (c *TimeSeriesCollector) takeSnapshot(now time.Time) {
 
 func (c *TimeSeriesCollector) trimSamplesBefore(cutoff time.Time) {
 	c.globalSamples = trimSamples(c.globalSamples, cutoff)
+<<<<<<< HEAD
+=======
+	c.httpOnlyGlobalSamples = trimSamples(c.httpOnlyGlobalSamples, cutoff)
+>>>>>>> dev
 	for nodeID := range c.nodeSamples {
 		c.nodeSamples[nodeID] = trimSamples(c.nodeSamples[nodeID], cutoff)
 	}

@@ -12,10 +12,17 @@
       :fit-view-options="{ padding: 0.25 }"
       :min-zoom="0.1"
       :max-zoom="2"
+<<<<<<< HEAD
       :nodes-draggable="true"
       :nodes-connectable="true"
       :elements-selectable="true"
       :edges-updatable="true"
+=======
+      :nodes-draggable="!isRunning"
+      :nodes-connectable="!isRunning"
+      :elements-selectable="true"
+      :edges-updatable="!isRunning"
+>>>>>>> dev
       class="vue-flow-canvas"
       ref="vueFlowRef"
       @node-click="onNodeClick"
@@ -29,17 +36,51 @@
       <Controls position="bottom-left" :show-interactive="false" />
       <MiniMap :node-stroke-color="minimapNodeStroke as any" :node-color="minimapNodeColor as any" pannable zoomable />
 
+<<<<<<< HEAD
       <template #node-scene-node="props">
         <SceneNode v-bind="props" @edit="$emit('edit', $event)" @delete="$emit('deleteNode', $event)" />
       </template>
     </VueFlow>
 
+=======
+      <template #node-scene-node="nodeProps">
+        <SceneNode
+          v-bind="nodeProps"
+          :execution-status="getNodeExecStatus(nodeProps.id)"
+          :chain-status="getNodeChainStatus(nodeProps.id)"
+          :loop-progress="getNodeLoopProgress(nodeProps.id)"
+          :view-mode="execViewMode"
+          @edit="$emit('edit', $event)"
+          @delete="$emit('deleteNode', $event)"
+        />
+      </template>
+    </VueFlow>
+
+    <!-- Execution view mode toolbar (shown when running) -->
+    <div v-if="isRunning" class="exec-toolbar" :class="{ 'chain-switch-flash': chainSwitchFlash }">
+      <button :class="['exec-tab', { active: execViewMode === 'aggregate' }]" @click="switchView('aggregate')">聚合视图</button>
+      <button :class="['exec-tab', { active: execViewMode === 'chain' }]" @click="switchView('chain')">单链路视图</button>
+      <CustomSelect
+        v-show="execViewMode === 'chain'"
+        v-model="localSelectedChain"
+        :options="chainSelectOpen ? frozenChainOptions : chainOptions"
+        placeholder="选择链路"
+        font-size="11px"
+        @update:modelValue="onChainSelect"
+        @openChange="onChainSelectOpenChange"
+      />
+      <div v-if="wsConnected" class="ws-indicator connected" title="WebSocket 已连接">●</div>
+      <div v-else class="ws-indicator disconnected" title="WebSocket 已断开">●</div>
+    </div>
+
+>>>>>>> dev
     <div class="dag-toolbar">
       <button class="toolbar-btn" title="自动美化布局" @click="autoLayout">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         美化布局
       </button>
       <div class="toolbar-divider"></div>
+<<<<<<< HEAD
       <button class="toolbar-btn" title="复制YAML配置" @click="copyYaml">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
         复制YAML
@@ -47,6 +88,15 @@
       <button class="toolbar-btn" title="导出YAML文件" @click="exportYaml">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         导出YAML
+=======
+      <button class="toolbar-btn" title="复制YAML配置" :disabled="exporting" @click="copyYaml">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        {{ exporting ? '导出中…' : '复制YAML' }}
+      </button>
+      <button class="toolbar-btn" title="导出YAML文件" :disabled="exporting" @click="exportYaml">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        {{ exporting ? '导出中…' : '导出YAML' }}
+>>>>>>> dev
       </button>
     </div>
 
@@ -65,9 +115,21 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge, Connection, NodeChange } from '@vue-flow/core'
+<<<<<<< HEAD
 import dagre from 'dagre'
 import SceneNode from './DagSceneNode.vue'
 import type { NodeDTO, EdgeDTO } from '@/types'
+=======
+import ELK from 'elkjs/lib/elk.bundled.js'
+import SceneNode from './DagSceneNode.vue'
+import { getDagIcon } from './dagIcons'
+import type { NodeDTO, EdgeDTO } from '@/types'
+import { useExecutionWs } from '@/composables/useExecutionWs'
+import { useExecutionStatus, type ViewMode } from '@/composables/useExecutionStatus'
+import { getTraceByRun } from '@/api/trace'
+import { exportYAML } from '@/api/scene'
+import CustomSelect from '@/components/CustomSelect.vue'
+>>>>>>> dev
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -76,6 +138,13 @@ import '@vue-flow/minimap/dist/style.css'
 const props = defineProps<{
   nodes: NodeDTO[]
   edges: EdgeDTO[]
+<<<<<<< HEAD
+=======
+  dataSources?: { name: string; columns: string[]; rows: Record<string, string>[] }[]
+  isRunning?: boolean
+  runId?: string
+  sceneId: string
+>>>>>>> dev
 }>()
 
 const emit = defineEmits<{
@@ -94,6 +163,188 @@ const nodeTypes: Record<string, any> = {
 
 const { fitView } = useVueFlow()
 
+<<<<<<< HEAD
+=======
+// ===== Execution status composables =====
+const { spanUpdates, statsEvents, isConnected: wsConnected, connect: wsConnect, disconnect: wsDisconnect } = useExecutionWs()
+const {
+  aggregateStatus,
+  chainStatuses,
+  loopProgress,
+  viewMode: execViewMode,
+  selectedChainId,
+  computeAggregateStatus,
+  switchView,
+  selectChain,
+  initFromSpans,
+  version: execVersion,
+} = useExecutionStatus(spanUpdates, statsEvents)
+
+const chainIds = computed(() => {
+  // Depend on version to react to shallowRef changes
+  void execVersion.value
+  return Array.from(chainStatuses.value.keys())
+})
+
+// Map chain_id to a readable label (Chain #1, Chain #2, etc.)
+const chainLabelMap = computed(() => {
+  void execVersion.value
+  const map = new Map<string, string>()
+  const ids = Array.from(chainStatuses.value.keys())
+  ids.forEach((id, index) => {
+    map.set(id, `Chain #${index + 1}`)
+  })
+  return map
+})
+
+// Options for CustomSelect
+const chainOptions = computed(() => {
+  return debouncedChainIds.value.map(cid => ({
+    value: cid,
+    label: chainLabelMap.value.get(cid) || cid,
+  }))
+})
+
+// Debounced chainIds: only update when user is not actively selecting
+// or when the list genuinely changes (new chain added)
+const debouncedChainIds = ref<string[]>([])
+let chainIdsTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(chainIds, (newIds) => {
+  // Always update immediately if the list size changed (new chain added)
+  if (newIds.length !== debouncedChainIds.value.length) {
+    debouncedChainIds.value = newIds
+    return
+  }
+  // Otherwise debounce to avoid frequent re-renders during WS event bursts
+  if (chainIdsTimer) clearTimeout(chainIdsTimer)
+  chainIdsTimer = setTimeout(() => {
+    debouncedChainIds.value = newIds
+  }, 300)
+}, { immediate: true })
+
+// Local ref for select binding, synced with composable's selectedChainId
+const localSelectedChain = ref('')
+
+// Sync: when composable's selectedChainId changes, update local
+watch(selectedChainId, (val) => {
+  localSelectedChain.value = val || ''
+}, { immediate: true })
+
+function onChainSelect(value: string | number) {
+  if (value) {
+    selectChain(String(value))
+    // Flash feedback
+    chainSwitchFlash.value = true
+    setTimeout(() => { chainSwitchFlash.value = false }, 600)
+  }
+}
+
+// Freeze chain options while dropdown is open to prevent jarring list changes
+const chainSelectOpen = ref(false)
+const frozenChainOptions = ref<{ value: string; label: string }[]>([])
+const chainSwitchFlash = ref(false)
+
+function onChainSelectOpenChange(isOpen: boolean) {
+  chainSelectOpen.value = isOpen
+  if (isOpen) {
+    // Snapshot current options when opening
+    frozenChainOptions.value = [...chainOptions.value]
+  }
+}
+
+// Compute node badges for current nodes
+const nodeBadges = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
+  return computeAggregateStatus(props.nodes)
+})
+
+function getNodeExecStatus(nodeId: string) {
+  if (!props.isRunning) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
+  return aggregateStatus.value.get(nodeId) || undefined
+}
+
+function getNodeChainStatus(nodeId: string) {
+  if (!props.isRunning || execViewMode.value !== 'chain' || !selectedChainId.value) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (!chainMap) return undefined
+  const state = chainMap.get(nodeId)
+  if (!state) return null
+  // Derive a single display status from the cumulative chain state:
+  // in-flight first, then any historical failure, pass, skip.
+  if (state.runningIdx.size > 0) return 'running'
+  if (state.fail > 0) return 'fail'
+  if (state.pass > 0) return 'pass'
+  if (state.skip > 0) return 'skip'
+  return null
+}
+
+function getNodeLoopProgress(nodeId: string) {
+  if (!props.isRunning || !selectedChainId.value) return undefined
+  void execVersion.value // depend on version for shallowRef reactivity
+  const chainLoopMap = loopProgress.value.get(selectedChainId.value)
+  if (!chainLoopMap) return undefined
+  return chainLoopMap.get(nodeId) || undefined
+}
+
+// Connect/disconnect WS based on runId, and load initial trace data
+watch(() => props.runId, async (newRunId) => {
+  if (newRunId) {
+    wsConnect(newRunId)
+    // Load existing trace data to initialize status
+    try {
+      const resp = await getTraceByRun(newRunId)
+      if (resp.code === 0 && resp.data?.spans) {
+        initFromSpans(resp.data.spans)
+      }
+    } catch { /* trace may not exist yet */ }
+  } else {
+    wsDisconnect()
+  }
+}, { immediate: true })
+
+// Active chain edges for single chain view edge styling
+const activeChainEdgeIds = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
+  if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
+  // In chain mode, all edges connected to nodes in the selected chain are "active"
+  const chainNodeIds = new Set<string>()
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (chainMap) {
+    for (const nodeId of chainMap.keys()) {
+      chainNodeIds.add(nodeId)
+    }
+  }
+  const activeIds = new Set<string>()
+  for (const e of props.edges) {
+    if (chainNodeIds.has(e.from_node) && chainNodeIds.has(e.to_node)) {
+      activeIds.add(e.id)
+    }
+  }
+  return activeIds
+})
+
+const runningChainEdgeIds = computed(() => {
+  void execVersion.value // depend on version for shallowRef reactivity
+  if (execViewMode.value !== 'chain' || !selectedChainId.value) return new Set<string>()
+  const chainMap = chainStatuses.value.get(selectedChainId.value)
+  if (!chainMap) return new Set<string>()
+  const runningNodeIds = new Set<string>()
+  for (const [nodeId, state] of chainMap) {
+    if (state.runningIdx.size > 0) runningNodeIds.add(nodeId)
+  }
+  const runningIds = new Set<string>()
+  for (const e of props.edges) {
+    if (runningNodeIds.has(e.from_node) || runningNodeIds.has(e.to_node)) {
+      runningIds.add(e.id)
+    }
+  }
+  return runningIds
+})
+
+>>>>>>> dev
 const defaultEdgeOptions = computed(() => ({
   type: 'smoothstep',
   style: { stroke: 'var(--text-tertiary)', strokeWidth: 2 },
@@ -101,11 +352,16 @@ const defaultEdgeOptions = computed(() => ({
 }))
 
 function getNodeTypeLabel(type: string) {
+<<<<<<< HEAD
   const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN' }
+=======
+  const map: Record<string, string> = { setup: 'SETUP', http: 'HTTP', delay: 'DELAY', condition: 'COND', 'if-else': 'IF-ELSE', teardown: 'TEARDOWN', group: 'GROUP', timer: 'TIMER', while: 'WHILE', parallel: 'PARALLEL', sub_flow: 'SUBFLOW', loop: 'LOOP' }
+>>>>>>> dev
   return map[type] || type.toUpperCase()
 }
 
 function getNodeIcon(type: string) {
+<<<<<<< HEAD
   const map: Record<string, string> = { setup: '▶', http: '⇄', delay: '⏱', condition: '◇', 'if-else': 'Y', teardown: '■' }
   return map[type] || '?'
 }
@@ -149,6 +405,80 @@ function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Map<string, { x:
         y: node.y - NODE_H / 2,
       })
     }
+=======
+  return getDagIcon(type)
+}
+
+const elk = new ELK()
+
+function getNodeDimensions(n: NodeDTO): { width: number; height: number } {
+  const DEFAULT_W = 280
+  const DEFAULT_H = 56
+  try {
+    const cfg = JSON.parse(n.config || '{}')
+    if (n.type === 'group' && cfg.node_ids && Array.isArray(cfg.node_ids)) {
+      const childCount = cfg.node_ids.length
+      // header (56) + children area (each child ~40px + 22px arrow) + padding
+      return { width: 320, height: DEFAULT_H + childCount * 62 + 24 }
+    }
+    // while/loop 引用子节点：高度按 node_ids 子节点数计算（while 与内嵌 steps 取较大者）
+    if ((n.type === 'while' || n.type === 'loop') && Array.isArray(cfg.node_ids) && cfg.node_ids.length > 0) {
+      const childH = DEFAULT_H + cfg.node_ids.length * 62 + 24
+      if (n.type === 'while' && Array.isArray(cfg.steps)) {
+        const stepH = DEFAULT_H + cfg.steps.length * 62 + 54
+        return { width: 300, height: Math.max(childH, stepH) }
+      }
+      return { width: 300, height: childH }
+    }
+    if (n.type === 'while' && cfg.steps && Array.isArray(cfg.steps)) {
+      const stepCount = cfg.steps.length
+      // header (56) + loop indicator (30) + steps (each step ~40px + 22px arrow) + padding
+      return { width: 300, height: DEFAULT_H + stepCount * 62 + 54 }
+    }
+  } catch { /* ignore */ }
+  return { width: DEFAULT_W, height: DEFAULT_H }
+}
+
+async function buildLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]): Promise<Map<string, { x: number; y: number }>> {
+  const positions = new Map<string, { x: number; y: number }>()
+  if (newNodes.length === 0) return positions
+
+  const elkNodes = newNodes.map(n => {
+    const dims = getNodeDimensions(n)
+    return { id: n.id, width: dims.width, height: dims.height }
+  })
+
+  const nodeIds = new Set(newNodes.map(n => n.id))
+  const elkEdges = newEdges
+    .filter(e => nodeIds.has(e.from_node) && nodeIds.has(e.to_node))
+    .map(e => ({ id: e.id, sources: [e.from_node], targets: [e.to_node] }))
+
+  const graph = {
+    id: 'root',
+    layoutOptions: {
+      'org.eclipse.elk.algorithm': 'layered',
+      'org.eclipse.elk.direction': 'DOWN',
+      'org.eclipse.elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+      'org.eclipse.elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'org.eclipse.elk.spacing.nodeNode': '70',
+      'org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers': '110',
+      'org.eclipse.elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'org.eclipse.elk.edgeRouting': 'ORTHOGONAL',
+      'org.eclipse.elk.layered.nodePlacement.favorStraightEdges': 'true',
+      'org.eclipse.elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+    },
+    children: elkNodes,
+    edges: elkEdges,
+  }
+
+  const result = await elk.layout(graph)
+
+  for (const child of result.children || []) {
+    positions.set(child.id, {
+      x: child.x || 0,
+      y: child.y || 0,
+    })
+>>>>>>> dev
   }
 
   return positions
@@ -158,15 +488,57 @@ const vfNodes = ref<Node[]>([])
 const vfEdges = ref<Edge[]>([])
 const handleOverrides = ref<Map<string, { sourceHandle: string; targetHandle: string }>>(new Map())
 
+<<<<<<< HEAD
 function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
   const layoutPositions = buildLayout(newNodes, newEdges)
 
   vfNodes.value = newNodes.map(n => {
     const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
+=======
+async function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
+  const layoutPositions = await buildLayout(newNodes, newEdges)
+
+  vfNodes.value = newNodes.map(n => {
+    const pos = layoutPositions.get(n.id) || { x: 0, y: 0 }
+    let loopCount = 1
+    let childNodes: NodeDTO[] = []
+    let whileSteps: { name: string; type: string }[] = []
+    try {
+      const cfg = JSON.parse(n.config || '{}')
+      loopCount = cfg.loop_count || 1
+      // 三类复合节点统一：config.node_ids 引用子节点 → 反查 NodeDTO 挂 childNodes（与 group 既有逻辑一致）
+      if ((n.type === 'group' || n.type === 'while' || n.type === 'loop') && Array.isArray(cfg.node_ids)) {
+        const childIdSet = new Set(cfg.node_ids as string[])
+        const childMap = new Map(newNodes.filter(cn => childIdSet.has(cn.id)).map(cn => [cn.id, cn]))
+        childNodes = (cfg.node_ids as string[]).map(id => childMap.get(id)).filter(Boolean) as NodeDTO[]
+      }
+      if (n.type === 'while' && cfg.steps && Array.isArray(cfg.steps)) {
+        whileSteps = (cfg.steps as any[]).map(s => ({ name: s.name || '', type: s.type || 'http' }))
+      }
+    } catch { /* ignore */ }
+
+    const baseData: Record<string, unknown> = {
+      label: n.name,
+      nodeType: n.type,
+      icon: getNodeIcon(n.type),
+      typeLabel: getNodeTypeLabel(n.type),
+      loopCount,
+      originalNode: n,
+    }
+
+    if (n.type === 'group' || n.type === 'while' || n.type === 'loop') {
+      baseData.childNodes = childNodes
+    }
+    if (n.type === 'while') {
+      baseData.whileSteps = whileSteps
+    }
+
+>>>>>>> dev
     return {
       id: n.id,
       type: 'scene-node',
       position: pos,
+<<<<<<< HEAD
       data: {
         label: n.name,
         nodeType: n.type,
@@ -174,6 +546,9 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
         typeLabel: getNodeTypeLabel(n.type),
         originalNode: n,
       },
+=======
+      data: baseData,
+>>>>>>> dev
     } as Node
   })
 
@@ -181,6 +556,11 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
     let markerEnd: string | { type: MarkerType; color: string } = MarkerType.ArrowClosed
     let strokeColor = 'var(--text-tertiary)'
     let edgeType = 'smoothstep'
+<<<<<<< HEAD
+=======
+    let animated = false
+    let edgeOpacity: number | undefined = undefined
+>>>>>>> dev
 
     if (e.condition === '__if_true__') {
       markerEnd = { type: MarkerType.ArrowClosed, color: '#2ecc71' }
@@ -190,6 +570,22 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       strokeColor = '#e74c3c'
     }
 
+<<<<<<< HEAD
+=======
+    // Single chain view edge styling
+    if (props.isRunning && execViewMode.value === 'chain' && selectedChainId.value) {
+      const isActive = activeChainEdgeIds.value.has(e.id)
+      const isRunningEdge = runningChainEdgeIds.value.has(e.id)
+      if (isRunningEdge) {
+        animated = true
+        strokeColor = 'var(--accent-primary)'
+        markerEnd = { type: MarkerType.ArrowClosed, color: 'var(--accent-primary)' }
+      } else if (!isActive) {
+        edgeOpacity = 0.15
+      }
+    }
+
+>>>>>>> dev
     const override = handleOverrides.value.get(e.id)
     const sourceHandle = override?.sourceHandle || 's-bottom'
     const targetHandle = override?.targetHandle || 't-top'
@@ -210,8 +606,13 @@ function applyLayout(newNodes: NodeDTO[], newEdges: EdgeDTO[]) {
       labelBgStyle: { fill: 'var(--bg-secondary)' },
       labelBgPadding: [4, 8] as [number, number],
       labelBgBorderRadius: 6,
+<<<<<<< HEAD
       animated: false,
       style: { stroke: strokeColor, strokeWidth: 2 },
+=======
+      animated,
+      style: { stroke: strokeColor, strokeWidth: 2, ...(edgeOpacity !== undefined ? { opacity: edgeOpacity } : {}) },
+>>>>>>> dev
       markerEnd,
     } as Edge
   })
@@ -221,12 +622,45 @@ watch([() => props.nodes, () => props.edges], ([newNodes, newEdges]) => {
   applyLayout(newNodes, newEdges)
 }, { immediate: true })
 
+<<<<<<< HEAD
 function autoLayout() {
   applyLayout(props.nodes, props.edges)
+=======
+// Update edge styles when view mode or selected chain changes
+watch([execViewMode, selectedChainId], () => {
+  if (!props.isRunning) return
+  // Update edge styles in-place without re-running layout
+  void execVersion.value // read current version to get latest data
+  for (const edge of vfEdges.value) {
+    if (execViewMode.value === 'chain' && selectedChainId.value) {
+      const isActive = activeChainEdgeIds.value.has(edge.id)
+      const isRunning = runningChainEdgeIds.value.has(edge.id)
+      if (isRunning) {
+        edge.style = { stroke: 'var(--accent-primary)', strokeWidth: 2, strokeDasharray: '8 4', animation: 'dash-flow 0.8s linear infinite' }
+        edge.animated = true
+      } else if (isActive) {
+        edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2 }
+        edge.animated = false
+      } else {
+        edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2, opacity: 0.15 }
+        edge.animated = false
+      }
+    } else {
+      // Reset to default style
+      edge.style = { stroke: 'var(--text-tertiary)', strokeWidth: 2 }
+      edge.animated = false
+    }
+  }
+})
+
+async function autoLayout() {
+  await applyLayout(props.nodes, props.edges)
+>>>>>>> dev
   setTimeout(() => fitView({ padding: 0.2 }), 50)
   showToast('布局已重新排列', 'success')
 }
 
+<<<<<<< HEAD
 function toYamlValue(val: any, indent: string): string {
   if (val === null || val === undefined) return 'null'
   if (typeof val === 'boolean') return val ? 'true' : 'false'
@@ -330,6 +764,69 @@ async function copyYaml() {
 
 function exportYaml() {
   const yaml = generateYaml()
+=======
+const exporting = ref(false)
+
+async function copyYaml() {
+  if (exporting.value) return
+  exporting.value = true
+  let yaml = ''
+  try {
+    const resp = await exportYAML(props.sceneId)
+    if (resp.code !== 0 || !resp.data) {
+      exporting.value = false
+      showToast(resp.message || '导出失败，请重试', 'error')
+      return
+    }
+    yaml = resp.data.yaml
+  } catch {
+    exporting.value = false
+    showToast('导出失败，请重试', 'error')
+    return
+  }
+  // 优先 Clipboard API；运行过场景后文档可能失焦导致 writeText reject，回退到 textarea + execCommand
+  let ok = false
+  try {
+    await navigator.clipboard.writeText(yaml)
+    ok = true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = yaml
+      ta.style.position = 'fixed'
+      ta.style.top = '-9999px'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+    } catch {
+      ok = false
+    }
+  }
+  exporting.value = false
+  showToast(ok ? 'YAML 已复制到剪贴板' : '复制失败，请手动选择文本', ok ? 'success' : 'error')
+}
+
+async function exportYaml() {
+  if (exporting.value) return
+  exporting.value = true
+  let yaml = ''
+  try {
+    const resp = await exportYAML(props.sceneId)
+    if (resp.code !== 0 || !resp.data) {
+      exporting.value = false
+      showToast(resp.message || '导出失败，请重试', 'error')
+      return
+    }
+    yaml = resp.data.yaml
+  } catch {
+    exporting.value = false
+    showToast('导出失败，请重试', 'error')
+    return
+  }
+>>>>>>> dev
   const blob = new Blob([yaml], { type: 'text/yaml;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -339,6 +836,10 @@ function exportYaml() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+<<<<<<< HEAD
+=======
+  exporting.value = false
+>>>>>>> dev
   showToast('YAML 文件已导出', 'success')
 }
 
@@ -442,6 +943,13 @@ function minimapNodeColor(node: any) {
   if (t === 'delay') return 'var(--accent-warning)'
   if (t === 'if-else') return '#e67e22'
   if (t === 'teardown') return 'var(--accent-danger)'
+<<<<<<< HEAD
+=======
+  if (t === 'while') return '#8e44ad'
+  if (t === 'parallel') return '#16a085'
+  if (t === 'sub_flow') return '#2980b9'
+  if (t === 'loop') return '#d35400'
+>>>>>>> dev
   return 'var(--text-tertiary)'
 }
 </script>
@@ -509,6 +1017,82 @@ function minimapNodeColor(node: any) {
   margin: 0 2px;
 }
 
+<<<<<<< HEAD
+=======
+/* ===== Execution toolbar ===== */
+.exec-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+}
+
+.exec-toolbar.chain-switch-flash {
+  animation: chain-flash 0.6s ease-out;
+}
+
+@keyframes chain-flash {
+  0% { box-shadow: 0 0 0 2px var(--accent-primary), var(--shadow-md); }
+  100% { box-shadow: 0 0 0 0px transparent, var(--shadow-md); }
+}
+
+.exec-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.exec-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.exec-tab.active {
+  background: rgba(0,229,255,0.1);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+
+
+.ws-indicator {
+  font-size: 10px;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.ws-indicator.connected {
+  color: var(--accent-success);
+}
+
+.ws-indicator.disconnected {
+  color: var(--accent-danger);
+  animation: exec-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes exec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+>>>>>>> dev
 .dag-toast {
   position: absolute;
   top: 48px;
@@ -525,7 +1109,11 @@ function minimapNodeColor(node: any) {
 }
 
 .dag-toast.success {
+<<<<<<< HEAD
   background: rgba(46, 204, 113, 0.92);
+=======
+  background: var(--accent-success);
+>>>>>>> dev
   color: #fff;
 }
 

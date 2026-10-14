@@ -3,6 +3,11 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+<<<<<<< HEAD
+=======
+	"encoding/json"
+	"fmt"
+>>>>>>> dev
 	"path/filepath"
 	"testing"
 	"time"
@@ -97,6 +102,215 @@ func TestSceneRepoDelete(t *testing.T) {
 	assert.Equal(t, sql.ErrNoRows, err)
 }
 
+<<<<<<< HEAD
+=======
+func TestSceneRepoUpdateStatusKeepsUpdatedAt(t *testing.T) {
+	db := openTestDB(t)
+	r := NewSceneRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "status-only", Status: "draft"}
+	require.NoError(t, r.Create(ctx, scene))
+	origUpdatedAt := scene.UpdatedAt
+
+	// Status transitions (running/completed on start/stop) must not touch
+	// updated_at: it should reflect configuration changes only.
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, r.UpdateStatus(ctx, scene.ID, "running"))
+
+	found, err := r.GetByID(ctx, scene.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "running", found.Status)
+	assert.True(t, found.UpdatedAt.Equal(origUpdatedAt),
+		"UpdateStatus must not modify updated_at, got %v want %v",
+		found.UpdatedAt, origUpdatedAt)
+}
+
+// buildCopySourceScene creates a scene with http/delay/group nodes, edges
+// (with condition/priority), variables and a CSV data source for copy tests.
+func buildCopySourceScene(t *testing.T, db *DB) (*model.Scene, []*model.Node) {
+	t.Helper()
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+	dsRepo := NewDataSourceRepo(db)
+
+	scene := &model.Scene{
+		Name:          "copy-src",
+		Description:   "源场景描述",
+		Variables:     `{"host":"http://example.com","token":"abc"}`,
+		ConfigParams:  `{"duration":30}`,
+		DerivedParams: `{"qps":100}`,
+		Plugins:       `{"telemetry":{"enabled":true}}`,
+		Status:        "completed",
+		DefaultTimeout: 15,
+	}
+	require.NoError(t, sceneRepo.Create(ctx, scene))
+
+	httpNode := &model.Node{SceneID: scene.ID, Name: "login", Type: model.NodeTypeHTTP,
+		Config: `{"url":"${host}/login","method":"POST","body":"token=${token}"}`,
+		Position: `{"x":100,"y":50}`, Lifecycle: `{"setup":"A","teardown":"B"}`}
+	require.NoError(t, nodeRepo.Create(ctx, httpNode))
+
+	delayNode := &model.Node{SceneID: scene.ID, Name: "wait", Type: model.NodeTypeDelay,
+		Config: `{"delay_ms":500}`, Position: `{"x":300,"y":50}`, LoopCount: 2, BlockOnError: true}
+	require.NoError(t, nodeRepo.Create(ctx, delayNode))
+
+	groupNode := &model.Node{SceneID: scene.ID, Name: "grp", Type: model.NodeTypeGroup,
+		Config: `{"node_ids":[]}`, Position: `{"x":200,"y":200}`, LoopCount: 3}
+	// node_ids 引用旧节点 ID，复制后必须重写为新节点 ID
+	groupNode.Config = fmt.Sprintf(`{"node_ids":["%d","%d"]}`, httpNode.ID, delayNode.ID)
+	require.NoError(t, nodeRepo.Create(ctx, groupNode))
+
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: scene.ID,
+		FromNode: httpNode.ID, ToNode: delayNode.ID, Condition: "status==200", Priority: 1}))
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: scene.ID,
+		FromNode: delayNode.ID, ToNode: groupNode.ID, Priority: 2}))
+
+	require.NoError(t, dsRepo.Create(ctx, &model.DataSource{SceneID: scene.ID,
+		Name: "users", FileName: "users.csv", Columns: `["name","age"]`,
+		Rows: `[{"name":"alice","age":30},{"name":"bob","age":25}]`, RowCount: 2, Source: "csv"}))
+
+	return scene, []*model.Node{httpNode, delayNode, groupNode}
+}
+
+func TestSceneRepoCopyTx(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+	dsRepo := NewDataSourceRepo(db)
+
+	src, srcNodes := buildCopySourceScene(t, db)
+
+	copied, err := sceneRepo.CopyTx(ctx, src.ID, "copy-dst", src.Description)
+	require.NoError(t, err)
+
+	// 场景本体：新 ID、draft、dag_json 空、description 原样继承、字段原样
+	assert.NotEqual(t, src.ID, copied.ID)
+	assert.Equal(t, "copy-dst", copied.Name)
+	assert.Equal(t, "draft", copied.Status)
+	assert.Empty(t, copied.DAGJSON)
+	assert.Equal(t, "源场景描述", copied.Description)
+	assert.Equal(t, src.Variables, copied.Variables)
+	assert.Equal(t, src.ConfigParams, copied.ConfigParams)
+	assert.Equal(t, src.DerivedParams, copied.DerivedParams)
+	assert.Equal(t, src.Plugins, copied.Plugins)
+	assert.Equal(t, src.DefaultTimeout, copied.DefaultTimeout)
+	// 源场景不受影响
+	srcAfter, err := sceneRepo.GetByID(ctx, src.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", srcAfter.Status)
+
+	// 节点：数量一致、逐字段相等、全新 ID、ID 映射正确
+	newNodes, err := nodeRepo.List(ctx, repo.Filter{SceneID: copied.ID, Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	require.Len(t, newNodes, 3)
+	newIDs := map[snowflake.ID]bool{}
+	for i, n := range newNodes {
+		assert.NotEqual(t, srcNodes[i].ID, n.ID, "node must get a new ID")
+		assert.Equal(t, srcNodes[i].Name, n.Name)
+		assert.Equal(t, srcNodes[i].Type, n.Type)
+		assert.Equal(t, srcNodes[i].Position, n.Position)
+		assert.Equal(t, srcNodes[i].LoopCount, n.LoopCount)
+		assert.Equal(t, srcNodes[i].BlockOnError, n.BlockOnError)
+		assert.Equal(t, srcNodes[i].Lifecycle, n.Lifecycle)
+		newIDs[n.ID] = true
+	}
+	// http/delay 节点 config 逐字节原样（含 ${host}、${token} 名称引用）
+	assert.Equal(t, srcNodes[0].Config, newNodes[0].Config)
+	assert.Equal(t, srcNodes[1].Config, newNodes[1].Config)
+
+	// 连线：from/to 映射重写，condition/priority 保留
+	newEdges, err := edgeRepo.List(ctx, repo.Filter{SceneID: copied.ID, Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	require.Len(t, newEdges, 2)
+	for _, e := range newEdges {
+		assert.True(t, newIDs[e.FromNode], "edge from_node must reference a new-scene node")
+		assert.True(t, newIDs[e.ToNode], "edge to_node must reference a new-scene node")
+		assert.Equal(t, copied.ID, e.SceneID)
+	}
+	assert.Equal(t, "status==200", newEdges[0].Condition)
+	assert.Equal(t, 1, newEdges[0].Priority)
+	assert.Equal(t, 2, newEdges[1].Priority)
+
+	// group 节点 node_ids 重写为新节点 ID
+	groupNew := newNodes[2]
+	var cfg struct {
+		NodeIDs []string `json:"node_ids"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(groupNew.Config), &cfg))
+	require.Len(t, cfg.NodeIDs, 2)
+	for _, idStr := range cfg.NodeIDs {
+		var id snowflake.ID
+		require.NoError(t, id.Parse(idStr))
+		assert.True(t, newIDs[id], "group node_ids must reference new-scene node IDs, got %s", idStr)
+	}
+
+	// 数据源：含全部 rows
+	newDS, err := dsRepo.ListBySceneID(ctx, copied.ID)
+	require.NoError(t, err)
+	require.Len(t, newDS, 1)
+	assert.Equal(t, "users", newDS[0].Name)
+	assert.Equal(t, "csv", newDS[0].Source)
+	assert.Equal(t, `[{"name":"alice","age":30},{"name":"bob","age":25}]`, newDS[0].Rows)
+	assert.Equal(t, 2, newDS[0].RowCount)
+}
+
+func TestSceneRepoCopyTxSourceNotFound(t *testing.T) {
+	db := openTestDB(t)
+	_, err := NewSceneRepo(db).CopyTx(context.Background(), 99999, "ghost", "")
+	assert.Error(t, err)
+}
+
+func TestSceneRepoCopyTxRollbackOnDanglingEdge(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	edgeRepo := NewEdgeRepo(db)
+
+	src, _ := buildCopySourceScene(t, db)
+	// 构造悬空边：引用不存在的节点
+	require.NoError(t, edgeRepo.Create(ctx, &model.Edge{SceneID: src.ID,
+		FromNode: 88888, ToNode: 99999, Priority: 9}))
+
+	_, err := sceneRepo.CopyTx(ctx, src.ID, "dangling-copy", "")
+	require.Error(t, err, "dangling edge must fail the copy")
+
+	// 回滚断言：无新场景残留
+	scenes, err := sceneRepo.List(ctx, repo.Filter{Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	for _, s := range scenes {
+		assert.NotEqual(t, "dangling-copy", s.Name, "failed copy must not leave a scene behind")
+	}
+}
+
+func TestSceneRepoCopyTxRollbackOnUnknownGroupRef(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	sceneRepo := NewSceneRepo(db)
+	nodeRepo := NewNodeRepo(db)
+
+	src := &model.Scene{Name: "grp-src", Status: "draft"}
+	require.NoError(t, sceneRepo.Create(ctx, src))
+	// group 引用不存在的节点 ID
+	badGroup := &model.Node{SceneID: src.ID, Name: "bad-grp", Type: model.NodeTypeGroup,
+		Config: `{"node_ids":["12345"]}`}
+	require.NoError(t, nodeRepo.Create(ctx, badGroup))
+
+	_, err := sceneRepo.CopyTx(ctx, src.ID, "grp-copy", "")
+	assert.Error(t, err, "unknown group node_ids must fail the copy")
+
+	scenes, err := sceneRepo.List(ctx, repo.Filter{Limit: 100, Offset: 0})
+	require.NoError(t, err)
+	for _, s := range scenes {
+		assert.NotEqual(t, "grp-copy", s.Name)
+	}
+}
+
+>>>>>>> dev
 func TestSceneRepoList(t *testing.T) {
 	db := openTestDB(t)
 	r := NewSceneRepo(db)
@@ -456,3 +670,955 @@ func TestOpenWALMode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "wal", journalMode)
 }
+<<<<<<< HEAD
+=======
+
+// --- ReportRepo tests with report_details ---
+
+func TestReportRepoCreateWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "report-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	detailJSON := `{"metrics":{"total":1000,"success":990}}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "All passed",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	err := rr.Create(ctx, report)
+	require.NoError(t, err)
+	assert.NotZero(t, report.ID)
+
+	// 验证 reports 表和 report_details 表都有数据
+	var count int
+	err = db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// 验证可以通过 GetByID 获取 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoCreateWithoutDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "report-no-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "All passed",
+		Detail:     "", // 空 detail
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	err := rr.Create(ctx, report)
+	require.NoError(t, err)
+
+	// 验证 report_details 表没有数据（因为 detail 为空）
+	var count int
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// 验证 GetByID 返回空 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", found.Detail)
+}
+
+func TestReportRepoGetByIDWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "get-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	detailJSON := `{"nodes":[{"id":"A","success":true}]}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 测试 GetByID
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, report.ID, found.ID)
+	assert.Equal(t, report.SceneID, found.SceneID)
+	assert.Equal(t, report.RunID, found.RunID)
+	assert.Equal(t, "success", found.Status)
+	assert.Equal(t, "Test summary", found.Summary)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoGetByRunIDWithDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "get-by-run-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	runID := db.NextID()
+	detailJSON := `{"metrics":{"latency":45.5}}`
+
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      runID,
+		Status:     "success",
+		Summary:    "Run summary",
+		Detail:     detailJSON,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 测试 GetByRunID
+	found, err := rr.GetByRunID(ctx, runID)
+	require.NoError(t, err)
+	assert.Equal(t, report.ID, found.ID)
+	assert.Equal(t, runID, found.RunID)
+	assert.Equal(t, detailJSON, found.Detail)
+}
+
+func TestReportRepoListWithoutDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "list-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	// 创建多个报告，有的有 detail，有的没有
+	for i := 0; i < 5; i++ {
+		report := &model.Report{
+			SceneID:    scene.ID,
+			RunID:      db.NextID(),
+			Status:     "success",
+			Summary:    "Summary " + string(rune('A'+i)),
+			Detail:     `{"data":"test"}`,
+			StartedAt:  &now,
+			FinishedAt: &now,
+		}
+		require.NoError(t, rr.Create(ctx, report))
+	}
+
+	// 测试 List 方法不返回 detail
+	reports, err := rr.List(ctx, repo.Filter{SceneID: scene.ID, Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, reports, 5)
+
+	for _, r := range reports {
+		assert.Equal(t, "", r.Detail, "List method should not return detail field")
+		assert.NotEmpty(t, r.Summary)
+		assert.NotEmpty(t, r.Status)
+	}
+}
+
+func TestReportRepoUpdateDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "update-report-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "Original summary",
+		Detail:     `{"old":"data"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 更新报告，包括 detail
+	report.Status = "failed"
+	report.Summary = "Updated summary"
+	report.Detail = `{"new":"data"}`
+	require.NoError(t, rr.Update(ctx, report))
+
+	// 验证更新后的数据
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", found.Status)
+	assert.Equal(t, "Updated summary", found.Summary)
+	assert.Equal(t, `{"new":"data"}`, found.Detail)
+}
+
+func TestReportRepoUpdateAddDetail(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "add-detail-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "No detail initially",
+		Detail:     "", // 初始没有 detail
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 验证初始没有 detail
+	found, err := rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", found.Detail)
+
+	// 更新，添加 detail
+	report.Detail = `{"added":"detail"}`
+	require.NoError(t, rr.Update(ctx, report))
+
+	// 验证 detail 已添加
+	found, err = rr.GetByID(ctx, report.ID)
+	require.NoError(t, err)
+	assert.Equal(t, `{"added":"detail"}`, found.Detail)
+}
+
+func TestReportRepoDeleteCascade(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	rr := NewReportRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "delete-cascade-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      db.NextID(),
+		Status:     "success",
+		Summary:    "To be deleted",
+		Detail:     `{"data":"will be deleted"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	require.NoError(t, rr.Create(ctx, report))
+
+	// 验证数据存在
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ? AND deleted_at IS NULL`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// 删除报告
+	require.NoError(t, rr.Delete(ctx, report.ID))
+
+	// 验证 reports 表已被软删除
+	err = db.QueryRow(`SELECT COUNT(*) FROM reports WHERE id = ? AND deleted_at IS NULL`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count, "reports table should be soft-deleted")
+
+	// 验证 report_details 表已被删除
+	err = db.QueryRow(`SELECT COUNT(*) FROM report_details WHERE report_id = ?`, report.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count, "report_details should be deleted")
+
+	// 验证 GetByID 返回错误
+	_, err = rr.GetByID(ctx, report.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- UserRepo tests ---
+
+func TestUserRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "test@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Test User",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	err := ur.Create(ctx, user)
+	require.NoError(t, err)
+	assert.NotZero(t, user.ID)
+
+	found, err := ur.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, user.Email, found.Email)
+	assert.Equal(t, user.Nickname, found.Nickname)
+	assert.Equal(t, user.RoleID, found.RoleID)
+	assert.Equal(t, user.Status, found.Status)
+}
+
+func TestUserRepoGetByEmail(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "findme@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Find Me",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	found, err := ur.GetByEmail(ctx, "findme@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, user.ID, found.ID)
+	assert.Equal(t, "Find Me", found.Nickname)
+
+	// Not found
+	_, err = ur.GetByEmail(ctx, "notfound@example.com")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestUserRepoList(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		u := &model.User{
+			Email:        "user" + string(rune('A'+i)) + "@example.com",
+			PasswordHash: "$2a$10$hash",
+			Nickname:     "User " + string(rune('A'+i)),
+			RoleID:       snowflake.ID(100),
+			Status:       "active",
+		}
+		require.NoError(t, ur.Create(ctx, u))
+	}
+
+	users, err := ur.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, users, 3)
+
+	all, err := ur.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestUserRepoListByStatus(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "a@example.com", PasswordHash: "h", Nickname: "A", RoleID: 1, Status: "active"}))
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "b@example.com", PasswordHash: "h", Nickname: "B", RoleID: 1, Status: "disabled"}))
+	require.NoError(t, ur.Create(ctx, &model.User{Email: "c@example.com", PasswordHash: "h", Nickname: "C", RoleID: 1, Status: "active"}))
+
+	active, err := ur.List(ctx, repo.Filter{Status: "active", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, active, 2)
+
+	disabled, err := ur.List(ctx, repo.Filter{Status: "disabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, disabled, 1)
+}
+
+func TestUserRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "update@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Old Name",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	user.Nickname = "New Name"
+	user.Status = "disabled"
+	user.PasswordHash = "$2a$10$newhash"
+	err := ur.Update(ctx, user)
+	require.NoError(t, err)
+
+	found, err := ur.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New Name", found.Nickname)
+	assert.Equal(t, "disabled", found.Status)
+	assert.Equal(t, "$2a$10$newhash", found.PasswordHash)
+}
+
+func TestUserRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	ur := NewUserRepo(db)
+	ctx := context.Background()
+
+	user := &model.User{
+		Email:        "delete@example.com",
+		PasswordHash: "$2a$10$hash",
+		Nickname:     "Delete Me",
+		RoleID:       snowflake.ID(100),
+		Status:       "active",
+	}
+	require.NoError(t, ur.Create(ctx, user))
+
+	err := ur.Delete(ctx, user.ID)
+	require.NoError(t, err)
+
+	_, err = ur.GetByID(ctx, user.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- RoleRepo tests ---
+
+func TestRoleRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{
+		Name:        "admin",
+		Description: "Administrator role",
+		IsBuiltin:   false,
+	}
+	err := rr.Create(ctx, role)
+	require.NoError(t, err)
+	assert.NotZero(t, role.ID)
+
+	found, err := rr.GetByID(ctx, role.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "admin", found.Name)
+	assert.Equal(t, "Administrator role", found.Description)
+	assert.False(t, found.IsBuiltin)
+}
+
+func TestRoleRepoGetByName(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "tester", Description: "Tester role", IsBuiltin: true}
+	require.NoError(t, rr.Create(ctx, role))
+
+	found, err := rr.GetByName(ctx, "tester")
+	require.NoError(t, err)
+	assert.Equal(t, role.ID, found.ID)
+	assert.True(t, found.IsBuiltin)
+
+	_, err = rr.GetByName(ctx, "notfound")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestRoleRepoList(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		r := &model.Role{Name: "role" + string(rune('A'+i)), Description: "Role " + string(rune('A'+i))}
+		require.NoError(t, rr.Create(ctx, r))
+	}
+
+	roles, err := rr.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, roles, 3)
+
+	all, err := rr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestRoleRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "old-name", Description: "Old description", IsBuiltin: false}
+	require.NoError(t, rr.Create(ctx, role))
+
+	role.Name = "new-name"
+	role.Description = "New description"
+	role.IsBuiltin = true
+	err := rr.Update(ctx, role)
+	require.NoError(t, err)
+
+	found, err := rr.GetByID(ctx, role.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "new-name", found.Name)
+	assert.Equal(t, "New description", found.Description)
+	assert.True(t, found.IsBuiltin)
+}
+
+func TestRoleRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	rr := NewRoleRepo(db)
+	ctx := context.Background()
+
+	role := &model.Role{Name: "to-delete", Description: "Delete me"}
+	require.NoError(t, rr.Create(ctx, role))
+
+	err := rr.Delete(ctx, role.ID)
+	require.NoError(t, err)
+
+	_, err = rr.GetByID(ctx, role.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- PermissionRepo tests ---
+
+func TestPermissionRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{
+		Resource:    "scene",
+		Action:      "read",
+		Description: "Read scene permission",
+	}
+	err := pr.Create(ctx, perm)
+	require.NoError(t, err)
+	assert.NotZero(t, perm.ID)
+
+	found, err := pr.GetByID(ctx, perm.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "scene", found.Resource)
+	assert.Equal(t, "read", found.Action)
+	assert.Equal(t, "Read scene permission", found.Description)
+}
+
+func TestPermissionRepoGetByResourceAction(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "user", Action: "write", Description: "Write user"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	found, err := pr.GetByResourceAction(ctx, "user", "write")
+	require.NoError(t, err)
+	assert.Equal(t, perm.ID, found.ID)
+	assert.Equal(t, "Write user", found.Description)
+
+	_, err = pr.GetByResourceAction(ctx, "user", "delete")
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestPermissionRepoList(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "scene", Action: "read"}))
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "scene", Action: "write"}))
+	require.NoError(t, pr.Create(ctx, &model.Permission{Resource: "user", Action: "read"}))
+
+	perms, err := pr.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, perms, 3)
+}
+
+func TestPermissionRepoListByRoleID(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm1 := &model.Permission{Resource: "scene", Action: "read"}
+	perm2 := &model.Permission{Resource: "scene", Action: "write"}
+	require.NoError(t, pr.Create(ctx, perm1))
+	require.NoError(t, pr.Create(ctx, perm2))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm1.ID))
+	require.NoError(t, rpr.Assign(ctx, roleID, perm2.ID))
+
+	perms, err := pr.ListByRoleID(ctx, roleID)
+	require.NoError(t, err)
+	assert.Len(t, perms, 2)
+}
+
+// --- RolePermissionRepo tests ---
+
+func TestRolePermissionRepoAssign(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "scene", Action: "read"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	roleID := snowflake.ID(100)
+	err := rpr.Assign(ctx, roleID, perm.ID)
+	require.NoError(t, err)
+
+	perms, err := rpr.ListPermissions(ctx, roleID)
+	require.NoError(t, err)
+	assert.Len(t, perms, 1)
+	assert.Equal(t, perm.ID, perms[0].ID)
+}
+
+func TestRolePermissionRepoRevoke(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm := &model.Permission{Resource: "scene", Action: "read"}
+	require.NoError(t, pr.Create(ctx, perm))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm.ID))
+
+	perms, _ := rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 1)
+
+	err := rpr.Revoke(ctx, roleID, perm.ID)
+	require.NoError(t, err)
+
+	perms, _ = rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 0)
+}
+
+func TestRolePermissionRepoRevokeAll(t *testing.T) {
+	db := openTestDB(t)
+	pr := NewPermissionRepo(db)
+	rpr := NewRolePermissionRepo(db)
+	ctx := context.Background()
+
+	perm1 := &model.Permission{Resource: "scene", Action: "read"}
+	perm2 := &model.Permission{Resource: "scene", Action: "write"}
+	require.NoError(t, pr.Create(ctx, perm1))
+	require.NoError(t, pr.Create(ctx, perm2))
+
+	roleID := snowflake.ID(100)
+	require.NoError(t, rpr.Assign(ctx, roleID, perm1.ID))
+	require.NoError(t, rpr.Assign(ctx, roleID, perm2.ID))
+
+	perms, _ := rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 2)
+
+	err := rpr.RevokeAll(ctx, roleID)
+	require.NoError(t, err)
+
+	perms, _ = rpr.ListPermissions(ctx, roleID)
+	assert.Len(t, perms, 0)
+}
+
+// --- DataSourceRepo tests ---
+
+func TestDataSourceRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{
+		SceneID:  scene.ID,
+		Name:     "users.csv",
+		FileName: "users.csv",
+		Columns:  `["id","name","email"]`,
+		Rows:     `[["1","Alice","alice@example.com"]]`,
+		RowCount: 1,
+		Source:   "csv",
+	}
+	err := dsr.Create(ctx, ds)
+	require.NoError(t, err)
+	assert.NotZero(t, ds.ID)
+
+	found, err := dsr.GetByID(ctx, ds.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "users.csv", found.Name)
+	assert.Equal(t, 1, found.RowCount)
+	assert.Equal(t, "csv", found.Source)
+}
+
+func TestDataSourceRepoGetBySceneIDAndName(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-find-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data.csv", FileName: "data.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data.yaml", FileName: "data.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	results, err := dsr.GetBySceneIDAndName(ctx, scene.ID, "data.csv")
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "csv", results[0].Source)
+}
+
+func TestDataSourceRepoGetBySceneIDAndNameAndSource(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-source-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data", FileName: "data.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "data", FileName: "data.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	csv, err := dsr.GetBySceneIDAndNameAndSource(ctx, scene.ID, "data", "csv")
+	require.NoError(t, err)
+	assert.Equal(t, "data.csv", csv.FileName)
+
+	yaml, err := dsr.GetBySceneIDAndNameAndSource(ctx, scene.ID, "data", "yaml")
+	require.NoError(t, err)
+	assert.Equal(t, "data.yaml", yaml.FileName)
+}
+
+func TestDataSourceRepoListBySceneID(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-list-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "a.csv", FileName: "a.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}))
+	require.NoError(t, dsr.Create(ctx, &model.DataSource{SceneID: scene.ID, Name: "b.yaml", FileName: "b.yaml", Columns: "[]", Rows: "[]", RowCount: 0, Source: "yaml"}))
+
+	sources, err := dsr.ListBySceneID(ctx, scene.ID)
+	require.NoError(t, err)
+	assert.Len(t, sources, 2)
+}
+
+func TestDataSourceRepoUpdate(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-update-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{
+		SceneID:  scene.ID,
+		Name:     "update.csv",
+		FileName: "update.csv",
+		Columns:  `["id"]`,
+		Rows:     `[]`,
+		RowCount: 0,
+		Source:   "csv",
+	}
+	require.NoError(t, dsr.Create(ctx, ds))
+
+	ds.Columns = `["id","name"]`
+	ds.Rows = `[["1","Alice"],["2","Bob"]]`
+	ds.RowCount = 2
+	err := dsr.Update(ctx, ds)
+	require.NoError(t, err)
+
+	found, err := dsr.GetByID(ctx, ds.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, found.RowCount)
+	assert.Contains(t, found.Columns, "name")
+}
+
+func TestDataSourceRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	sr := NewSceneRepo(db)
+	dsr := NewDataSourceRepo(db)
+	ctx := context.Background()
+
+	scene := &model.Scene{Name: "ds-delete-test", Status: "draft"}
+	require.NoError(t, sr.Create(ctx, scene))
+
+	ds := &model.DataSource{SceneID: scene.ID, Name: "delete.csv", FileName: "delete.csv", Columns: "[]", Rows: "[]", RowCount: 0, Source: "csv"}
+	require.NoError(t, dsr.Create(ctx, ds))
+
+	err := dsr.Delete(ctx, ds.ID)
+	require.NoError(t, err)
+
+	_, err = dsr.GetByID(ctx, ds.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+// --- SOPluginRepo tests ---
+
+func TestSOPluginRepoCRUD(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{
+		Name:     "test-plugin",
+		Version:  "1.0.0",
+		FilePath: "/path/to/plugin.so",
+		Status:   "enabled",
+		Config:   `{"key":"value"}`,
+	}
+	err := spr.Create(ctx, plugin)
+	require.NoError(t, err)
+	assert.NotZero(t, plugin.ID)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "test-plugin", found.Name)
+	assert.Equal(t, "1.0.0", found.Version)
+	assert.Equal(t, "enabled", found.Status)
+}
+
+func TestSOPluginRepoList(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		p := &model.SOPlugin{
+			Name:     "plugin-" + string(rune('A'+i)),
+			Version:  "1.0.0",
+			FilePath: "/path/to/plugin.so",
+			Status:   "enabled",
+		}
+		require.NoError(t, spr.Create(ctx, p))
+	}
+
+	plugins, err := spr.List(ctx, repo.Filter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, plugins, 3)
+
+	all, err := spr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, all, 5)
+}
+
+func TestSOPluginRepoListByStatus(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p1", Version: "1.0.0", FilePath: "/p1.so", Status: "enabled"}))
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p2", Version: "1.0.0", FilePath: "/p2.so", Status: "disabled"}))
+	require.NoError(t, spr.Create(ctx, &model.SOPlugin{Name: "p3", Version: "1.0.0", FilePath: "/p3.so", Status: "enabled"}))
+
+	enabled, err := spr.List(ctx, repo.Filter{Status: "enabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, enabled, 2)
+
+	disabled, err := spr.List(ctx, repo.Filter{Status: "disabled", Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, disabled, 1)
+}
+
+func TestSOPluginRepoUpdateStatus(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "status-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.UpdateStatus(ctx, plugin.ID, "disabled")
+	require.NoError(t, err)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "disabled", found.Status)
+}
+
+func TestSOPluginRepoUpdateConfig(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "config-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled", Config: `{"old":"value"}`}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.UpdateConfig(ctx, plugin.ID, `{"new":"value"}`)
+	require.NoError(t, err)
+
+	found, err := spr.GetByID(ctx, plugin.ID)
+	require.NoError(t, err)
+	assert.Equal(t, `{"new":"value"}`, found.Config)
+}
+
+func TestSOPluginRepoDelete(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	plugin := &model.SOPlugin{Name: "delete-test", Version: "1.0.0", FilePath: "/test.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin))
+
+	err := spr.Delete(ctx, plugin.ID)
+	require.NoError(t, err)
+
+	_, err = spr.GetByID(ctx, plugin.ID)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func TestSOPluginRepoDedup(t *testing.T) {
+	db := openTestDB(t)
+	spr := NewSOPluginRepo(db)
+	ctx := context.Background()
+
+	// Create first version
+	plugin1 := &model.SOPlugin{Name: "dedup-plugin", Version: "1.0.0", FilePath: "/v1.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin1))
+
+	// Create same name+version - should soft-delete the old one
+	plugin2 := &model.SOPlugin{Name: "dedup-plugin", Version: "1.0.0", FilePath: "/v2.so", Status: "enabled"}
+	require.NoError(t, spr.Create(ctx, plugin2))
+
+	// Only the new one should be active
+	plugins, err := spr.List(ctx, repo.Filter{Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, plugins, 1)
+	assert.Equal(t, "/v2.so", plugins[0].FilePath)
+}
+>>>>>>> dev

@@ -62,6 +62,11 @@ func (s *Seeders) Seed(ctx context.Context) error {
 		{"role", "write", "Create/edit roles"},
 		{"settings", "read", "View settings"},
 		{"settings", "write", "Edit settings"},
+<<<<<<< HEAD
+=======
+		{"admin", "read", "View admin settings"},
+		{"admin", "write", "Edit admin settings"},
+>>>>>>> dev
 	}
 
 	permIDs := make(map[string]snowflake.ID)
@@ -101,6 +106,10 @@ func (s *Seeders) Seed(ctx context.Context) error {
 				"runner:read", "runner:write",
 				"user:read", "user:write", "role:read", "role:write",
 				"settings:read", "settings:write",
+<<<<<<< HEAD
+=======
+				"admin:read", "admin:write",
+>>>>>>> dev
 			},
 		},
 		{

@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="720" viewBox="0 0 1280 720" font-family="Arial, &quot;Microsoft YaHei&quot;, sans-serif">
+<rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+<g id="shape-pagenum" data-pptx-object="shape" data-pptx-frame="1199.12 678.1 17.44 21.56" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 1199.12 678.1 L 1216.56 678.1 L 1216.56 699.66 L 1199.12 699.66 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="1216.56" y="690" text-anchor="end" xml:space="preserve" font-size="14" fill="#DCE1EA">32</text>
+</g>
+<g id="shape-badge" data-pptx-object="shape" data-pptx-frame="64 48 120 24" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-semantic-object="shape">
+<path d="M 64 60 A 12 12 0 0 1 76 48 L 172 48 A 12 12 0 0 1 184 60 L 184 60 A 12 12 0 0 1 172 72 L 76 72 A 12 12 0 0 1 64 60 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-badge-text" data-pptx-object="shape" data-pptx-frame="95 53.1 58 16.93" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 95 53.1 L 153 53.1 L 153 70.03 L 95 70.03 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="124" y="65" text-anchor="middle" xml:space="preserve" font-size="14" fill="#FFFFFF" font-weight="bold">体验八</text>
+</g>
+<g id="shape-title" data-pptx-object="shape" data-pptx-frame="62.56 89.4 500 55.44" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 62.56 89.4 L 562.56 89.4 L 562.56 144.84 L 62.56 144.84 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="62.56" y="120" text-anchor="start" xml:space="preserve" font-size="36" fill="#1A1D26" font-weight="bold">Git 提交趋势（按天统计）</text>
+</g>
+<g id="shape-underline" data-pptx-object="shape" data-pptx-frame="64 136 48 3" data-pptx-prst="roundRect" data-pptx-av-adj="val 50000" data-pptx-semantic-object="shape">
+<path d="M 64 137.5 A 1.5 1.5 0 0 1 65.5 136 L 110.5 136 A 1.5 1.5 0 0 1 112 137.5 L 112 137.5 A 1.5 1.5 0 0 1 110.5 139 L 65.5 139 A 1.5 1.5 0 0 1 64 137.5 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-subtitle" data-pptx-object="shape" data-pptx-frame="62.56 160 600 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 62.56 160 L 662.56 160 L 662.56 190 L 62.56 190 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="62.56" y="180" text-anchor="start" xml:space="preserve" font-size="18" fill="#59606E">总计 212 次提交 · 54 个活跃天 · bugfix 80 次（37.7%）</text>
+</g>
+<g id="shape-axis" data-pptx-object="shape" data-pptx-frame="140 560 1000 2" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 140 560 L 1140 560 L 1140 562 L 140 562 Z" fill="#DCE1EA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-1" data-pptx-object="shape" data-pptx-frame="140.0 386.3 15.6 173.7" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 140.0 389.3 A 3 3 0 0 1 143.0 386.3 L 152.6 386.3 A 3 3 0 0 1 155.6 389.3 L 155.6 560.0 L 140.0 560.0 Z" fill="#1A3D7A" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-2" data-pptx-object="shape" data-pptx-frame="157.6 260.0 15.6 300.0" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 157.6 263.0 A 3 3 0 0 1 160.6 260.0 L 170.2 260.0 A 3 3 0 0 1 173.2 263.0 L 173.2 560.0 L 157.6 560.0 Z" fill="#1A3D7A" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-3" data-pptx-object="shape" data-pptx-frame="175.2 402.1 15.6 157.9" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 175.2 405.1 A 3 3 0 0 1 178.2 402.1 L 187.7 402.1 A 3 3 0 0 1 190.7 405.1 L 190.7 560.0 L 175.2 560.0 Z" fill="#1A3D7A" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-4" data-pptx-object="shape" data-pptx-frame="192.7 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 192.7 547.2 A 3 3 0 0 1 195.7 544.2 L 205.3 544.2 A 3 3 0 0 1 208.3 547.2 L 208.3 560.0 L 192.7 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-5" data-pptx-object="shape" data-pptx-frame="210.3 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 210.3 515.6 A 3 3 0 0 1 213.3 512.6 L 222.9 512.6 A 3 3 0 0 1 225.9 515.6 L 225.9 560.0 L 210.3 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-6" data-pptx-object="shape" data-pptx-frame="227.9 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 227.9 547.2 A 3 3 0 0 1 230.9 544.2 L 240.5 544.2 A 3 3 0 0 1 243.5 547.2 L 243.5 560.0 L 227.9 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-7" data-pptx-object="shape" data-pptx-frame="245.5 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 245.5 515.6 A 3 3 0 0 1 248.5 512.6 L 258.1 512.6 A 3 3 0 0 1 261.1 515.6 L 261.1 560.0 L 245.5 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-8" data-pptx-object="shape" data-pptx-frame="263.1 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 263.1 547.2 A 3 3 0 0 1 266.1 544.2 L 275.6 544.2 A 3 3 0 0 1 278.6 547.2 L 278.6 560.0 L 263.1 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-9" data-pptx-object="shape" data-pptx-frame="280.6 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 280.6 547.2 A 3 3 0 0 1 283.6 544.2 L 293.2 544.2 A 3 3 0 0 1 296.2 547.2 L 296.2 560.0 L 280.6 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-10" data-pptx-object="shape" data-pptx-frame="298.2 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 298.2 515.6 A 3 3 0 0 1 301.2 512.6 L 310.8 512.6 A 3 3 0 0 1 313.8 515.6 L 313.8 560.0 L 298.2 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-11" data-pptx-object="shape" data-pptx-frame="315.8 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 315.8 547.2 A 3 3 0 0 1 318.8 544.2 L 328.4 544.2 A 3 3 0 0 1 331.4 547.2 L 331.4 560.0 L 315.8 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-12" data-pptx-object="shape" data-pptx-frame="333.4 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 333.4 547.2 A 3 3 0 0 1 336.4 544.2 L 345.9 544.2 A 3 3 0 0 1 348.9 547.2 L 348.9 560.0 L 333.4 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-13" data-pptx-object="shape" data-pptx-frame="350.9 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 350.9 531.4 A 3 3 0 0 1 353.9 528.4 L 363.5 528.4 A 3 3 0 0 1 366.5 531.4 L 366.5 560.0 L 350.9 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-14" data-pptx-object="shape" data-pptx-frame="368.5 481.1 15.6 78.9" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 368.5 484.1 A 3 3 0 0 1 371.5 481.1 L 381.1 481.1 A 3 3 0 0 1 384.1 484.1 L 384.1 560.0 L 368.5 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-15" data-pptx-object="shape" data-pptx-frame="386.1 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 386.1 531.4 A 3 3 0 0 1 389.1 528.4 L 398.7 528.4 A 3 3 0 0 1 401.7 531.4 L 401.7 560.0 L 386.1 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-16" data-pptx-object="shape" data-pptx-frame="403.7 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 403.7 515.6 A 3 3 0 0 1 406.7 512.6 L 416.3 512.6 A 3 3 0 0 1 419.3 515.6 L 419.3 560.0 L 403.7 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-17" data-pptx-object="shape" data-pptx-frame="421.3 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 421.3 547.2 A 3 3 0 0 1 424.3 544.2 L 433.8 544.2 A 3 3 0 0 1 436.8 547.2 L 436.8 560.0 L 421.3 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-18" data-pptx-object="shape" data-pptx-frame="438.8 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 438.8 547.2 A 3 3 0 0 1 441.8 544.2 L 451.4 544.2 A 3 3 0 0 1 454.4 547.2 L 454.4 560.0 L 438.8 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-19" data-pptx-object="shape" data-pptx-frame="456.4 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 456.4 547.2 A 3 3 0 0 1 459.4 544.2 L 469.0 544.2 A 3 3 0 0 1 472.0 547.2 L 472.0 560.0 L 456.4 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-20" data-pptx-object="shape" data-pptx-frame="474.0 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 474.0 515.6 A 3 3 0 0 1 477.0 512.6 L 486.6 512.6 A 3 3 0 0 1 489.6 515.6 L 489.6 560.0 L 474.0 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-21" data-pptx-object="shape" data-pptx-frame="491.6 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 491.6 547.2 A 3 3 0 0 1 494.6 544.2 L 504.2 544.2 A 3 3 0 0 1 507.2 547.2 L 507.2 560.0 L 491.6 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-22" data-pptx-object="shape" data-pptx-frame="509.2 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 509.2 531.4 A 3 3 0 0 1 512.2 528.4 L 521.7 528.4 A 3 3 0 0 1 524.7 531.4 L 524.7 560.0 L 509.2 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-23" data-pptx-object="shape" data-pptx-frame="526.7 370.5 15.6 189.5" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 526.7 373.5 A 3 3 0 0 1 529.7 370.5 L 539.3 370.5 A 3 3 0 0 1 542.3 373.5 L 542.3 560.0 L 526.7 560.0 Z" fill="#1A3D7A" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-24" data-pptx-object="shape" data-pptx-frame="544.3 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 544.3 515.6 A 3 3 0 0 1 547.3 512.6 L 556.9 512.6 A 3 3 0 0 1 559.9 515.6 L 559.9 560.0 L 544.3 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-25" data-pptx-object="shape" data-pptx-frame="561.9 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 561.9 515.6 A 3 3 0 0 1 564.9 512.6 L 574.5 512.6 A 3 3 0 0 1 577.5 515.6 L 577.5 560.0 L 561.9 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-26" data-pptx-object="shape" data-pptx-frame="579.5 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 579.5 547.2 A 3 3 0 0 1 582.5 544.2 L 592.1 544.2 A 3 3 0 0 1 595.1 547.2 L 595.1 560.0 L 579.5 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-27" data-pptx-object="shape" data-pptx-frame="597.1 481.1 15.6 78.9" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 597.1 484.1 A 3 3 0 0 1 600.1 481.1 L 609.6 481.1 A 3 3 0 0 1 612.6 484.1 L 612.6 560.0 L 597.1 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-28" data-pptx-object="shape" data-pptx-frame="614.6 433.7 15.6 126.3" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 614.6 436.7 A 3 3 0 0 1 617.6 433.7 L 627.2 433.7 A 3 3 0 0 1 630.2 436.7 L 630.2 560.0 L 614.6 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-29" data-pptx-object="shape" data-pptx-frame="632.2 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 632.2 499.8 A 3 3 0 0 1 635.2 496.8 L 644.8 496.8 A 3 3 0 0 1 647.8 499.8 L 647.8 560.0 L 632.2 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-30" data-pptx-object="shape" data-pptx-frame="649.8 417.9 15.6 142.1" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 649.8 420.9 A 3 3 0 0 1 652.8 417.9 L 662.4 417.9 A 3 3 0 0 1 665.4 420.9 L 665.4 560.0 L 649.8 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-31" data-pptx-object="shape" data-pptx-frame="667.4 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 667.4 499.8 A 3 3 0 0 1 670.4 496.8 L 679.9 496.8 A 3 3 0 0 1 682.9 499.8 L 682.9 560.0 L 667.4 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-32" data-pptx-object="shape" data-pptx-frame="684.9 465.3 15.6 94.7" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 684.9 468.3 A 3 3 0 0 1 687.9 465.3 L 697.5 465.3 A 3 3 0 0 1 700.5 468.3 L 700.5 560.0 L 684.9 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-33" data-pptx-object="shape" data-pptx-frame="702.5 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 702.5 531.4 A 3 3 0 0 1 705.5 528.4 L 715.1 528.4 A 3 3 0 0 1 718.1 531.4 L 718.1 560.0 L 702.5 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-34" data-pptx-object="shape" data-pptx-frame="720.1 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 720.1 499.8 A 3 3 0 0 1 723.1 496.8 L 732.7 496.8 A 3 3 0 0 1 735.7 499.8 L 735.7 560.0 L 720.1 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-35" data-pptx-object="shape" data-pptx-frame="737.7 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 737.7 531.4 A 3 3 0 0 1 740.7 528.4 L 750.3 528.4 A 3 3 0 0 1 753.3 531.4 L 753.3 560.0 L 737.7 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-36" data-pptx-object="shape" data-pptx-frame="755.3 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 755.3 531.4 A 3 3 0 0 1 758.3 528.4 L 767.8 528.4 A 3 3 0 0 1 770.8 531.4 L 770.8 560.0 L 755.3 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-37" data-pptx-object="shape" data-pptx-frame="772.8 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 772.8 515.6 A 3 3 0 0 1 775.8 512.6 L 785.4 512.6 A 3 3 0 0 1 788.4 515.6 L 788.4 560.0 L 772.8 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-38" data-pptx-object="shape" data-pptx-frame="790.4 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 790.4 499.8 A 3 3 0 0 1 793.4 496.8 L 803.0 496.8 A 3 3 0 0 1 806.0 499.8 L 806.0 560.0 L 790.4 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-39" data-pptx-object="shape" data-pptx-frame="808.0 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 808.0 499.8 A 3 3 0 0 1 811.0 496.8 L 820.6 496.8 A 3 3 0 0 1 823.6 499.8 L 823.6 560.0 L 808.0 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-40" data-pptx-object="shape" data-pptx-frame="825.6 433.7 15.6 126.3" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 825.6 436.7 A 3 3 0 0 1 828.6 433.7 L 838.2 433.7 A 3 3 0 0 1 841.2 436.7 L 841.2 560.0 L 825.6 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-41" data-pptx-object="shape" data-pptx-frame="843.2 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 843.2 515.6 A 3 3 0 0 1 846.2 512.6 L 855.7 512.6 A 3 3 0 0 1 858.7 515.6 L 858.7 560.0 L 843.2 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-42" data-pptx-object="shape" data-pptx-frame="860.7 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 860.7 547.2 A 3 3 0 0 1 863.7 544.2 L 873.3 544.2 A 3 3 0 0 1 876.3 547.2 L 876.3 560.0 L 860.7 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-43" data-pptx-object="shape" data-pptx-frame="878.3 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 878.3 547.2 A 3 3 0 0 1 881.3 544.2 L 890.9 544.2 A 3 3 0 0 1 893.9 547.2 L 893.9 560.0 L 878.3 560.0 Z" fill="#3458B0" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-44" data-pptx-object="shape" data-pptx-frame="895.9 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 895.9 515.6 A 3 3 0 0 1 898.9 512.6 L 908.5 512.6 A 3 3 0 0 1 911.5 515.6 L 911.5 560.0 L 895.9 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-45" data-pptx-object="shape" data-pptx-frame="913.5 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 913.5 531.4 A 3 3 0 0 1 916.5 528.4 L 926.1 528.4 A 3 3 0 0 1 929.1 531.4 L 929.1 560.0 L 913.5 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-46" data-pptx-object="shape" data-pptx-frame="931.1 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 931.1 515.6 A 3 3 0 0 1 934.1 512.6 L 943.6 512.6 A 3 3 0 0 1 946.6 515.6 L 946.6 560.0 L 931.1 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-47" data-pptx-object="shape" data-pptx-frame="948.6 528.4 15.6 31.6" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 948.6 531.4 A 3 3 0 0 1 951.6 528.4 L 961.2 528.4 A 3 3 0 0 1 964.2 531.4 L 964.2 560.0 L 948.6 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-48" data-pptx-object="shape" data-pptx-frame="966.2 481.1 15.6 78.9" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 966.2 484.1 A 3 3 0 0 1 969.2 481.1 L 978.8 481.1 A 3 3 0 0 1 981.8 484.1 L 981.8 560.0 L 966.2 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-49" data-pptx-object="shape" data-pptx-frame="983.8 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 983.8 499.8 A 3 3 0 0 1 986.8 496.8 L 996.4 496.8 A 3 3 0 0 1 999.4 499.8 L 999.4 560.0 L 983.8 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-50" data-pptx-object="shape" data-pptx-frame="1001.4 449.5 15.6 110.5" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1001.4 452.5 A 3 3 0 0 1 1004.4 449.5 L 1013.9 449.5 A 3 3 0 0 1 1016.9 452.5 L 1016.9 560.0 L 1001.4 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-51" data-pptx-object="shape" data-pptx-frame="1018.9 512.6 15.6 47.4" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1018.9 515.6 A 3 3 0 0 1 1021.9 512.6 L 1031.5 512.6 A 3 3 0 0 1 1034.5 515.6 L 1034.5 560.0 L 1018.9 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-52" data-pptx-object="shape" data-pptx-frame="1036.5 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1036.5 547.2 A 3 3 0 0 1 1039.5 544.2 L 1049.1 544.2 A 3 3 0 0 1 1052.1 547.2 L 1052.1 560.0 L 1036.5 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-53" data-pptx-object="shape" data-pptx-frame="1054.1 465.3 15.6 94.7" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1054.1 468.3 A 3 3 0 0 1 1057.1 465.3 L 1066.7 465.3 A 3 3 0 0 1 1069.7 468.3 L 1069.7 560.0 L 1054.1 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-54" data-pptx-object="shape" data-pptx-frame="1071.7 481.1 15.6 78.9" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1071.7 484.1 A 3 3 0 0 1 1074.7 481.1 L 1084.3 481.1 A 3 3 0 0 1 1087.3 484.1 L 1087.3 560.0 L 1071.7 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-55" data-pptx-object="shape" data-pptx-frame="1089.3 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1089.3 547.2 A 3 3 0 0 1 1092.3 544.2 L 1101.8 544.2 A 3 3 0 0 1 1104.8 547.2 L 1104.8 560.0 L 1089.3 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-56" data-pptx-object="shape" data-pptx-frame="1106.8 544.2 15.6 15.8" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1106.8 547.2 A 3 3 0 0 1 1109.8 544.2 L 1119.4 544.2 A 3 3 0 0 1 1122.4 547.2 L 1122.4 560.0 L 1106.8 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-bar-57" data-pptx-object="shape" data-pptx-frame="1124.4 496.8 15.6 63.2" data-pptx-prst="roundRect" data-pptx-av-adj="val 3000" data-pptx-semantic-object="shape">
+<path d="M 1124.4 499.8 A 3 3 0 0 1 1127.4 496.8 L 1137.0 496.8 A 3 3 0 0 1 1140.0 499.8 L 1140.0 560.0 L 1124.4 560.0 Z" fill="#5B8DEF" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-month-05" data-pptx-object="shape" data-pptx-frame="127.8 570 40 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 127.8 570 L 167.8 570 L 167.8 600 L 127.8 600 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="147.8" y="590" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">05月</text>
+</g>
+<g id="shape-month-06" data-pptx-object="shape" data-pptx-frame="461.8 570 40 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 461.8 570 L 501.8 570 L 501.8 600 L 461.8 600 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="481.8" y="590" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">06月</text>
+</g>
+<g id="shape-month-07" data-pptx-object="shape" data-pptx-frame="637.6 570 40 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 637.6 570 L 677.6 570 L 677.6 600 L 637.6 600 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="657.6" y="590" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">07月</text>
+</g>
+<g id="shape-month-08" data-pptx-object="shape" data-pptx-frame="883.7 570 40 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 883.7 570 L 923.7 570 L 923.7 600 L 883.7 600 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="903.7" y="590" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">08月</text>
+</g>
+<g id="shape-month-09" data-pptx-object="shape" data-pptx-frame="1041.9 570 40 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 1041.9 570 L 1081.9 570 L 1081.9 600 L 1041.9 600 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="1061.9" y="590" text-anchor="middle" xml:space="preserve" font-size="14" fill="#59606E">09月</text>
+</g>
+<g id="shape-peak-annot" data-pptx-object="shape" data-pptx-frame="115 230 110 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 125.4 230 L 205.4 230 L 205.4 260 L 125.4 260 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="165.4" y="248" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A3D7A" font-weight="bold">19次 (5/2)</text>
+</g>
+<g id="shape-summary" data-pptx-object="shape" data-pptx-frame="140 620 1000 40" data-pptx-prst="roundRect" data-pptx-av-adj="val 12500" data-pptx-semantic-object="shape">
+<path d="M 140 625 A 5 5 0 0 1 145 620 L 1135 620 A 5 5 0 0 1 1140 625 L 1140 655 A 5 5 0 0 1 1135 660 L 145 660 A 5 5 0 0 1 140 655 Z" fill="#F4F6FA" stroke="none" data-pptx-part="geometry" />
+</g>
+<g id="shape-summary-text" data-pptx-object="shape" data-pptx-frame="180 630 900 30" data-pptx-prst="rect" data-pptx-semantic-object="shape">
+<path d="M 180 630 L 1080 630 L 1080 660 L 180 660 Z" fill="none" stroke="none" data-pptx-part="geometry" />
+<text x="640" y="645" text-anchor="middle" xml:space="preserve" font-size="16" fill="#1A1D26">2026-05-01 ~ 09-07 · 6-7月为开发高峰期 · 8-9月趋于稳定迭代</text>
+</g>
+</svg>

@@ -23,6 +23,7 @@
 
         <div class="form-group">
           <label>密码</label>
+<<<<<<< HEAD
           <input
             v-model="form.password"
             type="password"
@@ -31,11 +32,42 @@
             required
             @keyup.enter="handleLogin"
           />
+=======
+          <div class="password-field">
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="请输入密码"
+              autocomplete="off"
+              required
+              @keyup.enter="handleLogin"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+>>>>>>> dev
         </div>
 
         <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
 
+<<<<<<< HEAD
         <button type="submit" class="btn-login" :disabled="loading">
+=======
+        <button type="submit" class="btn-primary login-submit" :disabled="loading">
+>>>>>>> dev
           <span v-if="loading" class="spinner"></span>
           <span v-else>登 录</span>
         </button>
@@ -66,6 +98,10 @@ const authStore = useAuthStore()
 const themeStore = useThemeStore()
 
 const form = reactive({ email: '', password: '' })
+<<<<<<< HEAD
+=======
+const showPassword = ref(false)
+>>>>>>> dev
 const loading = ref(false)
 const errorMsg = ref('')
 
@@ -80,8 +116,14 @@ async function handleLogin() {
     } else {
       errorMsg.value = resp.message || '登录失败'
     }
+<<<<<<< HEAD
   } catch {
     errorMsg.value = '网络错误，请稍后重试'
+=======
+  } catch (e: any) {
+    const msg = e?.message || ''
+    errorMsg.value = msg && msg !== 'Network Error' ? msg : '网络错误，请稍后重试'
+>>>>>>> dev
   } finally {
     loading.value = false
   }
@@ -119,10 +161,13 @@ async function handleLogin() {
   stroke: #0969da;
 }
 
+<<<<<<< HEAD
 [data-theme='light'] .btn-login {
   background: #0969da;
 }
 
+=======
+>>>>>>> dev
 .login-header h1 {
   font-size: 28px;
   font-weight: 700;
@@ -178,6 +223,50 @@ async function handleLogin() {
   color: var(--text-tertiary);
 }
 
+<<<<<<< HEAD
+=======
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+/* Hide the browser-native reveal control (e.g. Edge ::-ms-reveal): it only
+   shows on focus with content and disappears on blur, which reads as the
+   eye icon randomly vanishing. The in-app toggle replaces it. */
+.password-field input::-ms-reveal,
+.password-field input::-ms-clear {
+  display: none;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.toggle-password:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+>>>>>>> dev
 .error-msg {
   font-size: 13px;
   color: var(--accent-danger);
@@ -186,6 +275,7 @@ async function handleLogin() {
   border-radius: var(--radius-sm);
 }
 
+<<<<<<< HEAD
 .btn-login {
   height: 42px;
   border: none;
@@ -196,11 +286,17 @@ async function handleLogin() {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s ease;
+=======
+.login-submit {
+  height: 42px;
+  font-size: 15px;
+>>>>>>> dev
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+<<<<<<< HEAD
 .btn-login:hover {
   opacity: 0.9;
 }
@@ -210,6 +306,8 @@ async function handleLogin() {
   cursor: not-allowed;
 }
 
+=======
+>>>>>>> dev
 .spinner {
   width: 18px;
   height: 18px;

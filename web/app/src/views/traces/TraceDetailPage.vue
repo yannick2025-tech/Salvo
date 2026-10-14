@@ -6,8 +6,13 @@
     </div>
 
     <div v-if="trace" class="detail-card">
+<<<<<<< HEAD
       <div class="detail-row"><span class="label">TraceID</span><span class="value mono" :title="'数据库Trace主键'">{{ trace.id }}</span></div>
       <div class="detail-row"><span class="label">RunID</span><span class="value mono" :title="'可在日志中搜索此ID'">{{ trace.run_id }}</span></div>
+=======
+      <div class="detail-row"><span class="label">数据KEY</span><span class="value mono" :title="'数据库主键：' + trace.id">{{ trace.id }}</span></div>
+      <div class="detail-row"><span class="label">运行ID</span><span class="value mono copyable" :title="'运行ID，检索后端日志用此 ID，点击复制'" @click="copyWithToast(trace.run_id)">{{ trace.run_id }}</span></div>
+>>>>>>> dev
       <div class="detail-row"><span class="label">场景</span><span class="value">{{ trace.scene_name || trace.scene_id }}</span></div>
       <div class="detail-row"><span class="label">状态</span><span :class="['status-badge', 'st-' + trace.status]">{{ trace.status.toUpperCase() }}</span></div>
       <div class="detail-row"><span class="label">耗时</span><span class="value">{{ formatDuration(trace.duration_ns) }}</span></div>
@@ -45,12 +50,18 @@
         </div>
       </div>
     </div>
+<<<<<<< HEAD
     <div v-else-if="!trace" class="empty">加载中...</div>
+=======
+    <div v-else-if="!trace && !loadFailed" class="empty">加载中...</div>
+    <div v-else-if="!trace" class="empty">未找到链路记录</div>
+>>>>>>> dev
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick, onUnmounted } from 'vue'
+<<<<<<< HEAD
 import { useRoute } from 'vue-router'
 import { getTrace } from '@/api/trace'
 import type { TraceDTO, SpanDTO } from '@/types'
@@ -68,6 +79,29 @@ async function fetchTrace() {
       calculateContainerWidth()
     }
   } catch { /* ignore */ }
+=======
+import { getTrace } from '@/api/trace'
+import { copyWithToast } from '@/utils/clipboard'
+import type { TraceDTO, SpanDTO } from '@/types'
+
+const props = defineProps<{ id?: string }>()
+const trace = ref<TraceDTO | null>(null)
+const loadFailed = ref(false)
+
+async function fetchTrace() {
+  if (!props.id) return
+  try {
+    const resp = await getTrace(props.id)
+    if (resp.code === 0) {
+      trace.value = resp.data
+      calculateContainerWidth()
+    } else {
+      loadFailed.value = true
+    }
+  } catch {
+    loadFailed.value = true
+  }
+>>>>>>> dev
 }
 
 function formatDuration(ns: number): string {
@@ -98,10 +132,17 @@ function latencyLevel(span: SpanDTO): string {
 
 function latencyColor(span: SpanDTO): string {
   switch (latencyLevel(span)) {
+<<<<<<< HEAD
     case 'ok': return '#4ade80'
     case 'warn': return '#3b82f6'
     case 'alert': return '#eab308'
     case 'critical': return '#ef4444'
+=======
+    case 'ok': return '#3fb950'
+    case 'warn': return '#58a6ff'
+    case 'alert': return '#e3b341'
+    case 'critical': return '#f85149'
+>>>>>>> dev
     default: return 'var(--accent-primary)'
   }
 }
@@ -234,11 +275,21 @@ function formatDurationMs(ns: number): string {
 .detail-row { display: contents; }
 .label { font-size: 13px; color: var(--text-secondary); }
 .value { font-size: 14px; color: var(--text-primary); }
+<<<<<<< HEAD
 .mono { font-family: monospace; font-size: 12px; cursor: default; }
+=======
+.mono { font-family: var(--font-mono); font-size: 12px; cursor: default; }
+.copyable { cursor: pointer; }
+.copyable:hover { color: var(--accent-primary); }
+>>>>>>> dev
 
 .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; min-width: auto; max-width: fit-content; }
 .st-ok { background: rgba(163,230,53,0.12); color: #65a30d; border: 1px solid rgba(163,230,53,0.2); }
 .st-error { background: rgba(225,29,72,0.12); color: #be123c; border: 1px solid rgba(225,29,72,0.2); }
+<<<<<<< HEAD
+=======
+.st-canceled { background: rgba(255,193,7,0.12); color: #b45309; border: 1px solid rgba(255,193,7,0.2); }
+>>>>>>> dev
 .st-skip { background: rgba(251,146,60,0.12); color: #ea580c; border: 1px solid rgba(251,146,60,0.2); }
 
 .empty { text-align: center; color: var(--text-tertiary); padding: 48px 0; }
@@ -249,6 +300,7 @@ function formatDurationMs(ns: number): string {
 .legend { display: flex; gap: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-secondary); }
 .legend-item { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+<<<<<<< HEAD
 .dot.lat-ok { background: #4ade80; }
 .dot.lat-warn { background: #3b82f6; }
 .dot.lat-alert { background: #eab308; }
@@ -257,6 +309,16 @@ function formatDurationMs(ns: number): string {
 .lat-warn { color: #3b82f6; }
 .lat-alert { color: #eab308; font-weight: 700; }
 .lat-critical { color: #ef4444; font-weight: 700; }
+=======
+.dot.lat-ok { background: #3fb950; }
+.dot.lat-warn { background: #58a6ff; }
+.dot.lat-alert { background: #e3b341; }
+.dot.lat-critical { background: #f85149; }
+.lat-ok { color: #3fb950; }
+.lat-warn { color: #58a6ff; }
+.lat-alert { color: #e3b341; font-weight: 700; }
+.lat-critical { color: #f85149; font-weight: 700; }
+>>>>>>> dev
 
 .span-list { display: flex; flex-direction: column; gap: 10px; }
 .span-item { padding: 12px 14px; background: var(--bg-tertiary); border-radius: var(--radius-sm); border-left: 3px solid transparent; }
@@ -268,8 +330,13 @@ function formatDurationMs(ns: number): string {
 .span-node-id { font-size: 11px; color: var(--text-tertiary); }
 
 .span-bar-wrapper { height: 24px; background: transparent; border-radius: 4px; position: relative; overflow: hidden; }
+<<<<<<< HEAD
 .span-wait-bar { position: absolute; left: 0; top: 0; width: 100px; min-width: 100px; height: 100%; background: #8b949e; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 6px; color: #fff; font-size: 9px; font-weight: 600; font-family: 'Monaco', 'Menlo', monospace; white-space: nowrap; z-index: 2; box-sizing: border-box; }
 .span-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #fff; font-size: 9px; font-weight: 600; font-family: 'Monaco', 'Menlo', monospace; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; }
+=======
+.span-wait-bar { position: absolute; left: 0; top: 0; width: 100px; min-width: 100px; height: 100%; background: #8b949e; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 6px; color: #fff; font-size: 9px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; z-index: 2; box-sizing: border-box; }
+.span-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #fff; font-size: 9px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); box-sizing: border-box; }
+>>>>>>> dev
 
 .span-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-top: 6px; align-items: center; flex-wrap: wrap; }
 .latency-text { font-weight: 600; }

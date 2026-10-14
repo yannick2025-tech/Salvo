@@ -4,11 +4,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+<<<<<<< HEAD
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+=======
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+>>>>>>> dev
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +26,11 @@ import (
 	"github.com/yannick2025-tech/Salvo/internal/auth"
 	"github.com/yannick2025-tech/Salvo/internal/logger"
 	"github.com/yannick2025-tech/Salvo/internal/store/migration"
+<<<<<<< HEAD
+=======
+	"github.com/yannick2025-tech/Salvo/internal/store/model"
+	"github.com/yannick2025-tech/Salvo/internal/pkg/snowflake"
+>>>>>>> dev
 	"github.com/yannick2025-tech/Salvo/internal/store/sqlite"
 )
 
@@ -103,12 +117,20 @@ func postJSONAuth(t *testing.T, srv *Server, token, path string, body any) *http
 
 func decodeResponse(t *testing.T, resp *http.Response) dto.Response {
 	t.Helper()
+<<<<<<< HEAD
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 
 	var result dto.Response
 	require.NoError(t, json.Unmarshal(body, &result))
+=======
+	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
+	var result dto.Response
+	require.NoError(t, dec.Decode(&result))
+	_ = resp.Body.Close()
+>>>>>>> dev
 	return result
 }
 
@@ -219,6 +241,49 @@ func TestUpdateScene(t *testing.T) {
 	assert.Equal(t, "ready", updated.Status)
 }
 
+<<<<<<< HEAD
+=======
+func TestUpdateSceneConfigParams(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "cfg-scene",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// The frontend variables editor saves config_params and derived_params
+	// (stored separately from variables for YAML export fidelity) through
+	// the same scene update endpoint.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/update", dto.UpdateSceneRequest{
+		ID:            scene.ID,
+		ConfigParams:  `{"charge_time":"300","pay_type":"1"}`,
+		DerivedParams: `{"max_charge_power_kw":"30"}`,
+	})
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	updatedData, _ := json.Marshal(result.Data)
+	var updated dto.SceneDTO
+	require.NoError(t, json.Unmarshal(updatedData, &updated))
+	assert.Equal(t, `{"charge_time":"300","pay_type":"1"}`, updated.ConfigParams)
+	assert.Equal(t, `{"max_charge_power_kw":"30"}`, updated.DerivedParams)
+
+	// Re-get to confirm persistence.
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/get", dto.IDRequest{ID: scene.ID})
+	result = decodeResponse(t, resp)
+	fetchedData, _ := json.Marshal(result.Data)
+	var fetched dto.SceneDTO
+	require.NoError(t, json.Unmarshal(fetchedData, &fetched))
+	assert.Equal(t, `{"charge_time":"300","pay_type":"1"}`, fetched.ConfigParams)
+	assert.Equal(t, `{"max_charge_power_kw":"30"}`, fetched.DerivedParams)
+}
+
+>>>>>>> dev
 func TestDeleteScene(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)
@@ -265,6 +330,270 @@ func TestCreateSceneValidation(t *testing.T) {
 	assert.Contains(t, result.Message, "name is required")
 }
 
+<<<<<<< HEAD
+=======
+func TestListScenesWithLastRun(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name: "scene-with-run", Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	sceneData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	node, err := snowflake.NewNode(1)
+	require.NoError(t, err)
+	runID := node.Generate()
+	startedAt := time.Now().UTC().Add(-time.Minute)
+	require.NoError(t, srv.handler.runs.Create(context.Background(), &model.RunRecord{
+		SceneID:   scene.ID,
+		RunID:     runID,
+		Status:    "completed",
+		StartedAt: &startedAt,
+	}))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/list", dto.ListScenesRequest{Limit: 10})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	listData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var listResp dto.ListResponse[[]dto.SceneDTO]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+
+	var found *dto.SceneDTO
+	for i := range listResp.Items {
+		if listResp.Items[i].ID == scene.ID {
+			found = &listResp.Items[i]
+			break
+		}
+	}
+	require.NotNil(t, found, "created scene not found in list")
+	assert.Equal(t, strconv.FormatInt(int64(runID), 10), found.LastRunID)
+	require.NotNil(t, found.LastRunStartedAt)
+	assert.WithinDuration(t, startedAt, *found.LastRunStartedAt, time.Second)
+	assert.Equal(t, "completed", found.LastRunStatus)
+}
+
+func TestDashboardOverviewRunDropdownListsAllScenes(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	node, err := snowflake.NewNode(1)
+	require.NoError(t, err)
+
+	// Two scenes, one run each: the running run belongs to a DIFFERENT scene
+	// than the completed one. Selecting a run must not filter the dropdown
+	// (recent_runs) down to that run's scene.
+	createRun := func(sceneName, status string) *model.RunRecord {
+		resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+			Name: sceneName, Status: "draft",
+		})
+		result := decodeResponse(t, resp)
+		require.Equal(t, 0, result.Code)
+		sceneData, _ := json.Marshal(result.Data)
+		var scene dto.SceneDTO
+		require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+		startedAt := time.Now().UTC().Add(-2 * time.Minute)
+		rec := &model.RunRecord{
+			SceneID:   scene.ID,
+			RunID:     node.Generate(),
+			Status:    status,
+			StartedAt: &startedAt,
+		}
+		require.NoError(t, srv.handler.runs.Create(context.Background(), rec))
+		return rec
+	}
+
+	completedRun := createRun("dropdown-scene-a", "completed")
+	runningRun := createRun("dropdown-scene-b", "running")
+
+	// The dashboard polls overview with run_id set to the selected run.
+	resp := postJSONAuth(t, srv, token, "/api/v1/dashboard/overview", dto.DashboardOverviewRequest{
+		RunID: strconv.FormatInt(int64(runningRun.ID), 10),
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	data, _ := json.Marshal(result.Data)
+	var overview dto.DashboardOverviewDTO
+	require.NoError(t, json.Unmarshal(data, &overview))
+
+	// recent_runs feeds the run selector: it must list runs from ALL
+	// scenes so the user can switch between them.
+	ids := map[string]bool{}
+	for _, rr := range overview.RecentRuns {
+		ids[strconv.FormatInt(int64(rr.ID), 10)] = true
+	}
+	assert.True(t, ids[strconv.FormatInt(int64(completedRun.ID), 10)],
+		"completed run from another scene must stay in the dropdown")
+	assert.True(t, ids[strconv.FormatInt(int64(runningRun.ID), 10)],
+		"selected running run must be in the dropdown")
+}
+
+func TestDashboardOverviewSelectedRunOutsideCutoffDrivesTimeSeries(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	node, err := snowflake.NewNode(7)
+	require.NoError(t, err)
+
+	createRun := func(sceneName, status string, startedAt, finishedAt time.Time, duration float64) *model.RunRecord {
+		resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+			Name: sceneName, Status: "draft",
+		})
+		result := decodeResponse(t, resp)
+		require.Equal(t, 0, result.Code)
+		sceneData, _ := json.Marshal(result.Data)
+		var scene dto.SceneDTO
+		require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+		rec := &model.RunRecord{
+			SceneID:    scene.ID,
+			RunID:      node.Generate(),
+			Status:     status,
+			StartedAt:  &startedAt,
+			FinishedAt: &finishedAt,
+			Duration:   duration,
+		}
+		require.NoError(t, srv.handler.runs.Create(context.Background(), rec))
+		return rec
+	}
+
+	// The selected run ended 2h ago — far outside the run-derived cutoff
+	// (duration + 300s). A recent run from ANOTHER scene must not leak
+	// into the selected run's time series window.
+	oldStart := time.Now().UTC().Add(-2 * time.Hour)
+	oldEnd := oldStart.Add(60 * time.Second)
+	oldRun := createRun("ts-old-scene", "failed", oldStart, oldEnd, 60)
+
+	recentStart := time.Now().UTC().Add(-2 * time.Minute)
+	recentEnd := recentStart.Add(30 * time.Second)
+	createRun("ts-recent-scene", "completed", recentStart, recentEnd, 30)
+
+	resp := postJSONAuth(t, srv, token, "/api/v1/dashboard/overview", dto.DashboardOverviewRequest{
+		RunID: strconv.FormatInt(int64(oldRun.ID), 10),
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	data, _ := json.Marshal(result.Data)
+	var overview dto.DashboardOverviewDTO
+	require.NoError(t, json.Unmarshal(data, &overview))
+	require.NotNil(t, overview.TimeSeries)
+	require.NotEmpty(t, overview.TimeSeries.Timestamps)
+
+	// Bucket labels are time-of-day only ("15:04:05"); compare via
+	// wrap-around distance in seconds of day.
+	sodLabel := func(label string) int {
+		pt, err := time.Parse("15:04:05", label)
+		require.NoError(t, err)
+		return pt.Hour()*3600 + pt.Minute()*60 + pt.Second()
+	}
+	sodTime := func(t time.Time) int {
+		l := t.Local()
+		return l.Hour()*3600 + l.Minute()*60 + l.Second()
+	}
+	wrapDist := func(a, b int) int {
+		d := a - b
+		if d < 0 {
+			d = -d
+		}
+		if d > 43200 {
+			d = 86400 - d
+		}
+		return d
+	}
+
+	labels := overview.TimeSeries.Timestamps
+	first := sodLabel(labels[0])
+	last := sodLabel(labels[len(labels)-1])
+
+	// Window = [start - 10% padding, end + padding + 5s]; for a 60s run
+	// the padding is 6s. First bucket ≈ oldStart-6s, last bucket ≈ oldEnd+10s.
+	assert.LessOrEqual(t, wrapDist(first, sodTime(oldStart)-6), 3,
+		"window must start at the selected run's start (minus padding)")
+	assert.LessOrEqual(t, wrapDist(last, sodTime(oldEnd)+10), 3,
+		"window must end at the selected run's end (plus padding), not at other runs' times")
+}
+
+func TestCopyScene(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// 准备源场景（含节点，验证复制完整性）
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name: "copy-source", Description: "源描述", Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	srcData, _ := json.Marshal(result.Data)
+	var srcScene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(srcData, &srcScene))
+
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/add", dto.AddNodeRequest{
+		SceneID: srcScene.ID, Name: "login", Type: "http",
+		Config: `{"url":"http://example.com/login"}`,
+	})
+	require.Equal(t, 0, decodeResponse(t, resp).Code)
+
+	// 成功复制
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "copy-target",
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+
+	copyData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+	var copied dto.SceneDTO
+	require.NoError(t, json.Unmarshal(copyData, &copied))
+	assert.NotEqual(t, srcScene.ID, copied.ID)
+	assert.Equal(t, "copy-target", copied.Name)
+	assert.Equal(t, "draft", copied.Status)
+	assert.Equal(t, "源描述", copied.Description)
+
+	// 复制后新场景含节点
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/nodes/list", dto.ListNodesRequest{
+		SceneID: copied.ID,
+	})
+	result = decodeResponse(t, resp)
+	require.Equal(t, 0, result.Code)
+	nodesData, _ := json.Marshal(result.Data)
+	var nodesResp dto.ListResponse[[]dto.NodeDTO]
+	require.NoError(t, json.Unmarshal(nodesData, &nodesResp))
+	require.Len(t, nodesResp.Items, 1)
+	assert.Equal(t, "login", nodesResp.Items[0].Name)
+
+	// 失败：名称为空 → 400
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "",
+	})
+	errResult := decodeResponse(t, resp)
+	assert.Equal(t, 400, errResult.Code)
+
+	// 失败：源场景不存在 → 400
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: 99999, Name: "ghost-copy",
+	})
+	errResult = decodeResponse(t, resp)
+	assert.Equal(t, 400, errResult.Code)
+
+	// 失败：名称重复 → 409
+	resp = postJSONAuth(t, srv, token, "/api/v1/scenes/copy", dto.CopySceneRequest{
+		SceneID: srcScene.ID, Name: "copy-target",
+	})
+	errResult = decodeResponse(t, resp)
+	assert.Equal(t, 409, errResult.Code)
+}
+
+>>>>>>> dev
 func TestAddAndListNode(t *testing.T) {
 	srv := newTestServer(t)
 	token := getAdminToken(t, srv)
@@ -484,3 +813,133 @@ func TestInvalidJSON(t *testing.T) {
 	result := decodeResponse(t, resp)
 	assert.Equal(t, 400, result.Code)
 }
+<<<<<<< HEAD
+=======
+
+// TestListReportsReturnsLightweightDTO tests that ListReports returns lightweight DTOs without detail field
+func TestListReportsReturnsLightweightDTO(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Create a scene
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "report-list-test",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Create a test report directly using repository
+	now := time.Now().UTC()
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      srv.db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     `{"test": "data"}`,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	reportsRepo := sqlite.NewReportRepo(srv.db)
+	require.NoError(t, reportsRepo.Create(context.Background(), report))
+
+	// List reports
+	resp = postJSONAuth(t, srv, token, "/api/v1/reports/list", dto.ListReportsRequest{
+		SceneID: scene.ID,
+		Limit:   10,
+	})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	// Decode the response to verify structure
+	listData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+
+	var listResp dto.ListResponse[[]json.RawMessage]
+	require.NoError(t, json.Unmarshal(listData, &listResp))
+
+	// Verify we have at least one report
+	require.NotEmpty(t, listResp.Items, "Should have at least one report")
+
+	// Decode the first report item
+	var reportItem map[string]interface{}
+	require.NoError(t, json.Unmarshal(listResp.Items[0], &reportItem))
+
+	// Verify that the report item does NOT contain "detail" field
+	_, hasDetail := reportItem["detail"]
+	assert.False(t, hasDetail, "List reports should not include detail field")
+
+	// Verify that the report item contains expected fields
+	assert.Contains(t, reportItem, "id")
+	assert.Contains(t, reportItem, "scene_id")
+	assert.Contains(t, reportItem, "run_id")
+	assert.Contains(t, reportItem, "status")
+	assert.Contains(t, reportItem, "summary")
+	assert.Contains(t, reportItem, "started_at")
+	assert.Contains(t, reportItem, "finished_at")
+	assert.Contains(t, reportItem, "created_at")
+	assert.Contains(t, reportItem, "updated_at")
+}
+
+// TestGetReportReturnsFullDTO tests that GetReport returns full DTO with detail field
+func TestGetReportReturnsFullDTO(t *testing.T) {
+	srv := newTestServer(t)
+	token := getAdminToken(t, srv)
+
+	// Create a scene
+	resp := postJSONAuth(t, srv, token, "/api/v1/scenes/create", dto.CreateSceneRequest{
+		Name:   "report-get-test",
+		Status: "draft",
+	})
+	result := decodeResponse(t, resp)
+	sceneData, _ := json.Marshal(result.Data)
+	var scene dto.SceneDTO
+	require.NoError(t, json.Unmarshal(sceneData, &scene))
+
+	// Create a test report with detail
+	now := time.Now().UTC()
+	testDetail := `{"metrics":{"total":1000,"success":990,"failed":10}}`
+	report := &model.Report{
+		SceneID:    scene.ID,
+		RunID:      srv.db.NextID(),
+		Status:     "success",
+		Summary:    "Test summary",
+		Detail:     testDetail,
+		StartedAt:  &now,
+		FinishedAt: &now,
+	}
+	reportsRepo := sqlite.NewReportRepo(srv.db)
+	require.NoError(t, reportsRepo.Create(context.Background(), report))
+
+	// Get the report
+	resp = postJSONAuth(t, srv, token, "/api/v1/reports/get", dto.GetReportRequest{
+		ID: report.ID,
+	})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	result = decodeResponse(t, resp)
+	assert.Equal(t, 0, result.Code)
+
+	// Decode the response
+	reportData, err := json.Marshal(result.Data)
+	require.NoError(t, err)
+
+	var reportDTO dto.ReportDTO
+	require.NoError(t, json.Unmarshal(reportData, &reportDTO))
+
+	// Verify that the DTO contains detail field
+	assert.Equal(t, report.ID, reportDTO.ID)
+	assert.Equal(t, scene.ID, reportDTO.SceneID)
+	assert.Equal(t, report.RunID, reportDTO.RunID)
+	assert.Equal(t, "success", reportDTO.Status)
+	assert.Equal(t, "Test summary", reportDTO.Summary)
+	assert.NotEmpty(t, reportDTO.Detail, "GetReport should include detail field")
+	assert.JSONEq(t, testDetail, reportDTO.Detail, "Detail should match")
+	assert.NotNil(t, reportDTO.StartedAt)
+	assert.NotNil(t, reportDTO.FinishedAt)
+}
+>>>>>>> dev

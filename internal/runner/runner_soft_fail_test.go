@@ -1,0 +1,241 @@
+package runner
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/yannick2025-tech/Salvo/internal/core/dag"
+	"github.com/yannick2025-tech/Salvo/internal/logger"
+	"github.com/yannick2025-tech/Salvo/internal/store/model"
+)
+
+// newHTTPTestNode builds a sceneNode of type http pointing at ts.
+func newHTTPTestNode(config string, blockOnError bool, nodeStat *NodeStats) *sceneNode {
+	if nodeStat == nil {
+		nodeStat = &NodeStats{}
+	}
+	return &sceneNode{
+		id:           "test-node",
+		name:         "TestNode",
+		nodeType:     model.NodeTypeHTTP,
+		config:       config,
+		loopCount:    1,
+		mode:         dag.ExecSync,
+		blockOnError: blockOnError,
+		nodeStats:    nodeStat,
+		log:          newTestLogger(),
+	}
+}
+
+// TestExecuteHTTP_AssertionSoftFail verifies that an expect_body assertion
+// failure with block_on_error=false is a soft failure: no error returned,
+// Output.Error carries the assertion detail, Response is preserved.
+func TestExecuteHTTP_AssertionSoftFail(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028, "msg": "biz error"}`))
+	}))
+	defer ts.Close()
+
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		false, nil,
+	)
+
+	out, err := node.Execute(context.Background(), &dag.Input{})
+	require.NoError(t, err, "soft failure must not return an error")
+	require.NotNil(t, out)
+	require.Error(t, out.Error, "Output.Error must carry the assertion failure")
+	assert.Contains(t, out.Error.Error(), "errorCode")
+	assert.Contains(t, out.Error.Error(), "50028")
+	assert.NotNil(t, out.Response, "Response must be preserved for downstream variables")
+}
+
+// TestExecuteHTTP_AssertionHardFail verifies that with block_on_error=true
+// an assertion failure remains a hard failure (Execute returns error).
+func TestExecuteHTTP_AssertionHardFail(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028}`))
+	}))
+	defer ts.Close()
+
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		true, nil,
+	)
+
+	out, err := node.Execute(context.Background(), &dag.Input{})
+	require.Error(t, err)
+	assert.Nil(t, out)
+	assert.Contains(t, err.Error(), "errorCode")
+}
+
+// TestExecuteHTTP_AssertionFailRecordsFailureDetails verifies that an
+// expect_body failure on an HTTP 200 response lands in failedNodes (the
+// data source of the report's failure-record section) with full
+// request/response context — for both soft and block_on_error modes.
+func TestExecuteHTTP_AssertionFailRecordsFailureDetails(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028, "msg": "biz error"}`))
+	}))
+	defer ts.Close()
+
+	run := func(blockOnError bool) []FailedNodeDetail {
+		var failed []FailedNodeDetail
+		var mu sync.Mutex
+		node := newHTTPTestNode(
+			`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+			blockOnError, nil,
+		)
+		node.failedNodes = &failed
+		node.failedNodesMu = &mu
+		_, _ = node.Execute(context.Background(), &dag.Input{})
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]FailedNodeDetail(nil), failed...)
+	}
+
+	t.Run("soft", func(t *testing.T) {
+		details := run(false)
+		require.Len(t, details, 1, "assertion failure must appear in failure records")
+		assert.Equal(t, "ASSERT-FAIL", details[0].ErrorCode)
+		assert.Contains(t, details[0].ErrorMessage, "errorCode")
+		assert.Equal(t, 200, details[0].ResponseStatus)
+		assert.Contains(t, details[0].ResponseBody, "50028")
+		assert.Equal(t, "POST", details[0].RequestMethod)
+		assert.Contains(t, details[0].RequestURL, ts.URL)
+	})
+
+	t.Run("block_on_error", func(t *testing.T) {
+		details := run(true)
+		require.Len(t, details, 1, "hard assertion failure must appear in failure records")
+		assert.Equal(t, "ASSERT-FAIL", details[0].ErrorCode)
+		assert.Equal(t, 200, details[0].ResponseStatus)
+		assert.Contains(t, details[0].ResponseBody, "50028")
+	})
+}
+
+// TestExecuteHTTP_Non2xxSoftFailCarriesError verifies that a non-2xx response
+// with block_on_error=false continues the flow but carries Output.Error.
+func TestExecuteHTTP_Non2xxSoftFailCarriesError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`internal error`))
+	}))
+	defer ts.Close()
+
+	node := newHTTPTestNode(
+		`{"method":"GET","url":"`+ts.URL+`"}`,
+		false, nil,
+	)
+
+	out, err := node.Execute(context.Background(), &dag.Input{})
+	require.NoError(t, err, "non-2xx soft failure must not return an error")
+	require.NotNil(t, out)
+	require.Error(t, out.Error, "Output.Error must carry the HTTP error")
+	assert.True(t, strings.HasPrefix(out.Error.Error(), "HTTP 5"), "error should start with HTTP status, got: %s", out.Error.Error())
+}
+
+// TestExecuteHTTP_AssertionSoftFailRecordsNodeStats verifies the node-level
+// stats record a failure for a soft-failed assertion (aligned with trace).
+func TestExecuteHTTP_AssertionSoftFailRecordsNodeStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028}`))
+	}))
+	defer ts.Close()
+
+	stat := &NodeStats{}
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		false, stat,
+	)
+
+	_, err := node.Execute(context.Background(), &dag.Input{})
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(1), stat.TotalReqs.Load(), "total requests should be recorded")
+	assert.Equal(t, int64(1), stat.FailedReqs.Load(), "assertion soft-failure must be counted as failed")
+	assert.Equal(t, int64(0), stat.SuccessReqs.Load(), "assertion soft-failure must not count as success")
+}
+
+// TestExecuteHTTP_AssertionHardFailRecordsNodeStats verifies the node-level
+// stats also record a failure when block_on_error=true makes the assertion
+// failure a hard failure (early return path) — the report's node ranking
+// previously showed 0/0/0 for such nodes.
+func TestExecuteHTTP_AssertionHardFailRecordsNodeStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 50028}`))
+	}))
+	defer ts.Close()
+
+	stat := &NodeStats{}
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		true, stat,
+	)
+
+	_, err := node.Execute(context.Background(), &dag.Input{})
+	require.Error(t, err, "block_on_error assertion failure must be a hard failure")
+
+	assert.Equal(t, int64(1), stat.TotalReqs.Load(), "total requests should be recorded")
+	assert.Equal(t, int64(1), stat.FailedReqs.Load(), "assertion hard failure must be counted as failed")
+	assert.Equal(t, int64(0), stat.SuccessReqs.Load())
+	assert.Equal(t, int64(1), stat.Snapshot().ErrorCodes["ASSERT-FAIL"])
+}
+
+// TestExecuteHTTP_Non2xxHardFailRecordsNodeStats covers the non-2xx hard
+// failure early return: node stats must record the request as failed too.
+func TestExecuteHTTP_Non2xxHardFailRecordsNodeStats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`internal error`))
+	}))
+	defer ts.Close()
+
+	stat := &NodeStats{}
+	node := newHTTPTestNode(
+		`{"method":"GET","url":"`+ts.URL+`"}`,
+		true, stat,
+	)
+
+	_, err := node.Execute(context.Background(), &dag.Input{})
+	require.Error(t, err)
+
+	assert.Equal(t, int64(1), stat.TotalReqs.Load())
+	assert.Equal(t, int64(1), stat.FailedReqs.Load())
+	assert.Equal(t, int64(0), stat.SuccessReqs.Load())
+	assert.Equal(t, int64(1), stat.Snapshot().ErrorCodes["HTTP-500"])
+}
+
+// TestExecuteHTTP_AssertionPassKeepsNoError guards the happy path: passed
+// assertions leave Output.Error empty.
+func TestExecuteHTTP_AssertionPassKeepsNoError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errorCode": 0}`))
+	}))
+	defer ts.Close()
+
+	node := newHTTPTestNode(
+		`{"method":"POST","url":"`+ts.URL+`","expect_body":{"errorCode":0}}`,
+		false, nil,
+	)
+
+	out, err := node.Execute(context.Background(), &dag.Input{})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.NoError(t, out.Error)
+}
+
+var _ = logger.Logger(nil) // keep logger import for consistency with other tests

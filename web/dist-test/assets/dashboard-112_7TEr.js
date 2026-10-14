@@ -1,0 +1,1 @@
+import{t as e}from"./client-rK0MEaiS.js";function t(t){return e(`/dashboard/overview`,{range_seconds:t})}export{t as dashboardOverview};

@@ -12,8 +12,13 @@ import (
 )
 
 type Claims struct {
+<<<<<<< HEAD
 	UserID snowflake.ID `json:"uid"`
 	RoleID snowflake.ID `json:"rid"`
+=======
+	UserID   snowflake.ID `json:"uid"`
+	RoleName string       `json:"rn"`
+>>>>>>> dev
 	jwt.RegisteredClaims
 }
 
@@ -29,11 +34,19 @@ func NewJWTManager(secret string, ttl time.Duration) *JWTManager {
 	}
 }
 
+<<<<<<< HEAD
 func (m *JWTManager) Generate(userID, roleID snowflake.ID) (string, error) {
 	now := time.Now().UTC()
 	claims := Claims{
 		UserID: userID,
 		RoleID: roleID,
+=======
+func (m *JWTManager) Generate(userID snowflake.ID, roleName string) (string, error) {
+	now := time.Now().UTC()
+	claims := Claims{
+		UserID:   userID,
+		RoleName: roleName,
+>>>>>>> dev
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),

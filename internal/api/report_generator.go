@@ -17,11 +17,19 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
     <title>测试报告 - Salvo</title>
     <style>
         :root {
+<<<<<<< HEAD
             --primary: #6366f1;
             --primary-dark: #4f46e5;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
+=======
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --success: #1a7f37;
+            --warning: #bf8700;
+            --danger: #cf222e;
+>>>>>>> dev
             --bg-primary: #ffffff;
             --bg-secondary: #f9fafb;
             --bg-tertiary: #f3f4f6;
@@ -101,11 +109,19 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
             color: white;
         }
 
+<<<<<<< HEAD
         .icon-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
         .icon-green { background: linear-gradient(135deg, #10b981, #059669); }
         .icon-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
         .icon-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
         .icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+=======
+        .icon-blue { background: linear-gradient(135deg, #0969da, #0a6fbb); }
+        .icon-green { background: linear-gradient(135deg, #1a7f37, #15803d); }
+        .icon-orange { background: linear-gradient(135deg, #bc4c00, #973604); }
+        .icon-red { background: linear-gradient(135deg, #cf222e, #a40e26); }
+        .icon-purple { background: linear-gradient(135deg, #0d9488, #0f766e); }
+>>>>>>> dev
 
         .metrics-grid {
             display: grid;
@@ -206,6 +222,7 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">成功率</div>
+<<<<<<< HEAD
                     <div class="metric-value">{{printf "%.1f%%" .GlobalSummary.SuccessRate}}</div>
                 </div>
                 <div class="metric-card">
@@ -223,6 +240,25 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
                 <div class="metric-card">
                     <div class="metric-label">吞吐量 (req/s)</div>
                     <div class="metric-value">{{printf "%.1f" .GlobalSummary.Throughput}}</div>
+=======
+                    <div class="metric-value">{{printf "%.2f%%" .GlobalSummary.SuccessRate}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">平均延迟 (ms)</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.AvgLatencyMs}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">P95 延迟 (ms)</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.P95LatencyMs}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">P99 延迟 (ms)</div>
+                    <div class="metric-value">{{printf "%.3f" .GlobalSummary.P99LatencyMs}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">吞吐量 (req/s)</div>
+                    <div class="metric-value">{{printf "%.2f" .GlobalSummary.Throughput}}</div>
+>>>>>>> dev
                 </div>
             </div>
         </div>
@@ -253,8 +289,13 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
                         <td>{{.NodeName}}</td>
                         <td>{{printf "%.0f" .Summary.TotalRequests}}</td>
                         <td>{{printf "%.0f" .Summary.SuccessCount}} / {{printf "%.0f" .Summary.FailCount}}</td>
+<<<<<<< HEAD
                         <td><span class="status-badge status-success">{{printf "%.1f%%" .Summary.SuccessRate}}</span></td>
                         <td>{{printf "%.1f" .Summary.P50LatencyMs}} / {{printf "%.1f" .Summary.P95LatencyMs}} / {{printf "%.1f" .Summary.P99LatencyMs}}</td>
+=======
+                        <td><span class="status-badge status-success">{{printf "%.2f%%" .Summary.SuccessRate}}</span></td>
+                        <td>{{printf "%.3f" .Summary.P50LatencyMs}} / {{printf "%.3f" .Summary.P95LatencyMs}} / {{printf "%.3f" .Summary.P99LatencyMs}}</td>
+>>>>>>> dev
                         <td>{{printf "%.2f" .Summary.AvgQPS}}</td>
                     </tr>
                     {{end}}
@@ -263,6 +304,67 @@ var reportTemplate = template.Must(template.New("report").Parse(`<!DOCTYPE html>
         </div>
         {{end}}
 
+<<<<<<< HEAD
+=======
+        {{if gt (len .FailedNodes) 0}}
+        <!-- Failed Nodes Detail -->
+        <div class="section">
+            <div class="section-title">
+                <span class="icon icon-red">❌</span>
+                失败节点详情
+            </div>
+            {{range $idx, $fn := .FailedNodes}}
+            <div style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                <div style="background: var(--bg-tertiary); padding: 0.75rem 1rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                    <span>{{.NodeName}} <code style="font-size: 0.8rem; color: var(--text-secondary);">({{.NodeType}})</code></span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">{{.Timestamp.Format "15:04:05"}}</span>
+                </div>
+                <div style="padding: 1rem;">
+                    <div style="margin-bottom: 0.5rem;">
+                        <strong>错误信息:</strong> <span style="color: var(--danger);">{{.ErrorMessage}}</span>
+                    </div>
+                    {{if .RequestURL}}
+                    <details style="margin-top: 0.75rem;">
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-secondary);">请求详情</summary>
+                        <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.85rem;">
+                            <div><strong>Method:</strong> {{.RequestMethod}}</div>
+                            <div><strong>URL:</strong> <code>{{.RequestURL}}</code></div>
+                            {{if .RequestHeaders}}
+                            <div style="margin-top: 0.5rem;"><strong>Headers:</strong></div>
+                            <pre style="margin: 0.25rem 0; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; overflow-x: auto; font-size: 0.8rem;">{{range $k, $v := .RequestHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>
+                            {{end}}
+                            {{if .RequestBody}}
+                            <div style="margin-top: 0.5rem;"><strong>Body:</strong></div>
+                            <pre style="margin: 0.25rem 0; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; overflow-x: auto; font-size: 0.8rem;">{{.RequestBody}}</pre>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{end}}
+                    {{if or .ResponseBody .ResponseStatus}}
+                    <details style="margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-secondary);">响应详情</summary>
+                        <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.85rem;">
+                            <div><strong>Status:</strong> <span class="status-badge status-danger">{{.ResponseStatus}}</span></div>
+                            {{if .ResponseHeaders}}
+                            <div style="margin-top: 0.5rem;"><strong>Headers:</strong></div>
+                            <pre style="margin: 0.25rem 0; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; overflow-x: auto; font-size: 0.8rem;">{{range $k, $v := .ResponseHeaders}}{{$k}}: {{range $i, $vv := $v}}{{if $i}}, {{end}}{{$vv}}{{end}}
+{{end}}</pre>
+                            {{end}}
+                            {{if .ResponseBody}}
+                            <div style="margin-top: 0.5rem;"><strong>Body:</strong></div>
+                            <pre style="margin: 0.25rem 0; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; overflow-x: auto; font-size: 0.8rem;">{{.ResponseBody}}</pre>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+
+>>>>>>> dev
         <footer style="text-align: center; padding: 2rem; color: var(--text-secondary);">
             <p>Generated by Salvo v{{.Metadata.Version}} at {{.Metadata.GeneratedAt.Format "2006-01-02 15:04:05 UTC"}}</p>
         </footer>

@@ -3,6 +3,15 @@ server:
   port: 8766
   web_dir: "web/dist"
 
+<<<<<<< HEAD
+=======
+# Frontend dev server (vite). Used by `make start/dev` and vite.config.ts
+# to keep frontend port/host in sync with backend proxy target.
+frontend:
+  host: "0.0.0.0"
+  port: 17073
+
+>>>>>>> dev
 database:
   driver: "sqlite3"
   dsn: "salvo.db"
@@ -11,10 +20,18 @@ database:
   log_level: "warn"
 
 log:
+<<<<<<< HEAD
   level: "info"
   format: "json"
   output: "logs/salvo.log"
   max_size: 100
+=======
+  level: "debug"
+  format: "json"
+  output: "logs/salvo.log"
+  # Log file size in MB
+  max_size: 1000
+>>>>>>> dev
   max_backups: 5
   max_age: 30
   time_format: "2006-01-02T15:04:05.000Z07:00"
@@ -30,6 +47,12 @@ auth:
 mock:
   enabled: true
   port: 9090
+<<<<<<< HEAD
+=======
+  error_rate: 0.02
+  latency_min_ms: 30
+  latency_max_ms: 250
+>>>>>>> dev
 
 variables:
   base_url: "http://localhost:9090/mock/api"

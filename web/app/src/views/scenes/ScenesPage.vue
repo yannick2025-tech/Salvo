@@ -3,8 +3,13 @@
     <div class="page-header">
       <h2>场景管理</h2>
       <div class="header-actions">
+<<<<<<< HEAD
         <button class="btn-secondary" @click="showImport = true">导入 YAML</button>
         <button class="btn-login-primary" @click="showCreate = true">+ 新建场景</button>
+=======
+        <button class="btn-secondary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showImport = true">导入 YAML</button>
+        <button class="btn-primary" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有创建权限'" @click="showCreate = true">+ 新建场景</button>
+>>>>>>> dev
       </div>
     </div>
 
@@ -12,14 +17,24 @@
       <table class="data-table">
         <thead>
           <tr>
+<<<<<<< HEAD
             <th>ID</th>
+=======
+            <th>数据KEY</th>
+>>>>>>> dev
             <th>名称</th>
             <th>描述</th>
             <th>状态</th>
             <th>创建时间</th>
+<<<<<<< HEAD
             <th>测试开始时间</th>
             <th>结束时间</th>
             <th>持续时间</th>
+=======
+            <th>修改时间</th>
+            <th>最后一次运行时间</th>
+            <th>最后一次运行记录</th>
+>>>>>>> dev
             <th>操作</th>
           </tr>
         </thead>
@@ -28,6 +43,7 @@
             <td colspan="9" class="empty">暂无场景</td>
           </tr>
           <tr v-for="s in scenes" :key="s.id">
+<<<<<<< HEAD
             <td class="mono">{{ s.id }}</td>
             <td><router-link :to="`/scenes/${s.id}`" class="link">{{ s.name }}</router-link></td>
             <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
@@ -39,6 +55,23 @@
             <td class="actions">
               <button class="btn-sm" :class="{ disabled: isSceneRunning(s) }" :disabled="isSceneRunning(s)" @click="editScene(s)">编辑</button>
               <button class="btn-sm danger" @click="handleDelete(s.id)">删除</button>
+=======
+            <td class="mono" :title="'数据库主键：' + s.id">{{ s.id }}</td>
+            <td><router-link :to="`/scenes/${s.id}`" class="link name-cell" :title="s.name">{{ s.name }}</router-link></td>
+            <td><div class="desc-cell" :title="s.description">{{ s.description || '-' }}</div></td>
+            <td><span :class="['status-badge', s.status]">{{ s.status }}</span></td>
+            <td>{{ formatTime(s.created_at) }}</td>
+            <td class="time-cell">{{ formatTime(s.updated_at) }}</td>
+            <td class="time-cell">{{ s.last_run_started_at ? formatTime(s.last_run_started_at) : '-' }}</td>
+            <td class="mono">
+              <router-link v-if="s.last_run_id" :to="'/runner'" class="link" :title="'运行ID：' + s.last_run_id + '，点击跳转运行控制页面'">{{ s.last_run_id }}</router-link>
+              <span v-else>-</span>
+            </td>
+            <td class="actions">
+              <button class="btn-sm" :class="{ disabled: isSceneRunning(s) || !canWriteScene }" :disabled="isSceneRunning(s) || !canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有编辑权限'" @click="editScene(s)">编辑</button>
+              <button class="btn-sm progress" :class="{ disabled: !isSceneRunning(s) }" :disabled="!isSceneRunning(s)" @click="viewProgress(s)">实时进度</button>
+              <button class="btn-sm danger" :class="{ disabled: !canWriteScene }" :disabled="!canWriteScene" :title="canWriteScene ? '' : '您当前的角色没有删除权限'" @click="handleDelete(s.id)">删除</button>
+>>>>>>> dev
             </td>
           </tr>
         </tbody>
@@ -50,6 +83,7 @@
         <h3>新建场景</h3>
         <div class="form-group">
           <label>名称</label>
+<<<<<<< HEAD
           <input v-model="createForm.name" placeholder="场景名称" />
         </div>
         <div class="form-group">
@@ -59,6 +93,17 @@
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreate = false">取消</button>
           <button class="btn-login-primary" @click="handleCreate">创建</button>
+=======
+          <input v-model="createForm.name" placeholder="场景名称" maxlength="64" />
+        </div>
+        <div class="form-group">
+          <label>描述</label>
+          <input v-model="createForm.description" placeholder="场景描述" maxlength="256" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showCreate = false">取消</button>
+          <button class="btn-primary" @click="handleCreate">创建</button>
+>>>>>>> dev
         </div>
       </div>
     </div>
@@ -87,7 +132,11 @@
         <p class="import-hint">粘贴 YAML 配置内容，系统将自动创建场景和 DAG 请求流节点。支持 setup/teardown 生命周期、参数生成器 (generator)、参数关联 (extract)、条件判断 (condition) 和延迟 (delay) 等节点类型。可点击"加载示例"查看完整电商全链路配置模板。</p>
         <div class="form-group">
           <label>场景名称</label>
+<<<<<<< HEAD
           <input v-model="importForm.name" placeholder="留空则使用 YAML 中的 name 字段" />
+=======
+          <input v-model="importForm.name" placeholder="留空则使用 YAML 中的 name 字段" maxlength="64" />
+>>>>>>> dev
         </div>
         <div class="form-group">
           <label>YAML 内容</label>
@@ -96,8 +145,14 @@
         <div v-if="importError" class="form-error">{{ importError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="loadExample">加载示例</button>
+<<<<<<< HEAD
           <button class="btn-secondary" @click="showImport = false">取消</button>
           <button class="btn-login-primary" @click="handleImport" :disabled="importing">
+=======
+          <button class="btn-secondary" @click="loadExampleV2">加载新版示例</button>
+          <button class="btn-secondary" @click="showImport = false">取消</button>
+          <button class="btn-primary" @click="handleImport" :disabled="importing">
+>>>>>>> dev
             {{ importing ? '导入中...' : '导入' }}
           </button>
         </div>
@@ -107,12 +162,24 @@
 </template>
 
 <script setup lang="ts">
+<<<<<<< HEAD
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listScenes, createScene, deleteScene, importYAML } from '@/api/scene'
 import type { SceneDTO } from '@/types'
 
 const router = useRouter()
+=======
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { listScenes, createScene, deleteScene, importYAML } from '@/api/scene'
+import { useAuthStore } from '@/stores/auth'
+import type { SceneDTO } from '@/types'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const canWriteScene = computed(() => authStore.canAccess(['scene:write']))
+>>>>>>> dev
 const scenes = ref<SceneDTO[]>([])
 const showCreate = ref(false)
 const createForm = reactive({ name: '', description: '' })
@@ -332,6 +399,394 @@ edges:
     to: 清理测试数据
 `
 
+<<<<<<< HEAD
+=======
+const exampleYAMLV2 = `name: Mock API 电商全链路压测 V2（新版功能演示）
+description: |
+  基于 Mock Server 的完整电商链路压测场景，演示 Salvo 新版核心能力：
+  - 多变量嵌套引用 (Nested Variables) - 三级引用链 A→B→C
+  - CSV 数据源 (Data Source) - 用户凭据 + 商品数据双数据源参数化
+  - 分组节点 (Group Node) - 订单处理子流程 ×3 循环 + 异步推荐 Group
+  - 定时器节点 (Timer Node) - 延迟等待 + 间隔心跳检测
+  - 节点级 LoopCount - HTTP 节点独立循环执行
+  - Setup/Teardown 生命周期管理
+  - IF-ELSE 条件分支 - mock 创建订单随机返回 require_payment=yes/no，两条分支各约 50% 概率被走到
+  - Generator 参数生成器
+  - 业务错误码断言 (Business Error Code) - HTTP 200 + body 内 errorCode=5037，expect_body 断言失败演示
+
+variables:
+  - key: env
+    value: local
+  - key: api_host
+    value: localhost:9090
+  - key: base_url
+    value: http://\${api_host}/mock/api
+  - key: token
+    value: ""
+  - key: user_id
+    value: "0"
+  - key: product_id
+    value: "1"
+  - key: order_id
+    value: ""
+  - key: require_payment
+    value: "yes"
+  - key: payment_status
+    value: ""
+  - key: timeout_ms
+    value: "5000"
+  - key: retry_count
+    value: "3"
+
+data_sources:
+  - name: user_credentials
+    columns:
+      - username
+      - password
+      - role
+      - credit_limit
+    rows:
+      - username: "admin@example.com"
+        password: "admin123"
+        role: "admin"
+        credit_limit: "5000"
+      - username: "alice@example.com"
+        password: "alice123"
+        role: "user"
+        credit_limit: "2000"
+      - username: "bob@example.com"
+        password: "bob123"
+        role: "user"
+        credit_limit: "1000"
+      - username: "charlie@example.com"
+        password: "charlie123"
+        role: "user"
+        credit_limit: "3000"
+
+  # 商品数据源 — 演示 CSV 多列参数化（上传 products.csv 后自动关联）
+  - name: products
+    columns:
+      - product_id
+      - product_name
+      - category
+      - unit_price
+    rows:
+      - product_id: "1"
+        product_name: "Widget A"
+        category: "electronics"
+        unit_price: "29.99"
+      - product_id: "2"
+        product_name: "Widget B"
+        category: "electronics"
+        unit_price: "49.99"
+      - product_id: "3"
+        product_name: "Gadget C"
+        category: "gadgets"
+        unit_price: "99.99"
+
+setup:
+  - name: 注册测试用户
+    type: setup
+    config:
+      method: POST
+      url: "\${base_url}/users"
+      headers:
+        Content-Type: application/json
+      body: '{"name":"perf_user_\${user_credentials.username}","email":"\${user_credentials.username}","role":"\${user_credentials.role}"}'
+      timeout: \${timeout_ms}
+      expect_status: 201
+      extract:
+        user_id: "$.data.id"
+
+  - name: 用户登录获取Token
+    type: setup
+    config:
+      method: POST
+      url: "\${base_url}/auth/login"
+      headers:
+        Content-Type: application/json
+      body: '{"email":"\${user_credentials.username}","password":"\${user_credentials.password}"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+      extract:
+        token: "$.data.token"
+        user_id: "$.data.user.id"
+
+nodes:
+  - name: 浏览商品列表
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products?page=1"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+      extract:
+        product_id: "$.data[0].id"
+
+  - name: 查看商品详情
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/\${product_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 用户思考等待
+    type: timer
+    config:
+      mode: delay
+      delay: 500
+
+  - name: 订单处理子步骤1：校验库存
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/inventory/\${product_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 订单处理子步骤2：创建订单
+    type: http
+    config:
+      method: POST
+      url: "\${base_url}/orders"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"user_id":\${user_id},"product_id":\${product_id},"total":99.99}'
+      timeout: \${timeout_ms}
+      expect_status: 201
+      extract:
+        order_id: "$.data.id"
+        require_payment: "$.data.require_payment"
+      generator:
+        body_fields:
+          total:
+            type: number
+            minimum: 10
+            maximum: 500
+            multipleOf: 0.01
+
+  - name: 订单处理子步骤3：更新状态
+    type: http
+    config:
+      method: PUT
+      url: "\${base_url}/orders/\${order_id}/status"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"status":"confirmed"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 订单处理流程(Group)
+    type: group
+    config:
+      node_ids:
+        - 订单处理子步骤1：校验库存
+        - 订单处理子步骤2：创建订单
+        - 订单处理子步骤3：更新状态
+      loop_count: 3
+
+  # ---- IF-ELSE 分支演示：mock 创建订单时随机返回 require_payment=yes/no ----
+  # yes → 走支付链路；no → 走跳过支付，两条分支在【业务错误码断言演示】汇合
+  - name: 判断是否支付
+    type: if-else
+    config:
+      expr: '\${require_payment} == "yes"'
+
+  - name: 支付订单
+    type: http
+    config:
+      method: POST
+      url: "\${base_url}/payment"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"amount":99.99,"order_id":"\${order_id}"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+      extract:
+        payment_status: "$.data.status"
+      generator:
+        body_fields:
+          amount:
+            type: number
+            minimum: 10
+            maximum: 500
+
+  - name: 跳过支付
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/orders/\${order_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 支付结果轮询
+    type: timer
+    config:
+      mode: interval
+      interval: 1000
+      duration: 5000
+
+  - name: 发送支付通知
+    type: http
+    config:
+      method: POST
+      url: "\${base_url}/notify"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"event":"payment_success","order_id":"\${order_id}"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  # ---- CSV 多列参数化演示：使用 products 数据源 ----
+  - name: 商品搜索(CSV参数化)
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/search?q=\${products.product_name}&category=\${products.category}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+    # 节点级 LoopCount：每个迭代使用 CSV 下一行
+    loop_count: 3
+
+  - name: 商品推荐(Async Group)
+    type: group
+    config:
+      node_ids:
+        - 异步商品详情查询
+        - 异步价格计算
+      loop_count: 2
+      async: true
+
+  - name: 异步商品详情查询
+    type: http
+    config:
+      method: GET
+      url: "\${base_url}/products/\${products.product_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 异步价格计算
+    type: http
+    config:
+      method: POST
+      url: "\${base_url}/products/\${products.product_id}/price"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"unit_price":\${products.unit_price},"quantity":2}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  # ---- 业务错误码断言演示：HTTP 始终返回 200，业务错误码在 body 内部 ----
+  # Mock 端点固定返回 {"errorCode":5037,"errorMsg":"business error"}，
+  # expect_body 断言 errorCode=0 失败 → 节点失败（trace/报告节点排名均应计 1 次失败）
+  - name: 业务错误码断言演示
+    type: http
+    block_on_error: true
+    config:
+      method: POST
+      url: "\${base_url}/payment/error"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer \${token}"
+      body: '{"order_id":"\${order_id}"}'
+      timeout: \${timeout_ms}
+      expect_status: 200
+      expect_body:
+        errorCode: 0
+
+teardown:
+  - name: 查询最终订单状态
+    type: teardown
+    config:
+      method: GET
+      url: "\${base_url}/orders/\${order_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+  - name: 清理测试数据
+    type: teardown
+    config:
+      method: DELETE
+      url: "\${base_url}/users/\${user_id}"
+      headers:
+        Authorization: "Bearer \${token}"
+      timeout: \${timeout_ms}
+      expect_status: 200
+
+edges:
+  - from: 注册测试用户
+    to: 用户登录获取Token
+
+  - from: 用户登录获取Token
+    to: 浏览商品列表
+
+  - from: 浏览商品列表
+    to: 查看商品详情
+
+  - from: 查看商品详情
+    to: 用户思考等待
+
+  - from: 用户思考等待
+    to: 订单处理流程(Group)
+
+  - from: 订单处理流程(Group)
+    to: 判断是否支付
+
+  - from: 判断是否支付
+    to: 支付订单
+    condition: "__if_true__"
+
+  - from: 判断是否支付
+    to: 跳过支付
+    condition: "__if_false__"
+
+  - from: 支付订单
+    to: 支付结果轮询
+
+  - from: 支付结果轮询
+    to: 发送支付通知
+
+  - from: 发送支付通知
+    to: 商品搜索(CSV参数化)
+
+  # CSV 参数化链路：商品搜索 → 异步推荐
+  - from: 商品搜索(CSV参数化)
+    to: 商品推荐(Async Group)
+
+  - from: 商品推荐(Async Group)
+    to: 业务错误码断言演示
+
+  - from: 跳过支付
+    to: 业务错误码断言演示
+
+  - from: 业务错误码断言演示
+    to: 查询最终订单状态
+
+  - from: 查询最终订单状态
+    to: 清理测试数据
+`
+
+>>>>>>> dev
 async function fetchScenes() {
   try {
     const resp = await listScenes({ limit: 50 })
@@ -374,11 +829,26 @@ function editScene(s: SceneDTO) {
   router.push(`/scenes/${s.id}`)
 }
 
+<<<<<<< HEAD
+=======
+function viewProgress(s: SceneDTO) {
+  router.push(`/scenes/${s.id}?mode=exec`)
+}
+
+>>>>>>> dev
 function loadExample() {
   importForm.yaml = exampleYAML
   importForm.name = ''
 }
 
+<<<<<<< HEAD
+=======
+function loadExampleV2() {
+  importForm.yaml = exampleYAMLV2
+  importForm.name = ''
+}
+
+>>>>>>> dev
 async function handleImport() {
   importError.value = ''
   if (!importForm.yaml.trim()) {
@@ -416,6 +886,7 @@ function formatTime(t: string) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+<<<<<<< HEAD
 function formatDateTime(timeStr?: string): string {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
@@ -492,11 +963,18 @@ function calculateSceneDuration(scene: any): string {
   } else {
     return `${seconds}秒`
   }
+=======
+function isSceneRunning(scene: any): boolean {
+  return scene.last_run_status === 'running'
+>>>>>>> dev
 }
 
 onMounted(() => {
   fetchScenes()
+<<<<<<< HEAD
   fetchSceneRuns()
+=======
+>>>>>>> dev
 })
 </script>
 
@@ -506,15 +984,22 @@ onMounted(() => {
 .page-header h2 { font-size: 18px; font-weight: 600; }
 .header-actions { display: flex; gap: 8px; }
 
+<<<<<<< HEAD
 .btn-primary {
   padding: 8px 16px; border: none; border-radius: var(--radius-md);
   background: var(--accent-primary); color: #fff; font-size: 13px; cursor: pointer;
 }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+=======
+>>>>>>> dev
 .btn-secondary {
   padding: 8px 16px; border: 1px solid var(--border-primary); border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
 }
+<<<<<<< HEAD
+=======
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+>>>>>>> dev
 .btn-sm {
   padding: 4px 10px;
   border: 1px solid var(--border-primary);
@@ -537,6 +1022,25 @@ onMounted(() => {
   border-color: var(--accent-danger);
 }
 
+<<<<<<< HEAD
+=======
+.btn-sm.progress {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-sm.progress:hover:not(.disabled) {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.btn-sm.progress.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+>>>>>>> dev
 .btn-sm.danger:hover {
   background: var(--accent-danger);
   color: #fff;
@@ -572,8 +1076,14 @@ onMounted(() => {
 .data-table th { color: var(--text-secondary); font-weight: 500; background: var(--bg-tertiary); }
 .data-table td { color: var(--text-primary); }
 .empty { text-align: center; color: var(--text-tertiary); padding: 32px 0; }
+<<<<<<< HEAD
 .mono { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
 .desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
+=======
+.mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.desc-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-secondary); }
+.name-cell { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+>>>>>>> dev
 .link { color: var(--accent-primary); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 .time-cell { font-size: 13px; color: var(--text-primary); white-space: nowrap; }
@@ -591,7 +1101,11 @@ onMounted(() => {
 .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
 .form-group input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 13px; outline: none; }
 .form-group input:focus { border-color: var(--accent-primary); }
+<<<<<<< HEAD
 .yaml-input { width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; outline: none; resize: vertical; line-height: 1.5; }
+=======
+.yaml-input { width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none; resize: vertical; line-height: 1.5; }
+>>>>>>> dev
 .yaml-input:focus { border-color: var(--accent-primary); }
 .import-hint { font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; line-height: 1.5; }
 .form-error { font-size: 12px; color: var(--accent-danger, #e74c3c); background: rgba(248,81,73,0.1); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 8px; }

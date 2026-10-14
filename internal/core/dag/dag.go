@@ -44,6 +44,12 @@ type Input struct {
 	// Response carries the output of the immediate predecessor node
 	// (for parameter correlation).
 	Response any
+<<<<<<< HEAD
+=======
+	// Executor provides access to the DAG executor for cross-node operations
+	// (e.g. writing variables back to the shared scope).
+	Executor *Executor
+>>>>>>> dev
 }
 
 // Output is the result produced by a Node's Execute method.
@@ -52,6 +58,11 @@ type Output struct {
 	Response any
 	// Error is set when the node execution failed.
 	Error error
+<<<<<<< HEAD
+=======
+	// Variables is a map of variable assignments to propagate to subsequent nodes.
+	Variables map[string]any
+>>>>>>> dev
 }
 
 // Node is the core abstraction for a single step in a test scenario.
@@ -71,6 +82,20 @@ type Node interface {
 	// Mode returns whether this node blocks its dependants (sync) or not
 	// (async).
 	Mode() ExecMode
+<<<<<<< HEAD
+=======
+	// BlockOnError returns whether this node should block the entire chain
+	// execution when it fails. If true, the chain will be cancelled on error.
+	// If false (default), errors are logged but execution continues.
+	BlockOnError() bool
+}
+
+// AlwaysRunner is an optional interface for nodes that must execute even
+// when the chain is cancelled or their parent failed. Teardown nodes use it
+// so per-chain cleanup always runs, regardless of upstream hard failures.
+type AlwaysRunner interface {
+	AlwaysRun() bool
+>>>>>>> dev
 }
 
 // Edge represents a directed connection from one node to another.
